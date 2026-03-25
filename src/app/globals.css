@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Yellowtail&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Yellowtail&display=swap');
 
 :root {
   --yellow: #FFEB5A;
@@ -78,7 +78,7 @@ body {
   }
   textarea.input { min-height: 80px; resize: vertical; }
 
-  /* LABELS — Yellowtail */
+  /* LABELS â€” Yellowtail */
   .label {
     font-family: 'Yellowtail', cursive;
     font-size: 15px; font-weight: 400;
