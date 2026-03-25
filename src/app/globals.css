@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Yellowtail&display=swap');
+
+:root {
+  --yellow: #FFEB5A;
+  --pink: #FF82D7;
+  --blue: #005FFF;
+  --green: #009D3A;
+  --noir: #191923;
+  --blanc: #FFFFFF;
+  --gris: #EBEBEB;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--yellow);
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  color: var(--noir);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--noir); border-radius: 2px; }
+
+@layer components {
+  /* CARDS */
+  .card {
+    @apply bg-white rounded-lg border-2 border-noir p-5;
+    box-shadow: 4px 4px 0px #191923;
+  }
+  .card-yellow {
+    background: var(--yellow);
+    @apply rounded-lg border-2 border-noir p-5;
+    box-shadow: 4px 4px 0px #191923;
+  }
+  .card-pink {
+    background: var(--pink);
+    @apply rounded-lg border-2 border-noir p-5;
+    box-shadow: 4px 4px 0px #191923;
+  }
+
+  /* BUTTONS */
+  .btn {
+    @apply inline-flex items-center gap-2 rounded-md border-2 border-noir
+           font-bold uppercase tracking-wider cursor-pointer transition-all;
+    font-family: 'Arial Narrow', Arial, sans-serif;
+    box-shadow: 3px 3px 0px #191923;
+    font-size: 12px; padding: 9px 18px; letter-spacing: 1.5px;
+  }
+  .btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0px #191923; }
+  .btn-primary { background: var(--yellow); color: var(--noir); }
+  .btn-primary:hover { background: #ffe01a; }
+  .btn-pink { background: var(--pink); color: var(--noir); }
+  .btn-secondary { background: var(--blanc); color: var(--noir); }
+  .btn-secondary:hover { background: var(--gris); }
+  .btn-sm { padding: 5px 10px; font-size: 10px; border-radius: 4px; box-shadow: 2px 2px 0px #191923; }
+  .btn-ghost { background: transparent; color: #888; border: 2px solid transparent;
+               box-shadow: none; padding: 4px 8px; font-size: 11px; border-radius: 4px; }
+  .btn-ghost:hover { background: var(--gris); color: var(--noir); border-color: var(--noir); box-shadow: 2px 2px 0px #191923; }
+
+  /* INPUTS */
+  .input {
+    @apply w-full px-3 py-2.5 rounded-md border-2 border-noir bg-white
+           text-sm text-noir outline-none transition-all;
+    font-family: 'Arial Narrow', Arial, sans-serif;
+    box-shadow: 2px 2px 0px #191923;
+  }
+  .input:focus { border-color: var(--pink); box-shadow: 2px 2px 0px #FF82D7; }
+  .select {
+    @apply input appearance-none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23191923' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px;
+  }
+  textarea.input { min-height: 80px; resize: vertical; }
+
+  /* LABELS — Yellowtail */
+  .label {
+    font-family: 'Yellowtail', cursive;
+    font-size: 15px; font-weight: 400;
+    color: var(--noir); letter-spacing: 0;
+  }
+
+  /* BADGES */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded font-bold uppercase;
+    font-family: 'Arial Narrow', Arial, sans-serif;
+    font-size: 10px; letter-spacing: 1px; border: 1.5px solid currentColor;
+  }
+
+  /* PAGE */
+  .page-title {
+    font-family: 'Arial Narrow', Arial, sans-serif;
+    @apply text-5xl font-black uppercase tracking-tight text-noir leading-none;
+  }
+  .page-sub {
+    font-family: 'Yellowtail', cursive;
+    font-size: 17px; color: var(--noir); opacity: 0.5; margin-top: 2px;
+  }
+
+  /* SIDEBAR */
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer
+           font-black uppercase tracking-wider text-noir/40 transition-all border-2 border-transparent;
+    font-size: 12px; letter-spacing: 1px;
+    font-family: 'Arial Narrow', Arial, sans-serif;
+  }
+  .sidebar-item:hover { background: var(--yellow); color: var(--noir); border-color: var(--noir); }
+  .sidebar-item.active { background: var(--pink); color: var(--noir); border-color: var(--noir); }
+
+  /* MODAL */
+  .modal-overlay { @apply fixed inset-0 flex items-center justify-center z-50 p-4; background: rgba(25,25,35,0.6); }
+  .modal { @apply bg-white rounded-lg w-full max-w-lg overflow-y-auto; max-height: 85vh; border: 3px solid #191923; box-shadow: 8px 8px 0px #191923; }
+  .modal-header { @apply px-6 pt-5 pb-4 border-b-2 border-noir; background: var(--pink); }
+  .modal-title { font-family: 'Arial Narrow', Arial, sans-serif; @apply text-xl font-black uppercase tracking-wide text-noir; }
+  .modal-body { @apply px-6 py-4; }
+  .modal-footer { @apply px-6 pb-6 pt-4 flex justify-end gap-3 border-t-2 border-gris; }
+
+  /* TABLE */
+  .table-header { font-family: 'Yellowtail', cursive; font-size: 15px; color: var(--noir); @apply px-4 py-3; }
+  .table-row { @apply border-b-2 border-gris hover:bg-yellow/20 transition-colors; }
+  .table-cell { @apply px-4 py-3 text-sm text-noir; }
+
+  /* KPI */
+  .stat-card { @apply card relative overflow-hidden; }
+  .stat-value { font-family: 'Arial Narrow', Arial, sans-serif; @apply text-5xl font-black text-noir leading-none mt-1; }
+  .stat-label { font-family: 'Yellowtail', cursive; font-size: 16px; color: var(--noir); }
+
+  /* STRIP */
+  .strip { height: 4px; background: var(--noir); border-radius: 2px; margin-bottom: 24px; }
+}
