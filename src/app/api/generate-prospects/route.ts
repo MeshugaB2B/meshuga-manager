@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 
 export async function POST(req: NextRequest) {
   try {
-    const { cat, zone, count = 25 } = await req.json()
+    const { cat, zone, count = 15 } = await req.json()
 
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) return NextResponse.json({ error: 'Clé API manquante' }, { status: 500 })
@@ -69,7 +69,7 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte ni markdown avant ou après 
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
+        max_tokens: 2500,
         messages: [{ role: 'user', content: prompt }],
       }),
     })
