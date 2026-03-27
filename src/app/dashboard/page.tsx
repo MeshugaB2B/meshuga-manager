@@ -493,7 +493,7 @@ export default function App() {
       const res = await fetch('/api/generate-prospects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cat: genCat, zone: genZone, count: 20 }),
+        body: JSON.stringify({ cat: genCat, zone: genZone, count: 50 }),
       })
       const data = await res.json()
       if (data.error) { toast('Erreur : ' + data.error); return }
@@ -750,7 +750,7 @@ export default function App() {
                   </select>
                   <input className="inp" style={{flex:1,minWidth:120,fontSize:11}} value={genZone} onChange={e=>setGenZone(e.target.value)} placeholder="Zone (ex: Paris 8e)" />
                   <button className="btn btn-n btn-sm" disabled={genProspectLoading} onClick={generateProspects}>
-                    {genProspectLoading?'⏳ Génération…':'✨ Générer 20'}
+                    {genProspectLoading?'⏳ Génération…':'✨ Générer 50'}
                   </button>
                 </div>
                 <div style={{fontSize:10,opacity:.4,marginTop:5}}>{chasseTotal} prospects en base · {chasse.filter(p=>p.status==='to_contact').length} affichés à contacter</div>
