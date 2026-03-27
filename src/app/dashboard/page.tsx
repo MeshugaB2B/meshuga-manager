@@ -788,6 +788,8 @@ export default function App() {
                           </div>
                           <div style={{fontWeight:900,fontSize:14}}>{p.name}</div>
                           <div style={{fontSize:11,opacity:.5}}>{p.arr} · {p.taille} emp. · {p.contacts[0]?.name&&p.contacts[0].name!=='—'?p.contacts[0].name:'Contact non renseigné'}</div>
+                    {p.adresse&&p.adresse!==''&&p.adresse!=='—'&&<div style={{fontSize:11,opacity:.4}}>📍 {p.adresse}</div>}
+                    {p.contacts?.[0]?.linkedin&&<a href={p.contacts[0].linkedin} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#005FFF',textDecoration:'none',display:'inline-block',marginTop:2}} onClick={e=>e.stopPropagation()}>🔗 LinkedIn</a>}
                         </div>
                         <div style={{textAlign:'right',flexShrink:0}}>
                           {p.ve>0&&<div style={{fontWeight:900,fontSize:13}}>~{p.ve.toLocaleString()}€</div>}
@@ -815,6 +817,7 @@ export default function App() {
                               <div style={{display:'flex',gap:12,marginTop:3,flexWrap:'wrap',opacity:.7}}>
                                 {c.email&&c.email!=='—'&&<span>✉️ {c.email}</span>}
                                 {c.phone&&c.phone!=='—'&&<span>📞 {c.phone}</span>}
+                                {c.linkedin&&<a href={c.linkedin} target="_blank" rel="noopener noreferrer" style={{color:'#005FFF',textDecoration:'none'}}>🔗 LinkedIn</a>}
                               </div>
                             </div>
                           ))}
@@ -831,6 +834,7 @@ export default function App() {
                           {p.status==='nego'&&<button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={()=>{const ca=parseInt(prompt('CA de la commande (€ HT) ?')||'0');if(ca>0){updateChasseStatus(p.id,'won');toast(`🎉 ${p.name} gagné ! ${ca}€ HT`)}}}>🏆 Marquer Gagné</button>}
                           {!['won','lost'].includes(p.status)&&<button className="btn btn-sm btn-red" onClick={()=>updateChasseStatus(p.id,'lost')}>✗ Perdu</button>}
                           <button className="btn btn-y btn-sm" onClick={()=>open('chasse_edit',{...p})}>✏️ Modifier</button>
+                          <button className="btn btn-sm btn-red" onClick={async()=>{if(confirm('Supprimer ce prospect ?')){const s=sb();await s.from('chasse_prospects').delete().eq('id',p.id);setChasse(prev=>prev.filter(x=>x.id!==p.id));toast('Prospect supprimé')}}}>🗑 Supprimer</button>
                         </div>
                       </div>
                     )}
@@ -1127,6 +1131,7 @@ export default function App() {
                     <input className="inp" placeholder="Rôle / Poste" value={c.role||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],role:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
                     <input className="inp" placeholder="Email" value={c.email||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],email:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
                     <input className="inp" placeholder="Téléphone" value={c.phone||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],phone:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
+                    <input className="inp" placeholder="🔗 LinkedIn (lien profil)" value={c.linkedin||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],linkedin:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px',gridColumn:'1/-1'}} />
                   </div>
                   {i>0&&<button className="btn btn-sm btn-red" onClick={()=>{const cs=(form.contacts||[]).filter((_:any,j:number)=>j!==i);setForm({...form,contacts:cs})}}>✕</button>}
                 </div>
