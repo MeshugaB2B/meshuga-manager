@@ -687,7 +687,7 @@ Signature : Emy | B2B Manager Meshuga | emy@meshuga.fr | 3 rue Vavin, Paris 6e`
 
             <div className="filter-row">
               <span style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.4,marginRight:4}}>Catégorie :</span>
-              <div style={{overflowX:'auto',display:'flex',gap:4',flexWrap:'nowrap',paddingBottom:4}}>
+              <div style={{overflowX:'auto',display:'flex',gap:4,flexWrap:'nowrap',paddingBottom:4}}>
                 {Object.entries(CATS_MAP).map(([k,v]:any) => (
                   <div key={k} className={`tag${chasseCat===k?' on':''}`} onClick={() => setChasseChasse(k)}>{v.emoji} {v.label}</div>
                 ))}
