@@ -642,7 +642,7 @@ Signature : Emy | B2B Manager Meshuga | emy@meshuga.fr | 3 rue Vavin, Paris 6e`
                   <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>
                     {[['Prospects',reports[0].prospects],['RDV',reports[0].rdv],['Cmdes',reports[0].cmds]].map(([l,v]) => (
                       <div key={l as string} style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'6px',textAlign:'center'}}>
-                        <div style={{fontWeight:900,fontSize:18}}>{v}</div>
+                        <div style={{fontWeight:900,fontSize:18}}>{v as string}</div>
                         <div className="yt" style={{fontSize:10,opacity:.5}}>{l}</div>
                       </div>
                     ))}
@@ -881,7 +881,7 @@ Signature : Emy | B2B Manager Meshuga | emy@meshuga.fr | 3 rue Vavin, Paris 6e`
                 <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
                   {[['Prospects',r.prospects],['RDV',r.rdv],['Commandes',r.cmds]].map(([l,v]) => (
                     <div key={l as string} style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}>
-                      <div style={{fontWeight:900,fontSize:20}}>{v}</div>
+                      <div style={{fontWeight:900,fontSize:20}}>{v as string}</div>
                       <div className="yt" style={{fontSize:11,opacity:.5}}>{l}</div>
                     </div>
                   ))}
@@ -1084,7 +1084,7 @@ Signature : Emy | B2B Manager Meshuga | emy@meshuga.fr | 3 rue Vavin, Paris 6e`
               <div className="fg"><label className="lbl">Assignée à</label><select className="inp sel" value={form.assignee||'emy'} onChange={e=>setForm({...form,assignee:e.target.value})}><option value="emy">Emy</option><option value="edward">Edward</option></select></div>
               <div className="fg"><label className="lbl">Deadline</label><input type="date" className="inp" value={form.deadline||''} onChange={e=>setForm({...form,deadline:e.target.value})} /></div>
               <div className="fg"><label className="lbl">Priorité</label><select className="inp sel" value={form.priority||'medium'} onChange={e=>setForm({...form,priority:e.target.value})}><option value="high">Haute</option><option value="medium">Moyenne</option><option value="low">Basse</option></select></div>
-              <div className="fg"><label className="lbl">Statut</label><select className="inp sel" value={form.status||'todo'} onChange={e=>setForm({...form,status:e.target.value})}>{Object.entries(TASK_S).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div>
+              <div className="fg"><label className="lbl">Statut</label><select className="inp sel" value={form.status||'todo'} onChange={e=>setForm({...form,status:e.target.value})}>{Object.entries(TASK_S).map(([k,v])=><option key={k} value={k}>{v as string}</option>)}</select></div>
             </div>
           </div>
           <div className="mf"><button className="btn" onClick={closeModal}>Annuler</button><button className="btn btn-y" onClick={saveTask}>Sauvegarder</button></div>
