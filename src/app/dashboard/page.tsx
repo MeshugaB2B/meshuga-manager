@@ -428,34 +428,20 @@ export default function App() {
     setGenLoading(true)
     setGenEmail('')
     try {
-      const apiKey = process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY
-      if (!apiKey) { setGenEmail('Clé API manquante. Ajouter NEXT_PUBLIC_ANTHROPIC_API_KEY sur Vercel.'); setGenLoading(false); return }
-      const tone = ['avocats','banque','conseil','immo'].includes(prospect.cat||'') ? 'professionnel et sérieux' :
-                   ['startup','tech','coworking'].includes(prospect.cat||'') ? 'décontracté et direct' :
-                   prospect.cat==='luxe' ? 'raffiné et élégant' : 'chaleureux et professionnel'
-      const contactName = prospect.contacts?.[0]?.name || prospect.name
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body: JSON.stringify({
-          model:'claude-sonnet-4-20250514',max_tokens:800,
-          messages:[{role:'user',content:`Tu es Emy, B2B Manager de Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium : pastrami, lobster rolls, sandwichs gastronomiques. Spécialisés en plateaux déjeuner B2B et catering événementiel sur tout Paris.
-
-Écris un email de ${context} pour :
-- Entreprise : ${prospect.name}
-- Contact : ${contactName}
-- Secteur : ${CATS_MAP[prospect.cat]?.label||prospect.cat||prospect.category}
-- Ce qu'on propose : ${prospect.type||prospect.category}
-- Angle : ${prospect.pitch||prospect.notes}
-- Ton : ${tone}
-
-Format : Objet sur la 1ère ligne (préfixé "Objet : "), puis corps de l'email (6-8 lignes max), puis signature.
-Signature : Emy | B2B Manager Meshuga Crazy Deli | emy@meshuga.fr | 06 XX XX XX XX | 3 rue Vavin, Paris 6e`}]
-        })
+      const res = await fetch('/api/generate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospect, context }),
       })
       const data = await res.json()
-      setGenEmail(data.content?.[0]?.text || 'Erreur génération')
-    } catch { setGenEmail('Erreur connexion API. Vérifier la clé NEXT_PUBLIC_ANTHROPIC_API_KEY.') }
+      if (data.error) {
+        setGenEmail('Erreur : ' + data.error)
+      } else {
+        setGenEmail(data.email || 'Erreur génération')
+      }
+    } catch {
+      setGenEmail('Erreur réseau. Vérifier la connexion.')
+    }
     setGenLoading(false)
   }
 
