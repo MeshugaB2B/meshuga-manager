@@ -361,7 +361,14 @@ export default function App() {
   const [contacts, setContacts] = useState(INIT_CONTACTS)
   const [vault, setVault] = useState(INIT_VAULT)
   const [reports, setReports] = useState<any[]>([])
-  const [chasse, setChasse] = useState(BASE_PROSPECTS.map(p=>({...p,expanded:false})))
+  const [chasse, setChasse] = useState<any[]>([])
+  const [chasseLoading, setChasseLoading] = useState(true)
+  const [chasseTotal, setChasseTotal] = useState(0)
+  const [chasseOffset, setChasseOffset] = useState(0)
+  const [genProspectLoading, setGenProspectLoading] = useState(false)
+  const [genCat, setGenCat] = useState('evenementiel')
+  const [genZone, setGenZone] = useState('Paris et IDF')
+  const CHASSE_PAGE = 50
   const [toast2, setToast2] = useState('')
   const [modal, setModal] = useState('')
   const [form, setForm] = useState<any>({})
@@ -410,13 +417,15 @@ export default function App() {
     setChasse(prev=>prev.map(p=>p.id===id?{...p,expanded:!p.expanded}:p))
   }
 
-  function updateChasseStatus(id: string, status: string) {
+  async function updateChasseStatus(id: string, status: string) {
+    const supabase = sb()
+    await supabase.from('chasse_prospects').update({ status }).eq('id', id)
     setChasse(prev=>prev.map(p=>p.id===id?{...p,status}:p))
     if (status==='contacted') {
       setContactedToday(c=>c+1)
       const p = chasse.find(x=>x.id===id)
       if (p) {
-        setCrmProspects(prev=>[...prev, {id:Date.now(),name:p.name,contacts:p.contacts,size:p.taille,category:CATS_MAP[p.cat]?.label||p.cat,status:'contacted',nextAction:'Relancer',nextDate:'',notes:p.pitch,ca:0,score:p.score}])
+        setCrmProspects(prev=>[...prev, {id:Date.now(),name:p.name,contacts:p.contacts||[{name:p.contact_name,email:p.contact_email,phone:p.contact_phone,role:p.contact_role}],size:p.taille,category:CATS_MAP[p.cat]?.label||p.cat,status:'contacted',nextAction:'Relancer',nextDate:'',notes:p.pitch,ca:0,score:p.score}])
         toast(`✓ ${p.name} ajouté au CRM !`)
       }
     } else {
@@ -445,6 +454,55 @@ export default function App() {
     setGenLoading(false)
   }
 
+  // ─── CHARGER PROSPECTS DEPUIS SUPABASE ──────────────────────────
+  async function loadChasse(offset = 0, reset = true) {
+    setChasseLoading(true)
+    const supabase = sb()
+    let query = supabase
+      .from('chasse_prospects')
+      .select('*', { count: 'exact' })
+    if (chasseCat !== 'all') query = query.eq('cat', chasseCat)
+    if (chasseStatus !== 'all') query = query.eq('status', chasseStatus)
+    if (chasseSearch) query = query.or(`name.ilike.%${chasseSearch}%,arr.ilike.%${chasseSearch}%,adresse.ilike.%${chasseSearch}%`)
+    if (chasseSort === 'score') query = query.order('score', { ascending: false })
+    else if (chasseSort === 'valeur') query = query.order('ve', { ascending: false })
+    else query = query.order('name', { ascending: true })
+    query = query.range(offset, offset + CHASSE_PAGE - 1)
+    const { data, count, error } = await query
+    if (!error && data) {
+      const fmt = data.map((p: any) => ({
+        ...p,
+        contacts: [{ name: p.contact_name||'—', email: p.contact_email||'—', phone: p.contact_phone||'—', role: p.contact_role||'—' }],
+        expanded: false,
+      }))
+      if (reset) setChasse(fmt)
+      else setChasse(prev => [...prev, ...fmt])
+      setChasseTotal(count || 0)
+      setChasseOffset(offset)
+    }
+    setChasseLoading(false)
+  }
+
+  // Charger au mount et quand les filtres changent
+  useEffect(() => { loadChasse(0, true) }, [chasseCat, chasseStatus, chasseSearch, chasseSort])
+
+  // ─── GÉNÉRER PROSPECTS VIA IA ─────────────────────────────────
+  async function generateProspects() {
+    setGenProspectLoading(true)
+    try {
+      const res = await fetch('/api/generate-prospects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cat: genCat, zone: genZone, count: 20 }),
+      })
+      const data = await res.json()
+      if (data.error) { toast('Erreur : ' + data.error); return }
+      toast(`✨ ${data.inserted} nouveaux prospects ajoutés !`)
+      loadChasse(0, true)
+    } catch { toast('Erreur réseau') }
+    setGenProspectLoading(false)
+  }
+
   function saveTask() {
     if (!form.title) { toast('Titre requis !'); return }
     const t = {...form, checklist: form.checklist||[], files: form.files||[]}
@@ -461,15 +519,24 @@ export default function App() {
     close(); toast('Prospect sauvegardé ✓')
   }
 
-  function saveChasseProspect() {
+  async function saveChasseProspect() {
     if (!form.name) { toast('Nom requis !'); return }
-    const existing = chasse.find(p=>p.id===form.id)
-    if (existing) {
-      setChasse(prev=>prev.map(p=>p.id===form.id?{...p,...form,contacts:form.contacts||p.contacts}:p))
-    } else {
-      setChasse(prev=>[{...form,id:`m-${Date.now()}`,status:'to_contact',expanded:false,contacts:form.contacts||[{name:'',email:'',phone:'',role:''}]}, ...prev])
+    const supabase = sb()
+    const data = {
+      cat: form.cat||'evenementiel', name: form.name,
+      contact_name: form.contacts?.[0]?.name||'', contact_email: form.contacts?.[0]?.email||'',
+      contact_phone: form.contacts?.[0]?.phone||'', contact_role: form.contacts?.[0]?.role||'',
+      site: form.site||'', taille: form.taille||'10-50', arr: form.arr||'Paris',
+      adresse: form.adresse||'',
+      ve: parseInt(form.ve)||0, vm: parseInt(form.vm)||0,
+      type: form.type||'', pitch: form.pitch||'', score: parseInt(form.score)||5,
     }
-    close(); toast('Prospect mis à jour ✓')
+    if (form.id && !String(form.id).startsWith('new')) {
+      await supabase.from('chasse_prospects').update(data).eq('id', form.id)
+    } else {
+      await supabase.from('chasse_prospects').insert({...data, id:`m_${Date.now()}`, status:'to_contact'})
+    }
+    close(); toast('Prospect sauvegardé ✓'); loadChasse(0, true)
   }
 
   function saveContact() {
@@ -674,7 +741,28 @@ export default function App() {
                 ))}
               </div>
 
-              <div style={{fontSize:11,opacity:.5,marginBottom:10,fontWeight:900}}>{chasseFiltered.length} prospects affichés</div>
+              {/* BOUTON GÉNÉRER IA */}
+              <div className="card-y" style={{marginBottom:10,padding:'10px 12px'}}>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                  <span className="yt" style={{fontSize:14}}>✨ Générer via IA</span>
+                  <select className="inp sel" style={{flex:1,minWidth:120,fontSize:11}} value={genCat} onChange={e=>setGenCat(e.target.value)}>
+                    {Object.entries(CATS_MAP).filter(([k])=>k!=='all').map(([k,v]:any)=><option key={k} value={k}>{v.emoji} {v.label}</option>)}
+                  </select>
+                  <input className="inp" style={{flex:1,minWidth:120,fontSize:11}} value={genZone} onChange={e=>setGenZone(e.target.value)} placeholder="Zone (ex: Paris 8e)" />
+                  <button className="btn btn-n btn-sm" disabled={genProspectLoading} onClick={generateProspects}>
+                    {genProspectLoading?'⏳ Génération…':'✨ Générer 20'}
+                  </button>
+                </div>
+                <div style={{fontSize:10,opacity:.4,marginTop:5}}>{chasseTotal} prospects en base · {chasse.filter(p=>p.status==='to_contact').length} affichés à contacter</div>
+              </div>
+
+              {/* LISTE */}
+              {chasseLoading && chasse.length===0 && (
+                <div style={{textAlign:'center',padding:40}}>
+                  <div style={{fontSize:32,marginBottom:8}}>⏳</div>
+                  <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',opacity:.5}}>Chargement des prospects…</div>
+                </div>
+              )}
 
               {chasseFiltered.map(p=>{
                 const statusInfo = NEXT_ACTION_BY_STATUS[p.status]
@@ -749,6 +837,14 @@ export default function App() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {page==='chasse' && !chasseLoading && chasse.length < chasseTotal && (
+            <div style={{textAlign:'center',padding:16}}>
+              <button className="btn btn-y" onClick={()=>loadChasse(chasseOffset+CHASSE_PAGE, false)}>
+                Charger plus ({chasse.length} / {chasseTotal})
+              </button>
             </div>
           )}
 
@@ -1014,6 +1110,7 @@ export default function App() {
               <div className="fg"><label className="lbl">Valeur event €</label><input type="number" className="inp" value={form.ve||''} onChange={e=>setForm({...form,ve:parseInt(e.target.value)||0})} /></div>
               <div className="fg"><label className="lbl">Valeur mensuelle €</label><input type="number" className="inp" value={form.vm||''} onChange={e=>setForm({...form,vm:parseInt(e.target.value)||0})} /></div>
               <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Type de commande</label><input className="inp" value={form.type||''} onChange={e=>setForm({...form,type:e.target.value})} /></div>
+              <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">📍 Adresse</label><input className="inp" value={form.adresse||''} onChange={e=>setForm({...form,adresse:e.target.value})} placeholder="123 rue de la Paix, 75001 Paris" /></div>
               <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">💡 Angle d'approche</label><textarea className="inp" value={form.pitch||''} onChange={e=>setForm({...form,pitch:e.target.value})} /></div>
             </div>
 
