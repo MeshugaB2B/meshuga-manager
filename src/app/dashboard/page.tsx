@@ -165,7 +165,7 @@ const ALL_PROSPECTS = [
 ]
 
 export default function DashboardPage() {
-  const [profile, setProfile] = useState(null)
+  const [profile, setProfile] = useState<any>(null)
   const [page, setPage] = useState('dash')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [tasks, setTasks] = useState(INIT_TASKS)
