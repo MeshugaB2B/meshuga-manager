@@ -539,7 +539,7 @@ export default function DashboardPage() {
                   <div style={{background:'#FFEB5A',border:'2px solid #191923',borderRadius:5,padding:10}}>
                     <div className="yt" style={{fontSize:12,opacity:.5,marginBottom:4}}>{reports[0].week}</div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>
-                      {[['Prospects',reports[0].prospects],['RDV',reports[0].rdv],['Cmdes',reports[0].cmds]].map(([l,v]) => (
+                      {[['Prospects',reports[0].prospects],['RDV',reports[0].rdv],['Cmdes',reports[0].cmds]].map(([l,v]: any) => (
                         <div key={l} style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'6px',textAlign:'center'}}>
                           <div style={{fontWeight:900,fontSize:18}}>{v}</div>
                           <div className="yt" style={{fontSize:10,opacity:.5}}>{l}</div>
@@ -576,12 +576,12 @@ export default function DashboardPage() {
                 </select>
                 <select className="inp sel" style={{width:130}} value={chasseStatus} onChange={e => setChasseStatus2(e.target.value)}>
                   <option value="all">Tous statuts</option>
-                  {Object.entries(STATUS_P).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+                  {(Object.entries(STATUS_P) as any[]).map(([k,v]) => <option key={k} value={k}>{String(v)}</option>)}
                 </select>
               </div>
 
               <div className="filter-row">
-                {Object.entries(CATS_MAP).map(([k,v]) => (
+                {(Object.entries(CATS_MAP) as any[]).map(([k,v]: any) => (
                   <div key={k} className={"tag"+(chasseCat===k?' on':'')} onClick={() => setChasseChasse(k)}>{v.emoji} {v.label}</div>
                 ))}
               </div>
@@ -636,7 +636,7 @@ export default function DashboardPage() {
                 <button className="btn btn-y btn-sm" onClick={() => openModal('prospect', {status:'to_contact',ca:0,files:[]})}>+ Nouveau</button>
               </div>
               <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
-                {Object.entries(STATUS_P).map(([k,v]) => (
+                {(Object.entries(STATUS_P) as any[]).map(([k,v]: any) => (
                   <div key={k} style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:'8px 12px',textAlign:'center',boxShadow:'2px 2px 0 #191923',flex:'1 1 80px'}}>
                     <div style={{fontWeight:900,fontSize:22}}>{prospects.filter(p=>p.status===k).length}</div>
                     <div className="yt" style={{fontSize:11,opacity:.6}}>{v}</div>
@@ -750,7 +750,7 @@ export default function DashboardPage() {
                 <div className="card-y" style={{marginBottom:12}}>
                   <div className="ct">\ud83d\udcdd Formulaire CR d'Emy</div>
                   <div style={{fontSize:12,opacity:.7,marginBottom:8}}>Voici ce qu'Emy remplit chaque semaine :</div>
-                  {[['Semaine du','ex: 25 mars 2026'],['Prospects contact\u00e9s','nombre'],['RDV effectu\u00e9s','nombre'],['Commandes obtenues','nombre'],['Victoires','ce qu\'elle a accompli'],['Challenges','blocages rencontr\u00e9s'],['Priorit\u00e9s S+1','ses 3 priorit\u00e9s'],['Note pour Edward','message libre']].map(([l,p]) => (
+                  {[['Semaine du','ex: 25 mars 2026'],['Prospects contact\u00e9s','nombre'],['RDV effectu\u00e9s','nombre'],['Commandes obtenues','nombre'],['Victoires','ce qu\'elle a accompli'],['Challenges','blocages rencontr\u00e9s'],['Priorit\u00e9s S+1','ses 3 priorit\u00e9s'],['Note pour Edward','message libre']].map(([l,p]: any) => (
                     <div key={l} style={{display:'flex',gap:8,alignItems:'center',padding:'4px 0',borderBottom:'1px solid rgba(25,25,35,.08)'}}>
                       <div style={{fontSize:11,fontWeight:900,width:180,flexShrink:0}}>{l}</div>
                       <div style={{fontSize:11,opacity:.5,fontStyle:'italic'}}>{p}</div>
@@ -765,7 +765,7 @@ export default function DashboardPage() {
                     <span className="badge" style={{color:r.status==='submitted'?'#005FFF':'#009D3A',borderColor:r.status==='submitted'?'#005FFF':'#009D3A'}}>{r.status==='submitted'?'Soumis':'Lu \u2713'}</span>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
-                    {[['Prospects',r.prospects],['RDV',r.rdv],['Commandes',r.cmds]].map(([l,v]) => (
+                    {[['Prospects',r.prospects],['RDV',r.rdv],['Commandes',r.cmds]].map(([l,v]: any) => (
                       <div key={l} style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}>
                         <div style={{fontWeight:900,fontSize:20}}>{v}</div>
                         <div className="yt" style={{fontSize:11,opacity:.5}}>{l}</div>
@@ -853,7 +853,7 @@ export default function DashboardPage() {
               </div>
 
               <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
-                {[['all','Tout'],['email_copie','\u2709\ufe0f Emails'],['prospect_contacte','\ud83d\udcde Contacts']].map(([k,l]) => (
+                {[['all','Tout'],['email_copie','\u2709\ufe0f Emails'],['prospect_contacte','\ud83d\udcde Contacts']].map(([k,l]: any) => (
                   <div key={k} className={"tag"+(journalFilter===k?' on':'')} onClick={() => setJournalFilter(k)}>{l}</div>
                 ))}
               </div>
@@ -936,7 +936,7 @@ export default function DashboardPage() {
                 <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Entreprise *</label><input className="inp" value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} /></div>
                 <div className="fg"><label className="lbl">Cat\u00e9gorie</label>
                   <select className="inp sel" value={form.cat||'evenementiel'} onChange={e=>setForm({...form,cat:e.target.value})}>
-                    {Object.entries(CATS_MAP).filter(([k])=>k!=='all').map(([k,v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
+                    {(Object.entries(CATS_MAP) as any[]).filter(([k])=>k!=='all').map(([k,v]) => <option key={k} value={k}>{v.emoji} {v.label}</option>)}
                   </select>
                 </div>
                 <div className="fg"><label className="lbl">Score /10</label><input type="number" min="1" max="10" className="inp" value={form.score||5} onChange={e=>setForm({...form,score:parseInt(e.target.value)||5})} /></div>
@@ -981,7 +981,7 @@ export default function DashboardPage() {
                 <div className="fg"><label className="lbl">T\u00e9l\u00e9phone</label><input className="inp" value={form.phone||''} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
                 <div className="fg"><label className="lbl">Taille</label><select className="inp sel" value={form.size||''} onChange={e=>setForm({...form,size:e.target.value})}><option value="">\u2014</option><option>1-10</option><option>10-50</option><option>50-200</option><option>200+</option><option>1000+</option></select></div>
                 <div className="fg"><label className="lbl">Cat\u00e9gorie</label><select className="inp sel" value={form.category||''} onChange={e=>setForm({...form,category:e.target.value})}><option value="">\u2014</option><option>\u00c9v\u00e9nementiel</option><option>Corporate</option><option>Startup</option><option>Avocats</option><option>Conseil</option><option>H\u00f4tellerie</option><option>Tech</option><option>Institution</option><option>Autre</option></select></div>
-                <div className="fg"><label className="lbl">Statut</label><select className="inp sel" value={form.status||'to_contact'} onChange={e=>setForm({...form,status:e.target.value})}>{Object.entries(STATUS_P).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div>
+                <div className="fg"><label className="lbl">Statut</label><select className="inp sel" value={form.status||'to_contact'} onChange={e=>setForm({...form,status:e.target.value})}>{(Object.entries(STATUS_P) as any[]).map(([=><option key={k} value={k}>{v}</option>)}</select></div>
                 <div className="fg"><label className="lbl">CA gagn\u00e9 \u20ac</label><input type="number" className="inp" value={form.ca||0} onChange={e=>setForm({...form,ca:parseInt(e.target.value)||0})} /></div>
                 <div className="fg" style={{gridColumn:'1/-1'}}>
                   <label className="lbl">\ud83d\udcc5 Prochaine relance</label>
@@ -1024,7 +1024,7 @@ export default function DashboardPage() {
                 <div className="fg"><label className="lbl">Assign\u00e9e \u00e0</label><select className="inp sel" value={form.assignee||'emy'} onChange={e=>setForm({...form,assignee:e.target.value})}><option value="emy">Emy</option><option value="edward">Edward</option></select></div>
                 <div className="fg"><label className="lbl">Deadline</label><input type="date" className="inp" value={form.deadline||''} onChange={e=>setForm({...form,deadline:e.target.value})} /></div>
                 <div className="fg"><label className="lbl">Priorit\u00e9</label><select className="inp sel" value={form.priority||'medium'} onChange={e=>setForm({...form,priority:e.target.value})}><option value="high">\ud83d\udd34 Haute</option><option value="medium">\ud83d\udfe1 Moyenne</option><option value="low">\ud83d\udfe2 Basse</option></select></div>
-                <div className="fg"><label className="lbl">Statut</label><select className="inp sel" value={form.status||'todo'} onChange={e=>setForm({...form,status:e.target.value})}>{Object.entries(TASK_S).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div>
+                <div className="fg"><label className="lbl">Statut</label><select className="inp sel" value={form.status||'todo'} onChange={e=>setForm({...form,status:e.target.value})}>{(Object.entries(TASK_S) as any[]).map(([=><option key={k} value={k}>{v}</option>)}</select></div>
               </div>
               <div className="fg"><label className="lbl">Description</label><textarea className="inp" style={{minHeight:60}} value={form.description||''} onChange={e=>setForm({...form,description:e.target.value})} /></div>
               <div>
@@ -1057,7 +1057,7 @@ export default function DashboardPage() {
             <div className="mh"><div className="mt">{form.id ? 'Modifier' : 'Nouveau contact'}</div></div>
             <div className="mb">
               <div className="fg2">
-                <div className="fg"><label className="lbl">Cat\u00e9gorie</label><select className="inp sel" value={form.cat||'food'} onChange={e=>setForm({...form,cat:e.target.value})}>{Object.entries(CAT_ANN).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div>
+                <div className="fg"><label className="lbl">Cat\u00e9gorie</label><select className="inp sel" value={form.cat||'food'} onChange={e=>setForm({...form,cat:e.target.value})}>{(Object.entries(CAT_ANN) as any[]).map(([=><option key={k} value={k}>{v}</option>)}</select></div>
                 <div className="fg" style={{display:'flex',alignItems:'center',gap:8,paddingTop:22}}><input type="checkbox" checked={!!form.vip} onChange={e=>setForm({...form,vip:e.target.checked})} style={{width:16,height:16}} /><span style={{fontSize:12}}>VIP \u2b50</span></div>
                 <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Nom *</label><input className="inp" value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} /></div>
                 <div className="fg"><label className="lbl">Contact</label><input className="inp" value={form.contact||''} onChange={e=>setForm({...form,contact:e.target.value})} /></div>
@@ -1105,7 +1105,7 @@ export default function DashboardPage() {
             <div className="mb">
               <div className="fg"><label className="lbl">Semaine du *</label><input className="inp" value={form.week||''} onChange={e=>setForm({...form,week:e.target.value})} placeholder="ex: 25 mars 2026" /></div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
-                {[['prospects','Prospects'],['rdv','RDV'],['cmds','Commandes']].map(([k,l]) => (
+                {[['prospects','Prospects'],['rdv','RDV'],['cmds','Commandes']].map(([k,l]: any) => (
                   <div key={k} className="fg"><label className="lbl">{l}</label><input type="number" className="inp" value={form[k]||0} onChange={e=>setForm({...form,[k]:parseInt(e.target.value)||0})} /></div>
                 ))}
               </div>
