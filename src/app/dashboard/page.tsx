@@ -542,10 +542,10 @@ export default function App() {
       email_content: emailContent || null,
     }
     await supabase.from('activity_log').insert(entry)
-    setActivityLog((prev: any[]) => [{ ...entry, id: Date.now(), created_at: new Date().toISOString() }, ...prev.slice(0, 49)])
+    setActivityLog(prev => [{ ...entry, id: Date.now(), created_at: new Date().toISOString() }, ...(prev as any[]).slice(0, 49)])
   }
 
-    function saveTask() {
+  function saveTask() {
     if (!form.title) { toast('Titre requis !'); return }
     const t = {...form, checklist: form.checklist||[], files: form.files||[]}
     if (form.id) setTasks(prev=>prev.map(x=>x.id===form.id?t:x))
@@ -1268,6 +1268,76 @@ export default function App() {
       </div>
     )}
 
+
+    {/* GÉNÉRATION EMAIL IA */}
+    {modal==='gen_email'&&(
+      <div className="overlay" onClick={close}>
+        <div className="modal modal-lg" onClick={e=>e.stopPropagation()}>
+          <div className="mh"><div className="mt">✉️ Email IA — {form.name}</div></div>
+          <div className="mb">
+            {genLoading?(<div style={{textAlign:'center',padding:30}}><div style={{fontSize:32,marginBottom:10}}>✨</div><div style={{fontWeight:900,fontSize:13,textTransform:'uppercase'}}>Génération en cours…</div></div>):
+            genEmail?(<>
+              <div className="lbl">Email généré — modifie avant de copier</div>
+              <textarea className="inp" style={{minHeight:260,fontFamily:'Arial,sans-serif',fontSize:13,lineHeight:1.6}} value={genEmail} onChange={e=>setGenEmail(e.target.value)} />
+              <div style={{background:'#FFEB5A',border:'2px solid #191923',borderRadius:5,padding:10,fontSize:12,marginTop:8}}>
+                💡 Copie et envoie depuis ton client email depuis {profile?.role==='emy'?'emy@meshuga.fr':'edward@meshuga.fr'}
+              </div>
+            </>):null}
+          </div>
+          <div className="mf">
+            <button className="btn" onClick={close}>Fermer</button>
+            {genEmail&&<>
+              <button className="btn btn-y" onClick={()=>{navigator.clipboard.writeText(genEmail);toast('Email copié ! 📋');logActivity('email_copie',`Email copié pour ${form.name}`,form.name,genEmail)}}>📋 Copier</button>
+              <button className="btn btn-p" onClick={()=>generateEmail(form,form.emailContext||'prise de contact')}>🔄 Regénérer</button>
+            </>}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ÉDITION PROSPECT CHASSE */}
+    {modal==='chasse_edit'&&(
+      <div className="overlay" onClick={close}>
+        <div className="modal modal-xl" onClick={e=>e.stopPropagation()}>
+          <div className="mh"><div className="mt">{form.id?'Modifier le prospect':'Ajouter un prospect'}</div></div>
+          <div className="mb">
+            <div className="fg2">
+              <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Entreprise *</label><input className="inp" value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} /></div>
+              <div className="fg"><label className="lbl">Catégorie</label><select className="inp sel" value={form.cat||'evenementiel'} onChange={e=>setForm({...form,cat:e.target.value})}>{Object.entries(CATS_MAP).filter(([k])=>k!=='all').map(([k,v]:any)=><option key={k} value={k}>{v.emoji} {v.label}</option>)}</select></div>
+              <div className="fg"><label className="lbl">Score /10</label><input type="number" min="1" max="10" className="inp" value={form.score||5} onChange={e=>setForm({...form,score:parseInt(e.target.value)||5})} /></div>
+              <div className="fg"><label className="lbl">Site web</label><input className="inp" value={form.site||''} onChange={e=>setForm({...form,site:e.target.value})} placeholder="exemple.fr" /></div>
+              <div className="fg"><label className="lbl">Taille</label><select className="inp sel" value={form.taille||'10-50'} onChange={e=>setForm({...form,taille:e.target.value})}>{['1-10','5-20','10-30','10-50','50-100','100+','200+','500+','1000+'].map(t=><option key={t}>{t}</option>)}</select></div>
+              <div className="fg"><label className="lbl">Arrondissement</label><input className="inp" value={form.arr||''} onChange={e=>setForm({...form,arr:e.target.value})} placeholder="Paris 6e" /></div>
+              <div className="fg"><label className="lbl">📍 Adresse</label><input className="inp" value={form.adresse||''} onChange={e=>setForm({...form,adresse:e.target.value})} placeholder="123 rue de la Paix, 75001 Paris" /></div>
+              <div className="fg"><label className="lbl">Valeur event €</label><input type="number" className="inp" value={form.ve||''} onChange={e=>setForm({...form,ve:parseInt(e.target.value)||0})} /></div>
+              <div className="fg"><label className="lbl">Valeur mensuelle €</label><input type="number" className="inp" value={form.vm||''} onChange={e=>setForm({...form,vm:parseInt(e.target.value)||0})} /></div>
+              <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Type de commande</label><input className="inp" value={form.type||''} onChange={e=>setForm({...form,type:e.target.value})} /></div>
+              <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">💡 Angle d'approche</label><textarea className="inp" value={form.pitch||''} onChange={e=>setForm({...form,pitch:e.target.value})} /></div>
+            </div>
+            <div style={{marginTop:10}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                <div className="lbl" style={{margin:0}}>👤 Contacts ({(form.contacts||[]).length})</div>
+                <button className="btn btn-y btn-sm" onClick={()=>setForm({...form,contacts:[...(form.contacts||[]),{name:'',email:'',phone:'',role:'',linkedin:''}]})}>+ Ajouter contact</button>
+              </div>
+              {(form.contacts||[]).map((c: any, i: number)=>(
+                <div key={i} className="contact-item">
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,flex:1}}>
+                    <input className="inp" placeholder="Nom *" value={c.name||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],name:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
+                    <input className="inp" placeholder="Rôle / Poste" value={c.role||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],role:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
+                    <input className="inp" placeholder="Email" value={c.email||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],email:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
+                    <input className="inp" placeholder="Téléphone" value={c.phone||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],phone:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
+                    <input className="inp" placeholder="🔗 LinkedIn URL" value={c.linkedin||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],linkedin:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px',gridColumn:'1/-1'}} />
+                  </div>
+                  {i>0&&<button className="btn btn-sm btn-red" onClick={()=>{const cs=(form.contacts||[]).filter((_:any,j:number)=>j!==i);setForm({...form,contacts:cs})}}>✕</button>}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mf"><button className="btn" onClick={close}>Annuler</button><button className="btn btn-y" onClick={saveChasseProspect}>Sauvegarder</button></div>
+        </div>
+      </div>
+    )}
+
     {/* ÉDITION PROSPECT CRM */}
     {modal==='crm_prospect'&&(
       <div className="overlay" onClick={close}>
@@ -1404,7 +1474,7 @@ export default function App() {
     {modal==='vault_edit'&&(
       <div className="overlay" onClick={close}>
         <div className="modal" onClick={e=>e.stopPropagation()}>
-          <div className="mh"><div className="mt">{form.id?'Modifier l\'accès':'Nouvel accès'} 🔐</div></div>
+          <div className="mh"><div className="mt">{form.id?"Modifier l'accès":"Nouvel accès"} 🔐</div></div>
           <div className="mb">
             <div className="fg2">
               <div className="fg"><label className="lbl">Nom *</label><input className="inp" value={form.title||''} onChange={e=>setForm({...form,title:e.target.value})} /></div>
