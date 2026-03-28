@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
 const sb = () => createBrowserClient(
@@ -625,8 +625,8 @@ export default function App() {
   )
 
   return (
-    <><style>{G}</style>
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
+      <style>{G}</style>
       {/* MOBILE TOPBAR */}
       <div className="topbar">
         <button className="hamburger" onClick={()=>setSidebarOpen(!sidebarOpen)}>☰</button>
@@ -1524,6 +1524,6 @@ export default function App() {
 
     {/* TOAST */}
     <div className={`toast${toast2?' show':''}`}>{toast2}</div>
-    </>
+    </div>
   )
 }
