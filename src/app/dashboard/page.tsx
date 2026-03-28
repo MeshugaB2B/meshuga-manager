@@ -440,7 +440,7 @@ export default function App() {
       const res = await fetch('/api/generate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prospect, context }),
+        body: JSON.stringify({ prospect, context, senderRole: profile?.role || 'edward' }),
       })
       const data = await res.json()
       if (data.error) {
