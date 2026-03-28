@@ -175,7 +175,7 @@ export default function DashboardPage() {
     }
     loadLog()
     sb().from('activity_log').insert({user_role:profile.role,user_name:profile.full_name||profile.role,type:'session_start',description:'Connexion',prospect_name:null,email_content:null}).then(()=>{})
-  }, [profile?.role])
+  }, [profile])
 
   const toast = (msg) => { setToastMsg(msg); setTimeout(()=>setToastMsg(''),2800) }
   const openModal = (id, data) => { setForm(data||{}); setModal(id) }
