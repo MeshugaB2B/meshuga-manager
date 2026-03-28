@@ -227,13 +227,14 @@ export default function DashboardPage() {
     closeModal(); toast('CR soumis à Edward 📧')
   }
 
+  const pendingCRs = reports.filter(r=>r.status==='submitted'&&!r.feedback).length
   const NAV = [
     {id:'dash',label:'Dashboard',icon:'⚡'},
     {id:'chasse',label:'Tableau de chasse',icon:'🎯',badge:contactedToday>0?contactedToday+'/5':undefined},
     {id:'crm',label:'CRM Prospects',icon:'◎'},
     {id:'annuaire',label:'Annuaire',icon:'📒'},
     {id:'tasks',label:'Tâches',icon:'✓'},
-    {id:'reporting',label:'Reporting',icon:'📋',badge:!isEmy&&reports.filter(r=>r.status==='submitted'&&!r.feedback).length>0?reports.filter(r=>r.status==='submitted'&&!r.feedback).length:undefined},
+    {id:'reporting',label:'Reporting',icon:'📋',badge:(!isEmy&&pendingCRs>0)?pendingCRs:undefined},
     {id:'vault',label:'Coffre-fort',icon:'🔐'},
     {id:'gmb',label:'Google My Biz.',icon:'⭐'},
     {id:'journal',label:'Journal Emy',icon:'📓'},
