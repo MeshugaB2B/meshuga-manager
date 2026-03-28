@@ -360,8 +360,8 @@ export default function DashboardPage() {
   const [crmProspects, setCrmProspects] = useState(INIT_PROSPECTS_CRM)
   const [contacts, setContacts] = useState(INIT_CONTACTS)
   const [vault, setVault] = useState(INIT_VAULT)
-  const [reports, setReports] = useState([])
-  const [chasse, setChasse] = useState([])
+  const [reports, setReports] = useState<any[]>([])
+  const [chasse, setChasse] = useState<any[]>([])
   const [chasseLoading, setChasseLoading] = useState(true)
   const [chasseTotal, setChasseTotal] = useState(0)
   const [chasseOffset, setChasseOffset] = useState(0)
@@ -370,7 +370,7 @@ export default function DashboardPage() {
   const [planningWeek, setPlanningWeek] = useState(0)
   const [genCat, setGenCat] = useState('evenementiel')
   const [genZone, setGenZone] = useState('Paris et IDF')
-  const [activityLog, setActivityLog] = useState([])
+  const [activityLog, setActivityLog] = useState<any[]>([])
   const CHASSE_PAGE = 50
   const [toast2, setToast2] = useState('')
   const [modal, setModal] = useState('')
@@ -413,11 +413,11 @@ export default function DashboardPage() {
   const totalCa = crmProspects.filter(p=>p.status==='won').reduce((s,p)=>s+p.ca,0)
   const emyCommission = totalCa * 0.10
 
-  let chasseFiltered = chasse
-  if (chasseCat !== 'all') chasseFiltered = chasseFiltered.filter(p=>p.cat===chasseCat)
-  if (chasseSearch) chasseFiltered = chasseFiltered.filter(p=>p.name.toLowerCase().includes(chasseSearch.toLowerCase()) || p.arr.toLowerCase().includes(chasseSearch.toLowerCase()) || (p.contacts[0]?.name||'').toLowerCase().includes(chasseSearch.toLowerCase()))
-  if (chasseStatus !== 'all') chasseFiltered = chasseFiltered.filter(p=>p.status===chasseStatus)
-  chasseFiltered = [...chasseFiltered].sort((a,b)=>{
+  let chasseFiltered: any[] = [...chasse]
+  if (chasseCat !== 'all') chasseFiltered = chasseFiltered.filter((p:any)=>p.cat===chasseCat)
+  if (chasseSearch) chasseFiltered = chasseFiltered.filter((p:any)=>p.name.toLowerCase().includes(chasseSearch.toLowerCase()) || p.arr.toLowerCase().includes(chasseSearch.toLowerCase()) || (p.contacts[0]?.name||'').toLowerCase().includes(chasseSearch.toLowerCase()))
+  if (chasseStatus !== 'all') chasseFiltered = chasseFiltered.filter((p:any)=>p.status===chasseStatus)
+  chasseFiltered = [...chasseFiltered].sort((a:any,b:any)=>{
     if (chasseSort==='score') return b.score-a.score
     if (chasseSort==='valeur') return (b.ve+b.vm*12)-(a.ve+a.vm*12)
     if (chasseSort==='name') return a.name.localeCompare(b.name)
