@@ -530,7 +530,7 @@ export default function DashboardPage() {
 
 
   // ─── LOG ACTIVITY ──────────────────────────────────────────────────────────
-  async function logActivity(type, description, prospectName, emailContent) {
+  async function logActivity(type: string, description: string, prospectName?: string, emailContent?: string) {
     const supabase = sb()
     const entry = {
       user_role: profile?.role || 'unknown',
