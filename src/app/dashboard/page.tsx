@@ -374,7 +374,7 @@ export default function DashboardPage() {
   const CHASSE_PAGE = 50
   const [toast2, setToast2] = useState('')
   const [modal, setModal] = useState('')
-  const [form, setForm] = useState({})
+  const [form, setForm] = useState<any>({})
   const [pwVisible, setPwVisible] = useState({})
   const [contactedToday, setContactedToday] = useState(0)
   const [chasseCat, setChasseCat] = useState('all')
