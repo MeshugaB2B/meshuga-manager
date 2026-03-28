@@ -1238,43 +1238,8 @@ export default function App() {
             </div>
           )}
 
- /></div>
-              <div className="fg"><label className="lbl">Catégorie</label><select className="inp sel" value={form.cat||'evenementiel'} onChange={e=>setForm({...form,cat:e.target.value})}>{Object.entries(CATS_MAP).filter(([k])=>k!=='all').map(([k,v]:any)=><option key={k} value={k}>{v.emoji} {v.label}</option>)}</select></div>
-              <div className="fg"><label className="lbl">Score /10</label><input type="number" min="1" max="10" className="inp" value={form.score||5} onChange={e=>setForm({...form,score:parseInt(e.target.value)||5})} /></div>
-              <div className="fg"><label className="lbl">Site web</label><input className="inp" value={form.site||''} onChange={e=>setForm({...form,site:e.target.value})} placeholder="exemple.fr" /></div>
-              <div className="fg"><label className="lbl">Taille</label><select className="inp sel" value={form.taille||'10-50'} onChange={e=>setForm({...form,taille:e.target.value})}>{['1-10','5-20','10-30','10-50','50-100','100+','200+','500+','1000+'].map(t=><option key={t}>{t}</option>)}</select></div>
-              <div className="fg"><label className="lbl">Arrondissement</label><input className="inp" value={form.arr||''} onChange={e=>setForm({...form,arr:e.target.value})} placeholder="Paris 6e" /></div>
-              <div className="fg"><label className="lbl">Valeur event €</label><input type="number" className="inp" value={form.ve||''} onChange={e=>setForm({...form,ve:parseInt(e.target.value)||0})} /></div>
-              <div className="fg"><label className="lbl">Valeur mensuelle €</label><input type="number" className="inp" value={form.vm||''} onChange={e=>setForm({...form,vm:parseInt(e.target.value)||0})} /></div>
-              <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Type de commande</label><input className="inp" value={form.type||''} onChange={e=>setForm({...form,type:e.target.value})} /></div>
-              <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">📍 Adresse</label><input className="inp" value={form.adresse||''} onChange={e=>setForm({...form,adresse:e.target.value})} placeholder="123 rue de la Paix, 75001 Paris" /></div>
-              <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">💡 Angle d’approche</label><textarea className="inp" value={form.pitch||''} onChange={e=>setForm({...form,pitch:e.target.value})} /></div>
-            </div>
 
-            {/* Contacts multiples */}
-            <div style={{marginTop:10}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                <div className="lbl" style={{margin:0}}>👤 Contacts ({(form.contacts||[]).length})</div>
-                <button className="btn btn-y btn-sm" onClick={()=>setForm({...form,contacts:[...(form.contacts||[]),{name:'',email:'',phone:'',role:''}]})}>+ Ajouter contact</button>
-              </div>
-              {(form.contacts||[]).map((c, i)=>(
-                <div key={i} className="contact-item">
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,flex:1}}>
-                    <input className="inp" placeholder="Nom *" value={c.name||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],name:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
-                    <input className="inp" placeholder="Rôle / Poste" value={c.role||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],role:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
-                    <input className="inp" placeholder="Email" value={c.email||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],email:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
-                    <input className="inp" placeholder="Téléphone" value={c.phone||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],phone:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
-                    <input className="inp" placeholder="🔗 LinkedIn (lien profil)" value={c.linkedin||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],linkedin:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px',gridColumn:'1/-1'}} />
-                  </div>
-                  {i>0&&<button className="btn btn-sm btn-red" onClick={()=>{const cs=(form.contacts||[]).filter((_,j)=>j!==i);setForm({...form,contacts:cs})}}>✕</button>}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="mf"><button className="btn" onClick={close}>Annuler</button><button className="btn btn-y" onClick={saveChasseProspect}>Sauvegarder</button></div>
-        </div>
-      </div>
-    )}
+
 
 
     {/* GÉNÉRATION EMAIL IA */}
