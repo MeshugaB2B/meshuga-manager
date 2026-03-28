@@ -80,6 +80,27 @@ const INIT_PROSPECTS = [{id:1,name:'Agence Wagram Events',email:'contact@wagram.
 const INIT_CONTACTS = [{id:1,cat:'food',name:'Maison V\u00e9rot',contact:'\u2014',phone:'01 45 44 01 66',email:'contact@maisonverot.fr',notes:'Livraison lun-ven',vip:false},{id:2,cat:'banque',name:'BNP Paribas Vavin',contact:'Marie Dupont',phone:'01 56 xx xx xx',email:'m.dupont@bnp.fr',notes:'Gestionnaire pro',vip:false}]
 const INIT_VAULT = [{id:1,title:'Supabase',url:'https://supabase.com',user:'edward@meshuga.fr',pw:''},{id:2,title:'Vercel',url:'https://vercel.com',user:'edward@meshuga.fr',pw:''}]
 
+const ALL_PROSPECTS = [
+  {id:'ev01',cat:'evenementiel',name:'Moon Event',contact:'Direction commerciale',phone:'01 40 00 00 00',email:'contact@moon-event.fr',site:'moon-event.fr',linkedin:'',taille:'10-50',arrondissement:'Paris 9e',valeur_event:3000,valeur_mois:0,type:'Catering \u00e9v\u00e9nements corporate',pitch:'R\u00e9f\u00e9rence nationale \u00e9v\u00e9nementiel. +200 events/an.',status:'to_contact',score:10,contacted:false},
+  {id:'ev02',cat:'evenementiel',name:'Hopscotch Groupe',contact:'Direction commerciale',phone:'01 58 65 00 72',email:'hopscotch@hopscotch.fr',site:'hopscotch.fr',linkedin:'',taille:'200+',arrondissement:'Paris 11e',valeur_event:5000,valeur_mois:0,type:'Catering congr\u00e8s',pitch:'Groupe \u00e9v\u00e9nementiel r\u00e9f\u00e9rence. Congr\u00e8s nationaux.',status:'to_contact',score:10,contacted:false},
+  {id:'ev03',cat:'evenementiel',name:'GL Events Paris',contact:'Direction traiteur',phone:'01 46 08 19 19',email:'paris@gl-events.com',site:'gl-events.com',linkedin:'',taille:'500+',arrondissement:'Paris 15e',valeur_event:8000,valeur_mois:0,type:'Sous-traitance traiteur',pitch:'G\u00e9ant mondial \u00e9v\u00e9nementiel. Parcs des expos Paris.',status:'to_contact',score:10,contacted:false},
+  {id:'av01',cat:'avocats',name:'Gide Loyrette Nouel',contact:'Office Manager',phone:'01 40 75 60 00',email:'paris@gide.com',site:'gide.com',linkedin:'',taille:'500+',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:1200,type:'Plateaux d\u00e9jeuner hebdo',pitch:'Top 5 cabinets France. D\u00e9jeuners de travail quotidiens.',status:'to_contact',score:10,contacted:false},
+  {id:'av02',cat:'avocats',name:'Jones Day Paris',contact:'Facilities',phone:'01 56 59 39 39',email:'paris@jonesday.com',site:'jonesday.com',linkedin:'',taille:'150+',arrondissement:'Paris 8e',valeur_event:1800,valeur_mois:750,type:'Plateaux d\u00e9jeuner',pitch:'Cabinet US. Culture am\u00e9ricaine = sandwichs au bureau.',status:'to_contact',score:9,contacted:false},
+  {id:'av03',cat:'avocats',name:'Freshfields Paris',contact:'Facilities Manager',phone:'01 44 56 44 56',email:'paris@freshfields.com',site:'freshfields.com',linkedin:'',taille:'200+',arrondissement:'Paris 8e',valeur_event:2500,valeur_mois:1000,type:'Plateaux d\u00e9jeuner',pitch:'Cabinet magic circle londonien. D\u00e9jeuner au bureau tr\u00e8s fort.',status:'to_contact',score:10,contacted:false},
+  {id:'st01',cat:'startup',name:'Doctolib',contact:'Office Manager',phone:'',email:'office@doctolib.fr',site:'doctolib.fr',linkedin:'',taille:'500+',arrondissement:'Paris 10e',valeur_event:3000,valeur_mois:2000,type:'Plateaux d\u00e9jeuner hebdo',pitch:'Scale-up embl\u00e9matique. Culture d\u00e9jeuner ensemble forte.',status:'to_contact',score:10,contacted:false},
+  {id:'st02',cat:'startup',name:'Alan',contact:'Office Manager',phone:'',email:'hello@alan.com',site:'alan.com',linkedin:'',taille:'300+',arrondissement:'Paris 9e',valeur_event:2000,valeur_mois:1200,type:'Plateaux d\u00e9jeuner',pitch:'Licorne sant\u00e9. Fort focus bien-\u00eatre employ\u00e9s.',status:'to_contact',score:9,contacted:false},
+  {id:'st03',cat:'startup',name:'Payfit',contact:'Workplace Manager',phone:'',email:'contact@payfit.com',site:'payfit.com',linkedin:'',taille:'500+',arrondissement:'Paris 9e',valeur_event:2500,valeur_mois:1500,type:'Plateaux d\u00e9jeuner',pitch:'Scale-up RH en forte croissance.',status:'to_contact',score:9,contacted:false},
+  {id:'co01',cat:'conseil',name:'McKinsey Paris',contact:'Office Manager',phone:'01 40 69 16 00',email:'paris@mckinsey.com',site:'mckinsey.com',linkedin:'',taille:'500+',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:1500,type:'Plateaux d\u00e9jeuner',pitch:'Top cabinet conseil mondial. D\u00e9jeuners de travail quotidiens.',status:'to_contact',score:10,contacted:false},
+  {id:'co02',cat:'conseil',name:'BCG Paris',contact:'Facilities',phone:'01 40 74 45 00',email:'paris@bcg.com',site:'bcg.com',linkedin:'',taille:'500+',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:1500,type:'Plateaux d\u00e9jeuner',pitch:'Top 3 cabinet conseil.',status:'to_contact',score:10,contacted:false},
+  {id:'ht01',cat:'hotel',name:'H\u00f4tel Lutetia',contact:'Directeur F&B',phone:'01 45 44 38 10',email:'lutetia@hotellutetia.com',site:'hotellutetia.com',linkedin:'',taille:'200+',arrondissement:'Paris 6e',valeur_event:3000,valeur_mois:0,type:'Catering events VIP',pitch:'Palace 5 \u00e9toiles dans TON arrondissement!',status:'to_contact',score:10,contacted:false},
+  {id:'in01',cat:'institution',name:'Mairie Paris 6e',contact:'Protocole',phone:'01 40 46 40 46',email:'mairie06@paris.fr',site:'mairie06.paris.fr',linkedin:'',taille:'100+',arrondissement:'Paris 6e',valeur_event:1000,valeur_mois:300,type:'Catering c\u00e9r\u00e9monies',pitch:'Ta mairie! C\u00e9r\u00e9monies officielles, v\u0153ux.',status:'to_contact',score:10,contacted:false},
+  {id:'in02',cat:'institution',name:'Sciences Po Paris',contact:'Direction \u00e9v\u00e9nements',phone:'01 45 49 50 50',email:'events@sciencespo.fr',site:'sciencespo.fr',linkedin:'',taille:'1000+',arrondissement:'Paris 7e',valeur_event:3000,valeur_mois:0,type:'Catering conf\u00e9rences',pitch:'2 minutes de Meshuga! Conf\u00e9rences permanentes.',status:'to_contact',score:10,contacted:false},
+  {id:'tc01',cat:'tech',name:'Google France',contact:'Workplace Manager',phone:'01 42 68 53 00',email:'paris@google.com',site:'google.fr',linkedin:'',taille:'500+',arrondissement:'Paris 9e',valeur_event:3000,valeur_mois:2000,type:'Catering + plateaux',pitch:'Culture food am\u00e9ricaine tr\u00e8s forte.',status:'to_contact',score:9,contacted:false},
+  {id:'lx01',cat:'luxe',name:'Yves Saint Laurent',contact:'Events',phone:'01 42 36 22 22',email:'events@ysl.com',site:'ysl.com',linkedin:'',taille:'500+',arrondissement:'Paris 6e',valeur_event:4000,valeur_mois:0,type:'Catering events mode',pitch:'Dans TON arrondissement! Events mode r\u00e9guliers.',status:'to_contact',score:9,contacted:false},
+  {id:'cw01',cat:'coworking',name:'Station F',contact:'Community Manager',phone:'',email:'business@stationf.co',site:'stationf.co',linkedin:'',taille:'1000+',arrondissement:'Paris 13e',valeur_event:2000,valeur_mois:1500,type:'Catering events',pitch:'Plus grand startup campus monde.',status:'to_contact',score:10,contacted:false},
+  {id:'bk01',cat:'banque',name:'Rothschild & Co',contact:'Office Manager',phone:'01 40 74 40 74',email:'paris@rothschild.com',site:'rothschild.com',linkedin:'',taille:'200+',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:1200,type:'Plateaux d\u00e9jeuner',pitch:'Banque prestige. R\u00e9unions M&A permanentes.',status:'to_contact',score:10,contacted:false},
+]
+
 export default function DashboardPage() {
   const [profile, setProfile] = useState(null)
   const [page, setPage] = useState('dash')
@@ -100,13 +121,13 @@ export default function DashboardPage() {
   const [chasseCat, setChasseChasse] = useState('all')
   const [chasseSearch, setChasseSearch] = useState('')
   const [chasseSort, setChasseSort] = useState('score')
-  const [chasseTaille, setChasseTable] = useState('all')
   const [chasseStatus, setChasseStatus2] = useState('all')
-  const [chasse, setChasse] = useState([])
+  const [chasse, setChasse] = useState(ALL_PROSPECTS.map(function(p) { return Object.assign({}, p) }))
   const [generatingEmail, setGeneratingEmail] = useState(false)
   const [generatedEmail, setGeneratedEmail] = useState('')
+  const [emailProspect, setEmailProspect] = useState(null)
 
-  useEffect(() => {
+  useEffect(function() {
     async function load() {
       const res = await sb().auth.getUser()
       const user = res.data.user
@@ -123,7 +144,7 @@ export default function DashboardPage() {
     load()
   }, [])
 
-  useEffect(() => {
+  useEffect(function() {
     if (!profile) return
     sb().from('activity_log').select('*').order('created_at', {ascending: false}).limit(200).then(function(r) {
       if (r.data) setActivityLog(r.data)
@@ -138,11 +159,40 @@ export default function DashboardPage() {
 
   const today = new Date().toISOString().split('T')[0]
   const isEmy = profile && profile.role === 'emy'
+  const senderSig = isEmy ? 'Emy | B2B Manager | emy@meshuga.fr | +33 6 24 67 78 66' : 'Edward | Big Boss | edward@meshuga.fr | +33 6 58 58 58 01'
 
   function logActivity(type, description, prospectName, emailContent) {
     const entry = {user_role: (profile && profile.role) || 'unknown', user_name: (profile && profile.full_name) || '?', type: type, description: description, prospect_name: prospectName || null, email_content: emailContent || null}
     sb().from('activity_log').insert(entry)
-    setActivityLog(function(prev) { return [{id: Date.now(), created_at: new Date().toISOString(), ...entry}].concat(prev.slice(0, 199)) })
+    setActivityLog(function(prev) { return [{id: Date.now(), created_at: new Date().toISOString(), user_role: entry.user_role, user_name: entry.user_name, type: type, description: description, prospect_name: prospectName || null, email_content: emailContent || null}].concat(prev.slice(0, 199)) })
+  }
+
+  function contactProspect(id) {
+    const p = chasse.filter(function(x) { return x.id === id })[0]
+    setChasse(function(prev) { return prev.map(function(x) { return x.id === id ? Object.assign({}, x, {status: 'contacted', contacted: true}) : x }) })
+    setContactedToday(function(c) { return c + 1 })
+    if (p) {
+      setProspects(function(prev) { return prev.concat([{id: Date.now(), name: p.name, email: p.email, phone: p.phone, size: p.taille, category: CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat, status: 'contacted', nextAction: 'Relancer', nextDate: '', notes: p.pitch, ca: 0, score: p.score, files: []}]) })
+      logActivity('prospect_contacte', p.name + ' contact\u00e9 et ajout\u00e9 au CRM', p.name, null)
+    }
+    toast('\u2713 Prospect contact\u00e9!')
+  }
+
+  async function generateEmail(p) {
+    setEmailProspect(p)
+    setGeneratingEmail(true)
+    setGeneratedEmail('')
+    openModal('email', p)
+    const senderName = isEmy ? 'Emy, B2B Manager' : 'Edward, patron'
+    const prompt = 'Tu es ' + senderName + ' pour Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium : pastrami, lobster rolls, sandwichs gastronomiques. Sp\u00e9cialis\u00e9s dans les plateaux d\u00e9jeuner B2B et le catering \u00e9v\u00e9nementiel sur tout Paris.\n\n\u00c9cris un email de prise de contact pour ce prospect :\n- Entreprise : ' + p.name + '\n- Secteur : ' + (CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat) + '\n- Localisation : ' + p.arrondissement + '\n- Taille : ' + p.taille + ' employ\u00e9s\n- Ce qu\'on peut proposer : ' + p.type + '\n- Angle : ' + p.pitch + '\n\nSois concis (6-8 lignes), personnalis\u00e9. Commence par "Objet : " sur la 1\u00e8re ligne.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{role: 'user', content: prompt}]})})
+      const data = await res.json()
+      setGeneratedEmail(data.content && data.content[0] ? data.content[0].text : 'Erreur lors de la g\u00e9n\u00e9ration')
+    } catch(e) {
+      setGeneratedEmail('Erreur de connexion.')
+    }
+    setGeneratingEmail(false)
   }
 
   function saveTask() {
@@ -181,6 +231,15 @@ export default function DashboardPage() {
     setReports(function(prev) { return [cr].concat(prev) })
     closeModal()
   }
+
+  var chasseFiltered = chasse.filter(function(p) { return chasseCat === 'all' || p.cat === chasseCat })
+  if (chasseSearch) { chasseFiltered = chasseFiltered.filter(function(p) { return p.name.toLowerCase().indexOf(chasseSearch.toLowerCase()) >= 0 || (p.arrondissement && p.arrondissement.toLowerCase().indexOf(chasseSearch.toLowerCase()) >= 0) }) }
+  if (chasseStatus !== 'all') { chasseFiltered = chasseFiltered.filter(function(p) { return p.status === chasseStatus }) }
+  chasseFiltered = chasseFiltered.slice().sort(function(a, b) {
+    if (chasseSort === 'score') return b.score - a.score
+    if (chasseSort === 'valeur') return (b.valeur_event + b.valeur_mois*12) - (a.valeur_event + a.valeur_mois*12)
+    return a.name.localeCompare(b.name)
+  })
 
   const NAV = [
     {id: 'dash', label: 'Dashboard', icon: '\u26a1'},
@@ -251,15 +310,19 @@ export default function DashboardPage() {
                 </div>
                 {isEmy && <button className="btn btn-n btn-sm" onClick={function() { openModal('cr', {}) }}>+ Nouveau CR</button>}
               </div>
-
               <div className="g4">
-                <div className="kc" style={{background:'#FFEB5A'}} onClick={function() { nav('crm') }}>
+                <div className="kc" style={{background:'#FFEB5A'}} onClick={function() { nav('chasse') }}>
+                  <div className="kl">A contacter</div>
+                  <div className="kv">{chasse.filter(function(p) { return p.status === 'to_contact' }).length}</div>
+                  <div className="ki">\ud83c\udfaf</div>
+                </div>
+                <div className="kc" style={{background:'#FF82D7'}} onClick={function() { nav('crm') }}>
                   <div className="kl">Pipeline B2B</div>
-                  <div className="kv">{prospects.filter(function(p) { return !['won','lost'].includes(p.status) }).length}</div>
+                  <div className="kv">{prospects.filter(function(p) { return p.status !== 'won' && p.status !== 'lost' }).length}</div>
                   <div className="ki">\u25ce</div>
                 </div>
-                <div className="kc" style={{background:'#FF82D7'}} onClick={function() { nav('tasks') }}>
-                  <div className="kl">T\u00e2ches actives</div>
+                <div className="kc" style={{background:'#FFFFFF'}} onClick={function() { nav('tasks') }}>
+                  <div className="kl">Taches actives</div>
                   <div className="kv">{tasks.filter(function(t) { return t.status !== 'done' }).length}</div>
                   <div className="ki">\u2713</div>
                 </div>
@@ -268,21 +331,15 @@ export default function DashboardPage() {
                   <div className="kv">{reports.length}</div>
                   <div className="ki">\ud83d\udccb</div>
                 </div>
-                <div className="kc" style={{background:'#FFFFFF'}} onClick={function() { nav('annuaire') }}>
-                  <div className="kl">Contacts</div>
-                  <div className="kv">{contacts.length}</div>
-                  <div className="ki">\ud83d\udcd2</div>
-                </div>
               </div>
-
               <div className="g2">
                 <div className="card">
-                  <div className="ct">{isEmy ? 'Mes t\u00e2ches' : 'T\u00e2ches \u00e9quipe'}</div>
+                  <div className="ct">{isEmy ? 'Mes taches' : 'Taches equipe'}</div>
                   {tasks.filter(function(t) { return t.status !== 'done' }).slice(0,4).map(function(t) {
                     return (
                       <div key={t.id} className="row" style={{gridTemplateColumns:'4px 1fr auto',gap:10}}>
                         <div className="pbar" style={{background:t.priority==='high'?'#FF82D7':'#005FFF'}} />
-                        <div><div style={{fontSize:12,fontWeight:900}}>{t.title}</div><div style={{fontSize:10,opacity:.5}}>{t.deadline} \u00b7 {t.assignee}</div></div>
+                        <div><div style={{fontSize:12,fontWeight:900}}>{t.title}</div><div style={{fontSize:10,opacity:.5}}>{t.deadline}</div></div>
                         <span className="badge" style={{color:'#888',borderColor:'#ccc'}}>{TASK_S[t.status]}</span>
                       </div>
                     )
@@ -291,7 +348,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="card">
                   <div className="ct">{isEmy ? 'Mon pipeline' : 'Prospects chauds'}</div>
-                  {prospects.filter(function(p) { return !['won','lost'].includes(p.status) }).slice(0,4).map(function(p) {
+                  {prospects.filter(function(p) { return p.status !== 'won' && p.status !== 'lost' }).slice(0,4).map(function(p) {
                     return (
                       <div key={p.id} className="row" style={{gridTemplateColumns:'1fr auto',gap:8}}>
                         <div><div style={{fontSize:12,fontWeight:900}}>{p.name}</div><div style={{fontSize:10,opacity:.5}}>{p.nextAction}</div></div>
@@ -302,7 +359,6 @@ export default function DashboardPage() {
                   <button className="btn btn-y btn-sm" style={{marginTop:10}} onClick={function() { nav('crm') }}>Voir le CRM \u2192</button>
                 </div>
               </div>
-
               <div className="card" style={{padding:0,overflow:'hidden'}}>
                 <div style={{background:'#191923',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                   <div className="yt" style={{color:'#FFEB5A',fontSize:16}}>\ud83d\udcc5 Planning {isEmy ? 'de ma semaine' : "d'Emy"}</div>
@@ -337,54 +393,89 @@ export default function DashboardPage() {
                   })}
                 </div>
               </div>
+              {!isEmy && reports.length > 0 && (
+                <div className="card">
+                  <div className="ct">\ud83d\udccb Dernier CR d'Emy</div>
+                  <div style={{fontWeight:900,fontSize:16}}>{reports[0].week}</div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:8}}>
+                    <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{reports[0].prospects}</div><div className="yt" style={{fontSize:11,opacity:.5}}>Prospects</div></div>
+                    <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{reports[0].rdv}</div><div className="yt" style={{fontSize:11,opacity:.5}}>RDV</div></div>
+                    <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{reports[0].cmds}</div><div className="yt" style={{fontSize:11,opacity:.5}}>Commandes</div></div>
+                  </div>
+                  <button className="btn btn-y btn-sm" style={{marginTop:8}} onClick={function() { nav('reporting') }}>Voir et repondre \u2192</button>
+                </div>
+              )}
             </div>
           )}
 
-          {page === 'tasks' && (
+          {page === 'chasse' && (
             <div>
               <div className="ph">
-                <div><div className="pt">T\u00e2ches</div><div className="ps">{tasks.filter(function(t) { return t.status!=='done' }).length} actives</div></div>
-                <button className="btn btn-y btn-sm" onClick={function() { openModal('task', {assignee:'emy',priority:'medium',status:'todo',checklist:[],files:[]}) }}>+ Nouvelle</button>
+                <div>
+                  <div className="pt">Tableau de Chasse \ud83c\udfaf</div>
+                  <div className="ps">{chasse.filter(function(p) { return p.status === 'to_contact' }).length} a contacter \u00b7 {chasse.length} total</div>
+                </div>
+                <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+                  {isEmy && <span style={{fontWeight:900,fontSize:11}}>{contactedToday}/5 auj.</span>}
+                </div>
               </div>
-              {tasks.map(function(t) {
+              <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+                <input className="inp" style={{flex:1,minWidth:140}} value={chasseSearch} onChange={function(e) { setChasseSearch(e.target.value) }} placeholder="Rechercher..." />
+                <select className="inp" style={{width:130}} value={chasseSort} onChange={function(e) { setChasseSort(e.target.value) }}>
+                  <option value="score">Score</option>
+                  <option value="valeur">Valeur</option>
+                  <option value="name">A-Z</option>
+                </select>
+                <select className="inp" style={{width:130}} value={chasseStatus} onChange={function(e) { setChasseStatus2(e.target.value) }}>
+                  <option value="all">Tous statuts</option>
+                  <option value="to_contact">A contacter</option>
+                  <option value="contacted">Contacte</option>
+                  <option value="nego">Nego</option>
+                  <option value="won">Gagne</option>
+                  <option value="lost">Perdu</option>
+                </select>
+              </div>
+              <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:10}}>
+                {Object.keys(CATS_MAP).map(function(k) {
+                  return (
+                    <div key={k} className={chasseCat === k ? 'tag on' : 'tag'} onClick={function() { setChasseChasse(k) }}>
+                      {CATS_MAP[k].emoji} {CATS_MAP[k].label}
+                    </div>
+                  )
+                })}
+              </div>
+              {chasseFiltered.map(function(p) {
                 return (
-                  <div key={t.id} className="card" style={{padding:0,overflow:'hidden',marginBottom:8}}>
-                    <div style={{display:'flex',alignItems:'stretch'}}>
-                      <div style={{width:6,background:t.priority==='high'?'#FF82D7':t.priority==='medium'?'#005FFF':'#009D3A',flexShrink:0}} />
-                      <div style={{padding:'12px 14px',flex:1}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
-                          <div style={{flex:1}}>
-                            <div style={{fontSize:13,fontWeight:900}}>{t.title}</div>
-                            <div style={{fontSize:10,opacity:.5,marginTop:2}}>{t.deadline} \u00b7 {t.assignee}</div>
-                          </div>
-                          <div style={{display:'flex',gap:4}}>
-                            <span className="badge" style={{color:t.status==='done'?'#009D3A':'#888',borderColor:t.status==='done'?'#009D3A':'#ccc'}}>{TASK_S[t.status]}</span>
-                            <button className="btn btn-y btn-sm" onClick={function() {
-                              const o = ['todo','in_progress','done']
-                              setTasks(function(prev) { return prev.map(function(x) { return x.id !== t.id ? x : Object.assign({}, x, {status: o[Math.min(o.indexOf(x.status)+1,2)]}) }) })
-                            }}>\u2192</button>
-                            <button className="btn btn-sm" onClick={function() { openModal('task', Object.assign({}, t)) }}>\u270f\ufe0f</button>
-                            <button className="btn btn-sm btn-red" onClick={function() { setTasks(function(prev) { return prev.filter(function(x) { return x.id !== t.id }) }) }}>\u2715</button>
-                          </div>
+                  <div key={p.id} className="chasse-card">
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8,gap:10}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:4}}>
+                          <span style={{fontSize:9,fontWeight:900,textTransform:'uppercase',padding:'2px 6px',border:'1.5px solid #191923',borderRadius:3,background:'#FFEB5A'}}>{CATS_MAP[p.cat] ? CATS_MAP[p.cat].emoji+' '+CATS_MAP[p.cat].label : p.cat}</span>
+                          <span style={{fontSize:9,fontWeight:900,background:p.score>=9?'#191923':'#EBEBEB',color:p.score>=9?'#FFEB5A':'#191923',border:'1.5px solid #191923',borderRadius:3,padding:'2px 6px'}}>{p.score}/10</span>
+                          {p.status !== 'to_contact' && <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>}
                         </div>
-                        {t.checklist && t.checklist.filter(function(c) { return c }).length > 0 && (
-                          <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #EBEBEB'}}>
-                            {t.checklist.filter(function(c) { return c }).map(function(item, ci) {
-                              return (
-                                <div key={ci} style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
-                                  <input type="checkbox" checked={item.startsWith('\u2713 ')} style={{width:13,height:13,cursor:'pointer'}}
-                                    onChange={function(e) {
-                                      const nl = t.checklist.slice()
-                                      nl[ci] = e.target.checked ? '\u2713 '+item.replace('\u2713 ','') : item.replace('\u2713 ','')
-                                      setTasks(function(prev) { return prev.map(function(x) { return x.id===t.id ? Object.assign({},x,{checklist:nl}) : x }) })
-                                    }} />
-                                  <span style={{fontSize:11,textDecoration:item.startsWith('\u2713 ')?'line-through':'none',opacity:item.startsWith('\u2713 ')?.4:1}}>{item.replace('\u2713 ','')}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
+                        <div style={{fontWeight:900,fontSize:15}}>{p.name}</div>
+                        <div style={{fontSize:11,opacity:.5}}>{p.arrondissement} \u00b7 {p.taille} emp.</div>
                       </div>
+                      <div style={{textAlign:'right',flexShrink:0}}>
+                        {p.valeur_event > 0 && <div style={{fontWeight:900,fontSize:13}}>~{p.valeur_event.toLocaleString()}\u20ac/event</div>}
+                        {p.valeur_mois > 0 && <div style={{fontWeight:900,fontSize:13}}>~{p.valeur_mois.toLocaleString()}\u20ac/mois</div>}
+                      </div>
+                    </div>
+                    <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:5,padding:'8px 10px',marginBottom:8,fontSize:12}}>
+                      \ud83d\udca1 {p.pitch}
+                    </div>
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:11,marginBottom:8,opacity:.7}}>
+                      {p.email && <span>\u2709\ufe0f {p.email}</span>}
+                      {p.phone && <span>\ud83d\udcde {p.phone}</span>}
+                      {p.site && <a href={'https://'+p.site} target="_blank" rel="noopener noreferrer" style={{color:'#005FFF',textDecoration:'none'}}>\ud83c\udf10 {p.site}</a>}
+                      {p.linkedin && <a href={p.linkedin.indexOf('http') === 0 ? p.linkedin : 'https://'+p.linkedin} target="_blank" rel="noopener noreferrer" style={{color:'#0077B5',fontWeight:900,textDecoration:'none'}}>\ud83d\udd17 LinkedIn</a>}
+                    </div>
+                    <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                      <button className="btn btn-p btn-sm" onClick={function() { generateEmail(p) }}>\u2709\ufe0f Email IA</button>
+                      {p.status === 'to_contact' && <button className="btn btn-g btn-sm" onClick={function() { contactProspect(p.id) }}>\u2713 Contacte</button>}
+                      {p.status === 'contacted' && <button className="btn btn-b btn-sm" onClick={function() { setChasse(function(prev) { return prev.map(function(x) { return x.id===p.id ? Object.assign({},x,{status:'nego'}) : x }) }); toast('Passe en nego') }}>\u2192 Nego</button>}
+                      {p.status === 'nego' && <button className="btn btn-g btn-sm" onClick={function() { setChasse(function(prev) { return prev.map(function(x) { return x.id===p.id ? Object.assign({},x,{status:'won'}) : x }) }); toast('\ud83c\udf89 Gagne!') }}>\u2713 Gagne</button>}
                     </div>
                   </div>
                 )
@@ -408,7 +499,7 @@ export default function DashboardPage() {
                       </div>
                       <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>
                     </div>
-                    {p.nextDate && <div style={{fontSize:11,opacity:.6}}>{p.nextAction}</div>}
+                    {p.nextDate && <div style={{fontSize:11,opacity:.6,color:p.nextDate<=today?'#CC0066':'inherit'}}>{p.nextDate<=today?'\u26a0\ufe0f ':''}{p.nextAction}</div>}
                     {p.files && p.files.filter(function(f) { return f && f.trim() }).length > 0 && (
                       <div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:6}}>
                         {p.files.filter(function(f) { return f && f.trim() }).map(function(f, i) {
@@ -416,6 +507,9 @@ export default function DashboardPage() {
                         })}
                       </div>
                     )}
+                    <div style={{marginTop:6}}>
+                      <button className="btn btn-p btn-sm" onClick={function(e) { e.stopPropagation(); generateEmail(Object.assign({}, p, {cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category})) }}>\u2709\ufe0f Email IA</button>
+                    </div>
                   </div>
                 )
               })}
@@ -433,13 +527,67 @@ export default function DashboardPage() {
                   return (
                     <div key={c.id} className="card" style={{cursor:'pointer'}} onClick={function() { openModal('contact', Object.assign({}, c)) }}>
                       <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',padding:'2px 6px',border:'1.5px solid #191923',borderRadius:3,display:'inline-block',marginBottom:7,background:'#FFEB5A'}}>{CAT_ANN[c.cat]||c.cat}</div>
+                      {c.vip && <span style={{float:'right',fontSize:10}}>\u2b50 VIP</span>}
                       <div style={{fontWeight:900,fontSize:14}}>{c.name}</div>
                       {c.phone && c.phone !== '\u2014' && <div style={{fontSize:11,marginTop:4}}>\ud83d\udcde {c.phone}</div>}
                       {c.email && <div style={{fontSize:11,marginTop:2}}>\u2709\ufe0f {c.email}</div>}
+                      {c.notes && <div style={{fontSize:10,opacity:.4,marginTop:6,textTransform:'uppercase'}}>{c.notes}</div>}
                     </div>
                   )
                 })}
               </div>
+            </div>
+          )}
+
+          {page === 'tasks' && (
+            <div>
+              <div className="ph">
+                <div><div className="pt">Taches</div><div className="ps">{tasks.filter(function(t) { return t.status!=='done' }).length} actives</div></div>
+                <button className="btn btn-y btn-sm" onClick={function() { openModal('task', {assignee:'emy',priority:'medium',status:'todo',checklist:[],files:[]}) }}>+ Nouvelle</button>
+              </div>
+              {tasks.map(function(t) {
+                return (
+                  <div key={t.id} className="card" style={{padding:0,overflow:'hidden',marginBottom:8}}>
+                    <div style={{display:'flex',alignItems:'stretch'}}>
+                      <div style={{width:6,background:t.priority==='high'?'#FF82D7':t.priority==='medium'?'#005FFF':'#009D3A',flexShrink:0}} />
+                      <div style={{padding:'12px 14px',flex:1}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:13,fontWeight:900}}>{t.title}</div>
+                            <div style={{fontSize:10,opacity:.5,marginTop:2}}>{t.deadline} \u00b7 {t.assignee}</div>
+                          </div>
+                          <div style={{display:'flex',gap:4}}>
+                            <span className="badge" style={{color:t.status==='done'?'#009D3A':'#888',borderColor:t.status==='done'?'#009D3A':'#ccc'}}>{TASK_S[t.status]}</span>
+                            <button className="btn btn-y btn-sm" onClick={function() {
+                              var o = ['todo','in_progress','done']
+                              setTasks(function(prev) { return prev.map(function(x) { return x.id !== t.id ? x : Object.assign({}, x, {status: o[Math.min(o.indexOf(x.status)+1,2)]}) }) })
+                            }}>\u2192</button>
+                            <button className="btn btn-sm" onClick={function() { openModal('task', Object.assign({}, t)) }}>\u270f\ufe0f</button>
+                            <button className="btn btn-sm btn-red" onClick={function() { setTasks(function(prev) { return prev.filter(function(x) { return x.id !== t.id }) }) }}>\u2715</button>
+                          </div>
+                        </div>
+                        {t.checklist && t.checklist.filter(function(c) { return c }).length > 0 && (
+                          <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #EBEBEB'}}>
+                            {t.checklist.filter(function(c) { return c }).map(function(item, ci) {
+                              return (
+                                <div key={ci} style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
+                                  <input type="checkbox" checked={item.indexOf('\u2713 ') === 0} style={{width:13,height:13,cursor:'pointer'}}
+                                    onChange={function(e) {
+                                      var nl = t.checklist.slice()
+                                      nl[ci] = e.target.checked ? '\u2713 '+item.replace('\u2713 ','') : item.replace('\u2713 ','')
+                                      setTasks(function(prev) { return prev.map(function(x) { return x.id===t.id ? Object.assign({},x,{checklist:nl}) : x }) })
+                                    }} />
+                                  <span style={{fontSize:11,textDecoration:item.indexOf('\u2713 ')===0?'line-through':'none',opacity:item.indexOf('\u2713 ')===0?.4:1}}>{item.replace('\u2713 ','')}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
 
@@ -452,14 +600,15 @@ export default function DashboardPage() {
               {!isEmy && (
                 <div className="card-y" style={{marginBottom:12}}>
                   <div className="ct">\ud83d\udcdd Formulaire CR Emy</div>
-                  <div style={{fontSize:12,opacity:.7}}>Semaine \u00b7 Prospects contact\u00e9s \u00b7 RDV \u00b7 Commandes \u00b7 Victoires \u00b7 Challenges \u00b7 Priorit\u00e9s S+1 \u00b7 Note pour Edward</div>
+                  <div style={{fontSize:12,opacity:.7,marginBottom:8}}>Ce qu'Emy remplit chaque semaine :</div>
+                  <div style={{fontSize:11,opacity:.6,lineHeight:1.8}}>Semaine du \u00b7 Prospects contact\u00e9s \u00b7 RDV effectu\u00e9s \u00b7 Commandes \u00b7 Victoires \u00b7 Challenges \u00b7 Priorit\u00e9s S+1 \u00b7 Note pour Edward</div>
                 </div>
               )}
               {reports.length === 0 && (
                 <div className="card" style={{textAlign:'center',padding:40}}>
                   <div style={{fontSize:40,marginBottom:10}}>\ud83d\udccb</div>
                   <div style={{fontWeight:900,textTransform:'uppercase'}}>Aucun CR pour l'instant</div>
-                  {isEmy && <button className="btn btn-y" style={{marginTop:14}} onClick={function() { openModal('cr', {}) }}>Cr\u00e9er le premier CR</button>}
+                  {isEmy && <button className="btn btn-y" style={{marginTop:14}} onClick={function() { openModal('cr', {}) }}>Creer le premier CR</button>}
                 </div>
               )}
               {reports.map(function(r, i) {
@@ -467,31 +616,26 @@ export default function DashboardPage() {
                   <div key={r.id} className="card-y" style={{border:'2px solid #191923',borderRadius:7,boxShadow:'3px 3px 0 #191923',marginBottom:12}}>
                     <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}>
                       <div style={{fontWeight:900,fontSize:16,textTransform:'uppercase'}}>{r.week}</div>
-                      <span className="badge" style={{color:'#005FFF',borderColor:'#005FFF'}}>{r.date}</span>
+                      <span style={{fontSize:10,opacity:.5}}>{r.date}</span>
                     </div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
-                      {[['Prospects',r.prospects],['RDV',r.rdv],['Commandes',r.cmds]].map(function(pair) {
-                        return (
-                          <div key={pair[0]} style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}>
-                            <div style={{fontWeight:900,fontSize:20}}>{pair[1]}</div>
-                            <div className="yt" style={{fontSize:11,opacity:.5}}>{pair[0]}</div>
-                          </div>
-                        )
-                      })}
+                      <div style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{r.prospects}</div><div className="yt" style={{fontSize:11,opacity:.5}}>Prospects</div></div>
+                      <div style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{r.rdv}</div><div className="yt" style={{fontSize:11,opacity:.5}}>RDV</div></div>
+                      <div style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{r.cmds}</div><div className="yt" style={{fontSize:11,opacity:.5}}>Commandes</div></div>
                     </div>
                     {r.wins && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>\u2705 Victoires</div><div style={{fontSize:12}}>{r.wins}</div></div>}
                     {r.challenges && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>\u26a1 Challenges</div><div style={{fontSize:12}}>{r.challenges}</div></div>}
-                    {r.next && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>\ud83c\udfaf Priorit\u00e9s S+1</div><div style={{fontSize:12}}>{r.next}</div></div>}
+                    {r.next && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>\ud83c\udfaf Priorites S+1</div><div style={{fontSize:12}}>{r.next}</div></div>}
                     {r.notes && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>\ud83d\udcac Note d'Emy</div><div style={{fontSize:12}}>{r.notes}</div></div>}
                     {r.feedback && <div style={{background:'#FF82D7',border:'2px solid #191923',borderRadius:5,padding:10}}><div className="yt" style={{fontSize:14,marginBottom:4}}>Retour d'Edward</div><div style={{fontSize:12}}>{r.feedback}</div></div>}
                     {!isEmy && !r.feedback && (
                       <div style={{marginTop:10}}>
-                        <div className="lbl">Ton retour \u00e0 Emy</div>
+                        <div className="lbl">Ton retour a Emy</div>
                         <textarea className="inp" placeholder="Bravo, recadrages..." id={'fb-'+r.id} style={{minHeight:60}} />
                         <button className="btn btn-y btn-sm" style={{marginTop:6}} onClick={function() {
-                          const el = document.getElementById('fb-'+r.id)
-                          const v = el ? el.value : ''
-                          if (v) { setReports(function(prev) { return prev.map(function(x, j) { return j===i ? Object.assign({},x,{feedback:v,status:'read'}) : x }) }); toast('Retour envoy\u00e9 \u2713') }
+                          var el = document.getElementById('fb-'+r.id)
+                          var v = el ? el.value : ''
+                          if (v) { setReports(function(prev) { return prev.map(function(x, j) { return j===i ? Object.assign({},x,{feedback:v,status:'read'}) : x }) }); toast('Retour envoye \u2713') }
                         }}>Envoyer</button>
                       </div>
                     )}
@@ -504,20 +648,20 @@ export default function DashboardPage() {
           {page === 'vault' && (
             <div>
               <div className="ph">
-                <div><div className="pt">Coffre-fort \ud83d\udd10</div><div className="ps">Acc\u00e8s s\u00e9curis\u00e9s</div></div>
+                <div><div className="pt">Coffre-fort \ud83d\udd10</div><div className="ps">Acces securises</div></div>
                 <button className="btn btn-y btn-sm" onClick={function() { openModal('vault', {}) }}>+ Ajouter</button>
               </div>
               {vault.map(function(v, i) {
                 return (
                   <div key={v.id} className="card" style={{marginBottom:8}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap'}}>
                       <div style={{fontWeight:900,fontSize:13}}>{v.title}</div>
                       <a href={v.url} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#005FFF',textDecoration:'none'}} onClick={function(e) { e.stopPropagation() }}>{v.url}</a>
                       <div style={{fontSize:11}}>{v.user}</div>
-                      <div style={{fontFamily:'monospace',fontSize:11,cursor:'pointer'}} onClick={function() { setPwVisible(function(prev) { const n = Object.assign({}, prev); n[i] = !n[i]; return n }) }}>{pwVisible[i] ? (v.pw || '(vide)') : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'}</div>
+                      <div style={{fontFamily:'monospace',fontSize:11,cursor:'pointer'}} onClick={function() { setPwVisible(function(prev) { var n = Object.assign({}, prev); n[i] = !n[i]; return n }) }}>{pwVisible[i] ? (v.pw || '(vide)') : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'}</div>
                       <div style={{display:'flex',gap:4}}>
                         <button className="btn btn-sm" onClick={function() { openModal('vault', Object.assign({}, v)) }}>\u270f\ufe0f</button>
-                        <button className="btn btn-sm btn-red" onClick={function() { setVault(function(prev) { return prev.filter(function(x) { return x.id !== v.id }) }); toast('Supprim\u00e9') }}>\u2715</button>
+                        <button className="btn btn-sm btn-red" onClick={function() { setVault(function(prev) { return prev.filter(function(x) { return x.id !== v.id }) }); toast('Supprime') }}>\u2715</button>
                       </div>
                     </div>
                   </div>
@@ -528,7 +672,7 @@ export default function DashboardPage() {
 
           {page === 'gmb' && (
             <div>
-              <div className="ph"><div><div className="pt">Google My Business</div><div className="ps">Avis \u00b7 Visibilit\u00e9</div></div></div>
+              <div className="ph"><div><div className="pt">Google My Business</div><div className="ps">Avis \u00b7 Visibilite</div></div></div>
               <div className="card-y">
                 <div className="ct">\ud83d\udd17 Connexion requise</div>
                 <p style={{fontSize:13,marginBottom:14}}>Configure Google My Business pour voir tes avis.</p>
@@ -553,22 +697,23 @@ export default function DashboardPage() {
                 {activityLog.filter(function(a) { return a.type === 'session_start' }).length === 0 && <div style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>Aucune session</div>}
               </div>
               <div style={{display:'flex',gap:6,marginBottom:10}}>
-                {[['all','Tout'],['email_copie','\u2709\ufe0f Emails'],['prospect_contacte','\ud83d\udcde Contacts']].map(function(pair) {
-                  return <div key={pair[0]} className={journalFilter===pair[0]?'tag on':'tag'} onClick={function() { setJournalFilter(pair[0]) }}>{pair[1]}</div>
-                })}
+                <div className={journalFilter==='all'?'tag on':'tag'} onClick={function() { setJournalFilter('all') }}>Tout</div>
+                <div className={journalFilter==='email_copie'?'tag on':'tag'} onClick={function() { setJournalFilter('email_copie') }}>\u2709\ufe0f Emails</div>
+                <div className={journalFilter==='prospect_contacte'?'tag on':'tag'} onClick={function() { setJournalFilter('prospect_contacte') }}>\ud83d\udcde Contacts</div>
               </div>
               {activityLog.filter(function(a) { return a.type !== 'session_start' && (journalFilter === 'all' || a.type === journalFilter) }).length === 0 ? (
                 <div className="card" style={{textAlign:'center',padding:40,opacity:.4}}>
                   <div style={{fontSize:32,marginBottom:8}}>\ud83d\udcd3</div>
-                  <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase'}}>Aucune activit\u00e9</div>
+                  <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase'}}>Aucune activite</div>
                 </div>
               ) : activityLog.filter(function(a) { return a.type !== 'session_start' && (journalFilter === 'all' || a.type === journalFilter) }).map(function(a) {
                 return (
                   <div key={a.id || a.created_at} className="card" style={{padding:'12px 14px',marginBottom:8}}>
                     <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
                       <div>
-                        <div style={{fontWeight:900,fontSize:13}}>{a.description}</div>
-                        {a.prospect_name && <div style={{fontSize:11,opacity:.5}}>\ud83c\udfaf {a.prospect_name}</div>}
+                        <div style={{fontWeight:900,fontSize:13,marginBottom:4}}>{a.description}</div>
+                        <span style={{fontSize:9,fontWeight:900,padding:'2px 6px',border:'1.5px solid #191923',borderRadius:3,background:a.user_role==='emy'?'#FF82D7':'#FFEB5A'}}>{a.user_name}</span>
+                        {a.prospect_name && <div style={{fontSize:11,opacity:.5,marginTop:4}}>\ud83c\udfaf {a.prospect_name}</div>}
                         {a.email_content && (
                           <details style={{marginTop:6}}>
                             <summary style={{cursor:'pointer',fontSize:11,fontWeight:900,opacity:.6}}>Voir l'email</summary>
@@ -576,7 +721,7 @@ export default function DashboardPage() {
                           </details>
                         )}
                       </div>
-                      <div style={{fontSize:10,opacity:.4}}>{new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+                      <div style={{fontSize:10,opacity:.4,flexShrink:0}}>{new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
                     </div>
                   </div>
                 )
@@ -587,27 +732,63 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {modal === 'email' && (
+        <div className="overlay" onClick={closeModal}>
+          <div className="modal modal-lg" onClick={function(e) { e.stopPropagation() }}>
+            <div className="mh"><div className="mt">\u2709\ufe0f Email IA \u2014 {form.name}</div></div>
+            <div className="mb">
+              {generatingEmail && (
+                <div style={{textAlign:'center',padding:30}}>
+                  <div style={{fontSize:32,marginBottom:10}}>\u2728</div>
+                  <div style={{fontWeight:900,fontSize:13,textTransform:'uppercase'}}>Generation en cours...</div>
+                </div>
+              )}
+              {!generatingEmail && generatedEmail && (
+                <div>
+                  <div className="lbl" style={{marginBottom:6}}>Email genere - modifie avant d'envoyer</div>
+                  <textarea className="inp" style={{minHeight:280,fontFamily:'Arial,sans-serif',fontSize:13,lineHeight:1.6}} value={generatedEmail} onChange={function(e) { setGeneratedEmail(e.target.value) }} />
+                  <div style={{background:'#FFEB5A',border:'2px solid #191923',borderRadius:5,padding:10,fontSize:12,marginTop:8}}>
+                    Copie et envoie depuis <strong>{isEmy ? 'emy@meshuga.fr' : 'edward@meshuga.fr'}</strong>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mf">
+              <button className="btn" onClick={closeModal}>Fermer</button>
+              {generatedEmail && (
+                <button className="btn btn-y" onClick={function() {
+                  navigator.clipboard.writeText(generatedEmail)
+                  toast('Email copie ! \ud83d\udccb')
+                  logActivity('email_copie', 'Email copie pour ' + form.name, form.name, generatedEmail)
+                }}>\ud83d\udccb Copier</button>
+              )}
+              {generatedEmail && <button className="btn btn-p" onClick={function() { if (emailProspect) generateEmail(emailProspect) }}>\ud83d\udd04 Regenerer</button>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {modal === 'task' && (
         <div className="overlay" onClick={closeModal}>
           <div className="modal modal-lg" onClick={function(e) { e.stopPropagation() }}>
-            <div className="mh"><div className="mt">{form.id ? 'Modifier' : 'Nouvelle t\u00e2che'}</div></div>
+            <div className="mh"><div className="mt">{form.id ? 'Modifier' : 'Nouvelle tache'}</div></div>
             <div className="mb">
               <div className="fg"><label className="lbl">Titre *</label><input className="inp" value={form.title||''} onChange={function(e) { setForm(Object.assign({},form,{title:e.target.value})) }} /></div>
               <div className="fg2">
-                <div className="fg"><label className="lbl">Assign\u00e9e \u00e0</label><select className="inp" value={form.assignee||'emy'} onChange={function(e) { setForm(Object.assign({},form,{assignee:e.target.value})) }}><option value="emy">Emy</option><option value="edward">Edward</option></select></div>
+                <div className="fg"><label className="lbl">Assignee a</label><select className="inp" value={form.assignee||'emy'} onChange={function(e) { setForm(Object.assign({},form,{assignee:e.target.value})) }}><option value="emy">Emy</option><option value="edward">Edward</option></select></div>
                 <div className="fg"><label className="lbl">Deadline</label><input type="date" className="inp" value={form.deadline||''} onChange={function(e) { setForm(Object.assign({},form,{deadline:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">Priorit\u00e9</label><select className="inp" value={form.priority||'medium'} onChange={function(e) { setForm(Object.assign({},form,{priority:e.target.value})) }}><option value="high">\ud83d\udd34 Haute</option><option value="medium">\ud83d\udfe1 Moyenne</option><option value="low">\ud83d\udfe2 Basse</option></select></div>
-                <div className="fg"><label className="lbl">Statut</label><select className="inp" value={form.status||'todo'} onChange={function(e) { setForm(Object.assign({},form,{status:e.target.value})) }}><option value="todo">\u00c0 faire</option><option value="in_progress">En cours</option><option value="done">Termin\u00e9</option></select></div>
+                <div className="fg"><label className="lbl">Priorite</label><select className="inp" value={form.priority||'medium'} onChange={function(e) { setForm(Object.assign({},form,{priority:e.target.value})) }}><option value="high">\ud83d\udd34 Haute</option><option value="medium">\ud83d\udfe1 Moyenne</option><option value="low">\ud83d\udfe2 Basse</option></select></div>
+                <div className="fg"><label className="lbl">Statut</label><select className="inp" value={form.status||'todo'} onChange={function(e) { setForm(Object.assign({},form,{status:e.target.value})) }}><option value="todo">A faire</option><option value="in_progress">En cours</option><option value="done">Termine</option></select></div>
               </div>
               <div>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                  <div className="lbl" style={{margin:0}}>Sous-t\u00e2ches</div>
+                  <div className="lbl" style={{margin:0}}>Sous-taches</div>
                   <button className="btn btn-y btn-sm" onClick={function() { setForm(Object.assign({},form,{checklist:(form.checklist||[]).concat([''])})) }}>+ Ajouter</button>
                 </div>
                 {(form.checklist||[]).map(function(item, i) {
                   return (
                     <div key={i} style={{display:'flex',gap:6,marginBottom:5}}>
-                      <input className="inp" value={item} onChange={function(e) { const c = (form.checklist||[]).slice(); c[i] = e.target.value; setForm(Object.assign({},form,{checklist:c})) }} placeholder={'Sous-t\u00e2che '+(i+1)} style={{fontSize:12,padding:'5px 8px'}} />
+                      <input className="inp" value={item} onChange={function(e) { var c = (form.checklist||[]).slice(); c[i] = e.target.value; setForm(Object.assign({},form,{checklist:c})) }} placeholder={'Sous-tache '+(i+1)} style={{fontSize:12,padding:'5px 8px'}} />
                       <button className="btn btn-sm btn-red" onClick={function() { setForm(Object.assign({},form,{checklist:(form.checklist||[]).filter(function(_,j) { return j!==i })})) }}>\u2715</button>
                     </div>
                   )
@@ -631,15 +812,17 @@ export default function DashboardPage() {
               <div className="fg2">
                 <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Entreprise *</label><input className="inp" value={form.name||''} onChange={function(e) { setForm(Object.assign({},form,{name:e.target.value})) }} /></div>
                 <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e) { setForm(Object.assign({},form,{email:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">T\u00e9l\u00e9phone</label><input className="inp" value={form.phone||''} onChange={function(e) { setForm(Object.assign({},form,{phone:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">Statut</label><select className="inp" value={form.status||'to_contact'} onChange={function(e) { setForm(Object.assign({},form,{status:e.target.value})) }}><option value="to_contact">\u00c0 contacter</option><option value="contacted">Contact\u00e9</option><option value="nego">N\u00e9go</option><option value="won">Gagn\u00e9</option><option value="lost">Perdu</option></select></div>
+                <div className="fg"><label className="lbl">Telephone</label><input className="inp" value={form.phone||''} onChange={function(e) { setForm(Object.assign({},form,{phone:e.target.value})) }} /></div>
+                <div className="fg"><label className="lbl">Categorie</label><select className="inp" value={form.category||''} onChange={function(e) { setForm(Object.assign({},form,{category:e.target.value})) }}><option value="">-</option><option>Evenementiel</option><option>Corporate</option><option>Startup</option><option>Avocats</option><option>Conseil</option><option>Hotellerie</option><option>Tech</option><option>Institution</option><option>Autre</option></select></div>
+                <div className="fg"><label className="lbl">Statut</label><select className="inp" value={form.status||'to_contact'} onChange={function(e) { setForm(Object.assign({},form,{status:e.target.value})) }}><option value="to_contact">A contacter</option><option value="contacted">Contacte</option><option value="nego">Nego</option><option value="won">Gagne</option><option value="lost">Perdu</option></select></div>
                 <div className="fg" style={{gridColumn:'1/-1'}}>
                   <label className="lbl">Prochaine relance</label>
                   <div style={{display:'flex',gap:6}}>
                     <input type="date" className="inp" style={{flex:1}} value={form.nextDate||''} onChange={function(e) { setForm(Object.assign({},form,{nextDate:e.target.value})) }} />
-                    <button className="btn btn-sm" onClick={function() { const d=new Date();d.setDate(d.getDate()+7);setForm(Object.assign({},form,{nextDate:d.toISOString().split('T')[0]})) }}>+7j</button>
+                    <button className="btn btn-sm" onClick={function() { var d=new Date();d.setDate(d.getDate()+7);setForm(Object.assign({},form,{nextDate:d.toISOString().split('T')[0]})) }}>+7j</button>
+                    <button className="btn btn-sm" onClick={function() { var d=new Date();d.setDate(d.getDate()+14);setForm(Object.assign({},form,{nextDate:d.toISOString().split('T')[0]})) }}>+14j</button>
                   </div>
-                  <input className="inp" style={{marginTop:6}} value={form.nextAction||''} onChange={function(e) { setForm(Object.assign({},form,{nextAction:e.target.value})) }} placeholder="Action pr\u00e9vue\u2026" />
+                  <input className="inp" style={{marginTop:6}} value={form.nextAction||''} onChange={function(e) { setForm(Object.assign({},form,{nextAction:e.target.value})) }} placeholder="Action prevue..." />
                 </div>
                 <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Notes</label><textarea className="inp" value={form.notes||''} onChange={function(e) { setForm(Object.assign({},form,{notes:e.target.value})) }} /></div>
                 <div className="fg" style={{gridColumn:'1/-1'}}>
@@ -663,10 +846,10 @@ export default function DashboardPage() {
             <div className="mh"><div className="mt">{form.id ? 'Modifier' : 'Nouveau contact'}</div></div>
             <div className="mb">
               <div className="fg2">
-                <div className="fg"><label className="lbl">Cat\u00e9gorie</label><select className="inp" value={form.cat||'food'} onChange={function(e) { setForm(Object.assign({},form,{cat:e.target.value})) }}><option value="food">Fournisseur food</option><option value="banque">Banque</option><option value="presse">Presse</option><option value="prestataire">Prestataire</option><option value="partenaire">Partenaire</option><option value="livraison">Livraison</option><option value="fournisseur">Fournisseur</option><option value="it">IT</option><option value="juridique">Juridique</option></select></div>
+                <div className="fg"><label className="lbl">Categorie</label><select className="inp" value={form.cat||'food'} onChange={function(e) { setForm(Object.assign({},form,{cat:e.target.value})) }}><option value="food">Fournisseur food</option><option value="banque">Banque</option><option value="presse">Presse</option><option value="prestataire">Prestataire</option><option value="partenaire">Partenaire</option><option value="livraison">Livraison</option><option value="fournisseur">Fournisseur</option><option value="it">IT</option><option value="juridique">Juridique</option></select></div>
                 <div className="fg" style={{display:'flex',alignItems:'center',gap:8,paddingTop:22}}><input type="checkbox" checked={!!form.vip} onChange={function(e) { setForm(Object.assign({},form,{vip:e.target.checked})) }} style={{width:16,height:16}} /><span style={{fontSize:12}}>VIP \u2b50</span></div>
                 <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Nom *</label><input className="inp" value={form.name||''} onChange={function(e) { setForm(Object.assign({},form,{name:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">T\u00e9l\u00e9phone</label><input className="inp" value={form.phone||''} onChange={function(e) { setForm(Object.assign({},form,{phone:e.target.value})) }} /></div>
+                <div className="fg"><label className="lbl">Telephone</label><input className="inp" value={form.phone||''} onChange={function(e) { setForm(Object.assign({},form,{phone:e.target.value})) }} /></div>
                 <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e) { setForm(Object.assign({},form,{email:e.target.value})) }} /></div>
                 <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Notes</label><textarea className="inp" value={form.notes||''} onChange={function(e) { setForm(Object.assign({},form,{notes:e.target.value})) }} /></div>
               </div>
@@ -683,7 +866,7 @@ export default function DashboardPage() {
       {modal === 'vault' && (
         <div className="overlay" onClick={closeModal}>
           <div className="modal" onClick={function(e) { e.stopPropagation() }}>
-            <div className="mh"><div className="mt">{form.id ? 'Modifier' : 'Nouvel acc\u00e8s'} \ud83d\udd10</div></div>
+            <div className="mh"><div className="mt">{form.id ? 'Modifier' : 'Nouvel acces'} \ud83d\udd10</div></div>
             <div className="mb">
               <div className="fg2">
                 <div className="fg"><label className="lbl">Nom *</label><input className="inp" value={form.title||''} onChange={function(e) { setForm(Object.assign({},form,{title:e.target.value})) }} /></div>
@@ -714,10 +897,10 @@ export default function DashboardPage() {
               </div>
               <div className="fg"><label className="lbl">\u2705 Victoires</label><textarea className="inp" value={form.wins||''} onChange={function(e) { setForm(Object.assign({},form,{wins:e.target.value})) }} /></div>
               <div className="fg"><label className="lbl">\u26a1 Challenges</label><textarea className="inp" value={form.challenges||''} onChange={function(e) { setForm(Object.assign({},form,{challenges:e.target.value})) }} /></div>
-              <div className="fg"><label className="lbl">\ud83c\udfaf Priorit\u00e9s S+1</label><textarea className="inp" value={form.next||''} onChange={function(e) { setForm(Object.assign({},form,{next:e.target.value})) }} /></div>
+              <div className="fg"><label className="lbl">\ud83c\udfaf Priorites S+1</label><textarea className="inp" value={form.next||''} onChange={function(e) { setForm(Object.assign({},form,{next:e.target.value})) }} /></div>
               <div className="fg"><label className="lbl">\ud83d\udcac Note pour Edward</label><textarea className="inp" value={form.notes||''} onChange={function(e) { setForm(Object.assign({},form,{notes:e.target.value})) }} /></div>
             </div>
-            <div className="mf"><button className="btn" onClick={closeModal}>Annuler</button><button className="btn btn-y" onClick={submitCR}>Soumettre \u00e0 Edward</button></div>
+            <div className="mf"><button className="btn" onClick={closeModal}>Annuler</button><button className="btn btn-y" onClick={submitCR}>Soumettre a Edward</button></div>
           </div>
         </div>
       )}
