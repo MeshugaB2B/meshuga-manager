@@ -484,7 +484,7 @@ export default function App() {
     query = query.range(offset, offset + CHASSE_PAGE - 1)
     const { data, count, error } = await query
     if (!error && data) {
-      const fmt = data.map((p: any) => ({
+      const fmt = data.map((p) => ({
         ...p,
         contacts: [{ name: p.contact_name||'—', email: p.contact_email||'—', phone: p.contact_phone||'—', role: p.contact_role||'—' }],
         expanded: false,
@@ -744,11 +744,11 @@ export default function App() {
               <div style={{background:'#191923',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <div className="yt" style={{color:'#FFEB5A',fontSize:18}}>📅 Planning {isEmy?'de ma semaine':"d’Emy"}</div>
                 <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                  <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={()=>setPlanningWeek((w:any)=>w-1)}>←</button>
+                  <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={()=>setPlanningWeek((w)=>w-1)}>←</button>
                   <span style={{color:'#FFEB5A',fontSize:11,fontWeight:900,minWidth:120,textAlign:'center'}}>
                     {planningWeek===0?'Cette semaine':planningWeek<0?`Il y a ${Math.abs(planningWeek)} sem.`:`Dans ${planningWeek} sem.`}
                   </span>
-                  <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={()=>setPlanningWeek((w:any)=>w+1)}>→</button>
+                  <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={()=>setPlanningWeek((w)=>w+1)}>→</button>
                   {planningWeek!==0&&<button className="btn btn-y btn-sm" onClick={()=>setPlanningWeek(0)}>Auj.</button>}
                   {isEmy&&<button className="btn btn-p btn-sm" onClick={()=>open('task_detail',{assignee:'emy',priority:'medium',status:'todo',checklist:[],files:[]})}>+ Tâche</button>}
                 </div>
@@ -819,7 +819,7 @@ export default function App() {
                     <div className="yt" style={{fontSize:12,opacity:.5,marginBottom:4}}>{reports[0].week}</div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>
                       {[['Prospects',reports[0].prospects],['RDV',reports[0].rdv],['Cmdes',reports[0].cmds]].map(([l,v])=>(
-                        <div key={l as string} style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'6px',textAlign:'center'}}>
+                        <div key={l} style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'6px',textAlign:'center'}}>
                           <div style={{fontWeight:900,fontSize:18}}>{v}</div>
                           <div className="yt" style={{fontSize:10,opacity:.5}}>{l}</div>
                         </div>
@@ -855,7 +855,7 @@ export default function App() {
                 </select>
                 <select className="inp sel" style={{width:130}} value={chasseStatus} onChange={e=>setChasseStatus(e.target.value)}>
                   <option value="all">Tous statuts</option>
-                  {Object.entries(STATUS_P).map(([k,v])=><option key={k} value={k}>{v as string}</option>)}
+                  {Object.entries(STATUS_P).map(([k,v])=><option key={k} value={k}>{v}</option>)}
                 </select>
               </div>
 
@@ -936,7 +936,7 @@ export default function App() {
                         {/* Contacts */}
                         <div style={{marginBottom:10}}>
                           <div style={{fontFamily:"'Yellowtail',cursive",fontSize:14,marginBottom:6}}>Contacts</div>
-                          {p.contacts.map((c: any, i: number)=>(
+                          {p.contacts.map((c, i)=>(
                             <div key={i} style={{background:'#F8F8F8',border:'1.5px solid #DEDEDE',borderRadius:5,padding:'7px 10px',marginBottom:5,fontSize:12}}>
                               <div style={{fontWeight:900}}>{c.name||'—'} {c.role&&<span style={{fontSize:10,opacity:.5}}>· {c.role}</span>}</div>
                               <div style={{display:'flex',gap:12,marginTop:3,flexWrap:'wrap',opacity:.7}}>
@@ -998,7 +998,7 @@ export default function App() {
                   {Object.entries(STATUS_P).slice(0,4).map(([k,v])=>(
                     <div key={k} style={{background:STATUS_BG[k],border:`2px solid ${STATUS_COLOR[k]}`,borderRadius:5,padding:'8px 12px',textAlign:'center',boxShadow:`2px 2px 0 ${STATUS_COLOR[k]}`}}>
                       <div style={{fontWeight:900,fontSize:22,color:STATUS_COLOR[k]}}>{crmProspects.filter(p=>p.status===k).length}</div>
-                      <div className="yt" style={{fontSize:11,color:STATUS_COLOR[k]}}>{v as string}</div>
+                      <div className="yt" style={{fontSize:11,color:STATUS_COLOR[k]}}>{v}</div>
                     </div>
                   ))}
                 </div>
@@ -1063,7 +1063,7 @@ export default function App() {
                 {Object.entries(CAT_ANN).map(([k,v])=>{
                   const count = contacts.filter(c=>c.cat===k).length
                   if (count===0) return null
-                  return <div key={k} className={`ann-tab${annFilter===k?' on':''}`} onClick={()=>setAnnFilter(k)}>{v as string} ({count})</div>
+                  return <div key={k} className={`ann-tab${annFilter===k?' on':''}`} onClick={()=>setAnnFilter(k)}>{v} ({count})</div>
                 })}
               </div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:12}}>
@@ -1074,7 +1074,7 @@ export default function App() {
                     </div>
                     {c.vip&&<span style={{float:'right',fontSize:10,fontWeight:900}}>⭐ VIP</span>}
                     <div style={{fontWeight:900,fontSize:14}}>{c.name}</div>
-                    {c.contacts?.slice(0,2).map((ct: any, i: number)=>(
+                    {c.contacts?.slice(0,2).map((ct, i)=>(
                       <div key={i} style={{marginTop:4}}>
                         {ct.name&&ct.name!=='—'&&<div style={{fontSize:11,fontWeight:900}}>{ct.name} {ct.role&&<span style={{opacity:.5}}>· {ct.role}</span>}</div>}
                         {ct.phone&&ct.phone!=='—'&&<div style={{fontSize:11,opacity:.6}}>📞 {ct.phone}</div>}
@@ -1109,9 +1109,9 @@ export default function App() {
                           <div style={{fontSize:13,fontWeight:900,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.5:1}}>{t.title}</div>
                           <div style={{fontSize:10,opacity:.5,marginTop:2}}>📅 {t.deadline} · {t.assignee} · {t.priority==='high'?'🔴 Haute':t.priority==='medium'?'🟡 Moyenne':'🟢 Basse'}</div>
                           {t.description&&<div style={{fontSize:11,opacity:.6,marginTop:4,fontStyle:'italic'}}>{t.description.slice(0,80)}{t.description.length>80?'…':''}</div>}
-                          {t.checklist?.filter((c:string)=>c).length>0&&(
+                          {t.checklist?.filter((c)=>c).length>0&&(
                     <div style={{marginTop:6}}>
-                      {t.checklist.filter((c:string)=>c).map((item:string,ci:number)=>(
+                      {t.checklist.filter((c)=>c).map((item, ci)=>(
                         <div key={ci} style={{display:'flex',alignItems:'center',gap:6,marginTop:3}}>
                           <input type="checkbox" defaultChecked={false} style={{width:13,height:13,flexShrink:0}} onChange={e=>{
                             const newChecklist=[...t.checklist]
@@ -1149,7 +1149,7 @@ export default function App() {
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
                     {[['Prospects',r.prospects],['RDV',r.rdv],['Commandes',r.cmds]].map(([l,v])=>(
-                      <div key={l as string} style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}>
+                      <div key={l} style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}>
                         <div style={{fontWeight:900,fontSize:20}}>{v}</div>
                         <div className="yt" style={{fontSize:11,opacity:.5}}>{l}</div>
                       </div>
@@ -1186,7 +1186,7 @@ export default function App() {
                     <div style={{fontWeight:900,fontSize:13}}>{v.title}</div>
                     <a href={v.url} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#005FFF',textDecoration:'none',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} onClick={e=>e.stopPropagation()}>{v.url}</a>
                     <div style={{fontSize:11}}>{v.user}</div>
-                    <div style={{fontFamily:'monospace',letterSpacing:pwVisible[i]?'normal':3,fontSize:11,cursor:'pointer'}} onClick={e=>{e.stopPropagation();setPwVisible((prev:any)=>({...prev,[i]:!prev[i]}))}}>{pwVisible[i]?(v.pw||'(vide)'):'••••••••'} <span style={{fontSize:9,opacity:.4}}>{pwVisible[i]?'🙈':'👁'}</span></div>
+                    <div style={{fontFamily:'monospace',letterSpacing:pwVisible[i]?'normal':3,fontSize:11,cursor:'pointer'}} onClick={e=>{e.stopPropagation();setPwVisible((prev)=>({...prev,[i]:!prev[i]}))}}>{pwVisible[i]?(v.pw||'(vide)'):'••••••••'} <span style={{fontSize:9,opacity:.4}}>{pwVisible[i]?'🙈':'👁'}</span></div>
                     <button className="btn btn-sm" onClick={e=>{e.stopPropagation();setVault(prev=>prev.filter(x=>x.id!==v.id));toast('Supprimé')}}>✕</button>
                   </div>
                 </div>
@@ -1212,7 +1212,7 @@ export default function App() {
                   <div style={{fontWeight:900,textTransform:'uppercase',fontSize:12}}>Aucune activité enregistrée</div>
                   <div style={{fontSize:11,marginTop:6,opacity:.6}}>Les actions d’Emy apparaîtront ici en temps réel</div>
                 </div>
-              ):activityLog.filter((a:any)=>journalFilter==='all'||a.type===journalFilter).map((a:any)=>(
+              ):activityLog.filter((a)=>journalFilter==='all'||a.type===journalFilter).map((a)=>(
                 <div key={a.id} className="card" style={{padding:'12px 14px',marginBottom:8}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
                     <div style={{flex:1}}>
@@ -1257,7 +1257,7 @@ export default function App() {
                 <div className="lbl" style={{margin:0}}>👤 Contacts ({(form.contacts||[]).length})</div>
                 <button className="btn btn-y btn-sm" onClick={()=>setForm({...form,contacts:[...(form.contacts||[]),{name:'',email:'',phone:'',role:''}]})}>+ Ajouter contact</button>
               </div>
-              {(form.contacts||[]).map((c: any, i: number)=>(
+              {(form.contacts||[]).map((c, i)=>(
                 <div key={i} className="contact-item">
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,flex:1}}>
                     <input className="inp" placeholder="Nom *" value={c.name||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],name:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
@@ -1266,7 +1266,7 @@ export default function App() {
                     <input className="inp" placeholder="Téléphone" value={c.phone||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],phone:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
                     <input className="inp" placeholder="🔗 LinkedIn (lien profil)" value={c.linkedin||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],linkedin:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px',gridColumn:'1/-1'}} />
                   </div>
-                  {i>0&&<button className="btn btn-sm btn-red" onClick={()=>{const cs=(form.contacts||[]).filter((_:any,j:number)=>j!==i);setForm({...form,contacts:cs})}}>✕</button>}
+                  {i>0&&<button className="btn btn-sm btn-red" onClick={()=>{const cs=(form.contacts||[]).filter((_,j)=>j!==i);setForm({...form,contacts:cs})}}>✕</button>}
                 </div>
               ))}
             </div>
@@ -1327,7 +1327,7 @@ export default function App() {
                 <div className="lbl" style={{margin:0}}>👤 Contacts ({(form.contacts||[]).length})</div>
                 <button className="btn btn-y btn-sm" onClick={()=>setForm({...form,contacts:[...(form.contacts||[]),{name:'',email:'',phone:'',role:'',linkedin:''}]})}>+ Ajouter contact</button>
               </div>
-              {(form.contacts||[]).map((c: any, i: number)=>(
+              {(form.contacts||[]).map((c, i)=>(
                 <div key={i} className="contact-item">
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,flex:1}}>
                     <input className="inp" placeholder="Nom *" value={c.name||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],name:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
@@ -1336,7 +1336,7 @@ export default function App() {
                     <input className="inp" placeholder="Téléphone" value={c.phone||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],phone:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
                     <input className="inp" placeholder="🔗 LinkedIn URL" value={c.linkedin||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],linkedin:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px',gridColumn:'1/-1'}} />
                   </div>
-                  {i>0&&<button className="btn btn-sm btn-red" onClick={()=>{const cs=(form.contacts||[]).filter((_:any,j:number)=>j!==i);setForm({...form,contacts:cs})}}>✕</button>}
+                  {i>0&&<button className="btn btn-sm btn-red" onClick={()=>{const cs=(form.contacts||[]).filter((_,j)=>j!==i);setForm({...form,contacts:cs})}}>✕</button>}
                 </div>
               ))}
             </div>
@@ -1356,7 +1356,7 @@ export default function App() {
               <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Entreprise *</label><input className="inp" value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} /></div>
               <div className="fg"><label className="lbl">Catégorie</label><select className="inp sel" value={form.category||''} onChange={e=>setForm({...form,category:e.target.value})}><option value="">—</option><option>Événementiel</option><option>Corporate</option><option>Startup</option><option>Avocats</option><option>Conseil</option><option>Tech</option><option>Hôtellerie</option><option>Autre</option></select></div>
               <div className="fg"><label className="lbl">Taille</label><select className="inp sel" value={form.size||''} onChange={e=>setForm({...form,size:e.target.value})}><option value="">—</option><option>1-10</option><option>10-50</option><option>50-200</option><option>200+</option><option>1000+</option></select></div>
-              <div className="fg"><label className="lbl">Statut</label><select className="inp sel" value={form.status||'to_contact'} onChange={e=>setForm({...form,status:e.target.value})}>{Object.entries(STATUS_P).map(([k,v])=><option key={k} value={k}>{v as string}</option>)}</select></div>
+              <div className="fg"><label className="lbl">Statut</label><select className="inp sel" value={form.status||'to_contact'} onChange={e=>setForm({...form,status:e.target.value})}>{Object.entries(STATUS_P).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div>
               <div className="fg"><label className="lbl">CA gagné €</label><input type="number" className="inp" value={form.ca||0} onChange={e=>setForm({...form,ca:parseInt(e.target.value)||0})} /></div>
               <div className="fg" style={{gridColumn:'1/-1'}}>
                 <label className="lbl">📅 Prochaine relance</label>
@@ -1375,7 +1375,7 @@ export default function App() {
                 <div className="lbl" style={{margin:0}}>👤 Contacts</div>
                 <button className="btn btn-y btn-sm" onClick={()=>setForm({...form,contacts:[...(form.contacts||[]),{name:'',email:'',phone:'',role:''}]})}>+ Ajouter</button>
               </div>
-              {(form.contacts||[]).map((c: any,i: number)=>(
+              {(form.contacts||[]).map((c, i)=>(
                 <div key={i} className="contact-item">
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,flex:1}}>
                     <input className="inp" placeholder="Nom" value={c.name||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],name:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
@@ -1383,7 +1383,7 @@ export default function App() {
                     <input className="inp" placeholder="Email" value={c.email||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],email:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
                     <input className="inp" placeholder="Téléphone" value={c.phone||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],phone:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
                   </div>
-                  {i>0&&<button className="btn btn-sm btn-red" onClick={()=>{const cs=(form.contacts||[]).filter((_:any,j:number)=>j!==i);setForm({...form,contacts:cs})}}>✕</button>}
+                  {i>0&&<button className="btn btn-sm btn-red" onClick={()=>{const cs=(form.contacts||[]).filter((_,j)=>j!==i);setForm({...form,contacts:cs})}}>✕</button>}
                 </div>
               ))}
             </div>
@@ -1410,20 +1410,20 @@ export default function App() {
               <div className="fg"><label className="lbl">Assignée à</label><select className="inp sel" value={form.assignee||'emy'} onChange={e=>setForm({...form,assignee:e.target.value})}><option value="emy">Emy</option><option value="edward">Edward</option></select></div>
               <div className="fg"><label className="lbl">Deadline</label><input type="date" className="inp" value={form.deadline||''} onChange={e=>setForm({...form,deadline:e.target.value})} /></div>
               <div className="fg"><label className="lbl">Priorité</label><select className="inp sel" value={form.priority||'medium'} onChange={e=>setForm({...form,priority:e.target.value})}><option value="high">🔴 Haute</option><option value="medium">🟡 Moyenne</option><option value="low">🟢 Basse</option></select></div>
-              <div className="fg"><label className="lbl">Statut</label><select className="inp sel" value={form.status||'todo'} onChange={e=>setForm({...form,status:e.target.value})}>{Object.entries(TASK_S).map(([k,v])=><option key={k} value={k}>{v as string}</option>)}</select></div>
+              <div className="fg"><label className="lbl">Statut</label><select className="inp sel" value={form.status||'todo'} onChange={e=>setForm({...form,status:e.target.value})}>{Object.entries(TASK_S).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div>
             </div>
             <div className="fg"><label className="lbl">Description détaillée</label><textarea className="inp" style={{minHeight:80}} value={form.description||''} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Détailler ce qui est attendu, contexte, critères de succès…" /></div>
             {/* Checklist */}
             <div style={{marginBottom:10}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                <div className="lbl" style={{margin:0}}>☑ Sous-tâches ({(form.checklist||[]).filter((c:string)=>c).length})</div>
+                <div className="lbl" style={{margin:0}}>☑ Sous-tâches ({(form.checklist||[]).filter((c)=>c).length})</div>
                 <button className="btn btn-y btn-sm" onClick={()=>setForm({...form,checklist:[...(form.checklist||[]),'']})}>+ Ajouter</button>
               </div>
-              {(form.checklist||[]).map((item: string, i: number)=>(
+              {(form.checklist||[]).map((item, i)=>(
                 <div key={i} style={{display:'flex',gap:6,marginBottom:5,alignItems:'center'}}>
                   <input type="checkbox" style={{width:16,height:16,flexShrink:0}} />
                   <input className="inp" value={item} onChange={e=>{const c=[...(form.checklist||[])];c[i]=e.target.value;setForm({...form,checklist:c})}} placeholder={`Sous-tâche ${i+1}`} style={{fontSize:12,padding:'5px 8px'}} />
-                  <button className="btn btn-sm btn-red" onClick={()=>{const c=(form.checklist||[]).filter((_:string,j:number)=>j!==i);setForm({...form,checklist:c})}}>✕</button>
+                  <button className="btn btn-sm btn-red" onClick={()=>{const c=(form.checklist||[]).filter((_, j)=>j!==i);setForm({...form,checklist:c})}}>✕</button>
                 </div>
               ))}
             </div>
@@ -1445,7 +1445,7 @@ export default function App() {
           <div className="mh"><div className="mt">{form.id?'Modifier le contact':'Nouveau contact'}</div></div>
           <div className="mb">
             <div className="fg2">
-              <div className="fg"><label className="lbl">Catégorie</label><select className="inp sel" value={form.cat||'food'} onChange={e=>setForm({...form,cat:e.target.value})}>{Object.entries(CAT_ANN).map(([k,v])=><option key={k} value={k}>{v as string}</option>)}</select></div>
+              <div className="fg"><label className="lbl">Catégorie</label><select className="inp sel" value={form.cat||'food'} onChange={e=>setForm({...form,cat:e.target.value})}>{Object.entries(CAT_ANN).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div>
               <div className="fg" style={{display:'flex',alignItems:'center',gap:8,paddingTop:22}}><input type="checkbox" checked={!!form.vip} onChange={e=>setForm({...form,vip:e.target.checked})} style={{width:16,height:16}} /><span style={{fontSize:12}}>VIP ⭐</span></div>
               <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Nom entreprise *</label><input className="inp" value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} /></div>
               <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Notes</label><textarea className="inp" value={form.notes||''} onChange={e=>setForm({...form,notes:e.target.value})} /></div>
@@ -1456,7 +1456,7 @@ export default function App() {
                 <div className="lbl" style={{margin:0}}>👤 Personnes à contacter</div>
                 <button className="btn btn-y btn-sm" onClick={()=>setForm({...form,contacts:[...(form.contacts||[]),{name:'',phone:'',email:'',role:''}]})}>+ Ajouter</button>
               </div>
-              {(form.contacts||[]).map((c: any,i: number)=>(
+              {(form.contacts||[]).map((c, i)=>(
                 <div key={i} className="contact-item">
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,flex:1}}>
                     <input className="inp" placeholder="Nom" value={c.name||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],name:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
@@ -1464,7 +1464,7 @@ export default function App() {
                     <input className="inp" placeholder="Téléphone" value={c.phone||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],phone:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
                     <input className="inp" placeholder="Email" value={c.email||''} onChange={e=>{const cs=[...(form.contacts||[])];cs[i]={...cs[i],email:e.target.value};setForm({...form,contacts:cs})}} style={{fontSize:11,padding:'5px 8px'}} />
                   </div>
-                  {i>0&&<button className="btn btn-sm btn-red" onClick={()=>{const cs=(form.contacts||[]).filter((_:any,j:number)=>j!==i);setForm({...form,contacts:cs})}}>✕</button>}
+                  {i>0&&<button className="btn btn-sm btn-red" onClick={()=>{const cs=(form.contacts||[]).filter((_,j)=>j!==i);setForm({...form,contacts:cs})}}>✕</button>}
                 </div>
               ))}
             </div>
@@ -1509,7 +1509,7 @@ export default function App() {
             <div className="fg"><label className="lbl">Semaine du *</label><input className="inp" value={form.week||''} onChange={e=>setForm({...form,week:e.target.value})} placeholder="ex: 25 mars 2026" /></div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
               {[['prospects','Prospects'],['rdv','RDV'],['cmds','Commandes']].map(([k,l])=>(
-                <div key={k} className="fg"><label className="lbl">{l}</label><input type="number" className="inp" value={(form as any)[k]||0} onChange={e=>setForm({...form,[k]:parseInt(e.target.value)||0})} /></div>
+                <div key={k} className="fg"><label className="lbl">{l}</label><input type="number" className="inp" value={form[k]||0} onChange={e=>setForm({...form,[k]:parseInt(e.target.value)||0})} /></div>
               ))}
             </div>
             <div className="fg"><label className="lbl">✅ Victoires</label><textarea className="inp" value={form.wins||''} onChange={e=>setForm({...form,wins:e.target.value})} placeholder="Ce que j’ai accompli…" /></div>
