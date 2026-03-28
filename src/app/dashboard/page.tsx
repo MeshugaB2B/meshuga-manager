@@ -342,18 +342,12 @@ export default function DashboardPage() {
     {id:'journal', label:'Journal Emy', icon:'📓'},
   ]
 
-  if (!profile) return (
-    <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',background:'#FFEB5A',flexDirection:'column',gap:16}}>
-      <div style={{fontSize:48}}>😬</div>
-      <div style={{fontWeight:900,fontSize:14,textTransform:'uppercase',letterSpacing:3}}>Chargement…</div>
-      <a href="/login" style={{fontSize:14,opacity:.4}}>Se connecter</a>
-    </div>
-  )
+
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
       <style>{G}</style>
-
+      {!profile && <div style={{position:'fixed',inset:0,background:'#FFEB5A',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999,flexDirection:'column',gap:16}}><div style={{fontSize:48}}>😬</div><div style={{fontWeight:900,fontSize:14,textTransform:'uppercase',letterSpacing:3}}>Chargement…</div></div>}
       {/* MOBILE TOPBAR */}
       <div className="topbar">
         <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
