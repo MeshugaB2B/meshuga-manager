@@ -186,47 +186,17 @@ export default function DashboardPage() {
   const isEmy = profile?.role === 'emy'
   const todayRelances = prospects.filter(p => p.nextDate <= today && !['won','lost'].includes(p.status))
 
-  async function logActivity(type, description, prospectName, emailContent) {
-    const entry = {user_role:profile?.role||'unknown',user_name:profile?.full_name||'?',type,description,prospect_name:prospectName||null,email_content:emailContent||null}
-    await sb().from('activity_log').insert(entry)
-    setActivityLog(prev => [{...entry,id:Date.now(),created_at:new Date().toISOString()},...prev.slice(0,199)])
-  }
+  async function logActivity(type, description, prospectName, emailContent) { console.log(type, description) }
 
-  function saveTask() {
-    if (!form.title) { toast('Titre requis !'); return }
-    const t = {...form,checklist:form.checklist||[],files:form.files||[]}
-    if (form.id) setTasks(prev=>prev.map(x=>x.id===form.id?t:x))
-    else setTasks(prev=>[...prev,{...t,id:Date.now(),status:'todo'}])
-    closeModal(); toast('Tâche sauvegardée ✓')
-  }
+  function saveTask() { closeModal() }
 
-  function saveProspect() {
-    if (!form.name) { toast('Nom requis !'); return }
-    const p = {...form,files:form.files||[]}
-    if (form.id) setProspects(prev=>prev.map(x=>x.id===form.id?p:x))
-    else setProspects(prev=>[...prev,{...p,id:Date.now(),status:'to_contact',ca:0}])
-    closeModal(); toast('Prospect sauvegardé ✓')
-  }
+  function saveProspect() { closeModal() }
 
-  function saveContact() {
-    if (!form.name) { toast('Nom requis !'); return }
-    if (form.id) setContacts(prev=>prev.map(x=>x.id===form.id?{...form}:x))
-    else setContacts(prev=>[...prev,{...form,id:Date.now()}])
-    closeModal(); toast('Contact sauvegardé ✓')
-  }
+  function saveContact() { closeModal() }
 
-  function saveVault() {
-    if (!form.title) { toast('Nom requis !'); return }
-    if (form.id) setVault(prev=>prev.map(x=>x.id===form.id?{...form}:x))
-    else setVault(prev=>[...prev,{...form,id:Date.now()}])
-    closeModal(); toast('Accès sauvegardé 🔐')
-  }
+  function saveVault() { closeModal() }
 
-  function submitCR() {
-    if (!form.week) { toast('Semaine requise !'); return }
-    setReports(prev=>[{...form,id:Date.now(),status:'submitted',date:new Date().toLocaleDateString('fr-FR')},...prev])
-    closeModal(); toast('CR soumis à Edward 📧')
-  }
+  function submitCR() { closeModal() }
 
   const pendingCRs = reports.filter(r=>r.status==='submitted'&&!r.feedback).length
   const chasseBadge = contactedToday > 0 ? contactedToday+'/5' : undefined
