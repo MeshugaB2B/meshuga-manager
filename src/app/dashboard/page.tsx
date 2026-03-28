@@ -375,10 +375,10 @@ export default function App() {
     loadProfile()
   }, [])
 
-  const toast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 2800) }
-  const openModal = (id: string, data: any = {}) => { setForm(data); setModal(id) }
+  const toast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 2800) }
+  const openModal = (id, data = {}) => { setForm(data); setModal(id) }
   const closeModal = () => { setModal(''); setForm({}) }
-  const setPage2 = (p: string) => { setPage(p); setSidebarOpen(false) }
+  const setPage2 = (p) => { setPage(p); setSidebarOpen(false) }
 
   const today = new Date().toISOString().split('T')[0]
   const isEmy = profile?.role === 'emy'
@@ -401,7 +401,7 @@ export default function App() {
     return list
   }, [chasse, chasseCat, chasseSearch, chasseTaille, chasseStatus, showOnlyToContact, chasseSort])
 
-  function contactProspect(id: string) {
+  function contactProspect(id) {
     setChasse(prev => prev.map(p => p.id === id ? {...p, status:'contacted', contacted:true} : p))
     setContactedToday(c => c + 1)
     toast('✓ Prospect contacté ! Ajouté au CRM')
@@ -413,7 +413,7 @@ export default function App() {
     }
   }
 
-  async function generateEmail(p: any) {
+  async function generateEmail(p) {
     setEmailProspect(p)
     setGeneratingEmail(true)
     setGeneratedEmail('')
@@ -465,10 +465,10 @@ Signature : ${isEmy?'Emy | B2B Manager | emy@meshuga.fr | +33 6 24 67 78 66':'Ed
     sb().from('activity_log').insert({user_role:profile.role,user_name:profile.full_name||profile.role,type:'session_start',description:'Connexion',prospect_name:null,email_content:null}).then(()=>{})
   }, [profile?.role])
 
-  async function logActivity(type: string, description: string, prospectName?: string, emailContent?: string) {
+  async function logActivity(type, description, prospectName, emailContent) {
     const entry = {user_role:profile?.role||'unknown',user_name:profile?.full_name||'?',type,description,prospect_name:prospectName||null,email_content:emailContent||null}
     await sb().from('activity_log').insert(entry)
-    setActivityLog((prev:any[]) => [{...entry,id:Date.now(),created_at:new Date().toISOString()},...prev.slice(0,199)])
+    setActivityLog((prev) => [{...entry,id:Date.now(),created_at:new Date().toISOString()},...prev.slice(0,199)])
   }
 
   function saveTask() {
@@ -542,12 +542,12 @@ Signature : ${isEmy?'Emy | B2B Manager | emy@meshuga.fr | +33 6 24 67 78 66':'Ed
     {id:'journal',label:'Journal Emy',icon:'📓'},
   ]
 
-  if (!profile) return (
+  if (!profile) { return (
     <><style>{G}</style>
     <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',background:'#FFEB5A'}}>
       <div style={{textAlign:'center'}}><div style={{fontSize:48,marginBottom:12}}></div><div style={{fontWeight:900,fontSize:14,textTransform:'uppercase',letterSpacing:3}}>Chargement…</div></div>
     </div></>
-  )
+  ) }
 
   return (
     <><style>{G}</style>
