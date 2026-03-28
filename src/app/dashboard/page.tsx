@@ -192,7 +192,7 @@ const BASE_PROSPECTS = [
   {id:'ev16',cat:'evenementiel',name:'Ikebana DMC',contacts:[{name:'Direction',email:'contact@ikebana-event.com',phone:'01 00 00 00 00',role:'Direction'}],site:'ikebana-event.com',taille:'10-30',arr:'Paris',ve:2000,vm:0,type:'Catering events internationaux',pitch:'Agence réceptive DMC. Clients internationaux en France. Budget traiteur élevé.',score:8,status:'to_contact'},
   {id:'ev17',cat:'evenementiel',name:'Strat&Com Events',contacts:[{name:'Direction',email:'contact@stratetcom.fr',phone:'01 56 88 32 00',role:'Direction'}],site:'stratetcom.fr',taille:'10-30',arr:'Paris 17e',ve:1800,vm:0,type:'Catering événementiel',pitch:'Agence communication événementielle. Conférences de presse, lancements produits.',score:7,status:'to_contact'},
   {id:'ev18',cat:'evenementiel',name:'MINUT Prod',contacts:[{name:'Direction',email:'contact@minutprod.com',phone:'01 00 00 00 00',role:'Direction'}],site:'minutprod.com',taille:'10-20',arr:'Paris',ve:1500,vm:0,type:'Catering events brand content',pitch:'Story-telling et brand content. Events corporate réguliers.',score:7,status:'to_contact'},
-  {id:'ev19',cat:'evenementiel',name:'Synergy Event Management',contacts:[{name:'Direction',email:'contact@synergy-event.fr',phone:'01 00 00 00 00',role:'Direction'}],site:'synergy-event.fr',taille:'5-20',arr:'Paris',ve:2000,vm:0,type:'Catering events corporate',pitch:'Spécialisée tourisme d\'affaires. Events Paris pour clientèle internationale.',score:7,status:'to_contact'},
+  {id:'ev19',cat:'evenementiel',name:'Synergy Event Management',contacts:[{name:'Direction',email:'contact@synergy-event.fr',phone:'01 00 00 00 00',role:'Direction'}],site:'synergy-event.fr',taille:'5-20',arr:'Paris',ve:2000,vm:0,type:'Catering events corporate',pitch:'Spécialisée tourisme d’affaires. Events Paris pour clientèle internationale.',score:7,status:'to_contact'},
   {id:'ev20',cat:'evenementiel',name:'Invictus Corporate',contacts:[{name:'Direction',email:'contact@invictus-corporate.com',phone:'01 00 00 00 00',role:'Direction'}],site:'invictus-corporate.com',taille:'5-20',arr:'Paris',ve:1500,vm:0,type:'Catering events RSE',pitch:'Très engagée RSE. Events eco-responsables. Meshuga local et durable = fit parfait.',score:8,status:'to_contact'},
 
   // CABINETS D'AVOCATS — 25 cabinets
@@ -210,10 +210,10 @@ const BASE_PROSPECTS = [
   {id:'av12',cat:'avocats',name:'Simmons & Simmons Paris',contacts:[{name:'Office Manager',email:'paris@simmons-simmons.com',phone:'01 53 29 16 29',role:'Office Manager'}],site:'simmons-simmons.com',taille:'100+',arr:'Paris 8e',ve:1500,vm:650,type:'Plateaux déjeuner',pitch:'Cabinet UK international. Déjeuners de travail réguliers.',score:7,status:'to_contact'},
   {id:'av13',cat:'avocats',name:'Racine Avocats',contacts:[{name:'Direction administrative',email:'paris@racine.eu',phone:'01 44 82 43 00',role:'Admin'}],site:'racine.eu',taille:'80+',arr:'Paris 8e',ve:1200,vm:500,type:'Plateaux déjeuner',pitch:'Cabinet indépendant français de référence.',score:7,status:'to_contact'},
   {id:'av14',cat:'avocats',name:'Hoche Avocats',contacts:[{name:'Gestion',email:'contact@hoche-avocats.fr',phone:'01 45 62 81 00',role:'Gestion'}],site:'hoche-avocats.fr',taille:'50+',arr:'Paris 8e',ve:1000,vm:450,type:'Plateaux déjeuner',pitch:'Spécialisé M&A. Due diligence = repas livrés fréquents.',score:7,status:'to_contact'},
-  {id:'av15',cat:'avocats',name:'Lazard Paris (Legal)',contacts:[{name:'Administration',email:'paris@lazard.com',phone:'01 44 13 01 11',role:'Administration'}],site:'lazard.com',taille:'200+',arr:'Paris 8e',ve:2500,vm:1000,type:'Plateaux déjeuner',pitch:'Banque d\'affaires. Deal flow intense = déjeuners de travail quotidiens.',score:9,status:'to_contact'},
+  {id:'av15',cat:'avocats',name:'Lazard Paris (Legal)',contacts:[{name:'Administration',email:'paris@lazard.com',phone:'01 44 13 01 11',role:'Administration'}],site:'lazard.com',taille:'200+',arr:'Paris 8e',ve:2500,vm:1000,type:'Plateaux déjeuner',pitch:'Banque d’affaires. Deal flow intense = déjeuners de travail quotidiens.',score:9,status:'to_contact'},
 
   // STARTUPS / SCALE-UPS — 30 entreprises
-  {id:'st01',cat:'startup',name:'Doctolib',contacts:[{name:'Office Manager',email:'office@doctolib.fr',phone:'—',role:'Office Manager'}],site:'doctolib.fr',taille:'500+',arr:'Paris 10e',ve:3000,vm:2000,type:'Plateaux déjeuner hebdo',pitch:'Scale-up emblématique. Centaines d\'employés. Culture déjeuner ensemble très forte.',score:10,status:'to_contact'},
+  {id:'st01',cat:'startup',name:'Doctolib',contacts:[{name:'Office Manager',email:'office@doctolib.fr',phone:'—',role:'Office Manager'}],site:'doctolib.fr',taille:'500+',arr:'Paris 10e',ve:3000,vm:2000,type:'Plateaux déjeuner hebdo',pitch:'Scale-up emblématique. Centaines d’employés. Culture déjeuner ensemble très forte.',score:10,status:'to_contact'},
   {id:'st02',cat:'startup',name:'Alan',contacts:[{name:'Office Manager',email:'hello@alan.com',phone:'—',role:'Office Manager'}],site:'alan.com',taille:'300+',arr:'Paris 9e',ve:2000,vm:1200,type:'Plateaux déjeuner',pitch:'Licorne santé. Bien-être employés = clé. Meshuga frais et sain = parfait.',score:9,status:'to_contact'},
   {id:'st03',cat:'startup',name:'Payfit',contacts:[{name:'Workplace Manager',email:'contact@payfit.com',phone:'—',role:'Workplace'}],site:'payfit.com',taille:'500+',arr:'Paris 9e',ve:2500,vm:1500,type:'Plateaux déjeuner',pitch:'Scale-up RH. Bureau moderne. Focus experience employé.',score:9,status:'to_contact'},
   {id:'st04',cat:'startup',name:'Qonto',contacts:[{name:'Office Experience',email:'hello@qonto.com',phone:'—',role:'Office Experience'}],site:'qonto.com',taille:'400+',arr:'Paris 9e',ve:2000,vm:1200,type:'Plateaux déjeuner',pitch:'Néo-banque B2B licorne. Équipes Paris importantes.',score:9,status:'to_contact'},
@@ -250,13 +250,13 @@ const BASE_PROSPECTS = [
   {id:'co06',cat:'conseil',name:'KPMG France',contacts:[{name:'Office Manager',email:'paris@kpmg.fr',phone:'01 55 68 68 68',role:'Office Manager'}],site:'kpmg.fr',taille:'1000+',arr:'Paris 15e',ve:2500,vm:1500,type:'Plateaux + events',pitch:'Big 4. Nombreuses réunions clients avec déjeuner.',score:9,status:'to_contact'},
   {id:'co07',cat:'conseil',name:'Roland Berger Paris',contacts:[{name:'Administration',email:'paris@rolandberger.com',phone:'01 53 67 03 00',role:'Administration'}],site:'rolandberger.com',taille:'300+',arr:'Paris 8e',ve:2000,vm:900,type:'Plateaux déjeuner',pitch:'Cabinet conseil européen. Réunions clients régulières.',score:8,status:'to_contact'},
   {id:'co08',cat:'conseil',name:'Oliver Wyman Paris',contacts:[{name:'Office Manager',email:'paris@oliverwyman.com',phone:'01 45 02 30 00',role:'Office Manager'}],site:'oliverwyman.com',taille:'200+',arr:'Paris 8e',ve:2000,vm:800,type:'Plateaux déjeuner',pitch:'Conseil finance-assurance. Déjeuners de travail importants.',score:8,status:'to_contact'},
-  {id:'co09',cat:'conseil',name:'Rothschild & Co Paris',contacts:[{name:'Office Manager',email:'paris@rothschild.com',phone:'01 40 74 40 74',role:'Office Manager'}],site:'rothschild.com',taille:'200+',arr:'Paris 8e',ve:3000,vm:1200,type:'Plateaux déjeuner',pitch:'Banque d\'affaires prestige. Réunions M&A permanentes. Budget très élevé.',score:10,status:'to_contact'},
-  {id:'co10',cat:'conseil',name:'Lazard Paris',contacts:[{name:'Administration',email:'paris@lazard.com',phone:'01 44 13 01 11',role:'Administration'}],site:'lazard.com',taille:'200+',arr:'Paris 8e',ve:2500,vm:1000,type:'Plateaux déjeuner',pitch:'Banque d\'affaires. Deal flow intense = déjeuners quotidiens.',score:9,status:'to_contact'},
+  {id:'co09',cat:'conseil',name:'Rothschild & Co Paris',contacts:[{name:'Office Manager',email:'paris@rothschild.com',phone:'01 40 74 40 74',role:'Office Manager'}],site:'rothschild.com',taille:'200+',arr:'Paris 8e',ve:3000,vm:1200,type:'Plateaux déjeuner',pitch:'Banque d’affaires prestige. Réunions M&A permanentes. Budget très élevé.',score:10,status:'to_contact'},
+  {id:'co10',cat:'conseil',name:'Lazard Paris',contacts:[{name:'Administration',email:'paris@lazard.com',phone:'01 44 13 01 11',role:'Administration'}],site:'lazard.com',taille:'200+',arr:'Paris 8e',ve:2500,vm:1000,type:'Plateaux déjeuner',pitch:'Banque d’affaires. Deal flow intense = déjeuners quotidiens.',score:9,status:'to_contact'},
 
   // HÔTELS — 15 établissements
   {id:'ht01',cat:'hotel',name:'Hôtel Lutetia',contacts:[{name:'Directeur F&B',email:'lutetia@hotellutetia.com',phone:'01 45 44 38 10',role:'F&B Director'}],site:'hotellutetia.com',taille:'200+',arr:'Paris 6e',ve:3000,vm:0,type:'Catering events VIP',pitch:'Palace 5★ dans TON arrondissement ! Events VIP permanents.',score:10,status:'to_contact'},
   {id:'ht02',cat:'hotel',name:'Hôtel Bel Ami',contacts:[{name:'Concierge chef',email:'reservation@hotel-bel-ami.com',phone:'01 42 61 53 53',role:'Concierge'}],site:'hotel-bel-ami.com',taille:'50-100',arr:'Paris 6e',ve:1000,vm:400,type:'Recommandation clients',pitch:'Hôtel boutique chic Paris 6e. Clientèle business/créative.',score:9,status:'to_contact'},
-  {id:'ht03',cat:'hotel',name:"Hôtel d'Aubusson",contacts:[{name:'Concierge chef',email:'reservation@hoteldaubusson.com',phone:'01 43 29 43 43',role:'Concierge'}],site:'hoteldaubusson.com',taille:'30-50',arr:'Paris 6e',ve:800,vm:300,type:'Recommandation + catering',pitch:'5★ rue Dauphine Paris 6e. Clientèle internationale haut de gamme.',score:9,status:'to_contact'},
+  {id:'ht03',cat:'hotel',name:"Hôtel d’Aubusson",contacts:[{name:'Concierge chef',email:'reservation@hoteldaubusson.com',phone:'01 43 29 43 43',role:'Concierge'}],site:'hoteldaubusson.com',taille:'30-50',arr:'Paris 6e',ve:800,vm:300,type:'Recommandation + catering',pitch:'5★ rue Dauphine Paris 6e. Clientèle internationale haut de gamme.',score:9,status:'to_contact'},
   {id:'ht04',cat:'hotel',name:'La Villa Saint-Germain',contacts:[{name:'Direction',email:'contact@villa-saintgermain.com',phone:'01 43 26 60 00',role:'Direction'}],site:'villa-saintgermain.com',taille:'20-50',arr:'Paris 6e',ve:700,vm:300,type:'Recommandation',pitch:'Boutique hôtel Paris 6e. Clientèle affaires. Concierge prescripteur.',score:8,status:'to_contact'},
   {id:'ht05',cat:'hotel',name:'Hôtel Montalembert',contacts:[{name:'Concierge',email:'welcome@montalembert.com',phone:'01 45 49 68 68',role:'Concierge'}],site:'montalembert.com',taille:'50-100',arr:'Paris 7e',ve:900,vm:350,type:'Recommandation + events',pitch:'Hôtel design Paris 7e. Clientèle créative et business.',score:7,status:'to_contact'},
   {id:'ht06',cat:'hotel',name:'Le Relais Christine',contacts:[{name:'Directeur',email:'contact@relais-christine.com',phone:'01 40 51 60 80',role:'Directeur'}],site:'relais-christine.com',taille:'30-50',arr:'Paris 6e',ve:600,vm:200,type:'Recommandation',pitch:'Hôtel de charme Paris 6e. Clientèle luxe. Concierge recommande.',score:8,status:'to_contact'},
@@ -275,7 +275,7 @@ const BASE_PROSPECTS = [
   // INSTITUTIONS — 15 organisations
   {id:'in01',cat:'institution',name:'Mairie Paris 6e',contacts:[{name:'Protocole',email:'mairie06@paris.fr',phone:'01 40 46 40 46',role:'Protocole'}],site:'mairie06.paris.fr',taille:'100+',arr:'Paris 6e',ve:1000,vm:300,type:'Catering cérémonies',pitch:'Ta mairie ! Cérémonies officielles, vœux. Argument proximité et fierté locale.',score:10,status:'to_contact'},
   {id:'in02',cat:'institution',name:'Sénat',contacts:[{name:'Services intendance',email:'contact@senat.fr',phone:'01 42 34 20 00',role:'Intendance'}],site:'senat.fr',taille:'1000+',arr:'Paris 6e',ve:3000,vm:0,type:'Catering réceptions officielles',pitch:'5 minutes de Meshuga. Réceptions officielles permanentes.',score:8,status:'to_contact'},
-  {id:'in03',cat:'institution',name:"Musée d'Orsay",contacts:[{name:'Direction événements',email:'evenements@musee-orsay.fr',phone:'01 40 49 48 14',role:'Events'}],site:'musee-orsay.fr',taille:'500+',arr:'Paris 7e',ve:3000,vm:0,type:'Catering vernissages',pitch:'Privatisations corporate fréquentes. Traiteur partenaire très lucratif.',score:8,status:'to_contact'},
+  {id:'in03',cat:'institution',name:"Musée d’Orsay",contacts:[{name:'Direction événements',email:'evenements@musee-orsay.fr',phone:'01 40 49 48 14',role:'Events'}],site:'musee-orsay.fr',taille:'500+',arr:'Paris 7e',ve:3000,vm:0,type:'Catering vernissages',pitch:'Privatisations corporate fréquentes. Traiteur partenaire très lucratif.',score:8,status:'to_contact'},
   {id:'in04',cat:'institution',name:'Centre Pompidou',contacts:[{name:'Direction mécénat',email:'mecenat@centrepompidou.fr',phone:'01 44 78 12 33',role:'Mécénat'}],site:'centrepompidou.fr',taille:'500+',arr:'Paris 4e',ve:3500,vm:0,type:'Catering vernissages',pitch:'Centre culturel international. Vernissages et events corporate réguliers.',score:8,status:'to_contact'},
   {id:'in05',cat:'institution',name:'Fondation Louis Vuitton',contacts:[{name:'Events Manager',email:'fondation@louisvuitton.com',phone:'01 40 69 96 00',role:'Events'}],site:'fondationlouisvuitton.fr',taille:'200+',arr:'Paris 16e',ve:5000,vm:0,type:'Catering events VIP',pitch:'Events VIP et vernissages réguliers. Budget traiteur très élevé.',score:9,status:'to_contact'},
   {id:'in06',cat:'institution',name:'Sciences Po Paris',contacts:[{name:'Direction événements',email:'events@sciencespo.fr',phone:'01 45 49 50 50',role:'Events'}],site:'sciencespo.fr',taille:'1000+',arr:'Paris 7e',ve:3000,vm:0,type:'Catering conférences + events',pitch:'2 minutes de Meshuga ! Conférences permanentes. Argument proximité fort.',score:10,status:'to_contact'},
@@ -742,7 +742,7 @@ export default function App() {
               {/* ══ PLANNING SEMAINE ══════════════════════════════════════════ */}
             <div className="card" style={{padding:0,overflow:'hidden',marginBottom:10}}>
               <div style={{background:'#191923',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <div className="yt" style={{color:'#FFEB5A',fontSize:18}}>📅 Planning {isEmy?'de ma semaine':"d'Emy"}</div>
+                <div className="yt" style={{color:'#FFEB5A',fontSize:18}}>📅 Planning {isEmy?'de ma semaine':"d’Emy"}</div>
                 <div style={{display:'flex',gap:8,alignItems:'center'}}>
                   <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={()=>setPlanningWeek((w:any)=>w-1)}>←</button>
                   <span style={{color:'#FFEB5A',fontSize:11,fontWeight:900,minWidth:120,textAlign:'center'}}>
@@ -814,7 +814,7 @@ export default function App() {
 
             {!isEmy&&reports.length>0&&(
                 <div className="card card-click" onClick={()=>nav('reporting')}>
-                  <div className="ct">📋 Dernier CR d'Emy <span style={{fontSize:11,opacity:.4,fontFamily:'Arial',fontWeight:400}}>— cliquer pour voir →</span></div>
+                  <div className="ct">📋 Dernier CR d’Emy <span style={{fontSize:11,opacity:.4,fontFamily:'Arial',fontWeight:400}}>— cliquer pour voir →</span></div>
                   <div style={{background:'#FFEB5A',border:'2px solid #191923',borderRadius:5,padding:10}}>
                     <div className="yt" style={{fontSize:12,opacity:.5,marginBottom:4}}>{reports[0].week}</div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>
@@ -1157,7 +1157,7 @@ export default function App() {
                   </div>
                   {r.wins&&<div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>✅ Victoires</div><div style={{fontSize:12}}>{r.wins}</div></div>}
                   {r.next&&<div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>🎯 Priorités S+1</div><div style={{fontSize:12}}>{r.next}</div></div>}
-                  {r.feedback?<div style={{background:'#FF82D7',border:'2px solid #191923',borderRadius:5,padding:10}}><div className="yt" style={{fontSize:14,marginBottom:4}}>💬 Retour d'Edward</div><div style={{fontSize:12}}>{r.feedback}</div></div>:
+                  {r.feedback?<div style={{background:'#FF82D7',border:'2px solid #191923',borderRadius:5,padding:10}}><div className="yt" style={{fontSize:14,marginBottom:4}}>💬 Retour d’Edward</div><div style={{fontSize:12}}>{r.feedback}</div></div>:
                   !isEmy&&(<div style={{marginTop:10}}>
                     <div className="lbl">💬 Ton retour à Emy</div>
                     <textarea className="inp" placeholder="Bravo, recadrages…" id={`fb-${r.id}`} style={{minHeight:60}} />
@@ -1165,7 +1165,7 @@ export default function App() {
                   </div>)}
                 </div>
               ))}
-              {reports.length===0&&<div className="card" style={{textAlign:'center',padding:40}}><div style={{fontSize:40,marginBottom:10}}>📋</div><div style={{fontWeight:900,textTransform:'uppercase'}}>Aucun CR pour l'instant</div>{isEmy&&<button className="btn btn-y" style={{marginTop:14}} onClick={()=>open('cr',{})}>Créer le premier CR</button>}</div>}
+              {reports.length===0&&<div className="card" style={{textAlign:'center',padding:40}}><div style={{fontSize:40,marginBottom:10}}>📋</div><div style={{fontWeight:900,textTransform:'uppercase'}}>Aucun CR pour l’instant</div>{isEmy&&<button className="btn btn-y" style={{marginTop:14}} onClick={()=>open('cr',{})}>Créer le premier CR</button>}</div>}
             </div>
           )}
 
@@ -1198,7 +1198,7 @@ export default function App() {
           {page==='journal'&&(
             <div>
               <div className="ph">
-                <div><div className="pt">Journal d'activité 📓</div><div className="ps">Tout ce qu'Emy a fait, contacté, envoyé</div></div>
+                <div><div className="pt">Journal d’activité 📓</div><div className="ps">Tout ce qu'Emy a fait, contacté, envoyé</div></div>
               </div>
               {/* Filtres */}
               <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
@@ -1210,7 +1210,7 @@ export default function App() {
                 <div className="card" style={{textAlign:'center',padding:40,opacity:.4}}>
                   <div style={{fontSize:32,marginBottom:8}}>📓</div>
                   <div style={{fontWeight:900,textTransform:'uppercase',fontSize:12}}>Aucune activité enregistrée</div>
-                  <div style={{fontSize:11,marginTop:6,opacity:.6}}>Les actions d'Emy apparaîtront ici en temps réel</div>
+                  <div style={{fontSize:11,marginTop:6,opacity:.6}}>Les actions d’Emy apparaîtront ici en temps réel</div>
                 </div>
               ):activityLog.filter((a:any)=>journalFilter==='all'||a.type===journalFilter).map((a:any)=>(
                 <div key={a.id} className="card" style={{padding:'12px 14px',marginBottom:8}}>
@@ -1225,7 +1225,7 @@ export default function App() {
                       {a.email_content&&(
                         <div style={{marginTop:8,marginLeft:24}}>
                           <details>
-                            <summary style={{cursor:'pointer',fontSize:11,fontWeight:900,opacity:.6}}>Voir l'email envoyé</summary>
+                            <summary style={{cursor:'pointer',fontSize:11,fontWeight:900,opacity:.6}}>Voir l’email envoyé</summary>
                             <div style={{background:'#F8F8F8',border:'1.5px solid #DEDEDE',borderRadius:5,padding:10,marginTop:6,fontSize:12,whiteSpace:'pre-wrap',fontFamily:'Arial,sans-serif',lineHeight:1.6}}>{a.email_content}</div>
                           </details>
                         </div>
@@ -1248,7 +1248,7 @@ export default function App() {
               <div className="fg"><label className="lbl">Valeur mensuelle €</label><input type="number" className="inp" value={form.vm||''} onChange={e=>setForm({...form,vm:parseInt(e.target.value)||0})} /></div>
               <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Type de commande</label><input className="inp" value={form.type||''} onChange={e=>setForm({...form,type:e.target.value})} /></div>
               <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">📍 Adresse</label><input className="inp" value={form.adresse||''} onChange={e=>setForm({...form,adresse:e.target.value})} placeholder="123 rue de la Paix, 75001 Paris" /></div>
-              <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">💡 Angle d'approche</label><textarea className="inp" value={form.pitch||''} onChange={e=>setForm({...form,pitch:e.target.value})} /></div>
+              <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">💡 Angle d’approche</label><textarea className="inp" value={form.pitch||''} onChange={e=>setForm({...form,pitch:e.target.value})} /></div>
             </div>
 
             {/* Contacts multiples */}
@@ -1320,7 +1320,7 @@ export default function App() {
               <div className="fg"><label className="lbl">Valeur event €</label><input type="number" className="inp" value={form.ve||''} onChange={e=>setForm({...form,ve:parseInt(e.target.value)||0})} /></div>
               <div className="fg"><label className="lbl">Valeur mensuelle €</label><input type="number" className="inp" value={form.vm||''} onChange={e=>setForm({...form,vm:parseInt(e.target.value)||0})} /></div>
               <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Type de commande</label><input className="inp" value={form.type||''} onChange={e=>setForm({...form,type:e.target.value})} /></div>
-              <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">💡 Angle d'approche</label><textarea className="inp" value={form.pitch||''} onChange={e=>setForm({...form,pitch:e.target.value})} /></div>
+              <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">💡 Angle d’approche</label><textarea className="inp" value={form.pitch||''} onChange={e=>setForm({...form,pitch:e.target.value})} /></div>
             </div>
             <div style={{marginTop:10}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
@@ -1482,7 +1482,7 @@ export default function App() {
     {modal==='vault_edit'&&(
       <div className="overlay" onClick={close}>
         <div className="modal" onClick={e=>e.stopPropagation()}>
-          <div className="mh"><div className="mt">{form.id?"Modifier l'accès":"Nouvel accès"} 🔐</div></div>
+          <div className="mh"><div className="mt">{form.id?"Modifier l’accès":"Nouvel accès"} 🔐</div></div>
           <div className="mb">
             <div className="fg2">
               <div className="fg"><label className="lbl">Nom *</label><input className="inp" value={form.title||''} onChange={e=>setForm({...form,title:e.target.value})} /></div>
@@ -1512,7 +1512,7 @@ export default function App() {
                 <div key={k} className="fg"><label className="lbl">{l}</label><input type="number" className="inp" value={(form as any)[k]||0} onChange={e=>setForm({...form,[k]:parseInt(e.target.value)||0})} /></div>
               ))}
             </div>
-            <div className="fg"><label className="lbl">✅ Victoires</label><textarea className="inp" value={form.wins||''} onChange={e=>setForm({...form,wins:e.target.value})} placeholder="Ce que j'ai accompli…" /></div>
+            <div className="fg"><label className="lbl">✅ Victoires</label><textarea className="inp" value={form.wins||''} onChange={e=>setForm({...form,wins:e.target.value})} placeholder="Ce que j’ai accompli…" /></div>
             <div className="fg"><label className="lbl">⚡ Challenges</label><textarea className="inp" value={form.challenges||''} onChange={e=>setForm({...form,challenges:e.target.value})} /></div>
             <div className="fg"><label className="lbl">🎯 Priorités S+1</label><textarea className="inp" value={form.next||''} onChange={e=>setForm({...form,next:e.target.value})} /></div>
             <div className="fg"><label className="lbl">💬 Note pour Edward</label><textarea className="inp" value={form.notes||''} onChange={e=>setForm({...form,notes:e.target.value})} /></div>
