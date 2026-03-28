@@ -596,10 +596,11 @@ export default function App() {
           </nav>
           <div style={{padding:'10px 12px 14px',borderTop:'3px solid #191923'}}>
             <div className="yt" style={{fontSize:11,opacity:.35,marginBottom:5}}>Connecté</div>
-            <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
               <div style={{width:28,height:28,borderRadius:4,border:'2px solid #191923',background:isEmy?'#FF82D7':'#FFEB5A',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:13}}>{profile.full_name?.[0]?.toUpperCase()||'?'}</div>
               <div><div style={{fontWeight:900,fontSize:11,textTransform:'uppercase'}}>{profile.full_name||profile.email?.split('@')[0]}</div><div className="yt" style={{fontSize:11,opacity:.4}}>{isEmy?'B2B Manager':'The Big Boss'}</div></div>
             </div>
+            <button className="btn btn-sm" style={{width:'100%',justifyContent:'center',fontSize:10,opacity:.6}} onClick={async()=>{await sb().auth.signOut();window.location.href='/login'}}>↩ Se déconnecter</button>
           </div>
         </div>
 
