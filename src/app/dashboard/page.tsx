@@ -1,6 +1,6 @@
 'use client'
 // @ts-nocheck
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
 const sb = () => createBrowserClient(
@@ -385,7 +385,8 @@ export default function App() {
   const todayRelances = prospects.filter(p => p.nextDate <= today && !['won','lost'].includes(p.status))
 
   // Chasse filtered + sorted
-  const chasseFiltered = useMemo(() => {
+let chasseFiltered: any[] = [...chasse]
+
     let list = chasse
     if (chasseCat !== 'all') list = list.filter(p => p.cat === chasseCat)
     if (chasseSearch) list = list.filter(p => p.name.toLowerCase().includes(chasseSearch.toLowerCase()) || p.arrondissement.toLowerCase().includes(chasseSearch.toLowerCase()))
@@ -393,13 +394,12 @@ export default function App() {
     if (chasseStatus !== 'all') list = list.filter(p => p.status === chasseStatus)
     if (showOnlyToContact) list = list.filter(p => p.status === 'to_contact')
     list = [...list].sort((a,b) => {
-      if (chasseSort === 'score') return b.score - a.score
-      if (chasseSort === 'valeur') return (b.valeur_event + b.valeur_mois*12) - (a.valeur_event + a.valeur_mois*12)
-      if (chasseSort === 'name') return a.name.localeCompare(b.name)
-      return 0
-    })
-    return list
-  }, [chasse, chasseCat, chasseSearch, chasseTaille, chasseStatus, showOnlyToContact, chasseSort])
+      if (chasseSort === 'score')   chasseFiltered = [...chasseFiltered].sort((a:any,b:any)=>{
+    if (chasseSort==='score') return b.score-a.score
+    if (chasseSort==='valeur') return (b.valeur_event+b.valeur_mois*12)-(a.valeur_event+a.valeur_mois*12)
+    if (chasseSort==='name') return a.name.localeCompare(b.name)
+    return 0
+  })
 
   function contactProspect(id) {
     setChasse(prev => prev.map(p => p.id === id ? {...p, status:'contacted', contacted:true} : p))
