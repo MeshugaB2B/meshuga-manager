@@ -353,15 +353,15 @@ const INIT_VAULT = [
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [profile, setProfile] = useState<any>(null)
+  const [profile, setProfile] = useState(null)
   const [page, setPage] = useState('dash')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [tasks, setTasks] = useState(INIT_TASKS)
   const [crmProspects, setCrmProspects] = useState(INIT_PROSPECTS_CRM)
   const [contacts, setContacts] = useState(INIT_CONTACTS)
   const [vault, setVault] = useState(INIT_VAULT)
-  const [reports, setReports] = useState<any[]>([])
-  const [chasse, setChasse] = useState<any[]>([])
+  const [reports, setReports] = useState([])
+  const [chasse, setChasse] = useState([])
   const [chasseLoading, setChasseLoading] = useState(true)
   const [chasseTotal, setChasseTotal] = useState(0)
   const [chasseOffset, setChasseOffset] = useState(0)
@@ -370,12 +370,12 @@ export default function DashboardPage() {
   const [planningWeek, setPlanningWeek] = useState(0)
   const [genCat, setGenCat] = useState('evenementiel')
   const [genZone, setGenZone] = useState('Paris et IDF')
-  const [activityLog, setActivityLog] = useState<any[]>([])
+  const [activityLog, setActivityLog] = useState([])
   const CHASSE_PAGE = 50
   const [toast2, setToast2] = useState('')
   const [modal, setModal] = useState('')
-  const [form, setForm] = useState<any>({})
-  const [pwVisible, setPwVisible] = useState<any>({})
+  const [form, setForm] = useState({})
+  const [pwVisible, setPwVisible] = useState({})
   const [contactedToday, setContactedToday] = useState(0)
   const [chasseCat, setChasseCat] = useState('all')
   const [chasseSearch, setChasseSearch] = useState('')
@@ -402,10 +402,10 @@ export default function DashboardPage() {
     loadProfile()
   }, [])
 
-  const toast = (msg: string) => { setToast2(msg); setTimeout(()=>setToast2(''),2800) }
-  const open = (id: string, data: any={}) => { setForm(data); setModal(id); setGenEmail('') }
+  const toast = (msg) => { setToast2(msg); setTimeout(()=>setToast2(''),2800) }
+  const open = (id, data={}) => { setForm(data); setModal(id); setGenEmail('') }
   const close = () => { setModal(''); setForm({}) }
-  const nav = (p: string) => { setPage(p); setSidebarOpen(false) }
+  const nav = (p) => { setPage(p); setSidebarOpen(false) }
 
   const today = new Date().toISOString().split('T')[0]
   const isEmy = profile?.role === 'emy'
@@ -426,11 +426,11 @@ export default function DashboardPage() {
     })
   }, [chasse,chasseCat,chasseSearch,chasseStatus,chasseSort])
 
-  function toggleExpand(id: string) {
+  function toggleExpand(id) {
     setChasse(prev=>prev.map(p=>p.id===id?{...p,expanded:!p.expanded}:p))
   }
 
-  async function updateChasseStatus(id: string, status: string) {
+  async function updateChasseStatus(id, status) {
     const supabase = sb()
     await supabase.from('chasse_prospects').update({ status }).eq('id', id)
     setChasse(prev=>prev.map(p=>p.id===id?{...p,status}:p))
@@ -447,7 +447,7 @@ export default function DashboardPage() {
     }
   }
 
-  async function generateEmail(prospect: any, context: string) {
+  async function generateEmail(prospect, context) {
     setGenLoading(true)
     setGenEmail('')
     try {
@@ -532,7 +532,7 @@ export default function DashboardPage() {
 
 
   // ─── LOG ACTIVITY ──────────────────────────────────────────────────────────
-  async function logActivity(type: string, description: string, prospectName?: string, emailContent?: string) {
+  async function logActivity(type, description, prospectName?, emailContent?) {
     const supabase = sb()
     const entry = {
       user_role: profile?.role || 'unknown',
@@ -543,7 +543,7 @@ export default function DashboardPage() {
       email_content: emailContent || null,
     }
     await supabase.from('activity_log').insert(entry)
-    setActivityLog((prev: any) => [{ ...entry, id: Date.now(), created_at: new Date().toISOString() }, ...prev.slice(0, 49)])
+    setActivityLog((prev) => [{ ...entry, id: Date.now(), created_at: new Date().toISOString() }, ...prev.slice(0, 49)])
   }
 
   function saveTask() {
