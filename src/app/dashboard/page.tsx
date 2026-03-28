@@ -222,10 +222,10 @@ export default function DashboardPage() {
     }).then(() => {})
   }, [profile?.role])
 
-  const toast = (msg: string) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 2800) }
-  const openModal = (id: string, data?: any) => { setForm(data || {}); setModal(id) }
+  const toast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 2800) }
+  const openModal = (id, data) => { setForm(data || {}); setModal(id) }
   const closeModal = () => { setModal(''); setForm({}) }
-  const nav = (p: string) => { setPage(p); setSidebarOpen(false) }
+  const nav = (p) => { setPage(p); setSidebarOpen(false) }
 
   const today = new Date().toISOString().split('T')[0]
   const isEmy = profile?.role === 'emy'
@@ -245,7 +245,7 @@ export default function DashboardPage() {
     return 0
   })
 
-  async function logActivity(type: string, description: string, prospectName?: string, emailContent?: string) {
+  async function logActivity(type, description, prospectName, emailContent) {
     const entry = {
       user_role: profile?.role || 'unknown',
       user_name: profile?.full_name || '?',
@@ -257,7 +257,7 @@ export default function DashboardPage() {
     setActivityLog(prev => [{...entry, id: Date.now(), created_at: new Date().toISOString()}, ...prev.slice(0,199)])
   }
 
-  function contactProspect(id: string) {
+  function contactProspect(id) {
     const p = chasse.find(x => x.id === id)
     setChasse(prev => prev.map(x => x.id === id ? {...x, status:'contacted', contacted:true} : x))
     setContactedToday(c => c + 1)
@@ -268,7 +268,7 @@ export default function DashboardPage() {
     toast('✓ Prospect contacté ! Ajouté au CRM')
   }
 
-  async function generateEmail(p: any) {
+  async function generateEmail(p) {
     setGeneratingEmail(true)
     setGeneratedEmail('')
     openModal('email', p)
