@@ -232,10 +232,7 @@ export default function DashboardPage() {
   const todayRelances = prospects.filter(p => p.nextDate <= today && !['won','lost'].includes(p.status))
 
   let chasseFiltered = chasse.filter(p => chasseCat === 'all' || p.cat === chasseCat)
-  if (chasseSearch) chasseFiltered = chasseFiltered.filter(p =>
-    p.name.toLowerCase().includes(chasseSearch.toLowerCase()) ||
-    (p.arrondissement||'').toLowerCase().includes(chasseSearch.toLowerCase())
-  )
+  if (chasseSearch) chasseFiltered = chasseFiltered.filter(p => p.name.toLowerCase().includes(chasseSearch.toLowerCase()) || (p.arrondissement||'').toLowerCase().includes(chasseSearch.toLowerCase()))
   if (chasseTaille !== 'all') chasseFiltered = chasseFiltered.filter(p => p.taille === chasseTaille)
   if (chasseStatus !== 'all') chasseFiltered = chasseFiltered.filter(p => p.status === chasseStatus)
   chasseFiltered = [...chasseFiltered].sort((a, b) => {
