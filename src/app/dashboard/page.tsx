@@ -228,16 +228,18 @@ export default function DashboardPage() {
   }
 
   const pendingCRs = reports.filter(r=>r.status==='submitted'&&!r.feedback).length
+  const chasseBadge = contactedToday > 0 ? contactedToday+'/5' : undefined
+  const reportBadge = (!isEmy && pendingCRs > 0) ? pendingCRs : undefined
   const NAV = [
-    {id:'dash',label:'Dashboard',icon:'⚡'},
-    {id:'chasse',label:'Tableau de chasse',icon:'🎯',badge:contactedToday>0?contactedToday+'/5':undefined},
-    {id:'crm',label:'CRM Prospects',icon:'◎'},
-    {id:'annuaire',label:'Annuaire',icon:'📒'},
-    {id:'tasks',label:'Tâches',icon:'✓'},
-    {id:'reporting',label:'Reporting',icon:'📋',badge:(!isEmy&&pendingCRs>0)?pendingCRs:undefined},
-    {id:'vault',label:'Coffre-fort',icon:'🔐'},
-    {id:'gmb',label:'Google My Biz.',icon:'⭐'},
-    {id:'journal',label:'Journal Emy',icon:'📓'},
+    {id:'dash', label:'Dashboard', icon:'⚡'},
+    {id:'chasse', label:'Tableau de chasse', icon:'🎯', badge:chasseBadge},
+    {id:'crm', label:'CRM Prospects', icon:'◎'},
+    {id:'annuaire', label:'Annuaire', icon:'📒'},
+    {id:'tasks', label:'Taches', icon:'✓'},
+    {id:'reporting', label:'Reporting', icon:'📋', badge:reportBadge},
+    {id:'vault', label:'Coffre-fort', icon:'🔐'},
+    {id:'gmb', label:'Google My Biz.', icon:'⭐'},
+    {id:'journal', label:'Journal Emy', icon:'📓'},
   ]
 
   return (
