@@ -352,7 +352,7 @@ const INIT_VAULT = [
 ]
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
-export default function App() {
+export default function DashboardPage() {
   const [profile, setProfile] = useState<any>(null)
   const [page, setPage] = useState('dash')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -462,7 +462,7 @@ export default function App() {
       } else {
         setGenEmail(data.email || 'Erreur génération')
       }
-    } catch {
+    } catch(e) {
       setGenEmail('Erreur réseau. Vérifier la connexion.')
     }
     setGenLoading(false)
@@ -526,7 +526,7 @@ export default function App() {
       if (data.error) { toast('Erreur : ' + data.error); return }
       toast(`✨ ${data.inserted} nouveaux prospects ajoutés !`)
       loadChasse(0, true)
-    } catch { toast('Erreur réseau') }
+    } catch(e) { toast('Erreur réseau') }
     setGenProspectLoading(false)
   }
 
