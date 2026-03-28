@@ -6,27 +6,27 @@ const PRESS: Record<string, {source: string, phrase: string, url: string}> = {
   corporate: {
     source: 'Challenges',
     phrase: 'sélectionné parmi les meilleures adresses street food parisiennes',
-    url: 'https://challenges.fr/meshuga',
+    url: 'https://www.challenges.fr/lifestyle/les-nouvelles-adresses-de-street-food-a-decouvrir-cet-ete-a-paris_860036',
   },
   startup: {
     source: 'Konbini',
     phrase: 'les sandwiches les plus confort du moment',
-    url: 'https://konbini.com/meshuga',
+    url: 'https://www.konbini.com/food/on-a-teste-meshuga-le-deli-aux-sandwiches-les-plus-confort-du-moment/',
   },
   evenementiel: {
     source: 'Paris Première – Très Très Bon',
     phrase: 'sélectionné par l\'émission Très Très Bon',
-    url: 'https://fb.watch/meshuga-trestresbon',
+    url: 'https://www.facebook.com/watch/?v=648051137321383',
   },
   luxe: {
     source: 'Télérama',
     phrase: 'street food de haut niveau près du jardin du Luxembourg',
-    url: 'https://telerama.fr/meshuga',
+    url: 'https://www.telerama.fr/restos-loisirs/meshuga-de-la-street-food-de-haut-niveau-pres-du-jardin-du-luxembourg_cri-7043251.php',
   },
   default: {
     source: 'Télérama',
     phrase: 'street food de haut niveau près du jardin du Luxembourg',
-    url: 'https://telerama.fr/meshuga',
+    url: 'https://www.telerama.fr/restos-loisirs/meshuga-de-la-street-food-de-haut-niveau-pres-du-jardin-du-luxembourg_cri-7043251.php',
   },
 }
 
@@ -65,11 +65,16 @@ export async function POST(req: NextRequest) {
     const contactName = prospect.contacts?.[0]?.name || prospect.contact_name || 'Madame, Monsieur'
 
     const pressInstruction = (context.includes('premier contact') || context.includes('prise de contact') || context.includes('relance'))
-      ? `Inclus cette référence presse de façon naturelle. Écris-la EXACTEMENT comme ceci, en texte brut :
+      ? `Inclus cette référence presse dans l'email. Écris-la EXACTEMENT dans ce format, sur deux lignes séparées :
 
-${press.source} parle de nous comme de la ${press.phrase} : ${press.url}
+${press.source} parle de nous comme de la ${press.phrase}.
+Lire l'article ${press.source} : ${press.url}
 
-INTERDIT : format Markdown [texte](lien), crochets, parenthèses autour du lien. Le lien doit être brut, sur la même ligne que le texte.`
+RÈGLES ABSOLUES :
+- Le texte et le lien sont sur DEUX LIGNES SÉPARÉES
+- JAMAIS de format Markdown [texte](lien)
+- JAMAIS de crochets ou parenthèses autour du lien
+- Le lien est écrit tel quel, brut`
       : `Pas de référence presse pour cet email — concentre-toi sur l'action : ${context}.`
 
     const signature = `${senderName}
