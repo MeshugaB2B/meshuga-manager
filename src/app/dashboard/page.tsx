@@ -734,13 +734,13 @@ export default function App() {
               {/* ══ PLANNING SEMAINE ══════════════════════════════════════════ */}
             <div className="card" style={{padding:0,overflow:'hidden',marginBottom:10}}>
               <div style={{background:'#191923',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <div className="yt" style={{color:'#FFEB5A',fontSize:18}}>📅 Planning {isEmy?'de ma semaine':'d'Emy'}</div>
+                <div className="yt" style={{color:'#FFEB5A',fontSize:18}}>📅 Planning {isEmy?'de ma semaine':"d'Emy"}</div>
                 <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                  <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={()=>setPlanningWeek((w:number)=>w-1)}>←</button>
+                  <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={()=>setPlanningWeek((w:any)=>w-1)}>←</button>
                   <span style={{color:'#FFEB5A',fontSize:11,fontWeight:900,minWidth:120,textAlign:'center'}}>
                     {planningWeek===0?'Cette semaine':planningWeek<0?`Il y a ${Math.abs(planningWeek)} sem.`:`Dans ${planningWeek} sem.`}
                   </span>
-                  <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={()=>setPlanningWeek((w:number)=>w+1)}>→</button>
+                  <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={()=>setPlanningWeek((w:any)=>w+1)}>→</button>
                   {planningWeek!==0&&<button className="btn btn-y btn-sm" onClick={()=>setPlanningWeek(0)}>Auj.</button>}
                   {isEmy&&<button className="btn btn-p btn-sm" onClick={()=>open('task_detail',{assignee:'emy',priority:'medium',status:'todo',checklist:[],files:[]})}>+ Tâche</button>}
                 </div>
@@ -1204,7 +1204,7 @@ export default function App() {
                   <div style={{fontWeight:900,textTransform:'uppercase',fontSize:12}}>Aucune activité enregistrée</div>
                   <div style={{fontSize:11,marginTop:6,opacity:.6}}>Les actions d'Emy apparaîtront ici en temps réel</div>
                 </div>
-              ):activityLog.filter(a=>journalFilter==='all'||a.type===journalFilter).map((a:any)=>(
+              ):activityLog.filter((a:any)=>journalFilter==='all'||a.type===journalFilter).map((a:any)=>(
                 <div key={a.id} className="card" style={{padding:'12px 14px',marginBottom:8}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
                     <div style={{flex:1}}>
