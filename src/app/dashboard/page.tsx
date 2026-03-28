@@ -366,8 +366,11 @@ export default function App() {
   const [chasseTotal, setChasseTotal] = useState(0)
   const [chasseOffset, setChasseOffset] = useState(0)
   const [genProspectLoading, setGenProspectLoading] = useState(false)
+  const [journalFilter, setJournalFilter] = useState('all')
+  const [planningWeek, setPlanningWeek] = useState(0)
   const [genCat, setGenCat] = useState('evenementiel')
   const [genZone, setGenZone] = useState('Paris et IDF')
+  const [activityLog, setActivityLog] = useState<any[]>([])
   const CHASSE_PAGE = 50
   const [toast2, setToast2] = useState('')
   const [modal, setModal] = useState('')
@@ -385,7 +388,19 @@ export default function App() {
 
   useEffect(() => {
     sb().auth.getUser().then(({data:{user}}) => {
-      if (user) sb().from('profiles').select('*').eq('id',user.id).single().then(({data}) => setProfile(data || {role:'edward',full_name:'Edward',email:user.email}))
+      if (user) {
+        sb().from('profiles').select('*').eq('id',user.id).single().then(({data, error}) => {
+          if (data && data.role) {
+            setProfile(data)
+          } else {
+            // Profile existe mais sans role, ou pas de profile du tout
+            // On détecte via l'email
+            const role = user.email?.includes('emy') ? 'emy' : 'edward'
+            const full_name = role === 'emy' ? 'Emy' : 'Edward'
+            setProfile({ role, full_name, email: user.email })
+          }
+        })
+      }
     })
   }, [])
 
@@ -427,6 +442,7 @@ export default function App() {
       if (p) {
         setCrmProspects(prev=>[...prev, {id:Date.now(),name:p.name,contacts:p.contacts||[{name:p.contact_name,email:p.contact_email,phone:p.contact_phone,role:p.contact_role}],size:p.taille,category:CATS_MAP[p.cat]?.label||p.cat,status:'contacted',nextAction:'Relancer',nextDate:'',notes:p.pitch,ca:0,score:p.score}])
         toast(`✓ ${p.name} ajouté au CRM !`)
+        logActivity('prospect_contacte', `${p.name} marqué comme contacté et ajouté au CRM`, p.name)
       }
     } else {
       toast(`Statut mis à jour : ${STATUS_P[status]}`)
@@ -486,6 +502,16 @@ export default function App() {
   // Charger seulement si connecté
   useEffect(() => { if (profile) loadChasse(0, true) }, [chasseCat, chasseStatus, chasseSearch, chasseSort, profile])
 
+  // Charger le journal d'activité
+  useEffect(() => {
+    if (!profile) return
+    sb().from('activity_log')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100)
+      .then(({ data }) => { if (data) setActivityLog(data) })
+  }, [profile])
+
   // ─── GÉNÉRER PROSPECTS VIA IA ─────────────────────────────────
   async function generateProspects() {
     setGenProspectLoading(true)
@@ -503,7 +529,23 @@ export default function App() {
     setGenProspectLoading(false)
   }
 
-  function saveTask() {
+
+  // ─── LOG ACTIVITY ──────────────────────────────────────────────────────────
+  async function logActivity(type: string, description: string, prospectName?: string, emailContent?: string) {
+    const supabase = sb()
+    const entry = {
+      user_role: profile?.role || 'unknown',
+      user_name: profile?.full_name || '?',
+      type,
+      description,
+      prospect_name: prospectName || null,
+      email_content: emailContent || null,
+    }
+    await supabase.from('activity_log').insert(entry)
+    setActivityLog((prev: any[]) => [{ ...entry, id: Date.now(), created_at: new Date().toISOString() }, ...prev.slice(0, 49)])
+  }
+
+    function saveTask() {
     if (!form.title) { toast('Titre requis !'); return }
     const t = {...form, checklist: form.checklist||[], files: form.files||[]}
     if (form.id) setTasks(prev=>prev.map(x=>x.id===form.id?t:x))
@@ -569,6 +611,7 @@ export default function App() {
     {id:'reporting',label:'Reporting',icon:'📋',badge:!isEmy&&reports.filter(r=>r.status==='submitted'&&!r.feedback).length>0?reports.filter(r=>r.status==='submitted'&&!r.feedback).length:undefined},
     {id:'vault',label:'Coffre-fort',icon:'🔐'},
     {id:'gmb',label:'Google My Biz.',icon:'⭐'},
+    {id:'journal',label:'Journal Emy',icon:'📓'},
   ]
 
   if (!profile) return <><style>{G}</style><div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',background:'#FFEB5A'}}><div style={{textAlign:'center'}}><div style={{fontSize:48,marginBottom:12}}>😬</div><div style={{fontWeight:900,fontSize:14,textTransform:'uppercase',letterSpacing:3}}>Chargement…</div><div style={{marginTop:16}}><a href="/login" style={{fontFamily:"'Yellowtail',cursive",fontSize:16,color:'#191923',opacity:.5}}>← Se connecter</a></div></div></div></>
@@ -688,7 +731,80 @@ export default function App() {
                 </div>
               </div>
 
-              {!isEmy&&reports.length>0&&(
+              {/* ══ PLANNING SEMAINE ══════════════════════════════════════════ */}
+            <div className="card" style={{padding:0,overflow:'hidden',marginBottom:10}}>
+              <div style={{background:'#191923',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div className="yt" style={{color:'#FFEB5A',fontSize:18}}>📅 Planning {isEmy?'de ma semaine':'d'Emy'}</div>
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={()=>setPlanningWeek((w:number)=>w-1)}>←</button>
+                  <span style={{color:'#FFEB5A',fontSize:11,fontWeight:900,minWidth:120,textAlign:'center'}}>
+                    {planningWeek===0?'Cette semaine':planningWeek<0?`Il y a ${Math.abs(planningWeek)} sem.`:`Dans ${planningWeek} sem.`}
+                  </span>
+                  <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={()=>setPlanningWeek((w:number)=>w+1)}>→</button>
+                  {planningWeek!==0&&<button className="btn btn-y btn-sm" onClick={()=>setPlanningWeek(0)}>Auj.</button>}
+                  {isEmy&&<button className="btn btn-p btn-sm" onClick={()=>open('task_detail',{assignee:'emy',priority:'medium',status:'todo',checklist:[],files:[]})}>+ Tâche</button>}
+                </div>
+              </div>
+              <div style={{padding:'10px 14px'}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6}}>
+                  {['Lun','Mar','Mer','Jeu','Ven'].map((day,di)=>{
+                    const weekStart = new Date()
+                    const dow = weekStart.getDay()===0?6:weekStart.getDay()-1
+                    weekStart.setDate(weekStart.getDate()-dow+(planningWeek*7))
+                    const dayDate = new Date(weekStart)
+                    dayDate.setDate(weekStart.getDate()+di)
+                    const dateStr = dayDate.toISOString().split('T')[0]
+                    const isPast = dayDate < new Date(new Date().toDateString())
+                    const isToday = dateStr === new Date().toISOString().split('T')[0]
+                    const dayTasks = tasks.filter(t=>t.deadline===dateStr&&t.assignee==='emy')
+                    const hasLate = isPast && dayTasks.some(t=>t.status!=='done')
+                    const allDone = dayTasks.length>0 && dayTasks.every(t=>t.status==='done')
+                    return (
+                      <div key={day} style={{
+                        borderRadius:6,
+                        border:`2px solid ${isToday?'#005FFF':hasLate?'#CC0066':allDone?'#009D3A':'#EBEBEB'}`,
+                        background:isToday?'#E3F0FF':hasLate?'#FCE4EC':allDone?'#E8F5E9':'#FAFAFA',
+                        padding:'8px 8px',
+                        minHeight:80,
+                      }}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+                          <div style={{fontFamily:"'Yellowtail',cursive",fontSize:12,color:isToday?'#005FFF':hasLate?'#CC0066':allDone?'#009D3A':'#191923'}}>{day}</div>
+                          <div style={{fontSize:9,opacity:.5}}>{dayDate.getDate()}/{dayDate.getMonth()+1}</div>
+                        </div>
+                        {dayTasks.length===0?(
+                          <div style={{fontSize:9,opacity:.3,textAlign:'center',marginTop:8}}>—</div>
+                        ):dayTasks.map(t=>(
+                          <div key={t.id} onClick={()=>open('task_detail',{...t})} style={{
+                            cursor:'pointer',
+                            background:t.status==='done'?'rgba(0,157,58,.1)':t.priority==='high'?'rgba(255,130,215,.2)':'rgba(0,95,255,.1)',
+                            borderLeft:`3px solid ${t.status==='done'?'#009D3A':t.priority==='high'?'#FF82D7':'#005FFF'}`,
+                            borderRadius:'0 3px 3px 0',
+                            padding:'3px 5px',
+                            marginBottom:3,
+                            fontSize:10,
+                            fontWeight:900,
+                            textDecoration:t.status==='done'?'line-through':'none',
+                            opacity:t.status==='done'?.5:1,
+                            whiteSpace:'nowrap',
+                            overflow:'hidden',
+                            textOverflow:'ellipsis',
+                          }}>{t.title}</div>
+                        ))}
+                      </div>
+                    )
+                  })}
+                </div>
+                {/* Légende */}
+                <div style={{display:'flex',gap:12,marginTop:8,fontSize:9,opacity:.5,flexWrap:'wrap'}}>
+                  <span style={{display:'flex',alignItems:'center',gap:4}}><span style={{width:8,height:8,borderRadius:1,background:'#005FFF',display:'inline-block'}}/>Aujourd'hui</span>
+                  <span style={{display:'flex',alignItems:'center',gap:4}}><span style={{width:8,height:8,borderRadius:1,background:'#CC0066',display:'inline-block'}}/>Tâches en retard</span>
+                  <span style={{display:'flex',alignItems:'center',gap:4}}><span style={{width:8,height:8,borderRadius:1,background:'#009D3A',display:'inline-block'}}/>Tout fait ✓</span>
+                  <span style={{display:'flex',alignItems:'center',gap:4}}><span style={{width:8,height:8,borderRadius:1,background:'#FF82D7',display:'inline-block'}}/>Priorité haute</span>
+                </div>
+              </div>
+            </div>
+
+            {!isEmy&&reports.length>0&&(
                 <div className="card card-click" onClick={()=>nav('reporting')}>
                   <div className="ct">📋 Dernier CR d'Emy <span style={{fontSize:11,opacity:.4,fontFamily:'Arial',fontWeight:400}}>— cliquer pour voir →</span></div>
                   <div style={{background:'#FFEB5A',border:'2px solid #191923',borderRadius:5,padding:10}}>
@@ -985,7 +1101,21 @@ export default function App() {
                           <div style={{fontSize:13,fontWeight:900,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.5:1}}>{t.title}</div>
                           <div style={{fontSize:10,opacity:.5,marginTop:2}}>📅 {t.deadline} · {t.assignee} · {t.priority==='high'?'🔴 Haute':t.priority==='medium'?'🟡 Moyenne':'🟢 Basse'}</div>
                           {t.description&&<div style={{fontSize:11,opacity:.6,marginTop:4,fontStyle:'italic'}}>{t.description.slice(0,80)}{t.description.length>80?'…':''}</div>}
-                          {t.checklist?.length>0&&<div style={{fontSize:10,opacity:.5,marginTop:3}}>☑ {t.checklist.filter((c:string)=>c).length} sous-tâches</div>}
+                          {t.checklist?.filter((c:string)=>c).length>0&&(
+                    <div style={{marginTop:6}}>
+                      {t.checklist.filter((c:string)=>c).map((item:string,ci:number)=>(
+                        <div key={ci} style={{display:'flex',alignItems:'center',gap:6,marginTop:3}}>
+                          <input type="checkbox" defaultChecked={false} style={{width:13,height:13,flexShrink:0}} onChange={e=>{
+                            const newChecklist=[...t.checklist]
+                            if(e.target.checked){newChecklist[ci]='✓ '+item.replace('✓ ','')}
+                            else{newChecklist[ci]=item.replace('✓ ','')}
+                            setTasks(prev=>prev.map(x=>x.id===t.id?{...x,checklist:newChecklist}:x))
+                          }} checked={item.startsWith('✓ ')} readOnly />
+                          <span style={{fontSize:11,textDecoration:item.startsWith('✓ ')?'line-through':'none',opacity:item.startsWith('✓ ')?.4:1}}>{item.replace('✓ ','')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                         </div>
                         <span className="badge" style={{color:t.status==='in_progress'?'#005FFF':t.status==='done'?'#009D3A':'#888',borderColor:t.status==='in_progress'?'#005FFF':t.status==='done'?'#009D3A':'#ccc',flexShrink:0}}>{TASK_S[t.status]}</span>
                       </div>
@@ -1056,57 +1186,51 @@ export default function App() {
             </div>
           )}
 
-          {/* ══ GMB ══════════════════════════════════════════════════════ */}
-          {page==='gmb'&&(
+          {/* ══ JOURNAL EMY ═════════════════════════════════════════════ */}
+          {page==='journal'&&(
             <div>
-              <div className="ph"><div><div className="pt">Google My Business</div><div className="ps">Avis · Visibilité · Fiche</div></div></div>
-              <div className="card-y">
-                <div className="ct">🔗 Connexion requise</div>
-                <p style={{fontSize:13,marginBottom:14}}>Connecte Google My Business pour voir et répondre aux avis directement ici.</p>
-                <button className="btn btn-n" onClick={()=>{const url=`https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.NEXT_PUBLIC_GOOGLE_GMB_CLIENT_ID}&redirect_uri=${window.location.origin}/api/auth/google/callback&response_type=code&scope=https://www.googleapis.com/auth/business.manage&access_type=offline&prompt=consent`;window.location.href=url}}>Se connecter avec Google →</button>
+              <div className="ph">
+                <div><div className="pt">Journal d'activité 📓</div><div className="ps">Tout ce qu'Emy a fait, contacté, envoyé</div></div>
               </div>
+              {/* Filtres */}
+              <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+                {[['all','Tout'],['email_copie','Emails'],['prospect_contacte','Contacts'],['statut_change','Statuts'],['prospect_ajoute','Ajouts']].map(([k,l])=>(
+                  <div key={k} className={`tag${journalFilter===k?' on':''}`} onClick={()=>setJournalFilter(k)}>{l}</div>
+                ))}
+              </div>
+              {activityLog.filter(a=>journalFilter==='all'||a.type===journalFilter).length===0?(
+                <div className="card" style={{textAlign:'center',padding:40,opacity:.4}}>
+                  <div style={{fontSize:32,marginBottom:8}}>📓</div>
+                  <div style={{fontWeight:900,textTransform:'uppercase',fontSize:12}}>Aucune activité enregistrée</div>
+                  <div style={{fontSize:11,marginTop:6,opacity:.6}}>Les actions d'Emy apparaîtront ici en temps réel</div>
+                </div>
+              ):activityLog.filter(a=>journalFilter==='all'||a.type===journalFilter).map((a:any)=>(
+                <div key={a.id} className="card" style={{padding:'12px 14px',marginBottom:8}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                        <span style={{fontSize:16}}>{a.type==='email_copie'?'✉️':a.type==='prospect_contacte'?'📞':a.type==='statut_change'?'🔄':'➕'}</span>
+                        <span style={{fontWeight:900,fontSize:13}}>{a.description}</span>
+                        <span style={{fontSize:9,fontWeight:900,padding:'2px 6px',border:'1.5px solid #191923',borderRadius:3,background:a.user_role==='emy'?'#FF82D7':'#FFEB5A'}}>{a.user_name}</span>
+                      </div>
+                      {a.prospect_name&&<div style={{fontSize:11,opacity:.5,marginLeft:24}}>🎯 {a.prospect_name}</div>}
+                      {a.email_content&&(
+                        <div style={{marginTop:8,marginLeft:24}}>
+                          <details>
+                            <summary style={{cursor:'pointer',fontSize:11,fontWeight:900,opacity:.6}}>Voir l'email envoyé</summary>
+                            <div style={{background:'#F8F8F8',border:'1.5px solid #DEDEDE',borderRadius:5,padding:10,marginTop:6,fontSize:12,whiteSpace:'pre-wrap',fontFamily:'Arial,sans-serif',lineHeight:1.6}}>{a.email_content}</div>
+                          </details>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{fontSize:10,opacity:.4,flexShrink:0}}>{new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-        </div>
-      </div>
-    </div>
 
-    {/* ══ MODALS ════════════════════════════════════════════════════════════ */}
-
-    {/* GÉNÉRATION EMAIL */}
-    {modal==='gen_email'&&(
-      <div className="overlay" onClick={close}>
-        <div className="modal modal-lg" onClick={e=>e.stopPropagation()}>
-          <div className="mh"><div className="mt">✉️ Email IA — {form.name}</div></div>
-          <div className="mb">
-            {genLoading?(<div style={{textAlign:'center',padding:30}}><div style={{fontSize:32,marginBottom:10}}>✨</div><div style={{fontWeight:900,fontSize:13,textTransform:'uppercase'}}>Génération en cours…</div></div>):
-            genEmail?(<>
-              <div className="lbl">Email généré — modifie avant de copier</div>
-              <textarea className="inp" style={{minHeight:260,fontFamily:'Arial,sans-serif',fontSize:13,lineHeight:1.6}} value={genEmail} onChange={e=>setGenEmail(e.target.value)} />
-              <div style={{background:'#FFEB5A',border:'2px solid #191923',borderRadius:5,padding:10,fontSize:12,marginTop:8}}>
-                💡 Copie l'email ci-dessus et envoie depuis ton client email (Gmail, Outlook…) depuis <strong>emy@meshuga.fr</strong>
-              </div>
-            </>):null}
-          </div>
-          <div className="mf">
-            <button className="btn" onClick={close}>Fermer</button>
-            {genEmail&&<>
-              <button className="btn btn-y" onClick={()=>{navigator.clipboard.writeText(genEmail);toast('Email copié ! 📋')}}>📋 Copier</button>
-              <button className="btn btn-p" onClick={()=>generateEmail(form,form.emailContext||'prise de contact')}>🔄 Regénérer</button>
-            </>}
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* ÉDITION PROSPECT CHASSE */}
-    {modal==='chasse_edit'&&(
-      <div className="overlay" onClick={close}>
-        <div className="modal modal-xl" onClick={e=>e.stopPropagation()}>
-          <div className="mh"><div className="mt">{form.id?'Modifier le prospect':'Ajouter un prospect'}</div></div>
-          <div className="mb">
-            <div className="fg2">
-              <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Entreprise *</label><input className="inp" value={form.name||''} onChange={e=>setForm({...form,name:e.target.value})} /></div>
+ /></div>
               <div className="fg"><label className="lbl">Catégorie</label><select className="inp sel" value={form.cat||'evenementiel'} onChange={e=>setForm({...form,cat:e.target.value})}>{Object.entries(CATS_MAP).filter(([k])=>k!=='all').map(([k,v]:any)=><option key={k} value={k}>{v.emoji} {v.label}</option>)}</select></div>
               <div className="fg"><label className="lbl">Score /10</label><input type="number" min="1" max="10" className="inp" value={form.score||5} onChange={e=>setForm({...form,score:parseInt(e.target.value)||5})} /></div>
               <div className="fg"><label className="lbl">Site web</label><input className="inp" value={form.site||''} onChange={e=>setForm({...form,site:e.target.value})} placeholder="exemple.fr" /></div>
