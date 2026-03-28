@@ -91,7 +91,7 @@ textarea.inp{min-height:70px;resize:vertical}
 }
 `
 
-const CATS_MAP = {
+const CATS_MAP: any = {
   all:{label:'Tous',emoji:'\u2630'},
   evenementiel:{label:'\u00c9v\u00e9nementiel',emoji:'\ud83c\udf89'},
   avocats:{label:'Avocats',emoji:'\u2696\ufe0f'},
@@ -111,10 +111,10 @@ const CATS_MAP = {
   banque:{label:'Banques',emoji:'\ud83c\udfe6'},
 }
 
-const STATUS_P = {to_contact:'\u00c0 contacter',contacted:'Contact\u00e9',nego:'N\u00e9go',won:'Gagn\u00e9 \u2713',lost:'Perdu'}
-const STATUS_PC = {to_contact:'#888',contacted:'#B8920A',nego:'#005FFF',won:'#009D3A',lost:'#CC0066'}
-const TASK_S = {todo:'\u00c0 faire',in_progress:'En cours',done:'Termin\u00e9 \u2713'}
-const CAT_ANN = {food:'\ud83e\udd69 Fournisseur food',banque:'\ud83c\udfe6 Banque',presse:'\ud83d\udcf0 Presse',prestataire:'\ud83d\udd27 Prestataire',partenaire:'\ud83e\udd1d Partenaire',livraison:'\ud83d\udeb2 Livraison',fournisseur:'\ud83d\udce6 Fournisseur',it:'\ud83d\udcbb IT',juridique:'\u2696\ufe0f Juridique'}
+const STATUS_P: any = {to_contact:'\u00c0 contacter',contacted:'Contact\u00e9',nego:'N\u00e9go',won:'Gagn\u00e9 \u2713',lost:'Perdu'}
+const STATUS_PC: any = {to_contact:'#888',contacted:'#B8920A',nego:'#005FFF',won:'#009D3A',lost:'#CC0066'}
+const TASK_S: any = {todo:'\u00c0 faire',in_progress:'En cours',done:'Termin\u00e9 \u2713'}
+const CAT_ANN: any = {food:'\ud83e\udd69 Fournisseur food',banque:'\ud83c\udfe6 Banque',presse:'\ud83d\udcf0 Presse',prestataire:'\ud83d\udd27 Prestataire',partenaire:'\ud83e\udd1d Partenaire',livraison:'\ud83d\udeb2 Livraison',fournisseur:'\ud83d\udce6 Fournisseur',it:'\ud83d\udcbb IT',juridique:'\u2696\ufe0f Juridique'}
 
 const INIT_TASKS = [
   {id:1,title:'Cr\u00e9er le kit B2B (menu plateaux, tarifs)',assignee:'emy',deadline:'2026-03-28',status:'in_progress',priority:'high',checklist:['S\u00e9lectionner les 5 meilleurs sandwichs','Faire les photos','R\u00e9diger les tarifs'],files:[]},
