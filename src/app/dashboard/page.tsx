@@ -615,14 +615,16 @@ export default function App() {
     {id:'journal',label:'Journal Emy',icon:'📓'},
   ]
 
-  if (!profile) return (
-    <div style={{minHeight:'100vh',background:'#FFEB5A',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:16}}>
-      <style>{G}</style>
-      <div style={{fontSize:48}}>😬</div>
-      <div style={{fontWeight:900,fontSize:14,textTransform:'uppercase',letterSpacing:3}}>Chargement…</div>
-      <a href="/login" style={{fontFamily:"'Yellowtail',cursive",fontSize:16,color:'#191923',opacity:.5}}>← Se connecter</a>
-    </div>
-  )
+  if (!profile) {
+    return (
+      <div style={{minHeight:'100vh',background:'#FFEB5A',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:16}}>
+        <style>{G}</style>
+        <div style={{fontSize:48}}>😬</div>
+        <div style={{fontWeight:900,fontSize:14,textTransform:'uppercase',letterSpacing:3}}>Chargement…</div>
+        <a href="/login" style={{fontFamily:"'Yellowtail',cursive",fontSize:16,color:'#191923',opacity:.5}}>← Se connecter</a>
+      </div>
+    )
+  }
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
