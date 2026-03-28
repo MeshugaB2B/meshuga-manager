@@ -345,16 +345,14 @@ export default function DashboardPage() {
     {id:'journal', label:'Journal Emy', icon:'📓'},
   ]
 
-  if (!profile) {
-    return (
-      <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',background:'#FFEB5A',flexDirection:'column',gap:16}}>
-        <style>{G}</style>
-        <div style={{fontSize:48}}>😬</div>
-        <div style={{fontWeight:900,fontSize:14,textTransform:'uppercase',letterSpacing:3}}>Chargement…</div>
-        <a href="/login" style={{fontFamily:"'Yellowtail',cursive",fontSize:14,opacity:.4}}>← Se connecter</a>
-      </div>
-    )
-  }
+  if (!profile) return (
+    <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',background:'#FFEB5A',flexDirection:'column',gap:16}}>
+      <style>{G}</style>
+      <div style={{fontSize:48}}>😬</div>
+      <div style={{fontWeight:900,fontSize:14,textTransform:'uppercase',letterSpacing:3}}>Chargement…</div>
+      <a href="/login" style={{fontFamily:"'Yellowtail',cursive",fontSize:14,opacity:.4}}>← Se connecter</a>
+    </div>
+  )
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
