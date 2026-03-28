@@ -387,21 +387,19 @@ export default function App() {
   const [kpiPeriod, setKpiPeriod] = useState('week')
 
   useEffect(() => {
-    sb().auth.getUser().then(({data:{user}}) => {
-      if (user) {
-        sb().from('profiles').select('*').eq('id',user.id).single().then(({data, error}) => {
-          if (data && data.role) {
-            setProfile(data)
-          } else {
-            // Profile existe mais sans role, ou pas de profile du tout
-            // On détecte via l'email
-            const role = user.email?.includes('emy') ? 'emy' : 'edward'
-            const full_name = role === 'emy' ? 'Emy' : 'Edward'
-            setProfile({ role, full_name, email: user.email })
-          }
-        })
+    async function loadProfile() {
+      const { data: { user } } = await sb().auth.getUser()
+      if (!user) return
+      const { data: prof } = await sb().from('profiles').select('*').eq('id', user.id).single()
+      if (prof && prof.role) {
+        setProfile(prof)
+      } else {
+        const role = user.email?.includes('emy') ? 'emy' : 'edward'
+        const full_name = role === 'emy' ? 'Emy' : 'Edward'
+        setProfile({ role, full_name, email: user.email })
       }
-    })
+    }
+    loadProfile()
   }, [])
 
   const toast = (msg: string) => { setToast2(msg); setTimeout(()=>setToast2(''),2800) }
@@ -505,11 +503,14 @@ export default function App() {
   // Charger le journal d'activité
   useEffect(() => {
     if (!profile) return
-    sb().from('activity_log')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100)
-      .then(({ data }) => { if (data) setActivityLog(data) })
+    async function loadLog() {
+      const { data: logData } = await sb().from('activity_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (logData) setActivityLog(logData)
+    }
+    loadLog()
   }, [profile])
 
   // ─── GÉNÉRER PROSPECTS VIA IA ─────────────────────────────────
@@ -542,7 +543,7 @@ export default function App() {
       email_content: emailContent || null,
     }
     await supabase.from('activity_log').insert(entry)
-    setActivityLog(prev => [{ ...entry, id: Date.now(), created_at: new Date().toISOString() }, ...(prev as any[]).slice(0, 49)])
+    setActivityLog((prev: any) => [{ ...entry, id: Date.now(), created_at: new Date().toISOString() }, ...prev.slice(0, 49)])
   }
 
   function saveTask() {
@@ -564,7 +565,7 @@ export default function App() {
   async function saveChasseProspect() {
     if (!form.name) { toast('Nom requis !'); return }
     const supabase = sb()
-    const data = {
+    const payload = {
       cat: form.cat||'evenementiel', name: form.name,
       contact_name: form.contacts?.[0]?.name||'', contact_email: form.contacts?.[0]?.email||'',
       contact_phone: form.contacts?.[0]?.phone||'', contact_role: form.contacts?.[0]?.role||'',
@@ -574,9 +575,9 @@ export default function App() {
       type: form.type||'', pitch: form.pitch||'', score: parseInt(form.score)||5,
     }
     if (form.id && !String(form.id).startsWith('new')) {
-      await supabase.from('chasse_prospects').update(data).eq('id', form.id)
+      await supabase.from('chasse_prospects').update(payload).eq('id', form.id)
     } else {
-      await supabase.from('chasse_prospects').insert({...data, id:`m_${Date.now()}`, status:'to_contact'})
+      await supabase.from('chasse_prospects').insert({...payload, id:`m_${Date.now()}`, status:'to_contact'})
     }
     close(); toast('Prospect sauvegardé ✓'); loadChasse(0, true)
   }
