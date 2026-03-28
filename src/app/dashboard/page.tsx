@@ -402,10 +402,10 @@ export default function DashboardPage() {
     loadProfile()
   }, [])
 
-  const toast = (msg) => { setToast2(msg); setTimeout(()=>setToast2(''),2800) }
-  const open = (id, data={}) => { setForm(data); setModal(id); setGenEmail('') }
+  const toast = (msg: string) => { setToast2(msg); setTimeout(()=>setToast2(''),2800) }
+  const open = (id: string, data: any={}) => { setForm(data); setModal(id); setGenEmail('') }
   const close = () => { setModal(''); setForm({}) }
-  const nav = (p) => { setPage(p); setSidebarOpen(false) }
+  const nav = (p: string) => { setPage(p); setSidebarOpen(false) }
 
   const today = new Date().toISOString().split('T')[0]
   const isEmy = profile?.role === 'emy'
@@ -424,11 +424,11 @@ export default function DashboardPage() {
     return 0
   })
 
-  function toggleExpand(id) {
+  function toggleExpand(id: string) {
     setChasse(prev=>prev.map(p=>p.id===id?{...p,expanded:!p.expanded}:p))
   }
 
-  async function updateChasseStatus(id, status) {
+  async function updateChasseStatus(id: string, status: string) {
     const supabase = sb()
     await supabase.from('chasse_prospects').update({ status }).eq('id', id)
     setChasse(prev=>prev.map(p=>p.id===id?{...p,status}:p))
@@ -445,7 +445,7 @@ export default function DashboardPage() {
     }
   }
 
-  async function generateEmail(prospect, context) {
+  async function generateEmail(prospect: any, context: string) {
     setGenLoading(true)
     setGenEmail('')
     try {
