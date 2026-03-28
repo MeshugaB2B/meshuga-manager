@@ -539,7 +539,7 @@ export default function DashboardPage() {
                   <div style={{background:'#FFEB5A',border:'2px solid #191923',borderRadius:5,padding:10}}>
                     <div className="yt" style={{fontSize:12,opacity:.5,marginBottom:4}}>{reports[0].week}</div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>
-                      {[['Prospects',reports[0].prospects],['RDV',reports[0].rdv],['Cmdes',reports[0].cmds]].map(([l,v]: any) => (
+                      {[['Prospects',reports[0].prospects],['RDV',reports[0].rdv],['Cmdes',reports[0].cmds]].map(([l,v]) => (
                         <div key={l} style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'6px',textAlign:'center'}}>
                           <div style={{fontWeight:900,fontSize:18}}>{v}</div>
                           <div className="yt" style={{fontSize:10,opacity:.5}}>{l}</div>
@@ -581,7 +581,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="filter-row">
-                {(Object.entries(CATS_MAP) as any[]).map(([k,v]: any) => (
+                {(Object.entries(CATS_MAP) as any[]).map(([k,v]) => (
                   <div key={k} className={"tag"+(chasseCat===k?' on':'')} onClick={() => setChasseChasse(k)}>{v.emoji} {v.label}</div>
                 ))}
               </div>
@@ -636,7 +636,7 @@ export default function DashboardPage() {
                 <button className="btn btn-y btn-sm" onClick={() => openModal('prospect', {status:'to_contact',ca:0,files:[]})}>+ Nouveau</button>
               </div>
               <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
-                {(Object.entries(STATUS_P) as any[]).map(([k,v]: any) => (
+                {(Object.entries(STATUS_P) as any[]).map(([k,v]) => (
                   <div key={k} style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:'8px 12px',textAlign:'center',boxShadow:'2px 2px 0 #191923',flex:'1 1 80px'}}>
                     <div style={{fontWeight:900,fontSize:22}}>{prospects.filter(p=>p.status===k).length}</div>
                     <div className="yt" style={{fontSize:11,opacity:.6}}>{v}</div>
@@ -750,7 +750,7 @@ export default function DashboardPage() {
                 <div className="card-y" style={{marginBottom:12}}>
                   <div className="ct">\ud83d\udcdd Formulaire CR d'Emy</div>
                   <div style={{fontSize:12,opacity:.7,marginBottom:8}}>Voici ce qu'Emy remplit chaque semaine :</div>
-                  {[['Semaine du','ex: 25 mars 2026'],['Prospects contact\u00e9s','nombre'],['RDV effectu\u00e9s','nombre'],['Commandes obtenues','nombre'],['Victoires','ce qu\'elle a accompli'],['Challenges','blocages rencontr\u00e9s'],['Priorit\u00e9s S+1','ses 3 priorit\u00e9s'],['Note pour Edward','message libre']].map(([l,p]: any) => (
+                  {[['Semaine du','ex: 25 mars 2026'],['Prospects contact\u00e9s','nombre'],['RDV effectu\u00e9s','nombre'],['Commandes obtenues','nombre'],['Victoires','ce qu\'elle a accompli'],['Challenges','blocages rencontr\u00e9s'],['Priorit\u00e9s S+1','ses 3 priorit\u00e9s'],['Note pour Edward','message libre']].map(([l,p]) => (
                     <div key={l} style={{display:'flex',gap:8,alignItems:'center',padding:'4px 0',borderBottom:'1px solid rgba(25,25,35,.08)'}}>
                       <div style={{fontSize:11,fontWeight:900,width:180,flexShrink:0}}>{l}</div>
                       <div style={{fontSize:11,opacity:.5,fontStyle:'italic'}}>{p}</div>
@@ -765,7 +765,7 @@ export default function DashboardPage() {
                     <span className="badge" style={{color:r.status==='submitted'?'#005FFF':'#009D3A',borderColor:r.status==='submitted'?'#005FFF':'#009D3A'}}>{r.status==='submitted'?'Soumis':'Lu \u2713'}</span>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
-                    {[['Prospects',r.prospects],['RDV',r.rdv],['Commandes',r.cmds]].map(([l,v]: any) => (
+                    {[['Prospects',r.prospects],['RDV',r.rdv],['Commandes',r.cmds]].map(([l,v]) => (
                       <div key={l} style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}>
                         <div style={{fontWeight:900,fontSize:20}}>{v}</div>
                         <div className="yt" style={{fontSize:11,opacity:.5}}>{l}</div>
@@ -853,7 +853,7 @@ export default function DashboardPage() {
               </div>
 
               <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
-                {[['all','Tout'],['email_copie','\u2709\ufe0f Emails'],['prospect_contacte','\ud83d\udcde Contacts']].map(([k,l]: any) => (
+                {[['all','Tout'],['email_copie','\u2709\ufe0f Emails'],['prospect_contacte','\ud83d\udcde Contacts']].map(([k,l]) => (
                   <div key={k} className={"tag"+(journalFilter===k?' on':'')} onClick={() => setJournalFilter(k)}>{l}</div>
                 ))}
               </div>
@@ -1105,7 +1105,7 @@ export default function DashboardPage() {
             <div className="mb">
               <div className="fg"><label className="lbl">Semaine du *</label><input className="inp" value={form.week||''} onChange={e=>setForm({...form,week:e.target.value})} placeholder="ex: 25 mars 2026" /></div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
-                {[['prospects','Prospects'],['rdv','RDV'],['cmds','Commandes']].map(([k,l]: any) => (
+                {[['prospects','Prospects'],['rdv','RDV'],['cmds','Commandes']].map(([k,l]) => (
                   <div key={k} className="fg"><label className="lbl">{l}</label><input type="number" className="inp" value={form[k]||0} onChange={e=>setForm({...form,[k]:parseInt(e.target.value)||0})} /></div>
                 ))}
               </div>
