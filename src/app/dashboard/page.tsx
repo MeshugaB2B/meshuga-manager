@@ -543,15 +543,18 @@ Signature : ${isEmy?'Emy | B2B Manager | emy@meshuga.fr | +33 6 24 67 78 66':'Ed
   ]
 
   if (!profile) { return (
-    <><style>{G}</style>
-    <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',background:'#FFEB5A'}}>
-      <div style={{textAlign:'center'}}><div style={{fontSize:48,marginBottom:12}}></div><div style={{fontWeight:900,fontSize:14,textTransform:'uppercase',letterSpacing:3}}>Chargement…</div></div>
-    </div></>
+    <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',background:'#FFEB5A',flexDirection:'column'}}>
+      <style>{G}</style>
+      <div style={{fontSize:48,marginBottom:12}}>😬</div>
+      <div style={{fontWeight:900,fontSize:14,textTransform:'uppercase',letterSpacing:3}}>Chargement…</div>
+      <a href="/login" style={{fontFamily:"'Yellowtail',cursive",fontSize:14,opacity:.4,marginTop:8}}>← Se connecter</a>
+    </div>
   ) }
 
   return (
-    <><style>{G}</style>
-    <div className="shell">
+    <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
+      <style>{G}</style>
+      <div className="shell" style={{flex:1,overflow:'hidden'}}>
       {/* MOBILE TOPBAR */}
       <div className="topbar">
         <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
@@ -1284,6 +1287,7 @@ Signature : ${isEmy?'Emy | B2B Manager | emy@meshuga.fr | +33 6 24 67 78 66':'Ed
         )}
     {/* TOAST */}
     <div className={`toast${toastMsg?' show':''}`}>{toastMsg}</div>
-    </>
+      </div>
+    </div>
   )
 }
