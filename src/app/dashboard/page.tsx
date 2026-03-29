@@ -262,6 +262,10 @@ export default function DashboardPage() {
     {id: 'gmb', label: 'Google My Biz.', icon: '⭐'},
     {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
   ]
+  var zeltyCA = zeltyData && zeltyData.stats ? (zeltyData.stats[zeltyPeriod].ca/100).toFixed(2) + ' €' : '--'
+  var zeltyTickets = zeltyData && zeltyData.stats ? zeltyData.stats[zeltyPeriod].tickets : '--'
+  var zeltyAvg = zeltyData && zeltyData.stats ? (zeltyData.stats[zeltyPeriod].avg/100).toFixed(2) + ' €' : '--'
+  var zeltyUpdated = zeltyData && zeltyData.lastUpdated ? 'Mis à jour ' + new Date(zeltyData.lastUpdated).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : 'Données en temps réel'
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
@@ -327,7 +331,7 @@ export default function DashboardPage() {
                     <span style={{fontSize:22}}>🟡</span>
                     <div>
                       <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#FFEB5A'}}>Zelty — Caisse du jour</div>
-                      <div style={{fontSize:10,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:1}}>{zeltyData && zeltyData.lastUpdated ? 'Mis à jour ' + new Date(zeltyData.lastUpdated).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : 'Données en temps réel'}</div>
+                      <div style={{fontSize:10,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:1}}>{zeltyUpdated}</div>
                     </div>
                   </div>
                   <div style={{display:'flex',gap:4}}>
@@ -359,20 +363,26 @@ export default function DashboardPage() {
                   <div>
                     {/* KPIs principaux */}
                     <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:1,background:'rgba(255,255,255,.1)'}}>
-                      {[
-                        {label:'Chiffre d'affaires', value:(zeltyData.stats[zeltyPeriod].ca/100).toFixed(2)+' €', icon:'💰', color:'#FFEB5A'},
-                        {label:'Tickets', value:zeltyData.stats[zeltyPeriod].tickets, icon:'🧾', color:'#FF82D7'},
-                        {label:'Panier moyen', value:(zeltyData.stats[zeltyPeriod].avg/100).toFixed(2)+' €', icon:'🛒', color:'#FFEB5A'},
-                        {label:'vs hier', value:'+12%', icon:'📈', color:'#009D3A'},
-                      ].map(function(kpi) {
-                        return (
-                          <div key={kpi.label} style={{padding:'14px 16px',background:'#191923'}}>
-                            <div style={{fontSize:18,marginBottom:4}}>{kpi.icon}</div>
-                            <div style={{fontWeight:900,fontSize:22,color:kpi.color,lineHeight:1}}>{kpi.value}</div>
-                            <div style={{fontSize:10,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:.5,marginTop:4}}>{kpi.label}</div>
-                          </div>
-                        )
-                      })}
+                      <div style={{padding:'14px 16px',background:'#191923'}}>
+                        <div style={{fontSize:18,marginBottom:4}}>💰</div>
+                        <div style={{fontWeight:900,fontSize:22,color:'#FFEB5A',lineHeight:1}}>{zeltyCA}</div>
+                        <div style={{fontSize:10,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:.5,marginTop:4}}>Chiffre d'affaires</div>
+                      </div>
+                      <div style={{padding:'14px 16px',background:'#191923'}}>
+                        <div style={{fontSize:18,marginBottom:4}}>🧾</div>
+                        <div style={{fontWeight:900,fontSize:22,color:'#FF82D7',lineHeight:1}}>{zeltyTickets}</div>
+                        <div style={{fontSize:10,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:.5,marginTop:4}}>Tickets</div>
+                      </div>
+                      <div style={{padding:'14px 16px',background:'#191923'}}>
+                        <div style={{fontSize:18,marginBottom:4}}>🛒</div>
+                        <div style={{fontWeight:900,fontSize:22,color:'#FFEB5A',lineHeight:1}}>{zeltyAvg}</div>
+                        <div style={{fontSize:10,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:.5,marginTop:4}}>Panier moyen</div>
+                      </div>
+                      <div style={{padding:'14px 16px',background:'#191923'}}>
+                        <div style={{fontSize:18,marginBottom:4}}>📈</div>
+                        <div style={{fontWeight:900,fontSize:22,color:'#009D3A',lineHeight:1}}>--</div>
+                        <div style={{fontSize:10,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:.5,marginTop:4}}>vs hier</div>
+                      </div>
                     </div>
 
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:1,background:'rgba(255,255,255,.1)'}}>
