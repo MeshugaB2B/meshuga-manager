@@ -126,6 +126,12 @@ export default function DashboardPage() {
   const [generatingEmail, setGeneratingEmail] = useState(false)
   const [generatedEmail, setGeneratedEmail] = useState('')
   const [emailProspect, setEmailProspect] = useState(null)
+  const [devisList, setDevisList] = useState([])
+  const [devisView, setDevisView] = useState('list')
+  const [currentDevisId, setCurrentDevisId] = useState(null)
+  const [devisLivraison, setDevisLivraison] = useState(0)
+  const [devisLivraisonOffert, setDevisLivraisonOffert] = useState(false)
+  const [devisMepOffert, setDevisMepOffert] = useState(false) // 'list' | 'edit'
   const [devisNbPersonnes, setDevisNbPersonnes] = useState(50)
   const [devisFormat, setDevisFormat] = useState('normal')
   const [devisItems, setDevisItems] = useState([])
@@ -164,6 +170,7 @@ export default function DashboardPage() {
     sb().from('activity_log').select('*').order('created_at', {ascending: false}).limit(200).then(function(r) {
       if (r.data) setActivityLog(r.data)
     })
+    loadDevis()
     sb().from('activity_log').insert({user_role: profile.role, user_name: profile.full_name || profile.role, type: 'session_start', description: 'Connexion', prospect_name: null, email_content: null})
   }, [profile])
 
@@ -180,6 +187,148 @@ export default function DashboardPage() {
     const entry = {user_role: (profile && profile.role) || 'unknown', user_name: (profile && profile.full_name) || '?', type: type, description: description, prospect_name: prospectName || null, email_content: emailContent || null}
     sb().from('activity_log').insert(entry)
     setActivityLog(function(prev) { return [{id: Date.now(), created_at: new Date().toISOString(), user_role: entry.user_role, user_name: entry.user_name, type: type, description: description, prospect_name: prospectName || null, email_content: emailContent || null}].concat(prev.slice(0, 199)) })
+  }
+
+  function loadDevis() {
+    sb().from('devis').select('*').order('created_at', {ascending: false}).then(function(r) {
+      if (r.data) setDevisList(r.data)
+    })
+  }
+
+  function saveDevisToSupabase(devisData, callback) {
+    var isNew = !devisData.id
+    if (isNew) {
+      sb().from('devis').insert(devisData).select().then(function(r) {
+        if (r.data && r.data[0]) {
+          sb().from('devis_historique').insert({devis_id: r.data[0].id, action: 'cree', user_name: profile?.full_name || '?'})
+          loadDevis()
+          if (callback) callback(r.data[0])
+        }
+      })
+    } else {
+      var id = devisData.id
+      var payload = Object.assign({}, devisData)
+      delete payload.id
+      delete payload.created_at
+      sb().from('devis').update(payload).eq('id', id).then(function() {
+        sb().from('devis_historique').insert({devis_id: id, action: 'modifie', user_name: profile?.full_name || '?'})
+        loadDevis()
+        if (callback) callback(devisData)
+      })
+    }
+  }
+
+  function updateDevisStatut(id, statut, note) {
+    sb().from('devis').update({statut: statut}).eq('id', id).then(function() {
+      sb().from('devis_historique').insert({devis_id: id, action: statut, note: note || '', user_name: profile?.full_name || '?'})
+      loadDevis()
+      toast('Statut mis a jour : ' + statut)
+    })
+  }
+
+  function generateAndPrintDoc(dv, isFacture) {
+    var items = (dv.items||[]).map(function(x){
+      return '<tr><td>'+x.nom+'</td><td style="text-align:center">'+x.qte+'</td><td style="text-align:right">'+parseFloat(x.prix||x.pu_ht||0).toFixed(2)+' EUR</td><td style="text-align:right">'+parseFloat(x.total_ht||0).toFixed(2)+' EUR</td></tr>'
+    }).join('')
+    var mep = parseFloat(dv.mep||dv.mise_en_place||0)
+    var mepOffert = dv.mep_offert||dv.mise_en_place_offert
+    var liv = parseFloat(dv.liv||dv.livraison||0)
+    var livOffert = dv.liv_offert||dv.livraison_offert
+    var mepHT = mepOffert ? mep : mep*(1-(parseFloat(dv.mep_remise||dv.remise_mep_pct||0)/100))
+    var livHT = livOffert ? liv : liv
+    var remisePct = parseFloat(dv.remise_pct||dv.remise_total_pct||0)
+    var remiseMontant = parseFloat(dv.remise_montant||0)
+    var totalHT = parseFloat(dv.total_ht||0)
+    var tva = parseFloat(dv.tva||0)
+    var totalTTC = parseFloat(dv.total_ttc||0)
+    var numero = isFacture ? (dv.facture_numero||dv.numero) : dv.numero
+    var titre = isFacture ? 'FACTURE' : 'DEVIS'
+
+    var mepRow = mep > 0 ? '<tr><td>'+(mepOffert?'<span style="text-decoration:line-through;opacity:.5">Mise en place / Show cooking</span> <strong style="color:#009D3A">OFFERT 🎁</strong>':'Mise en place / Show cooking'+(dv.mep_remise>0?' (-'+dv.mep_remise+'%)':''))+'</td><td></td><td></td><td style="text-align:right">'+(mepOffert?'<span style="text-decoration:line-through;opacity:.5">'+mep.toFixed(2)+' EUR</span> <strong style="color:#009D3A">0,00 EUR</strong>':mepHT.toFixed(2)+' EUR')+'</td></tr>' : ''
+    var livRow = liv > 0 ? '<tr><td>'+(livOffert?'<span style="text-decoration:line-through;opacity:.5">Frais de livraison</span> <strong style="color:#009D3A">OFFERT 🎁</strong>':'Frais de livraison')+'</td><td></td><td></td><td style="text-align:right">'+(livOffert?'<span style="text-decoration:line-through;opacity:.5">'+liv.toFixed(2)+' EUR</span> <strong style="color:#009D3A">0,00 EUR</strong>':livHT.toFixed(2)+' EUR')+'</td></tr>' : ''
+    var remiseRow = remiseMontant > 0 ? '<tr style="color:#CC0066"><td>Remise commerciale ('+remisePct+'%)</td><td></td><td></td><td style="text-align:right">-'+remiseMontant.toFixed(2)+' EUR</td></tr>' : ''
+
+    var condPaiement = isFacture ? 'Virement bancaire sous 30 jours' : '30% a la commande — Solde 72h avant evenement'
+    var validite = isFacture ? '' : '<p style="font-size:11px;color:#666"><strong>Validite :</strong> 30 jours a compter de la date d'emission</p>'
+
+    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titre+' '+numero+'</title><style>'+
+      'body{font-family:Arial,sans-serif;margin:0;padding:0;color:#191923;font-size:12px}'+
+      '@page{margin:1.5cm}'+
+      '@media print{.no-print{display:none}}'+
+      '.header{background:#191923;color:white;padding:24px 30px;display:flex;justify-content:space-between;align-items:flex-start}'+
+      '.logo-name{font-size:30px;font-weight:900;letter-spacing:3px;color:#FFEB5A}'+
+      '.logo-sub{font-size:10px;color:#888;margin-top:3px}'+
+      '.doc-title{font-size:28px;font-weight:900;color:white;text-align:right}'+
+      '.doc-meta{font-size:10px;color:#888;text-align:right;margin-top:4px}'+
+      '.pink-bar{height:6px;background:#FF82D7}'+
+      '.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px 30px;background:#FAFAFA;border-bottom:1px solid #EBEBEB}'+
+      '.box-title{font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#FF82D7;margin-bottom:6px}'+
+      '.box-name{font-size:15px;font-weight:900;margin-bottom:3px}'+
+      '.box-detail{font-size:11px;color:#555;margin-top:2px}'+
+      '.content{padding:20px 30px}'+
+      'table{width:100%;border-collapse:collapse;margin:12px 0}'+
+      'th{background:#191923;color:#FFEB5A;padding:9px 12px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px}'+
+      'td{padding:8px 12px;border-bottom:1px solid #EBEBEB;font-size:11px}'+
+      'tr:nth-child(even) td{background:#F8F8F8}'+
+      '.totals-wrap{display:flex;justify-content:flex-end;margin:10px 0 20px}'+
+      '.totals-box{min-width:280px;border:2px solid #191923;border-radius:6px;overflow:hidden}'+
+      '.t-row{display:flex;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #EBEBEB;font-size:12px}'+
+      '.t-final{display:flex;justify-content:space-between;padding:12px 14px;background:#191923}'+
+      '.t-final span{color:#FFEB5A;font-weight:900;font-size:15px}'+
+      '.rib-box{background:#FAFAFA;border:2px solid #191923;border-radius:6px;padding:16px 20px;margin:16px 0}'+
+      '.rib-title{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#FF82D7;margin-bottom:10px}'+
+      '.rib-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}'+
+      '.rib-item label{display:block;font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:3px}'+
+      '.rib-item span{font-size:12px;font-weight:900;font-family:monospace}'+
+      '.legal{font-size:8.5px;color:#888;margin-top:16px;padding-top:12px;border-top:1px solid #EBEBEB;line-height:1.6}'+
+      '.footer{background:#191923;color:#888;font-size:9px;text-align:center;padding:10px 30px;margin-top:20px}'+
+      '</style></head><body>'+
+      '<div class="header">'+
+      '<div><div class="logo-name">MESHUGA</div><div class="logo-sub">CRAZY DELI &nbsp;·&nbsp; NEW YORK STYLE</div><div class="logo-sub" style="margin-top:6px">3 rue Vavin, 75006 Paris</div></div>'+
+      '<div><div class="doc-title">'+titre+'</div><div class="doc-meta">N° '+numero+'</div><div class="doc-meta">Date : '+new Date().toLocaleDateString('fr-FR')+'</div>'+(isFacture?'<div class="doc-meta" style="color:#FFEB5A;font-weight:900">ORIGINAL</div>':'')+'</div>'+
+      '</div>'+
+      '<div class="pink-bar"></div>'+
+      '<div class="info-grid">'+
+      '<div><div class="box-title">Emetteur</div><div class="box-name">SAS AEGIA FOOD — Meshuga</div><div class="box-detail">3 rue Vavin, 75006 Paris</div><div class="box-detail">SIRET : 904 639 531 00014</div><div class="box-detail">TVA : FR31904639531</div><div class="box-detail">edward@meshuga.fr</div></div>'+
+      '<div><div class="box-title">Client</div><div class="box-name">'+dv.client_nom+'</div><div class="box-detail">'+dv.client_contact+'</div><div class="box-detail">'+dv.client_email+'</div><div class="box-detail" style="margin-top:8px"><strong>Evenement :</strong> '+(dv.event_date?new Date(dv.event_date).toLocaleDateString('fr-FR'):'')+'</div><div class="box-detail"><strong>Lieu :</strong> '+dv.event_lieu+'</div><div class="box-detail">'+dv.nb_personnes+' personnes — '+(dv.format||'')+'</div></div>'+
+      '</div>'+
+      '<div class="content">'+
+      '<table><thead><tr><th style="width:50%">Designation</th><th style="text-align:center;width:10%">Qte</th><th style="text-align:right;width:20%">PU HT</th><th style="text-align:right;width:20%">Total HT</th></tr></thead><tbody>'+
+      items+mepRow+livRow+remiseRow+
+      '</tbody></table>'+
+      '<div class="totals-wrap"><div class="totals-box">'+
+      '<div class="t-row"><span>Total HT</span><span style="font-weight:900">'+totalHT.toFixed(2)+' EUR</span></div>'+
+      '<div class="t-row" style="color:#888;font-size:11px"><span>TVA 5,5%</span><span>'+tva.toFixed(2)+' EUR</span></div>'+
+      '<div class="t-final"><span>TOTAL TTC</span><span>'+totalTTC.toFixed(2)+' EUR</span></div>'+
+      '<div style="background:#FFEB5A;padding:6px 14px;font-size:10px;text-align:center;font-weight:900;color:#191923">'+
+      parseFloat(totalTTC/dv.nb_personnes).toFixed(2)+' EUR TTC / personne'+
+      '</div></div></div>'+
+      (isFacture ? '<div class="rib-box">'+
+      '<div class="rib-title">Reglement par virement bancaire</div>'+
+      '<div class="rib-grid">'+
+      '<div class="rib-item"><label>Banque</label><span>Banque Populaire</span></div>'+
+      '<div class="rib-item"><label>IBAN</label><span>FR76 1020 7000 8723 2175 3218 077</span></div>'+
+      '<div class="rib-item"><label>BIC</label><span>CCBPFRPPMTG</span></div>'+
+      '<div class="rib-item"><label>Titulaire</label><span>SAS AEGIA FOOD</span></div>'+
+      '</div></div>' : '')+
+      validite+
+      '<p style="font-size:11px;color:#555"><strong>Conditions de reglement :</strong> '+condPaiement+'</p>'+
+      (dv.notes ? '<div style="background:#F8F8F8;border-left:4px solid #FF82D7;padding:10px 14px;margin:12px 0;font-size:11px"><strong>Notes :</strong> '+dv.notes+'</div>' : '')+
+      '<div class="legal">'+
+      'SAS AEGIA FOOD — Capital social : [A REMPLIR] EUR — RCS Paris — SIRET 904 639 531 00014 — Code APE : [A REMPLIR] — TVA intracommunautaire : FR31904639531<br/>'+
+      (isFacture ? 'Conformement a la loi, tout retard de paiement entraine l'exigibilite de penalites d'un taux egal a 3 fois le taux d'interet legal, ainsi qu'une indemnite forfaitaire de 40 EUR pour frais de recouvrement.' : 'Devis valable 30 jours. Tout commencement d'execution vaut acceptation. TVA sur les produits alimentaires a taux reduit de 5,5%. Prix HT en euros.')+
+      '</div>'+
+      '</div>'+
+      '<div class="footer">SAS AEGIA FOOD — Meshuga Crazy Deli &nbsp;|&nbsp; 3 rue Vavin, 75006 Paris &nbsp;|&nbsp; edward@meshuga.fr</div>'+
+      '<div class="no-print" style="text-align:center;padding:20px">'+
+      '<button onclick="window.print()" style="padding:12px 30px;background:#191923;color:#FFEB5A;border:none;border-radius:6px;font-size:14px;font-weight:900;cursor:pointer;letter-spacing:1px">📥 Imprimer / Enregistrer PDF</button>'+
+      '</div>'+
+      '</body></html>'
+
+    var w = window.open('', '_blank')
+    w.document.write(html)
+    w.document.close()
+    w.focus()
   }
 
   function contactProspect(id) {
@@ -856,258 +1005,365 @@ export default function DashboardPage() {
           {page === 'devis' && (
             <div>
               <div className="ph">
-                <div><div className="pt">Editeur de Devis 📄</div><div className="ps">Plateaux B2B · Evenements · Show Cooking</div></div>
+                <div><div className="pt">Devis 📄</div><div className="ps">{devisView==='list' ? devisList.length+' devis' : 'Editeur'}</div></div>
+                <div style={{display:'flex',gap:6}}>
+                  {devisView==='edit' && <button className="btn btn-sm" onClick={function(){setDevisView('list')}}>← Liste</button>}
+                  <button className="btn btn-y btn-sm" onClick={function(){
+                    setDevisView('edit')
+                    setDevisNumero('DEV-'+new Date().getFullYear()+'-'+String(devisList.length+1).padStart(3,'0'))
+                    setDevisItems([])
+                    setDevisClient({nom:'',contact:'',email:'',phone:'',date:'',lieu:'',prospectId:null})
+                    setDevisNbPersonnes(50)
+                    setDevisFormat('normal')
+                    setDevisMiseEnPlace(1500)
+                    setDevisMiseEnPlacePct(0)
+                    setDevisRemiseTotal(0)
+                    setDevisNotes('')
+                    setCurrentDevisId(null)
+                    setDevisLivraison(0)
+                    setDevisLivraisonOffert(false)
+                    setDevisMepOffert(false)
+                  }}>+ Nouveau devis</button>
+                </div>
               </div>
 
-              <div className="g2">
-                {/* LEFT: Config */}
+              {/* LIST VIEW */}
+              {devisView === 'list' && (
                 <div>
-                  {/* Infos client avec rattachement prospect */}
-                  <div className="card" style={{marginBottom:10}}>
-                    <div className="ct">👤 Client</div>
-                    <div className="fg">
-                      <label className="lbl">Rattacher a un prospect existant</label>
-                      <select className="inp" onChange={function(e) {
-                        var pid = e.target.value
-                        if (!pid) return
-                        var p = prospects.filter(function(x){return String(x.id)===pid})[0]
-                        if (p) setDevisClient(Object.assign({},devisClient,{nom:p.name,contact:p.nextAction||'',email:p.email||'',prospectId:p.id}))
-                      }}>
-                        <option value="">-- Nouveau client ou choisir --</option>
-                        {prospects.map(function(p) {
-                          return <option key={p.id} value={p.id}>{p.name}</option>
-                        })}
-                      </select>
+                  {devisList.length === 0 ? (
+                    <div className="card" style={{textAlign:'center',padding:50,opacity:.4}}>
+                      <div style={{fontSize:40,marginBottom:10}}>📄</div>
+                      <div style={{fontWeight:900,textTransform:'uppercase'}}>Aucun devis</div>
+                      <div style={{fontSize:12,marginTop:6}}>Cliquez sur "+ Nouveau devis" pour commencer</div>
                     </div>
-                    <div className="fg"><label className="lbl">Entreprise *</label><input className="inp" value={devisClient.nom} onChange={function(e){setDevisClient(Object.assign({},devisClient,{nom:e.target.value}))}} placeholder="Wagram Events..." /></div>
-                    <div className="fg2">
-                      <div className="fg"><label className="lbl">Contact</label><input className="inp" value={devisClient.contact} onChange={function(e){setDevisClient(Object.assign({},devisClient,{contact:e.target.value}))}} placeholder="Marie Dupont" /></div>
-                      <div className="fg"><label className="lbl">Email</label><input className="inp" value={devisClient.email} onChange={function(e){setDevisClient(Object.assign({},devisClient,{email:e.target.value}))}} placeholder="contact@..." /></div>
-                    </div>
-                    <div className="fg2">
-                      <div className="fg"><label className="lbl">Date evenement</label><input type="date" className="inp" value={devisClient.date} onChange={function(e){setDevisClient(Object.assign({},devisClient,{date:e.target.value}))}} /></div>
-                      <div className="fg"><label className="lbl">Lieu</label><input className="inp" value={devisClient.lieu} onChange={function(e){setDevisClient(Object.assign({},devisClient,{lieu:e.target.value}))}} placeholder="Paris 8e..." /></div>
-                    </div>
-                    {!devisClient.prospectId && devisClient.nom && (
-                      <button className="btn btn-y btn-sm" style={{marginTop:4}} onClick={function() {
-                        var newP = {id:Date.now(),name:devisClient.nom,email:devisClient.email,phone:'',size:'',category:'Evenementiel',status:'contacted',nextAction:'Devis envoye',nextDate:'',notes:'Devis cree depuis editeur',ca:0,score:7,files:[]}
-                        setProspects(function(prev){return prev.concat([newP])})
-                        setDevisClient(Object.assign({},devisClient,{prospectId:newP.id}))
-                        toast('Prospect ajoute au CRM !')
-                      }}>+ Ajouter au CRM</button>
-                    )}
-                    <div className="fg" style={{marginTop:8}}><label className="lbl">N° Devis</label><input className="inp" value={devisNumero} onChange={function(e){setDevisNumero(e.target.value)}} /></div>
-                  </div>
-
-                  {/* Format */}
-                  <div className="card" style={{marginBottom:10}}>
-                    <div className="ct">🎯 Format</div>
-                    <div className="fg">
-                      <label className="lbl">Nombre de personnes</label>
-                      <input type="number" className="inp" value={devisNbPersonnes} min="1" onChange={function(e){setDevisNbPersonnes(parseInt(e.target.value)||1)}} />
-                    </div>
-                    <div className="fg">
-                      <label className="lbl">Format (indicatif)</label>
-                      <div style={{display:'flex',gap:8}}>
-                        <div onClick={function(){setDevisFormat('normal')}} style={{flex:1,padding:'10px',border:'2px solid '+(devisFormat==='normal'?'#191923':'#EBEBEB'),borderRadius:5,cursor:'pointer',background:devisFormat==='normal'?'#FFEB5A':'#FAFAFA',textAlign:'center'}}>
-                          <div style={{fontWeight:900,fontSize:13}}>🥪 Normal</div>
-                          <div style={{fontSize:10,opacity:.6}}>~1 / personne</div>
-                        </div>
-                        <div onClick={function(){setDevisFormat('mini')}} style={{flex:1,padding:'10px',border:'2px solid '+(devisFormat==='mini'?'#191923':'#EBEBEB'),borderRadius:5,cursor:'pointer',background:devisFormat==='mini'?'#FFEB5A':'#FAFAFA',textAlign:'center'}}>
-                          <div style={{fontWeight:900,fontSize:13}}>🥙 Mini</div>
-                          <div style={{fontSize:10,opacity:.6}}>~3 / personne</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:4,padding:'6px 10px',fontSize:10,opacity:.7}}>
-                      💡 Quantites conseillees : {devisFormat==='normal' ? devisNbPersonnes+' sandwichs' : (devisNbPersonnes*3)+' minis'} — ajustez librement ci-dessous
-                    </div>
-                  </div>
-
-                  {/* Mise en place */}
-                  <div className="card" style={{marginBottom:10}}>
-                    <div className="ct">⚙️ Mise en place & Remises</div>
-                    <div className="fg2">
-                      <div className="fg">
-                        <label className="lbl">Frais mise en place (HT)</label>
-                        <input type="number" className="inp" value={devisMiseEnPlace} onChange={function(e){setDevisMiseEnPlace(parseFloat(e.target.value)||0)}} />
-                      </div>
-                      <div className="fg">
-                        <label className="lbl">Remise mise en place (%)</label>
-                        <input type="number" className="inp" value={devisMiseEnPlaceRemise} min="0" max="100" onChange={function(e){setDevisMiseEnPlacePct(parseFloat(e.target.value)||0)}} />
-                      </div>
-                    </div>
-                    <div className="fg">
-                      <label className="lbl">Remise sur le total (%)</label>
-                      <input type="number" className="inp" value={devisRemiseTotal} min="0" max="100" onChange={function(e){setDevisRemiseTotal(parseFloat(e.target.value)||0)}} />
-                    </div>
-                  </div>
-
-                  <div className="card">
-                    <div className="ct">📝 Notes</div>
-                    <textarea className="inp" value={devisNotes} onChange={function(e){setDevisNotes(e.target.value)}} placeholder="Conditions de paiement, details logistiques..." style={{minHeight:70}} />
-                  </div>
-                </div>
-
-                {/* RIGHT */}
-                <div>
-                  <div className="card" style={{marginBottom:10}}>
-                    <div className="ct">🥪 Sandwichs</div>
-                    <div style={{fontSize:10,opacity:.5,marginBottom:8,background:'#F8F8F8',padding:'6px 8px',borderRadius:4}}>
-                      Conseille : {devisFormat==='normal' ? devisNbPersonnes : devisNbPersonnes*3} pieces — vous pouvez ajuster librement
-                    </div>
-                    {(devisFormat==='normal' ? [{id:"hot_dog",nom:"Hot Dog",prix:7.56},{id:"grilled_cheese",nom:"Grilled Cheese",prix:7.56},{id:"egg_salad",nom:"Egg Salad",prix:8.51},{id:"chicken_caesar",nom:"Chicken Caesar",prix:11.34},{id:"tuna_melt",nom:"Tuna Melt",prix:11.34},{id:"pastrami",nom:"Pastrami",prix:14.18},{id:"smoked_salmon",nom:"Smoked Salmon",prix:13.23},{id:"lobster_roll",nom:"Lobster Roll",prix:20.79},{id:"pbn",nom:"PBN",prix:5.67}] : [{id:"hot_dog_m",nom:"Hot Dog Mini",prix:2.7},{id:"grilled_cheese_m",nom:"Grilled Cheese Mini",prix:2.87},{id:"egg_salad_m",nom:"Egg Salad Mini",prix:2.65},{id:"chicken_caesar_m",nom:"Chicken Caesar Mini",prix:3.35},{id:"tuna_melt_m",nom:"Tuna Melt Mini",prix:3.0},{id:"pastrami_m",nom:"Pastrami Mini",prix:3.8},{id:"smoked_salmon_m",nom:"Smoked Salmon Mini",prix:3.9},{id:"lobster_roll_m",nom:"Lobster Roll Mini",prix:7.5},{id:"pbn_m",nom:"PBN Mini",prix:2.7},{id:"mini_veggie",nom:"Salade Mini Veggie",prix:4.72}]).map(function(s) {
-                      var existing = devisItems.filter(function(x){return x.id===s.id})[0]
-                      var qty = existing ? existing.qte : 0
-                      return (
-                        <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderBottom:'1px solid #EBEBEB'}}>
-                          <div style={{flex:1}}>
-                            <div style={{fontSize:12,fontWeight:qty>0?900:400}}>{s.nom}</div>
-                            <div style={{fontSize:10,opacity:.5}}>{s.prix.toFixed(2)} EUR HT</div>
-                          </div>
-                          <div style={{display:'flex',alignItems:'center',gap:5}}>
-                            <button className="btn btn-sm" onClick={function(){
-                              var newQty = Math.max(0, qty-1)
-                              if (newQty===0) setDevisItems(devisItems.filter(function(x){return x.id!==s.id}))
-                              else setDevisItems(devisItems.map(function(x){return x.id===s.id?Object.assign({},x,{qte:newQty,total_ht:newQty*s.prix}):x}))
-                            }}>-</button>
-                            <input type="number" min="0" style={{width:48,textAlign:'center',border:'2px solid #191923',borderRadius:4,padding:'3px',fontSize:12,fontWeight:900}} value={qty}
-                              onChange={function(e) {
-                                var newQty = parseInt(e.target.value)||0
-                                if (newQty===0) setDevisItems(devisItems.filter(function(x){return x.id!==s.id}))
-                                else if (qty===0) setDevisItems(devisItems.concat([{id:s.id,nom:s.nom,prix:s.prix,qte:newQty,total_ht:newQty*s.prix}]))
-                                else setDevisItems(devisItems.map(function(x){return x.id===s.id?Object.assign({},x,{qte:newQty,total_ht:newQty*s.prix}):x}))
-                              }} />
-                            <button className="btn btn-y btn-sm" onClick={function(){
-                              if (qty===0) setDevisItems(devisItems.concat([{id:s.id,nom:s.nom,prix:s.prix,qte:1,total_ht:s.prix}]))
-                              else setDevisItems(devisItems.map(function(x){return x.id===s.id?Object.assign({},x,{qte:qty+1,total_ht:(qty+1)*s.prix}):x}))
-                            }}>+</button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                    <div style={{marginTop:8,padding:'7px 10px',background:'#FFEB5A',borderRadius:4,border:'1.5px solid #191923',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                      <span style={{fontSize:11,fontWeight:900}}>Total selectionne</span>
-                      <span style={{fontSize:13,fontWeight:900}}>{devisItems.reduce(function(s,x){return s+x.qte},0)} pieces</span>
-                    </div>
-                  </div>
-
-                  {/* RECAP */}
-                  {(function() {
-                    var sandTotal = devisItems.reduce(function(s,x){return s+x.total_ht},0)
-                    var mepApresRemise = devisMiseEnPlace * (1 - devisMiseEnPlaceRemise/100)
-                    var sousTotal = sandTotal + mepApresRemise
-                    var remiseMontant = sousTotal * devisRemiseTotal/100
-                    var totalHT = sousTotal - remiseMontant
-                    var tva = totalHT * 0.055
-                    var totalTTC = totalHT + tva
-
-                    function printDevis() {
-                      var items = devisItems.map(function(x){return '<tr><td>'+x.nom+'</td><td style="text-align:center">'+x.qte+'</td><td style="text-align:right">'+x.prix.toFixed(2)+' EUR</td><td style="text-align:right">'+x.total_ht.toFixed(2)+' EUR</td></tr>'}).join('')
-                      var mepRow = mepApresRemise > 0 ? '<tr><td>Frais de mise en place / Show cooking'+(devisMiseEnPlaceRemise>0?' (-'+devisMiseEnPlaceRemise+'%)':'')+'</td><td></td><td></td><td style="text-align:right">'+mepApresRemise.toFixed(2)+' EUR</td></tr>' : ''
-                      var remiseRow = remiseMontant > 0 ? '<tr style="color:#CC0066"><td>Remise commerciale ('+devisRemiseTotal+'%)</td><td></td><td></td><td style="text-align:right">-'+remiseMontant.toFixed(2)+' EUR</td></tr>' : ''
-                      var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Devis '+devisNumero+'</title><style>'+
-                        'body{font-family:Arial,sans-serif;margin:0;padding:0;color:#191923}'+
-                        '@page{margin:1.5cm}'+
-                        '.header{background:#191923;color:#FFEB5A;padding:20px 30px;display:flex;justify-content:space-between;align-items:center}'+
-                        '.header h1{margin:0;font-size:28px;letter-spacing:2px}'+
-                        '.header .sub{font-size:11px;opacity:.6;margin-top:4px}'+
-                        '.devis-title{font-size:22px;font-weight:900}'+
-                        '.devis-num{font-size:11px;opacity:.6}'+
-                        '.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:20px 0}'+
-                        '.info-box{background:#F8F8F8;border-radius:6px;padding:14px;border:1px solid #DEDEDE}'+
-                        '.info-box h3{margin:0 0 8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.5}'+
-                        '.info-box .name{font-size:14px;font-weight:900;margin-bottom:4px}'+
-                        '.info-box .detail{font-size:11px;color:#666;margin-top:2px}'+
-                        'table{width:100%;border-collapse:collapse;margin:16px 0}'+
-                        'th{background:#191923;color:#FFEB5A;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px}'+
-                        'td{padding:8px 10px;font-size:11px;border-bottom:1px solid #EBEBEB}'+
-                        'tr:nth-child(even) td{background:#F8F8F8}'+
-                        '.totals{display:flex;justify-content:flex-end;margin-top:10px}'+
-                        '.totals-box{background:#F8F8F8;border-radius:6px;padding:16px;min-width:250px;border:1px solid #DEDEDE}'+
-                        '.total-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid #EBEBEB}'+
-                        '.total-final{display:flex;justify-content:space-between;padding:10px;background:#191923;border-radius:4px;margin-top:8px}'+
-                        '.total-final span{color:#FFEB5A;font-weight:900;font-size:14px}'+
-                        '.notes{margin-top:20px;background:#F8F8F8;border-radius:6px;padding:14px;border:1px solid #DEDEDE}'+
-                        '.notes h3{margin:0 0 6px;font-size:10px;text-transform:uppercase;opacity:.5}'+
-                        '.footer{margin-top:30px;padding-top:10px;border-top:1px solid #DEDEDE;font-size:9px;color:#888;text-align:center}'+
-                        '</style></head><body>'+
-                        '<div class="header">'+
-                        '<div><h1>MESHUGA</h1><div class="sub">CRAZY DELI &nbsp;|&nbsp; 3 rue Vavin, 75006 Paris</div></div>'+
-                        '<div style="text-align:right"><div class="devis-title">DEVIS</div><div class="devis-num">N° '+devisNumero+'<br/>Date : '+new Date().toLocaleDateString('fr-FR')+'</div></div>'+
-                        '</div>'+
-                        '<div class="info-grid">'+
-                        '<div class="info-box"><h3>Client</h3><div class="name">'+devisClient.nom+'</div><div class="detail">'+devisClient.contact+'</div><div class="detail">'+devisClient.email+'</div></div>'+
-                        '<div class="info-box"><h3>Evenement</h3><div class="detail">Date : '+devisClient.date+'</div><div class="detail">Lieu : '+devisClient.lieu+'</div><div class="detail">'+devisNbPersonnes+' personnes — Format : '+(devisFormat==='normal'?'Sandwich normal (~1/pers.)':'Mini (~3/pers.')+')</div></div>'+
-                        '</div>'+
-                        '<table><thead><tr><th>Designation</th><th style="text-align:center">Qte</th><th style="text-align:right">PU HT</th><th style="text-align:right">Total HT</th></tr></thead><tbody>'+
-                        items+mepRow+remiseRow+
-                        '</tbody></table>'+
-                        '<div class="totals"><div class="totals-box">'+
-                        '<div class="total-row"><span>Total HT</span><span>'+totalHT.toFixed(2)+' EUR</span></div>'+
-                        '<div class="total-row"><span>TVA 5,5%</span><span>'+tva.toFixed(2)+' EUR</span></div>'+
-                        '<div class="total-final"><span>TOTAL TTC</span><span>'+totalTTC.toFixed(2)+' EUR</span></div>'+
-                        '<div style="text-align:center;font-size:10px;opacity:.5;margin-top:6px">soit '+( totalTTC/devisNbPersonnes).toFixed(2)+' EUR TTC / personne</div>'+
-                        '</div></div>'+
-                        (devisNotes ? '<div class="notes"><h3>Notes et conditions</h3><p style="margin:0;font-size:11px;color:#444">'+devisNotes+'</p></div>' : '')+
-                        '<div class="footer">Meshuga Crazy Deli &nbsp;|&nbsp; 3 rue Vavin, 75006 Paris &nbsp;|&nbsp; edward@meshuga.fr &nbsp;|&nbsp; Devis valable 30 jours</div>'+
-                        '</body></html>'
-                      var w = window.open('', '_blank')
-                      w.document.write(html)
-                      w.document.close()
-                      w.focus()
-                      setTimeout(function(){w.print()}, 500)
-                    }
-
+                  ) : devisList.map(function(dv) {
+                    var statusColors = {brouillon:'#888',envoye:'#005FFF',accepte:'#009D3A',refuse:'#CC0066',a_modifier:'#FF6B2B',facture:'#191923',paye:'#009D3A'}
+                    var statusLabels = {brouillon:'Brouillon',envoye:'Envoye',accepte:'Accepte',refuse:'Refuse',a_modifier:'A modifier',facture:'Facture',paye:'Paye'}
+                    var sc = statusColors[dv.statut] || '#888'
                     return (
-                      <div className="card" style={{border:'3px solid #191923',boxShadow:'4px 4px 0 #191923'}}>
-                        <div className="ct">💰 Total</div>
-                        <div style={{borderRadius:5,overflow:'hidden',marginBottom:10}}>
-                          {devisItems.map(function(item) {
-                            return (
-                              <div key={item.id} style={{display:'flex',justifyContent:'space-between',padding:'6px 8px',borderBottom:'1px solid #EBEBEB',background:'#FAFAFA'}}>
-                                <span style={{fontSize:11}}>{item.nom} x{item.qte}</span>
-                                <span style={{fontSize:11,fontWeight:900}}>{item.total_ht.toFixed(2)} EUR</span>
-                              </div>
-                            )
-                          })}
-                          {devisMiseEnPlace > 0 && (
-                            <div style={{display:'flex',justifyContent:'space-between',padding:'6px 8px',borderBottom:'1px solid #EBEBEB',background:'#FAFAFA'}}>
-                              <span style={{fontSize:11}}>Mise en place{devisMiseEnPlaceRemise>0?' (-'+devisMiseEnPlaceRemise+'%)':''}</span>
-                              <span style={{fontSize:11,fontWeight:900}}>{mepApresRemise.toFixed(2)} EUR</span>
+                      <div key={dv.id} className="card" style={{marginBottom:8}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
+                          <div style={{flex:1}}>
+                            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                              <span style={{fontWeight:900,fontSize:14}}>{dv.numero}</span>
+                              <span className="badge" style={{color:sc,borderColor:sc}}>{statusLabels[dv.statut]||dv.statut}</span>
+                              {dv.paiement_statut === 'paye' && <span className="badge" style={{color:'#009D3A',borderColor:'#009D3A',background:'#E8F5E9'}}>💰 Paye</span>}
+                              {dv.facture_numero && <span className="badge" style={{color:'#191923',borderColor:'#191923'}}>FACT {dv.facture_numero}</span>}
+                            </div>
+                            <div style={{fontWeight:900,fontSize:13}}>{dv.client_nom}</div>
+                            <div style={{fontSize:11,opacity:.5}}>{dv.client_email} · {dv.event_date ? new Date(dv.event_date).toLocaleDateString('fr-FR') : ''} · {dv.event_lieu}</div>
+                            <div style={{fontSize:11,opacity:.5}}>{dv.nb_personnes} pers. · {dv.format}</div>
+                          </div>
+                          <div style={{textAlign:'right',flexShrink:0}}>
+                            <div style={{fontWeight:900,fontSize:18}}>{parseFloat(dv.total_ttc||0).toFixed(2)} EUR</div>
+                            <div style={{fontSize:10,opacity:.5}}>TTC</div>
+                          </div>
+                        </div>
+                        <div style={{display:'flex',gap:6,marginTop:10,flexWrap:'wrap'}}>
+                          <button className="btn btn-sm" onClick={function() {
+                            setDevisView('edit')
+                            setCurrentDevisId(dv.id)
+                            setDevisNumero(dv.numero)
+                            setDevisClient({nom:dv.client_nom,contact:dv.client_contact||'',email:dv.client_email||'',phone:dv.client_phone||'',date:dv.event_date||'',lieu:dv.event_lieu||'',prospectId:dv.prospect_id})
+                            setDevisNbPersonnes(dv.nb_personnes||50)
+                            setDevisFormat(dv.format||'normal')
+                            setDevisItems(dv.items||[])
+                            setDevisMiseEnPlace(parseFloat(dv.mise_en_place||0))
+                            setDevisMiseEnPlacePct(parseFloat(dv.remise_mep_pct||0))
+                            setDevisRemiseTotal(parseFloat(dv.remise_total_pct||0))
+                            setDevisNotes(dv.notes||'')
+                            setDevisLivraison(parseFloat(dv.livraison||0))
+                            setDevisLivraisonOffert(!!dv.livraison_offert)
+                            setDevisMepOffert(!!dv.mise_en_place_offert)
+                          }}>✏️ Modifier</button>
+                          {dv.statut === 'brouillon' && <button className="btn btn-b btn-sm" onClick={function(){updateDevisStatut(dv.id,'envoye','Devis envoye au client')}}>📤 Marquer envoye</button>}
+                          {dv.statut === 'envoye' && (
+                            <div>
+                              <button className="btn btn-g btn-sm" onClick={function(){updateDevisStatut(dv.id,'accepte','Client a accepte le devis')}}>✓ Accepte</button>
+                              {' '}
+                              <button className="btn btn-red btn-sm" onClick={function(){updateDevisStatut(dv.id,'refuse','Client a refuse le devis')}}>✕ Refuse</button>
+                              {' '}
+                              <button className="btn btn-sm" style={{background:'#FF6B2B',color:'#fff'}} onClick={function(){updateDevisStatut(dv.id,'a_modifier','Modifications demandees')}}>✎ A modifier</button>
                             </div>
                           )}
-                          {remiseMontant > 0 && (
-                            <div style={{display:'flex',justifyContent:'space-between',padding:'6px 8px',borderBottom:'1px solid #EBEBEB',background:'#FFF0F5'}}>
-                              <span style={{fontSize:11,color:'#CC0066'}}>Remise ({devisRemiseTotal}%)</span>
-                              <span style={{fontSize:11,fontWeight:900,color:'#CC0066'}}>-{remiseMontant.toFixed(2)} EUR</span>
-                            </div>
+                          {dv.statut === 'accepte' && !dv.facture_numero && (
+                            <button className="btn btn-n btn-sm" onClick={function(){
+                              var factNum = 'FACT-'+new Date().getFullYear()+'-'+String(devisList.filter(function(x){return x.facture_numero}).length+1).padStart(3,'0')
+                              sb().from('devis').update({statut:'facture',facture_numero:factNum,facture_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){
+                                sb().from('devis_historique').insert({devis_id:dv.id,action:'facture',note:'Facture '+factNum+' generee',user_name:profile?.full_name||'?'})
+                                loadDevis()
+                                toast('Facture '+factNum+' generee !')
+                              })
+                            }}>🧾 Generer facture</button>
                           )}
+                          {(dv.statut === 'facture') && dv.paiement_statut !== 'paye' && (
+                            <button className="btn btn-g btn-sm" onClick={function(){
+                              sb().from('devis').update({paiement_statut:'paye',statut:'paye',solde_recu:true,solde_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){
+                                sb().from('devis_historique').insert({devis_id:dv.id,action:'paye',note:'Paiement complet recu',user_name:profile?.full_name||'?'})
+                                loadDevis()
+                                toast('💰 Paiement enregistre !')
+                              })
+                            }}>💰 Marquer paye</button>
+                          )}
+                          <button className="btn btn-sm" onClick={function(){generateAndPrintDoc(dv, false)}}>📄 PDF Devis</button>
+                          {dv.facture_numero && <button className="btn btn-sm btn-n" onClick={function(){generateAndPrintDoc(dv, true)}}>🧾 PDF Facture</button>}
                         </div>
-                        <div style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #EBEBEB'}}>
-                          <span style={{fontSize:12}}>Total HT</span><span style={{fontSize:12,fontWeight:900}}>{totalHT.toFixed(2)} EUR</span>
-                        </div>
-                        <div style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #EBEBEB',opacity:.6}}>
-                          <span style={{fontSize:11}}>TVA 5,5%</span><span style={{fontSize:11}}>{tva.toFixed(2)} EUR</span>
-                        </div>
-                        <div style={{display:'flex',justifyContent:'space-between',padding:'10px 8px',background:'#191923',borderRadius:5,marginTop:8}}>
-                          <span style={{fontSize:14,fontWeight:900,color:'#FFEB5A'}}>TOTAL TTC</span>
-                          <span style={{fontSize:18,fontWeight:900,color:'#FFEB5A'}}>{totalTTC.toFixed(2)} EUR</span>
-                        </div>
-                        <div style={{fontSize:10,opacity:.4,textAlign:'center',marginTop:4}}>{(totalTTC/devisNbPersonnes).toFixed(2)} EUR TTC / personne</div>
-                        <button className="btn btn-n" style={{width:'100%',justifyContent:'center',marginTop:12,fontSize:11}} onClick={function() {
-                          if (!devisClient.nom) { toast('Nom du client requis !'); return }
-                          if (devisItems.length === 0) { toast('Selectionnez au moins un sandwich !'); return }
-                          printDevis()
-                        }}>
-                          📥 Imprimer / Telecharger PDF
-                        </button>
-                        <div style={{fontSize:9,opacity:.4,textAlign:'center',marginTop:4}}>Dans la fenetre d'impression, choisir "Enregistrer en PDF"</div>
                       </div>
                     )
-                  })()}
+                  })}
                 </div>
-              </div>
+              )}
+
+              {/* EDIT VIEW */}
+              {devisView === 'edit' && (
+                <div>
+                  <div className="g2">
+                    <div>
+                      <div className="card" style={{marginBottom:10}}>
+                        <div className="ct">👤 Client</div>
+                        <div className="fg">
+                          <label className="lbl">Prospect existant</label>
+                          <select className="inp" value={devisClient.prospectId||''} onChange={function(e) {
+                            var pid = e.target.value
+                            if (!pid) { setDevisClient(Object.assign({},devisClient,{prospectId:null})); return }
+                            var p = prospects.filter(function(x){return String(x.id)===pid})[0]
+                            if (p) setDevisClient(Object.assign({},devisClient,{nom:p.name,contact:p.nextAction||'',email:p.email||'',phone:p.phone||'',prospectId:p.id}))
+                          }}>
+                            <option value="">-- Nouveau client --</option>
+                            {prospects.map(function(p){return <option key={p.id} value={p.id}>{p.name}</option>})}
+                          </select>
+                        </div>
+                        <div className="fg"><label className="lbl">Entreprise *</label><input className="inp" value={devisClient.nom} onChange={function(e){setDevisClient(Object.assign({},devisClient,{nom:e.target.value}))}} /></div>
+                        <div className="fg2">
+                          <div className="fg"><label className="lbl">Contact</label><input className="inp" value={devisClient.contact} onChange={function(e){setDevisClient(Object.assign({},devisClient,{contact:e.target.value}))}} /></div>
+                          <div className="fg"><label className="lbl">Email</label><input className="inp" value={devisClient.email} onChange={function(e){setDevisClient(Object.assign({},devisClient,{email:e.target.value}))}} /></div>
+                        </div>
+                        <div className="fg2">
+                          <div className="fg"><label className="lbl">Date evenement</label><input type="date" className="inp" value={devisClient.date} onChange={function(e){setDevisClient(Object.assign({},devisClient,{date:e.target.value}))}} /></div>
+                          <div className="fg"><label className="lbl">Lieu</label><input className="inp" value={devisClient.lieu} onChange={function(e){setDevisClient(Object.assign({},devisClient,{lieu:e.target.value}))}} /></div>
+                        </div>
+                        {!devisClient.prospectId && devisClient.nom && (
+                          <button className="btn btn-y btn-sm" onClick={function(){
+                            var np = {id:Date.now(),name:devisClient.nom,email:devisClient.email,phone:devisClient.phone||'',size:'',category:'Evenementiel',status:'contacted',nextAction:'Devis envoye',nextDate:'',notes:'',ca:0,score:7,files:[]}
+                            setProspects(function(prev){return prev.concat([np])})
+                            setDevisClient(Object.assign({},devisClient,{prospectId:np.id}))
+                            toast('Prospect ajoute au CRM !')
+                          }}>+ Ajouter au CRM</button>
+                        )}
+                        <div className="fg" style={{marginTop:8}}><label className="lbl">N° Devis</label><input className="inp" value={devisNumero} onChange={function(e){setDevisNumero(e.target.value)}} /></div>
+                      </div>
+
+                      <div className="card" style={{marginBottom:10}}>
+                        <div className="ct">🎯 Format</div>
+                        <div className="fg">
+                          <label className="lbl">Nombre de personnes</label>
+                          <input type="number" className="inp" value={devisNbPersonnes} min="1" onChange={function(e){setDevisNbPersonnes(parseInt(e.target.value)||1)}} />
+                        </div>
+                        <div className="fg">
+                          <label className="lbl">Format (indicatif)</label>
+                          <div style={{display:'flex',gap:8}}>
+                            <div onClick={function(){setDevisFormat('normal')}} style={{flex:1,padding:'10px',border:'2px solid '+(devisFormat==='normal'?'#191923':'#EBEBEB'),borderRadius:5,cursor:'pointer',background:devisFormat==='normal'?'#FFEB5A':'#FAFAFA',textAlign:'center'}}>
+                              <div style={{fontWeight:900,fontSize:12}}>🥪 Normal</div>
+                              <div style={{fontSize:10,opacity:.6}}>~1/pers.</div>
+                            </div>
+                            <div onClick={function(){setDevisFormat('mini')}} style={{flex:1,padding:'10px',border:'2px solid '+(devisFormat==='mini'?'#191923':'#EBEBEB'),borderRadius:5,cursor:'pointer',background:devisFormat==='mini'?'#FFEB5A':'#FAFAFA',textAlign:'center'}}>
+                              <div style={{fontWeight:900,fontSize:12}}>🥙 Mini</div>
+                              <div style={{fontSize:10,opacity:.6}}>~3/pers.</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:4,padding:'6px 10px',fontSize:10}}>
+                          💡 Conseille : {devisFormat==='normal'?devisNbPersonnes:(devisNbPersonnes*3)} pieces — quantites libres
+                        </div>
+                      </div>
+
+                      <div className="card" style={{marginBottom:10}}>
+                        <div className="ct">⚙️ Frais & Remises</div>
+                        <div style={{padding:'10px',border:'2px solid #191923',borderRadius:5,marginBottom:10,background:'#FAFAFA'}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                            <div style={{fontWeight:900,fontSize:12}}>🏗️ Mise en place / Show cooking</div>
+                            <div style={{display:'flex',alignItems:'center',gap:6}}>
+                              <input type="checkbox" checked={devisMepOffert} style={{width:14,height:14,accentColor:'#009D3A'}} onChange={function(e){setDevisMepOffert(e.target.checked)}} />
+                              <span style={{fontSize:11,fontWeight:900,color:devisMepOffert?'#009D3A':'#888'}}>Offert 🎁</span>
+                            </div>
+                          </div>
+                          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                            <input type="number" className="inp" style={{flex:1}} value={devisMiseEnPlace} onChange={function(e){setDevisMiseEnPlace(parseFloat(e.target.value)||0)}} disabled={devisMepOffert} />
+                            <span style={{fontSize:11}}>EUR HT</span>
+                            <span style={{fontSize:11,opacity:.5}}>Remise</span>
+                            <input type="number" className="inp" style={{width:60}} min="0" max="100" value={devisMiseEnPlaceRemise} onChange={function(e){setDevisMiseEnPlacePct(parseFloat(e.target.value)||0)}} disabled={devisMepOffert} />
+                            <span style={{fontSize:11}}>%</span>
+                          </div>
+                        </div>
+                        <div style={{padding:'10px',border:'2px solid #191923',borderRadius:5,marginBottom:10,background:'#FAFAFA'}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                            <div style={{fontWeight:900,fontSize:12}}>🚚 Frais de livraison</div>
+                            <div style={{display:'flex',alignItems:'center',gap:6}}>
+                              <input type="checkbox" checked={devisLivraisonOffert} style={{width:14,height:14,accentColor:'#009D3A'}} onChange={function(e){setDevisLivraisonOffert(e.target.checked)}} />
+                              <span style={{fontSize:11,fontWeight:900,color:devisLivraisonOffert?'#009D3A':'#888'}}>Offert 🎁</span>
+                            </div>
+                          </div>
+                          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                            <input type="number" className="inp" style={{flex:1}} value={devisLivraison} onChange={function(e){setDevisLivraison(parseFloat(e.target.value)||0)}} disabled={devisLivraisonOffert} />
+                            <span style={{fontSize:11}}>EUR HT</span>
+                          </div>
+                        </div>
+                        <div className="fg">
+                          <label className="lbl">Remise sur le total (%)</label>
+                          <input type="number" className="inp" value={devisRemiseTotal} min="0" max="100" onChange={function(e){setDevisRemiseTotal(parseFloat(e.target.value)||0)}} />
+                        </div>
+                      </div>
+
+                      <div className="card">
+                        <div className="ct">📝 Notes</div>
+                        <textarea className="inp" value={devisNotes} onChange={function(e){setDevisNotes(e.target.value)}} placeholder="Conditions speciales, details logistiques..." style={{minHeight:70}} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="card" style={{marginBottom:10}}>
+                        <div className="ct">🥪 Sandwichs</div>
+                        <div style={{fontSize:10,opacity:.5,marginBottom:8,padding:'5px 8px',background:'#F8F8F8',borderRadius:4}}>
+                          Conseille : {devisFormat==='normal'?devisNbPersonnes:(devisNbPersonnes*3)} pieces
+                        </div>
+                        {(devisFormat==='normal' ? [{id:"hot_dog",nom:"Hot Dog",prix:7.56},{id:"grilled_cheese",nom:"Grilled Cheese",prix:7.56},{id:"egg_salad",nom:"Egg Salad",prix:8.51},{id:"chicken_caesar",nom:"Chicken Caesar",prix:11.34},{id:"tuna_melt",nom:"Tuna Melt",prix:11.34},{id:"pastrami",nom:"Pastrami",prix:14.18},{id:"smoked_salmon",nom:"Smoked Salmon",prix:13.23},{id:"lobster_roll",nom:"Lobster Roll",prix:20.79},{id:"pbn",nom:"PBN",prix:5.67}] : [{id:"hot_dog_m",nom:"Hot Dog Mini",prix:2.7},{id:"grilled_cheese_m",nom:"Grilled Cheese Mini",prix:2.87},{id:"egg_salad_m",nom:"Egg Salad Mini",prix:2.65},{id:"chicken_caesar_m",nom:"Chicken Caesar Mini",prix:3.35},{id:"tuna_melt_m",nom:"Tuna Melt Mini",prix:3.0},{id:"pastrami_m",nom:"Pastrami Mini",prix:3.8},{id:"smoked_salmon_m",nom:"Smoked Salmon Mini",prix:3.9},{id:"lobster_roll_m",nom:"Lobster Roll Mini",prix:7.5},{id:"pbn_m",nom:"PBN Mini",prix:2.7},{id:"mini_veggie",nom:"Salade Mini Veggie",prix:4.72}]).map(function(s) {
+                          var ex = devisItems.filter(function(x){return x.id===s.id})[0]
+                          var qty = ex ? ex.qte : 0
+                          function setQty(nq) {
+                            if (nq<=0) setDevisItems(devisItems.filter(function(x){return x.id!==s.id}))
+                            else if (qty===0) setDevisItems(devisItems.concat([{id:s.id,nom:s.nom,prix:s.prix,qte:nq,total_ht:nq*s.prix}]))
+                            else setDevisItems(devisItems.map(function(x){return x.id===s.id?Object.assign({},x,{qte:nq,total_ht:nq*s.prix}):x}))
+                          }
+                          return (
+                            <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderBottom:'1px solid #EBEBEB'}}>
+                              <div style={{flex:1}}>
+                                <div style={{fontSize:12,fontWeight:qty>0?900:400}}>{s.nom}</div>
+                                <div style={{fontSize:10,opacity:.5}}>{s.prix.toFixed(2)} EUR HT</div>
+                              </div>
+                              <div style={{display:'flex',alignItems:'center',gap:5}}>
+                                <button className="btn btn-sm" onClick={function(){setQty(qty-1)}}>-</button>
+                                <input type="number" min="0" style={{width:48,textAlign:'center',border:'2px solid #191923',borderRadius:4,padding:'3px',fontSize:12,fontWeight:900}} value={qty}
+                                  onChange={function(e){setQty(parseInt(e.target.value)||0)}} />
+                                <button className="btn btn-y btn-sm" onClick={function(){setQty(qty+1)}}>+</button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        <div style={{marginTop:8,padding:'7px 10px',background:'#FFEB5A',borderRadius:4,border:'1.5px solid #191923',display:'flex',justifyContent:'space-between'}}>
+                          <span style={{fontSize:11,fontWeight:900}}>Total selectionne</span>
+                          <span style={{fontSize:13,fontWeight:900}}>{devisItems.reduce(function(s,x){return s+x.qte},0)} pieces</span>
+                        </div>
+                      </div>
+
+                      {(function() {
+                        var sandTotal = devisItems.reduce(function(s,x){return s+x.total_ht},0)
+                        var mepHT = devisMepOffert ? devisMiseEnPlace : devisMiseEnPlace*(1-devisMiseEnPlaceRemise/100)
+                        var livHT = devisLivraisonOffert ? devisLivraison : devisLivraison
+                        var sousTotal = sandTotal + mepHT + livHT
+                        var remiseMontant = sousTotal * devisRemiseTotal/100
+                        var totalHT = sousTotal - remiseMontant
+                        var tva = totalHT * 0.055
+                        var totalTTC = totalHT + tva
+
+                        function generateAndPrint(isFacture) {
+                          var doc = {
+                            isFacture: isFacture,
+                            numero: isFacture ? (currentDevisId ? devisList.filter(function(x){return x.id===currentDevisId})[0]?.facture_numero || devisNumero : devisNumero) : devisNumero,
+                            date: new Date().toLocaleDateString('fr-FR'),
+                            client_nom: devisClient.nom,
+                            client_contact: devisClient.contact,
+                            client_email: devisClient.email,
+                            event_date: devisClient.date,
+                            event_lieu: devisClient.lieu,
+                            nb_personnes: devisNbPersonnes,
+                            format: devisFormat==='normal'?'1 sandwich / personne':'3 minis / personne',
+                            items: devisItems,
+                            mep: devisMiseEnPlace, mep_offert: devisMepOffert, mep_remise: devisMiseEnPlaceRemise, mep_ht: mepHT,
+                            liv: devisLivraison, liv_offert: devisLivraisonOffert,
+                            remise_pct: devisRemiseTotal, remise_montant: remiseMontant,
+                            total_ht: totalHT, tva: tva, total_ttc: totalTTC,
+                            notes: devisNotes,
+                          }
+                          generateAndPrintDoc(doc, isFacture)
+                        }
+
+                        return (
+                          <div className="card" style={{border:'3px solid #191923',boxShadow:'4px 4px 0 #191923'}}>
+                            <div className="ct">💰 Recapitulatif</div>
+                            <div style={{borderRadius:5,overflow:'hidden',marginBottom:8}}>
+                              {devisItems.map(function(item) {
+                                return <div key={item.id} style={{display:'flex',justifyContent:'space-between',padding:'5px 8px',borderBottom:'1px solid #EBEBEB',background:'#FAFAFA',fontSize:11}}>
+                                  <span>{item.nom} x{item.qte}</span><span style={{fontWeight:900}}>{item.total_ht.toFixed(2)} EUR</span>
+                                </div>
+                              })}
+                              {devisMiseEnPlace > 0 && (
+                                <div style={{display:'flex',justifyContent:'space-between',padding:'5px 8px',borderBottom:'1px solid #EBEBEB',background:'#FAFAFA',fontSize:11}}>
+                                  <span style={{textDecoration:devisMepOffert?'line-through':'none',opacity:devisMepOffert?.5:1}}>
+                                    Mise en place{devisMiseEnPlaceRemise>0&&!devisMepOffert?' (-'+devisMiseEnPlaceRemise+'%)':''}
+                                    {devisMepOffert&&<span style={{color:'#009D3A',marginLeft:6,fontWeight:900}}>OFFERT 🎁</span>}
+                                  </span>
+                                  <span style={{fontWeight:900,textDecoration:devisMepOffert?'line-through':'none',opacity:devisMepOffert?.5:1}}>{devisMiseEnPlace.toFixed(2)} EUR</span>
+                                </div>
+                              )}
+                              {devisLivraison > 0 && (
+                                <div style={{display:'flex',justifyContent:'space-between',padding:'5px 8px',borderBottom:'1px solid #EBEBEB',background:'#FAFAFA',fontSize:11}}>
+                                  <span style={{textDecoration:devisLivraisonOffert?'line-through':'none',opacity:devisLivraisonOffert?.5:1}}>
+                                    Livraison
+                                    {devisLivraisonOffert&&<span style={{color:'#009D3A',marginLeft:6,fontWeight:900}}>OFFERT 🎁</span>}
+                                  </span>
+                                  <span style={{fontWeight:900,textDecoration:devisLivraisonOffert?'line-through':'none',opacity:devisLivraisonOffert?.5:1}}>{devisLivraison.toFixed(2)} EUR</span>
+                                </div>
+                              )}
+                              {remiseMontant > 0 && (
+                                <div style={{display:'flex',justifyContent:'space-between',padding:'5px 8px',background:'#FFF0F5',fontSize:11,color:'#CC0066'}}>
+                                  <span>Remise ({devisRemiseTotal}%)</span><span style={{fontWeight:900}}>-{remiseMontant.toFixed(2)} EUR</span>
+                                </div>
+                              )}
+                            </div>
+                            <div style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #EBEBEB',fontSize:12}}>
+                              <span>Total HT</span><span style={{fontWeight:900}}>{totalHT.toFixed(2)} EUR</span>
+                            </div>
+                            <div style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #EBEBEB',fontSize:11,opacity:.6}}>
+                              <span>TVA 5,5%</span><span>{tva.toFixed(2)} EUR</span>
+                            </div>
+                            <div style={{display:'flex',justifyContent:'space-between',padding:'10px 8px',background:'#191923',borderRadius:5,marginTop:8}}>
+                              <span style={{fontSize:14,fontWeight:900,color:'#FFEB5A'}}>TOTAL TTC</span>
+                              <span style={{fontSize:18,fontWeight:900,color:'#FFEB5A'}}>{totalTTC.toFixed(2)} EUR</span>
+                            </div>
+                            <div style={{fontSize:10,opacity:.4,textAlign:'center',marginTop:4}}>{(totalTTC/devisNbPersonnes).toFixed(2)} EUR TTC / personne</div>
+                            <div style={{display:'flex',gap:6,marginTop:12}}>
+                              <button className="btn btn-y" style={{flex:1,justifyContent:'center',fontSize:11}} onClick={function(){
+                                if (!devisClient.nom) { toast('Nom du client requis !'); return }
+                                if (devisItems.length===0) { toast('Selectionnez au moins un sandwich !'); return }
+                                var payload = {
+                                  numero:devisNumero, statut:'brouillon',
+                                  prospect_id: devisClient.prospectId ? String(devisClient.prospectId) : null,
+                                  client_nom:devisClient.nom, client_contact:devisClient.contact, client_email:devisClient.email, client_phone:devisClient.phone||'',
+                                  event_date:devisClient.date||null, event_lieu:devisClient.lieu,
+                                  nb_personnes:devisNbPersonnes, format:devisFormat,
+                                  items:devisItems,
+                                  mise_en_place:devisMiseEnPlace, mise_en_place_offert:devisMepOffert,
+                                  livraison:devisLivraison, livraison_offert:devisLivraisonOffert,
+                                  remise_mep_pct:devisMiseEnPlaceRemise, remise_total_pct:devisRemiseTotal, remise_montant:remiseMontant,
+                                  total_ht:totalHT, tva:tva, total_ttc:totalTTC,
+                                  notes:devisNotes,
+                                  date_validite: new Date(Date.now()+30*24*60*60*1000).toISOString().split('T')[0],
+                                }
+                                if (currentDevisId) payload.id = currentDevisId
+                                saveDevisToSupabase(payload, function(saved){
+                                  toast('Devis sauvegarde !')
+                                  setCurrentDevisId(saved.id)
+                                })
+                              }}>💾 Sauvegarder</button>
+                              <button className="btn btn-n" style={{flex:1,justifyContent:'center',fontSize:11}} onClick={function(){generateAndPrint(false)}}>📄 PDF Devis</button>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
