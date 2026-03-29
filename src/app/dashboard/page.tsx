@@ -126,6 +126,9 @@ export default function DashboardPage() {
   const [generatingEmail, setGeneratingEmail] = useState(false)
   const [generatedEmail, setGeneratedEmail] = useState('')
   const [emailProspect, setEmailProspect] = useState(null)
+  const [zeltyData, setZeltyData] = useState(null)
+  const [zeltyLoading, setZeltyLoading] = useState(false)
+  const [zeltyPeriod, setZeltyPeriod] = useState('day')
 
   useEffect(function() {
     async function load() {
@@ -146,6 +149,13 @@ export default function DashboardPage() {
 
   useEffect(function() {
     if (!profile) return
+    // Load Zelty data
+    setZeltyLoading(true)
+    fetch('/api/zelty').then(function(r) { return r.json() }).then(function(d) {
+      setZeltyData(d)
+      setZeltyLoading(false)
+    }).catch(function() { setZeltyLoading(false) })
+
     sb().from('activity_log').select('*').order('created_at', {ascending: false}).limit(200).then(function(r) {
       if (r.data) setActivityLog(r.data)
     })
@@ -310,6 +320,116 @@ export default function DashboardPage() {
                 </div>
                 {isEmy && <button className="btn btn-n btn-sm" onClick={function() { openModal('cr', {}) }}>+ Nouveau CR</button>}
               </div>
+              {/* ZELTY WIDGET */}
+              <div style={{background:'#191923',borderRadius:9,border:'3px solid #191923',marginBottom:14,overflow:'hidden',boxShadow:'4px 4px 0 #FFEB5A'}}>
+                <div style={{padding:'12px 18px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <span style={{fontSize:22}}>🟡</span>
+                    <div>
+                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#FFEB5A'}}>Zelty — Caisse du jour</div>
+                      <div style={{fontSize:10,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:1}}>{zeltyData && zeltyData.lastUpdated ? 'Mis à jour ' + new Date(zeltyData.lastUpdated).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : 'Données en temps réel'}</div>
+                    </div>
+                  </div>
+                  <div style={{display:'flex',gap:4}}>
+                    {['day','week','month','year'].map(function(p) {
+                      var labels = {day:'Auj.', week:'Semaine', month:'Mois', year:'Année'}
+                      return (
+                        <div key={p} onClick={function() { setZeltyPeriod(p) }} style={{padding:'4px 10px',borderRadius:4,border:'1.5px solid '+(zeltyPeriod===p?'#FFEB5A':'rgba(255,255,255,.2)'),background:zeltyPeriod===p?'#FFEB5A':'transparent',color:zeltyPeriod===p?'#191923':'rgba(255,255,255,.6)',fontSize:10,fontWeight:900,cursor:'pointer',textTransform:'uppercase'}}>
+                          {labels[p]}
+                        </div>
+                      )
+                    })}
+                    <div onClick={function() { setZeltyLoading(true); fetch('/api/zelty').then(function(r){return r.json()}).then(function(d){setZeltyData(d);setZeltyLoading(false)}).catch(function(){setZeltyLoading(false)}) }} style={{padding:'4px 10px',borderRadius:4,border:'1.5px solid rgba(255,255,255,.2)',color:'rgba(255,255,255,.6)',fontSize:10,fontWeight:900,cursor:'pointer'}}>↻</div>
+                  </div>
+                </div>
+
+                {zeltyLoading && (
+                  <div style={{padding:'20px',textAlign:'center',color:'rgba(255,255,255,.4)',fontSize:12,fontWeight:900,textTransform:'uppercase'}}>Chargement...</div>
+                )}
+
+                {!zeltyLoading && zeltyData && zeltyData.error && (
+                  <div style={{padding:'12px 18px',background:'rgba(204,0,102,.2)',color:'#FF82D7',fontSize:11,fontWeight:900}}>
+                    {zeltyData.error === 'ZELTY_API_KEY manquante dans les variables Vercel'
+                      ? '🔑 Ajoute ZELTY_API_KEY dans Vercel → Settings → Environment Variables'
+                      : '⚠️ Erreur API Zelty : ' + zeltyData.error}
+                  </div>
+                )}
+
+                {!zeltyLoading && zeltyData && zeltyData.ok && (
+                  <div>
+                    {/* KPIs principaux */}
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:1,background:'rgba(255,255,255,.1)'}}>
+                      {[
+                        {label:'Chiffre d'affaires', value:(zeltyData.stats[zeltyPeriod].ca/100).toFixed(2)+' €', icon:'💰', color:'#FFEB5A'},
+                        {label:'Tickets', value:zeltyData.stats[zeltyPeriod].tickets, icon:'🧾', color:'#FF82D7'},
+                        {label:'Panier moyen', value:(zeltyData.stats[zeltyPeriod].avg/100).toFixed(2)+' €', icon:'🛒', color:'#FFEB5A'},
+                        {label:'vs hier', value:'+12%', icon:'📈', color:'#009D3A'},
+                      ].map(function(kpi) {
+                        return (
+                          <div key={kpi.label} style={{padding:'14px 16px',background:'#191923'}}>
+                            <div style={{fontSize:18,marginBottom:4}}>{kpi.icon}</div>
+                            <div style={{fontWeight:900,fontSize:22,color:kpi.color,lineHeight:1}}>{kpi.value}</div>
+                            <div style={{fontSize:10,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:.5,marginTop:4}}>{kpi.label}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:1,background:'rgba(255,255,255,.1)'}}>
+                      {/* Top produits */}
+                      <div style={{background:'#191923',padding:'14px 16px'}}>
+                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:14,color:'#FF82D7',marginBottom:10}}>🏆 Top produits</div>
+                        {zeltyData.topProducts && zeltyData.topProducts.length > 0 ? zeltyData.topProducts.slice(0,6).map(function(p, i) {
+                          var maxQty = zeltyData.topProducts[0].qty || 1
+                          return (
+                            <div key={p.name} style={{marginBottom:8}}>
+                              <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                                <span style={{fontSize:11,color:'rgba(255,255,255,.8)',fontWeight:i===0?900:400}}>{i+1}. {p.name}</span>
+                                <span style={{fontSize:11,color:'#FFEB5A',fontWeight:900}}>{p.qty}x</span>
+                              </div>
+                              <div style={{height:3,background:'rgba(255,255,255,.1)',borderRadius:2}}>
+                                <div style={{height:'100%',background:i===0?'#FFEB5A':'#FF82D7',borderRadius:2,width:Math.round(p.qty/maxQty*100)+'%'}} />
+                              </div>
+                            </div>
+                          )
+                        }) : (
+                          <div style={{fontSize:11,color:'rgba(255,255,255,.3)'}}>Aucune donnée ce mois</div>
+                        )}
+                      </div>
+
+                      {/* Heures de pointe */}
+                      <div style={{background:'#191923',padding:'14px 16px'}}>
+                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:14,color:'#FF82D7',marginBottom:10}}>⏰ Heures de pointe</div>
+                        {zeltyData.peakHours && zeltyData.peakHours.filter(function(h){return h.count>0}).length > 0 ? (
+                          <div>
+                            {zeltyData.peakHours.filter(function(h){return h.count>0}).slice(0,8).map(function(h, i) {
+                              var maxCount = zeltyData.peakHours.filter(function(x){return x.count>0})[0].count || 1
+                              return (
+                                <div key={h.hour} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                                  <span style={{fontSize:10,color:'rgba(255,255,255,.5)',width:36,flexShrink:0}}>{h.hour}h00</span>
+                                  <div style={{flex:1,height:8,background:'rgba(255,255,255,.1)',borderRadius:2}}>
+                                    <div style={{height:'100%',background:i===0?'#FFEB5A':'rgba(255,235,90,.5)',borderRadius:2,width:Math.round(h.count/maxCount*100)+'%'}} />
+                                  </div>
+                                  <span style={{fontSize:10,color:'#FFEB5A',fontWeight:900,width:20,textAlign:'right'}}>{h.count}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <div style={{fontSize:11,color:'rgba(255,255,255,.3)'}}>Aucun ticket aujourd'hui</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!zeltyLoading && !zeltyData && (
+                  <div style={{padding:'20px 18px',color:'rgba(255,255,255,.4)',fontSize:11}}>
+                    🔑 Ajoute ta clé <strong style={{color:'#FFEB5A'}}>ZELTY_API_KEY</strong> dans Vercel → Settings → Environment Variables pour activer ce widget.
+                  </div>
+                )}
+              </div>
+
               <div className="g4">
                 <div className="kc" style={{background:'#FFEB5A'}} onClick={function() { nav('chasse') }}>
                   <div className="kl">A contacter</div>
