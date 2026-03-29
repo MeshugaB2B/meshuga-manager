@@ -118,6 +118,8 @@ export default function DashboardPage() {
   const [activityLog, setActivityLog] = useState([])
   const [journalFilter, setJournalFilter] = useState('all')
   const [planningWeek, setPlanningWeek] = useState(0)
+  const [crmFilter, setCrmFilter] = useState('all')
+  const [crmSearch, setCrmSearch] = useState('')
   const [chasseCat, setChasseChasse] = useState('all')
   const [chasseSearch, setChasseSearch] = useState('')
   const [chasseSort, setChasseSort] = useState('score')
@@ -315,7 +317,7 @@ export default function DashboardPage() {
       '<p style="font-size:11px;color:#555"><strong>Conditions de reglement :</strong> '+condPaiement+'</p>'+
       (dv.notes ? '<div style="background:#F8F8F8;border-left:4px solid #FF82D7;padding:10px 14px;margin:12px 0;font-size:11px"><strong>Notes :</strong> '+dv.notes+'</div>' : '')+
       '<div class="legal">'+
-      'SAS AEGIA FOOD — Capital social : [A REMPLIR] EUR — RCS Paris — SIRET 904 639 531 00014 — Code APE : [A REMPLIR] — TVA intracommunautaire : FR31904639531<br/>'+
+      'SAS AEGIA FOOD — Capital social : 1 000 EUR — RCS Paris — SIRET 904 639 531 00014 — Code APE : 56.10C — TVA intracommunautaire : FR31904639531<br/>'+
       (isFacture ? 'Conformement a la loi, tout retard de paiement entraine l'exigibilite de penalites d'un taux egal a 3 fois le taux d'interet legal, ainsi qu'une indemnite forfaitaire de 40 EUR pour frais de recouvrement.' : 'Devis valable 30 jours. Tout commencement d'execution vaut acceptation. TVA sur les produits alimentaires a taux reduit de 5,5%. Prix HT en euros.')+
       '</div>'+
       '</div>'+
@@ -350,9 +352,10 @@ export default function DashboardPage() {
     const senderName = isEmy ? 'Emy, B2B Manager' : 'Edward, patron'
     const prompt = 'Tu es ' + senderName + ' pour Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium : pastrami, lobster rolls, sandwichs gastronomiques. Spécialisés dans les plateaux déjeuner B2B et le catering événementiel sur tout Paris.\n\nÉcris un email de prise de contact pour ce prospect :\n- Entreprise : ' + p.name + '\n- Secteur : ' + (CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat) + '\n- Localisation : ' + p.arrondissement + '\n- Taille : ' + p.taille + ' employés\n- Ce qu\'on peut proposer : ' + p.type + '\n- Angle : ' + p.pitch + '\n\nSois concis (6-8 lignes), personnalisé. Commence par "Objet : " sur la 1ère ligne.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{role: 'user', content: prompt}]})})
+      const res = await fetch('/api/generate-email', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: prompt})})
       const data = await res.json()
-      setGeneratedEmail(data.content && data.content[0] ? data.content[0].text : 'Erreur lors de la génération')
+      if (!res.ok) throw new Error(data.error || 'Erreur API')
+      setGeneratedEmail(data.text || 'Erreur lors de la génération')
     } catch(e) {
       setGeneratedEmail('Erreur de connexion.')
     }
@@ -809,26 +812,170 @@ export default function DashboardPage() {
                 <div><div className="pt">CRM Prospects</div><div className="ps">{prospects.length} prospects</div></div>
                 <button className="btn btn-y btn-sm" onClick={function() { openModal('prospect', {status:'to_contact',ca:0,files:[]}) }}>+ Nouveau</button>
               </div>
-              {prospects.map(function(p) {
+
+              {/* KPIs CRM */}
+              {(function() {
+                var wonProspects = prospects.filter(function(p){return p.status==='won'})
+                var caTotal = wonProspects.reduce(function(s,p){return s+parseFloat(p.ca||0)},0)
+                var devisEnAttente = devisList.filter(function(d){return d.statut==='envoye'||d.statut==='brouillon'})
+                var devisEnAttenteMontant = devisEnAttente.reduce(function(s,d){return s+parseFloat(d.total_ht||0)},0)
+                var devisAcceptes = devisList.filter(function(d){return d.statut==='accepte'||d.statut==='facture'||d.statut==='paye'})
+                var caBDevis = devisAcceptes.reduce(function(s,d){return s+parseFloat(d.total_ht||0)},0)
+                var commissionEmy = caBDevis * 0.10
+                var urgents = prospects.filter(function(p){return p.nextDate && p.nextDate <= new Date().toISOString().split('T')[0] && p.status!=='won' && p.status!=='lost'})
+                var pipeline = prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'})
                 return (
-                  <div key={p.id} className="card" style={{cursor:'pointer',marginBottom:8}} onClick={function() { openModal('prospect', Object.assign({}, p)) }}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:6}}>
-                      <div>
-                        <div style={{fontWeight:900,fontSize:14}}>{p.name}</div>
-                        <div style={{fontSize:11,opacity:.5}}>{p.category} · {p.email}</div>
+                  <div>
+                    <div className="g4" style={{marginBottom:10}}>
+                      <div className="kc" style={{background:'#FFEB5A'}}>
+                        <div className="kl">CA B2B gagne</div>
+                        <div className="kv">{caBDevis.toFixed(0)} EUR</div>
+                        <div style={{fontSize:9,opacity:.5,marginTop:2}}>HT total devis acceptes</div>
+                        <div className="ki">💰</div>
                       </div>
-                      <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>
+                      <div className="kc" style={{background:'#FF82D7'}}>
+                        <div className="kl">Devis a confirmer</div>
+                        <div className="kv">{devisEnAttenteMontant.toFixed(0)} EUR</div>
+                        <div style={{fontSize:9,opacity:.5,marginTop:2}}>{devisEnAttente.length} devis en attente</div>
+                        <div className="ki">📄</div>
+                      </div>
+                      <div className="kc" style={{background:'#FFFFFF'}}>
+                        <div className="kl">Commission Emy</div>
+                        <div className="kv">{commissionEmy.toFixed(0)} EUR</div>
+                        <div style={{fontSize:9,opacity:.5,marginTop:2}}>10% du CA HT signe</div>
+                        <div className="ki">⭐</div>
+                      </div>
+                      <div className="kc" style={{background:urgents.length>0?'#FFE8F0':'#FFFFFF'}}>
+                        <div className="kl">Relances urgentes</div>
+                        <div className="kv" style={{color:urgents.length>0?'#CC0066':'#191923'}}>{urgents.length}</div>
+                        <div style={{fontSize:9,opacity:.5,marginTop:2}}>{pipeline.length} en pipeline</div>
+                        <div className="ki">🔔</div>
+                      </div>
                     </div>
-                    {p.nextDate && <div style={{fontSize:11,opacity:.6,color:p.nextDate<=today?'#CC0066':'inherit'}}>{p.nextDate<=today?'⚠️ ':''}{p.nextAction}</div>}
-                    {p.files && p.files.filter(function(f) { return f && f.trim() }).length > 0 && (
-                      <div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:6}}>
-                        {p.files.filter(function(f) { return f && f.trim() }).map(function(f, i) {
-                          return <span key={i} style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:3,padding:'2px 6px',fontSize:9,fontWeight:900}}>📦 {f.slice(0,25)}</span>
+
+                    {/* Relances urgentes */}
+                    {urgents.length > 0 && (
+                      <div className="card-p" style={{marginBottom:10,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                        <div className="ct">🔔 Relances urgentes aujourd'hui</div>
+                        {urgents.slice(0,5).map(function(p) {
+                          return (
+                            <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:'1px solid rgba(25,25,35,.1)'}}>
+                              <div>
+                                <div style={{fontWeight:900,fontSize:13}}>{p.name}</div>
+                                <div style={{fontSize:11,opacity:.7}}>{p.nextAction}</div>
+                              </div>
+                              <div style={{display:'flex',gap:6}}>
+                                <button className="btn btn-sm" style={{background:'#191923',color:'#FFEB5A'}} onClick={function(){generateEmail({id:p.id,name:p.name,cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category,email:p.email})}}>✉️ Email IA</button>
+                                <button className="btn btn-y btn-sm" onClick={function(){openModal('prospect',Object.assign({},p))}}>✏️</button>
+                              </div>
+                            </div>
+                          )
                         })}
                       </div>
                     )}
-                    <div style={{marginTop:6}}>
-                      <button className="btn btn-p btn-sm" onClick={function(e) { e.stopPropagation(); generateEmail(Object.assign({}, p, {cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category})) }}>✉️ Email IA</button>
+
+                    {/* Devis en attente */}
+                    {devisEnAttente.length > 0 && (
+                      <div className="card" style={{marginBottom:10}}>
+                        <div className="ct">📄 Devis en attente de reponse</div>
+                        {devisEnAttente.map(function(dv) {
+                          return (
+                            <div key={dv.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:'1px solid #EBEBEB'}}>
+                              <div>
+                                <div style={{fontWeight:900,fontSize:12}}>{dv.client_nom}</div>
+                                <div style={{fontSize:10,opacity:.5}}>{dv.numero} · {dv.event_date ? new Date(dv.event_date).toLocaleDateString('fr-FR') : 'Date a definir'}</div>
+                              </div>
+                              <div style={{textAlign:'right'}}>
+                                <div style={{fontWeight:900,fontSize:13}}>{parseFloat(dv.total_ttc||0).toFixed(0)} EUR TTC</div>
+                                <span className="badge" style={{color:'#005FFF',borderColor:'#005FFF',fontSize:8}}>{dv.statut}</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        <button className="btn btn-y btn-sm" style={{marginTop:8}} onClick={function(){nav('devis')}}>Voir tous les devis →</button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* Pipeline par statut */}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6,marginBottom:12}}>
+                {['to_contact','contacted','nego','won','lost'].map(function(s) {
+                  var labels = {to_contact:'A contacter',contacted:'Contacte',nego:'Nego',won:'Gagne',lost:'Perdu'}
+                  var colors = {to_contact:'#888',contacted:'#B8920A',nego:'#005FFF',won:'#009D3A',lost:'#CC0066'}
+                  var cnt = prospects.filter(function(p){return p.status===s}).length
+                  return (
+                    <div key={s} style={{textAlign:'center',padding:'8px 4px',border:'2px solid '+colors[s],borderRadius:5,background:'#fff',cursor:'pointer'}} onClick={function(){setCrmFilter(s)}}>
+                      <div style={{fontWeight:900,fontSize:18,color:colors[s]}}>{cnt}</div>
+                      <div style={{fontSize:8,fontWeight:900,textTransform:'uppercase',color:colors[s],opacity:.8}}>{labels[s]}</div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Filtres */}
+              <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+                <input className="inp" style={{flex:1,minWidth:140}} placeholder="Rechercher..." value={crmSearch||''} onChange={function(e){setCrmSearch(e.target.value)}} />
+                <select className="inp" style={{width:140}} value={crmFilter||'all'} onChange={function(e){setCrmFilter(e.target.value)}}>
+                  <option value="all">Tous les statuts</option>
+                  <option value="to_contact">A contacter</option>
+                  <option value="contacted">Contacte</option>
+                  <option value="nego">Nego</option>
+                  <option value="won">Gagne</option>
+                  <option value="lost">Perdu</option>
+                </select>
+              </div>
+
+              {/* Liste prospects */}
+              {prospects.filter(function(p){
+                var matchFilter = !crmFilter || crmFilter==='all' || p.status===crmFilter
+                var matchSearch = !crmSearch || p.name.toLowerCase().indexOf(crmSearch.toLowerCase())>=0 || (p.email&&p.email.toLowerCase().indexOf(crmSearch.toLowerCase())>=0)
+                return matchFilter && matchSearch
+              }).map(function(p) {
+                var dvProspect = devisList.filter(function(d){return d.client_nom===p.name||String(d.prospect_id)===String(p.id)})
+                var isUrgent = p.nextDate && p.nextDate <= new Date().toISOString().split('T')[0] && p.status!=='won' && p.status!=='lost'
+                var isLate = p.nextDate && p.nextDate < new Date().toISOString().split('T')[0] && p.status!=='won' && p.status!=='lost'
+                return (
+                  <div key={p.id} className="card" style={{cursor:'pointer',marginBottom:8,borderLeft:'4px solid '+(isLate?'#CC0066':STATUS_PC[p.status])}} onClick={function(){openModal('prospect',Object.assign({},p))}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:6}}>
+                      <div style={{flex:1}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:3}}>
+                          <div style={{fontWeight:900,fontSize:14}}>{p.name}</div>
+                          {isUrgent && <span style={{fontSize:9,fontWeight:900,background:'#CC0066',color:'#fff',padding:'2px 6px',borderRadius:3}}>🔔 URGENT</span>}
+                        </div>
+                        <div style={{fontSize:11,opacity:.5}}>{p.category} · {p.email}</div>
+                        {p.nextDate && (
+                          <div style={{fontSize:11,marginTop:4,color:isLate?'#CC0066':'#191923',fontWeight:isLate?900:400}}>
+                            {isLate?'⚠️ En retard : ':'📅 '}{p.nextAction} — {new Date(p.nextDate).toLocaleDateString('fr-FR')}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
+                        <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>
+                        {p.score && <span style={{fontSize:9,fontWeight:900,background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:3,padding:'1px 5px'}}>⭐ {p.score}/10</span>}
+                      </div>
+                    </div>
+                    {dvProspect.length > 0 && (
+                      <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:6}}>
+                        {dvProspect.slice(0,3).map(function(dv) {
+                          var sc = {brouillon:'#888',envoye:'#005FFF',accepte:'#009D3A',refuse:'#CC0066',a_modifier:'#FF6B2B',facture:'#191923',paye:'#009D3A'}
+                          var sl = {brouillon:'Brouillon',envoye:'Envoye',accepte:'Accepte',refuse:'Refuse',a_modifier:'A modifier',facture:'Facture',paye:'Paye'}
+                          return <span key={dv.id} style={{fontSize:9,fontWeight:900,padding:'2px 6px',border:'1.5px solid '+(sc[dv.statut]||'#888'),borderRadius:3,color:sc[dv.statut]||'#888'}}>
+                            📄 {dv.numero} — {parseFloat(dv.total_ttc||0).toFixed(0)} EUR · {sl[dv.statut]||dv.statut}
+                          </span>
+                        })}
+                      </div>
+                    )}
+                    {p.notes && <div style={{fontSize:11,opacity:.5,marginBottom:6,fontStyle:'italic'}}>"{p.notes.slice(0,80)}{p.notes.length>80?'...':''}"</div>}
+                    <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                      <button className="btn btn-p btn-sm" onClick={function(e){e.stopPropagation();generateEmail({id:p.id,name:p.name,cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category,email:p.email})}}>✉️ Email IA</button>
+                      <button className="btn btn-y btn-sm" onClick={function(e){e.stopPropagation();nav('devis')}}>📄 Devis</button>
+                      {p.files && p.files.filter(function(f){return f&&f.trim()}).length > 0 && (
+                        p.files.filter(function(f){return f&&f.trim()}).map(function(f,i){
+                          return <span key={i} style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:3,padding:'2px 6px',fontSize:9,fontWeight:900}}>📦 {f.slice(0,20)}</span>
+                        })
+                      )}
                     </div>
                   </div>
                 )
