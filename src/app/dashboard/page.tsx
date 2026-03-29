@@ -394,19 +394,19 @@ export default function DashboardPage() {
       (dv.notes?'<div class="notes"><strong>Notes :</strong> '+dv.notes+'</div>':'')+
 
       '<div class="conditions">'+
-        '<strong>Conditions de r&egrave;glement :</strong> '+(isFacture?'Virement bancaire — 30% vers&eacute; &agrave; la commande, solde &agrave; r&eacute;gler 72h avant la date de l'&eacute;v&eacute;nement.':'30% &agrave; la commande, solde 72h avant l'&eacute;v&eacute;nement. Devis valable 30 jours.')+
+        '<strong>Conditions de r&egrave;glement :</strong> '+(isFacture?'Virement bancaire — 30% vers&eacute; &agrave; la commande, solde &agrave; r&eacute;gler 72h avant la date de l&#39;&eacute;v&eacute;nement.':'30% &agrave; la commande, solde 72h avant l&#39;&eacute;v&eacute;nement. Devis valable 30 jours.')+
       '</div>'+
 
       '<div class="footer-legal">'+
         '<div class="legal-text">'+
           'SAS AEGIA FOOD (enseigne Meshuga) &mdash; SASU &mdash; Capital social : 1 000 EUR &mdash; RCS Paris &mdash; SIRET 904 639 531 00014 &mdash; Code APE : 56.10C &mdash; TVA intracommunautaire : FR31904639531 &mdash; 3 rue Vavin, 75006 Paris<br>'+
-          (isFacture?'Conform&eacute;ment &agrave; la loi, tout retard de paiement entra&icirc;ne l'exigibilit&eacute; de p&eacute;nalit&eacute;s d'un taux &eacute;gal &agrave; 3 fois le taux d'int&eacute;r&ecirc;t l&eacute;gal, ainsi qu'une indemnit&eacute; forfaitaire de 40 EUR pour frais de recouvrement.':'TVA sur les produits alimentaires &agrave; taux r&eacute;duit de 5,5%. Prix HT en euros. Tout commencement d'ex&eacute;cution vaut acceptation du pr&eacute;sent devis.')+
+          (isFacture?'Conform&eacute;ment &agrave; la loi, tout retard de paiement entra&icirc;ne l&#39;exigibilit&eacute; de p&eacute;nalit&eacute;s d&#39;un taux &eacute;gal &agrave; 3 fois le taux d&#39;int&eacute;r&ecirc;t l&eacute;gal, ainsi qu&#39;une indemnit&eacute; forfaitaire de 40 EUR pour frais de recouvrement.':'TVA sur les produits alimentaires &agrave; taux r&eacute;duit de 5,5%. Prix HT en euros. Tout commencement d&#39;ex&eacute;cution vaut acceptation du pr&eacute;sent devis.')+
         '</div>'+
         '<div class="pink-footer">meshuga &mdash; crazy deli &mdash; 3 rue vavin, paris 6e &mdash; edward@meshuga.fr</div>'+
       '</div>'+
 
       '<div class="no-print print-bar">'+
-        '<p style="margin-bottom:10px;font-size:11px;color:#888">Dans la fen&ecirc;tre d'impression : d&eacute;sactivez <strong>En-t&ecirc;tes et pieds de page</strong>, puis <strong>Enregistrer en PDF</strong></p>'+
+        '<p style="margin-bottom:10px;font-size:11px;color:#888">Dans la fen&ecirc;tre d&#39;impression : d&eacute;sactivez <strong>En-t&ecirc;tes et pieds de page</strong>, puis <strong>Enregistrer en PDF</strong></p>'+
         '<button onclick="window.print()" style="padding:11px 28px;background:#191923;color:#FFEB5A;border:none;border-radius:5px;font-size:13px;font-weight:900;cursor:pointer;letter-spacing:1px">&#128229; Imprimer / Enregistrer en PDF</button>'+
       '</div>'+
 
