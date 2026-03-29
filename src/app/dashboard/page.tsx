@@ -69,36 +69,36 @@ textarea.inp{min-height:70px;resize:vertical}
 @media(max-width:768px){.shell{flex-direction:column}.topbar{display:flex}.sidebar{position:fixed;left:0;top:0;bottom:0;z-index:50;transform:translateX(-100%);width:240px}.sidebar.open{transform:translateX(0)}.sidebar-overlay.open{display:block}.main{padding:12px 14px}.g2,.g4{grid-template-columns:1fr 1fr}.fg2{grid-template-columns:1fr}}
 `
 
-const CATS_MAP = {all:{label:'Tous',emoji:'\u2630'},evenementiel:{label:'\u00c9v\u00e9nementiel',emoji:'\ud83c\udf89'},avocats:{label:'Avocats',emoji:'\u2696\ufe0f'},startup:{label:'Startups',emoji:'\ud83d\ude80'},agence_pub:{label:'Agences cr\u00e9a',emoji:'\ud83c\udfa8'},hotel:{label:'H\u00f4tels',emoji:'\ud83c\udfe8'},immo:{label:'Immobilier',emoji:'\ud83c\udfe2'},medical:{label:'M\u00e9dical',emoji:'\ud83c\udfe5'},production:{label:'Tournages',emoji:'\ud83c\udfac'},ecole:{label:'\u00c9coles',emoji:'\ud83c\udf93'},institution:{label:'Institutions',emoji:'\ud83c\udfdb\ufe0f'},luxe:{label:'Luxe & Mode',emoji:'\ud83d\udc5c'},tech:{label:'Tech',emoji:'\ud83d\udcbb'},conseil:{label:'Conseil',emoji:'\ud83d\udcca'},medias:{label:'M\u00e9dias',emoji:'\ud83d\udcf0'},coworking:{label:'Coworking',emoji:'\ud83c\udfd7\ufe0f'},banque:{label:'Banques',emoji:'\ud83c\udfe6'}}
-const STATUS_P = {to_contact:'\u00c0 contacter',contacted:'Contact\u00e9',nego:'N\u00e9go',won:'Gagn\u00e9 \u2713',lost:'Perdu'}
+const CATS_MAP = {all:{label:'Tous',emoji:'☰'},evenementiel:{label:'Événementiel',emoji:'🎉'},avocats:{label:'Avocats',emoji:'⚖️'},startup:{label:'Startups',emoji:'🚀'},agence_pub:{label:'Agences créa',emoji:'🎨'},hotel:{label:'Hôtels',emoji:'🏨'},immo:{label:'Immobilier',emoji:'🏢'},medical:{label:'Médical',emoji:'🏥'},production:{label:'Tournages',emoji:'🎬'},ecole:{label:'Écoles',emoji:'🎓'},institution:{label:'Institutions',emoji:'🏛️'},luxe:{label:'Luxe & Mode',emoji:'👜'},tech:{label:'Tech',emoji:'💻'},conseil:{label:'Conseil',emoji:'📊'},medias:{label:'Médias',emoji:'📰'},coworking:{label:'Coworking',emoji:'🏗️'},banque:{label:'Banques',emoji:'🏦'}}
+const STATUS_P = {to_contact:'À contacter',contacted:'Contacté',nego:'Négo',won:'Gagné ✓',lost:'Perdu'}
 const STATUS_PC = {to_contact:'#888',contacted:'#B8920A',nego:'#005FFF',won:'#009D3A',lost:'#CC0066'}
-const TASK_S = {todo:'\u00c0 faire',in_progress:'En cours',done:'Termin\u00e9 \u2713'}
-const CAT_ANN = {food:'\ud83e\udd69 Fournisseur',banque:'\ud83c\udfe6 Banque',presse:'\ud83d\udcf0 Presse',prestataire:'\ud83d\udd27 Prestataire',partenaire:'\ud83e\udd1d Partenaire',livraison:'\ud83d\udeb2 Livraison',fournisseur:'\ud83d\udce6 Fournisseur',it:'\ud83d\udcbb IT',juridique:'\u2696\ufe0f Juridique'}
+const TASK_S = {todo:'À faire',in_progress:'En cours',done:'Terminé ✓'}
+const CAT_ANN = {food:'🥩 Fournisseur',banque:'🏦 Banque',presse:'📰 Presse',prestataire:'🔧 Prestataire',partenaire:'🤝 Partenaire',livraison:'🚲 Livraison',fournisseur:'📦 Fournisseur',it:'💻 IT',juridique:'⚖️ Juridique'}
 
-const INIT_TASKS = [{id:1,title:'Cr\u00e9er le kit B2B',assignee:'emy',deadline:'2026-03-28',status:'in_progress',priority:'high',checklist:['S\u00e9lectionner les sandwichs','Faire les photos','R\u00e9diger les tarifs'],files:[]},{id:2,title:'RDV Wagram Events',assignee:'emy',deadline:'2026-03-28',status:'todo',priority:'high',checklist:['R\u00e9viser le pitch'],files:[]},{id:3,title:'Valider le menu B2B',assignee:'edward',deadline:'2026-03-30',status:'todo',priority:'high',checklist:[],files:[]},{id:4,title:'Appeler 5 prospects',assignee:'emy',deadline:'2026-03-31',status:'todo',priority:'medium',checklist:[],files:[]}]
-const INIT_PROSPECTS = [{id:1,name:'Agence Wagram Events',email:'contact@wagram.fr',phone:'01 40 xx xx xx',size:'10-50',category:'\u00c9v\u00e9nementiel',status:'contacted',nextAction:'Envoyer devis',nextDate:'2026-03-25',notes:'Int\u00e9ress\u00e9e plateaux.',ca:0,score:8,files:[]},{id:2,name:'Station F',email:'office@stationf.co',phone:'06 98 76 54 32',size:'200-1000',category:'Startup',status:'nego',nextAction:'Envoyer devis URGENT',nextDate:'2026-03-25',notes:'Commandes r\u00e9guli\u00e8res.',ca:0,score:9,files:[]}]
-const INIT_CONTACTS = [{id:1,cat:'food',name:'Maison V\u00e9rot',contact:'\u2014',phone:'01 45 44 01 66',email:'contact@maisonverot.fr',notes:'Livraison lun-ven',vip:false},{id:2,cat:'banque',name:'BNP Paribas Vavin',contact:'Marie Dupont',phone:'01 56 xx xx xx',email:'m.dupont@bnp.fr',notes:'Gestionnaire pro',vip:false}]
+const INIT_TASKS = [{id:1,title:'Créer le kit B2B',assignee:'emy',deadline:'2026-03-28',status:'in_progress',priority:'high',checklist:['Sélectionner les sandwichs','Faire les photos','Rédiger les tarifs'],files:[]},{id:2,title:'RDV Wagram Events',assignee:'emy',deadline:'2026-03-28',status:'todo',priority:'high',checklist:['Réviser le pitch'],files:[]},{id:3,title:'Valider le menu B2B',assignee:'edward',deadline:'2026-03-30',status:'todo',priority:'high',checklist:[],files:[]},{id:4,title:'Appeler 5 prospects',assignee:'emy',deadline:'2026-03-31',status:'todo',priority:'medium',checklist:[],files:[]}]
+const INIT_PROSPECTS = [{id:1,name:'Agence Wagram Events',email:'contact@wagram.fr',phone:'01 40 xx xx xx',size:'10-50',category:'Événementiel',status:'contacted',nextAction:'Envoyer devis',nextDate:'2026-03-25',notes:'Intéressée plateaux.',ca:0,score:8,files:[]},{id:2,name:'Station F',email:'office@stationf.co',phone:'06 98 76 54 32',size:'200-1000',category:'Startup',status:'nego',nextAction:'Envoyer devis URGENT',nextDate:'2026-03-25',notes:'Commandes régulières.',ca:0,score:9,files:[]}]
+const INIT_CONTACTS = [{id:1,cat:'food',name:'Maison Vérot',contact:'—',phone:'01 45 44 01 66',email:'contact@maisonverot.fr',notes:'Livraison lun-ven',vip:false},{id:2,cat:'banque',name:'BNP Paribas Vavin',contact:'Marie Dupont',phone:'01 56 xx xx xx',email:'m.dupont@bnp.fr',notes:'Gestionnaire pro',vip:false}]
 const INIT_VAULT = [{id:1,title:'Supabase',url:'https://supabase.com',user:'edward@meshuga.fr',pw:''},{id:2,title:'Vercel',url:'https://vercel.com',user:'edward@meshuga.fr',pw:''}]
 
 const ALL_PROSPECTS = [
-  {id:'ev01',cat:'evenementiel',name:'Moon Event',contact:'Direction commerciale',phone:'01 40 00 00 00',email:'contact@moon-event.fr',site:'moon-event.fr',linkedin:'',taille:'10-50',arrondissement:'Paris 9e',valeur_event:3000,valeur_mois:0,type:'Catering \u00e9v\u00e9nements corporate',pitch:'R\u00e9f\u00e9rence nationale \u00e9v\u00e9nementiel. +200 events/an.',status:'to_contact',score:10,contacted:false},
-  {id:'ev02',cat:'evenementiel',name:'Hopscotch Groupe',contact:'Direction commerciale',phone:'01 58 65 00 72',email:'hopscotch@hopscotch.fr',site:'hopscotch.fr',linkedin:'',taille:'200+',arrondissement:'Paris 11e',valeur_event:5000,valeur_mois:0,type:'Catering congr\u00e8s',pitch:'Groupe \u00e9v\u00e9nementiel r\u00e9f\u00e9rence. Congr\u00e8s nationaux.',status:'to_contact',score:10,contacted:false},
-  {id:'ev03',cat:'evenementiel',name:'GL Events Paris',contact:'Direction traiteur',phone:'01 46 08 19 19',email:'paris@gl-events.com',site:'gl-events.com',linkedin:'',taille:'500+',arrondissement:'Paris 15e',valeur_event:8000,valeur_mois:0,type:'Sous-traitance traiteur',pitch:'G\u00e9ant mondial \u00e9v\u00e9nementiel. Parcs des expos Paris.',status:'to_contact',score:10,contacted:false},
-  {id:'av01',cat:'avocats',name:'Gide Loyrette Nouel',contact:'Office Manager',phone:'01 40 75 60 00',email:'paris@gide.com',site:'gide.com',linkedin:'',taille:'500+',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:1200,type:'Plateaux d\u00e9jeuner hebdo',pitch:'Top 5 cabinets France. D\u00e9jeuners de travail quotidiens.',status:'to_contact',score:10,contacted:false},
-  {id:'av02',cat:'avocats',name:'Jones Day Paris',contact:'Facilities',phone:'01 56 59 39 39',email:'paris@jonesday.com',site:'jonesday.com',linkedin:'',taille:'150+',arrondissement:'Paris 8e',valeur_event:1800,valeur_mois:750,type:'Plateaux d\u00e9jeuner',pitch:'Cabinet US. Culture am\u00e9ricaine = sandwichs au bureau.',status:'to_contact',score:9,contacted:false},
-  {id:'av03',cat:'avocats',name:'Freshfields Paris',contact:'Facilities Manager',phone:'01 44 56 44 56',email:'paris@freshfields.com',site:'freshfields.com',linkedin:'',taille:'200+',arrondissement:'Paris 8e',valeur_event:2500,valeur_mois:1000,type:'Plateaux d\u00e9jeuner',pitch:'Cabinet magic circle londonien. D\u00e9jeuner au bureau tr\u00e8s fort.',status:'to_contact',score:10,contacted:false},
-  {id:'st01',cat:'startup',name:'Doctolib',contact:'Office Manager',phone:'',email:'office@doctolib.fr',site:'doctolib.fr',linkedin:'',taille:'500+',arrondissement:'Paris 10e',valeur_event:3000,valeur_mois:2000,type:'Plateaux d\u00e9jeuner hebdo',pitch:'Scale-up embl\u00e9matique. Culture d\u00e9jeuner ensemble forte.',status:'to_contact',score:10,contacted:false},
-  {id:'st02',cat:'startup',name:'Alan',contact:'Office Manager',phone:'',email:'hello@alan.com',site:'alan.com',linkedin:'',taille:'300+',arrondissement:'Paris 9e',valeur_event:2000,valeur_mois:1200,type:'Plateaux d\u00e9jeuner',pitch:'Licorne sant\u00e9. Fort focus bien-\u00eatre employ\u00e9s.',status:'to_contact',score:9,contacted:false},
-  {id:'st03',cat:'startup',name:'Payfit',contact:'Workplace Manager',phone:'',email:'contact@payfit.com',site:'payfit.com',linkedin:'',taille:'500+',arrondissement:'Paris 9e',valeur_event:2500,valeur_mois:1500,type:'Plateaux d\u00e9jeuner',pitch:'Scale-up RH en forte croissance.',status:'to_contact',score:9,contacted:false},
-  {id:'co01',cat:'conseil',name:'McKinsey Paris',contact:'Office Manager',phone:'01 40 69 16 00',email:'paris@mckinsey.com',site:'mckinsey.com',linkedin:'',taille:'500+',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:1500,type:'Plateaux d\u00e9jeuner',pitch:'Top cabinet conseil mondial. D\u00e9jeuners de travail quotidiens.',status:'to_contact',score:10,contacted:false},
-  {id:'co02',cat:'conseil',name:'BCG Paris',contact:'Facilities',phone:'01 40 74 45 00',email:'paris@bcg.com',site:'bcg.com',linkedin:'',taille:'500+',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:1500,type:'Plateaux d\u00e9jeuner',pitch:'Top 3 cabinet conseil.',status:'to_contact',score:10,contacted:false},
-  {id:'ht01',cat:'hotel',name:'H\u00f4tel Lutetia',contact:'Directeur F&B',phone:'01 45 44 38 10',email:'lutetia@hotellutetia.com',site:'hotellutetia.com',linkedin:'',taille:'200+',arrondissement:'Paris 6e',valeur_event:3000,valeur_mois:0,type:'Catering events VIP',pitch:'Palace 5 \u00e9toiles dans TON arrondissement!',status:'to_contact',score:10,contacted:false},
-  {id:'in01',cat:'institution',name:'Mairie Paris 6e',contact:'Protocole',phone:'01 40 46 40 46',email:'mairie06@paris.fr',site:'mairie06.paris.fr',linkedin:'',taille:'100+',arrondissement:'Paris 6e',valeur_event:1000,valeur_mois:300,type:'Catering c\u00e9r\u00e9monies',pitch:'Ta mairie! C\u00e9r\u00e9monies officielles, v\u0153ux.',status:'to_contact',score:10,contacted:false},
-  {id:'in02',cat:'institution',name:'Sciences Po Paris',contact:'Direction \u00e9v\u00e9nements',phone:'01 45 49 50 50',email:'events@sciencespo.fr',site:'sciencespo.fr',linkedin:'',taille:'1000+',arrondissement:'Paris 7e',valeur_event:3000,valeur_mois:0,type:'Catering conf\u00e9rences',pitch:'2 minutes de Meshuga! Conf\u00e9rences permanentes.',status:'to_contact',score:10,contacted:false},
-  {id:'tc01',cat:'tech',name:'Google France',contact:'Workplace Manager',phone:'01 42 68 53 00',email:'paris@google.com',site:'google.fr',linkedin:'',taille:'500+',arrondissement:'Paris 9e',valeur_event:3000,valeur_mois:2000,type:'Catering + plateaux',pitch:'Culture food am\u00e9ricaine tr\u00e8s forte.',status:'to_contact',score:9,contacted:false},
-  {id:'lx01',cat:'luxe',name:'Yves Saint Laurent',contact:'Events',phone:'01 42 36 22 22',email:'events@ysl.com',site:'ysl.com',linkedin:'',taille:'500+',arrondissement:'Paris 6e',valeur_event:4000,valeur_mois:0,type:'Catering events mode',pitch:'Dans TON arrondissement! Events mode r\u00e9guliers.',status:'to_contact',score:9,contacted:false},
+  {id:'ev01',cat:'evenementiel',name:'Moon Event',contact:'Direction commerciale',phone:'01 40 00 00 00',email:'contact@moon-event.fr',site:'moon-event.fr',linkedin:'',taille:'10-50',arrondissement:'Paris 9e',valeur_event:3000,valeur_mois:0,type:'Catering événements corporate',pitch:'Référence nationale événementiel. +200 events/an.',status:'to_contact',score:10,contacted:false},
+  {id:'ev02',cat:'evenementiel',name:'Hopscotch Groupe',contact:'Direction commerciale',phone:'01 58 65 00 72',email:'hopscotch@hopscotch.fr',site:'hopscotch.fr',linkedin:'',taille:'200+',arrondissement:'Paris 11e',valeur_event:5000,valeur_mois:0,type:'Catering congrès',pitch:'Groupe événementiel référence. Congrès nationaux.',status:'to_contact',score:10,contacted:false},
+  {id:'ev03',cat:'evenementiel',name:'GL Events Paris',contact:'Direction traiteur',phone:'01 46 08 19 19',email:'paris@gl-events.com',site:'gl-events.com',linkedin:'',taille:'500+',arrondissement:'Paris 15e',valeur_event:8000,valeur_mois:0,type:'Sous-traitance traiteur',pitch:'Géant mondial événementiel. Parcs des expos Paris.',status:'to_contact',score:10,contacted:false},
+  {id:'av01',cat:'avocats',name:'Gide Loyrette Nouel',contact:'Office Manager',phone:'01 40 75 60 00',email:'paris@gide.com',site:'gide.com',linkedin:'',taille:'500+',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:1200,type:'Plateaux déjeuner hebdo',pitch:'Top 5 cabinets France. Déjeuners de travail quotidiens.',status:'to_contact',score:10,contacted:false},
+  {id:'av02',cat:'avocats',name:'Jones Day Paris',contact:'Facilities',phone:'01 56 59 39 39',email:'paris@jonesday.com',site:'jonesday.com',linkedin:'',taille:'150+',arrondissement:'Paris 8e',valeur_event:1800,valeur_mois:750,type:'Plateaux déjeuner',pitch:'Cabinet US. Culture américaine = sandwichs au bureau.',status:'to_contact',score:9,contacted:false},
+  {id:'av03',cat:'avocats',name:'Freshfields Paris',contact:'Facilities Manager',phone:'01 44 56 44 56',email:'paris@freshfields.com',site:'freshfields.com',linkedin:'',taille:'200+',arrondissement:'Paris 8e',valeur_event:2500,valeur_mois:1000,type:'Plateaux déjeuner',pitch:'Cabinet magic circle londonien. Déjeuner au bureau très fort.',status:'to_contact',score:10,contacted:false},
+  {id:'st01',cat:'startup',name:'Doctolib',contact:'Office Manager',phone:'',email:'office@doctolib.fr',site:'doctolib.fr',linkedin:'',taille:'500+',arrondissement:'Paris 10e',valeur_event:3000,valeur_mois:2000,type:'Plateaux déjeuner hebdo',pitch:'Scale-up emblématique. Culture déjeuner ensemble forte.',status:'to_contact',score:10,contacted:false},
+  {id:'st02',cat:'startup',name:'Alan',contact:'Office Manager',phone:'',email:'hello@alan.com',site:'alan.com',linkedin:'',taille:'300+',arrondissement:'Paris 9e',valeur_event:2000,valeur_mois:1200,type:'Plateaux déjeuner',pitch:'Licorne santé. Fort focus bien-être employés.',status:'to_contact',score:9,contacted:false},
+  {id:'st03',cat:'startup',name:'Payfit',contact:'Workplace Manager',phone:'',email:'contact@payfit.com',site:'payfit.com',linkedin:'',taille:'500+',arrondissement:'Paris 9e',valeur_event:2500,valeur_mois:1500,type:'Plateaux déjeuner',pitch:'Scale-up RH en forte croissance.',status:'to_contact',score:9,contacted:false},
+  {id:'co01',cat:'conseil',name:'McKinsey Paris',contact:'Office Manager',phone:'01 40 69 16 00',email:'paris@mckinsey.com',site:'mckinsey.com',linkedin:'',taille:'500+',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:1500,type:'Plateaux déjeuner',pitch:'Top cabinet conseil mondial. Déjeuners de travail quotidiens.',status:'to_contact',score:10,contacted:false},
+  {id:'co02',cat:'conseil',name:'BCG Paris',contact:'Facilities',phone:'01 40 74 45 00',email:'paris@bcg.com',site:'bcg.com',linkedin:'',taille:'500+',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:1500,type:'Plateaux déjeuner',pitch:'Top 3 cabinet conseil.',status:'to_contact',score:10,contacted:false},
+  {id:'ht01',cat:'hotel',name:'Hôtel Lutetia',contact:'Directeur F&B',phone:'01 45 44 38 10',email:'lutetia@hotellutetia.com',site:'hotellutetia.com',linkedin:'',taille:'200+',arrondissement:'Paris 6e',valeur_event:3000,valeur_mois:0,type:'Catering events VIP',pitch:'Palace 5 étoiles dans TON arrondissement!',status:'to_contact',score:10,contacted:false},
+  {id:'in01',cat:'institution',name:'Mairie Paris 6e',contact:'Protocole',phone:'01 40 46 40 46',email:'mairie06@paris.fr',site:'mairie06.paris.fr',linkedin:'',taille:'100+',arrondissement:'Paris 6e',valeur_event:1000,valeur_mois:300,type:'Catering cérémonies',pitch:'Ta mairie! Cérémonies officielles, vœux.',status:'to_contact',score:10,contacted:false},
+  {id:'in02',cat:'institution',name:'Sciences Po Paris',contact:'Direction événements',phone:'01 45 49 50 50',email:'events@sciencespo.fr',site:'sciencespo.fr',linkedin:'',taille:'1000+',arrondissement:'Paris 7e',valeur_event:3000,valeur_mois:0,type:'Catering conférences',pitch:'2 minutes de Meshuga! Conférences permanentes.',status:'to_contact',score:10,contacted:false},
+  {id:'tc01',cat:'tech',name:'Google France',contact:'Workplace Manager',phone:'01 42 68 53 00',email:'paris@google.com',site:'google.fr',linkedin:'',taille:'500+',arrondissement:'Paris 9e',valeur_event:3000,valeur_mois:2000,type:'Catering + plateaux',pitch:'Culture food américaine très forte.',status:'to_contact',score:9,contacted:false},
+  {id:'lx01',cat:'luxe',name:'Yves Saint Laurent',contact:'Events',phone:'01 42 36 22 22',email:'events@ysl.com',site:'ysl.com',linkedin:'',taille:'500+',arrondissement:'Paris 6e',valeur_event:4000,valeur_mois:0,type:'Catering events mode',pitch:'Dans TON arrondissement! Events mode réguliers.',status:'to_contact',score:9,contacted:false},
   {id:'cw01',cat:'coworking',name:'Station F',contact:'Community Manager',phone:'',email:'business@stationf.co',site:'stationf.co',linkedin:'',taille:'1000+',arrondissement:'Paris 13e',valeur_event:2000,valeur_mois:1500,type:'Catering events',pitch:'Plus grand startup campus monde.',status:'to_contact',score:10,contacted:false},
-  {id:'bk01',cat:'banque',name:'Rothschild & Co',contact:'Office Manager',phone:'01 40 74 40 74',email:'paris@rothschild.com',site:'rothschild.com',linkedin:'',taille:'200+',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:1200,type:'Plateaux d\u00e9jeuner',pitch:'Banque prestige. R\u00e9unions M&A permanentes.',status:'to_contact',score:10,contacted:false},
+  {id:'bk01',cat:'banque',name:'Rothschild & Co',contact:'Office Manager',phone:'01 40 74 40 74',email:'paris@rothschild.com',site:'rothschild.com',linkedin:'',taille:'200+',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:1200,type:'Plateaux déjeuner',pitch:'Banque prestige. Réunions M&A permanentes.',status:'to_contact',score:10,contacted:false},
 ]
 
 export default function DashboardPage() {
@@ -173,9 +173,9 @@ export default function DashboardPage() {
     setContactedToday(function(c) { return c + 1 })
     if (p) {
       setProspects(function(prev) { return prev.concat([{id: Date.now(), name: p.name, email: p.email, phone: p.phone, size: p.taille, category: CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat, status: 'contacted', nextAction: 'Relancer', nextDate: '', notes: p.pitch, ca: 0, score: p.score, files: []}]) })
-      logActivity('prospect_contacte', p.name + ' contact\u00e9 et ajout\u00e9 au CRM', p.name, null)
+      logActivity('prospect_contacte', p.name + ' contacté et ajouté au CRM', p.name, null)
     }
-    toast('\u2713 Prospect contact\u00e9!')
+    toast('✓ Prospect contacté!')
   }
 
   async function generateEmail(p) {
@@ -184,11 +184,11 @@ export default function DashboardPage() {
     setGeneratedEmail('')
     openModal('email', p)
     const senderName = isEmy ? 'Emy, B2B Manager' : 'Edward, patron'
-    const prompt = 'Tu es ' + senderName + ' pour Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium : pastrami, lobster rolls, sandwichs gastronomiques. Sp\u00e9cialis\u00e9s dans les plateaux d\u00e9jeuner B2B et le catering \u00e9v\u00e9nementiel sur tout Paris.\n\n\u00c9cris un email de prise de contact pour ce prospect :\n- Entreprise : ' + p.name + '\n- Secteur : ' + (CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat) + '\n- Localisation : ' + p.arrondissement + '\n- Taille : ' + p.taille + ' employ\u00e9s\n- Ce qu\'on peut proposer : ' + p.type + '\n- Angle : ' + p.pitch + '\n\nSois concis (6-8 lignes), personnalis\u00e9. Commence par "Objet : " sur la 1\u00e8re ligne.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
+    const prompt = 'Tu es ' + senderName + ' pour Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium : pastrami, lobster rolls, sandwichs gastronomiques. Spécialisés dans les plateaux déjeuner B2B et le catering événementiel sur tout Paris.\n\nÉcris un email de prise de contact pour ce prospect :\n- Entreprise : ' + p.name + '\n- Secteur : ' + (CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat) + '\n- Localisation : ' + p.arrondissement + '\n- Taille : ' + p.taille + ' employés\n- Ce qu\'on peut proposer : ' + p.type + '\n- Angle : ' + p.pitch + '\n\nSois concis (6-8 lignes), personnalisé. Commence par "Objet : " sur la 1ère ligne.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{role: 'user', content: prompt}]})})
       const data = await res.json()
-      setGeneratedEmail(data.content && data.content[0] ? data.content[0].text : 'Erreur lors de la g\u00e9n\u00e9ration')
+      setGeneratedEmail(data.content && data.content[0] ? data.content[0].text : 'Erreur lors de la génération')
     } catch(e) {
       setGeneratedEmail('Erreur de connexion.')
     }
@@ -242,15 +242,15 @@ export default function DashboardPage() {
   })
 
   const NAV = [
-    {id: 'dash', label: 'Dashboard', icon: '\u26a1'},
-    {id: 'chasse', label: 'Tableau de chasse', icon: '\ud83c\udfaf'},
-    {id: 'crm', label: 'CRM Prospects', icon: '\u25ce'},
-    {id: 'annuaire', label: 'Annuaire', icon: '\ud83d\udcd2'},
-    {id: 'tasks', label: 'Taches', icon: '\u2713'},
-    {id: 'reporting', label: 'Reporting', icon: '\ud83d\udccb'},
-    {id: 'vault', label: 'Coffre-fort', icon: '\ud83d\udd10'},
-    {id: 'gmb', label: 'Google My Biz.', icon: '\u2b50'},
-    {id: 'journal', label: 'Journal Emy', icon: '\ud83d\udcd3'},
+    {id: 'dash', label: 'Dashboard', icon: '⚡'},
+    {id: 'chasse', label: 'Tableau de chasse', icon: '🎯'},
+    {id: 'crm', label: 'CRM Prospects', icon: '◎'},
+    {id: 'annuaire', label: 'Annuaire', icon: '📒'},
+    {id: 'tasks', label: 'Taches', icon: '✓'},
+    {id: 'reporting', label: 'Reporting', icon: '📋'},
+    {id: 'vault', label: 'Coffre-fort', icon: '🔐'},
+    {id: 'gmb', label: 'Google My Biz.', icon: '⭐'},
+    {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
   ]
 
   return (
@@ -259,13 +259,13 @@ export default function DashboardPage() {
 
       {!profile && (
         <div style={{position:'fixed',inset:0,background:'#FFEB5A',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999,flexDirection:'column',gap:16}}>
-          <div style={{fontSize:48}}>\ud83d\ude2c</div>
+          <div style={{fontSize:48}}>😬</div>
           <div style={{fontWeight:900,fontSize:14,textTransform:'uppercase',letterSpacing:3}}>Chargement...</div>
         </div>
       )}
 
       <div className="topbar">
-        <button className="hamburger" onClick={function() { setSidebarOpen(!sidebarOpen) }}>\u2630</button>
+        <button className="hamburger" onClick={function() { setSidebarOpen(!sidebarOpen) }}>☰</button>
         <span style={{fontWeight:900,fontSize:18,textTransform:'uppercase',letterSpacing:2,color:'#FFEB5A'}}>meshuga</span>
         <span className="yt" style={{fontSize:13,color:'#FF82D7'}}>{isEmy ? 'Emy' : 'Edward'}</span>
       </div>
@@ -274,14 +274,14 @@ export default function DashboardPage() {
         <div className={sidebarOpen ? 'sidebar-overlay open' : 'sidebar-overlay'} onClick={function() { setSidebarOpen(false) }} />
         <div className={sidebarOpen ? 'sidebar open' : 'sidebar'}>
           <div className="sb-logo">
-            <div className="sb-stamp">\ud83d\ude2c</div>
+            <div className="sb-stamp">😬</div>
             <div>
               <div style={{fontWeight:900,fontSize:18,textTransform:'uppercase',letterSpacing:2,lineHeight:1}}>meshuga</div>
               <div className="yt" style={{fontSize:12,opacity:.45}}>B2B Manager</div>
             </div>
           </div>
           <nav className="sb-nav">
-            {NAV.map(function(n) {
+            {NAV.filter(function(n) { return !n.edwardOnly || !isEmy }).map(function(n) {
               return (
                 <div key={n.id} className={page === n.id ? 'ni active' : 'ni'} onClick={function() { nav(n.id) }}>
                   <span style={{fontSize:14}}>{n.icon}</span>{n.label}
@@ -293,7 +293,7 @@ export default function DashboardPage() {
             <div style={{fontWeight:900,fontSize:11,textTransform:'uppercase',marginBottom:4}}>{profile && (profile.full_name || (profile.email && profile.email.split('@')[0]))}</div>
             <div className="yt" style={{fontSize:11,opacity:.4,marginBottom:8}}>{isEmy ? 'B2B Manager' : 'The Big Boss'}</div>
             <button className="btn btn-sm" style={{width:'100%',justifyContent:'center',opacity:.6}} onClick={function() { sb().auth.signOut().then(function() { window.location.href = '/login' }) }}>
-              \u21a9 D\u00e9connexion
+              ↩ Déconnexion
             </button>
           </div>
         </div>
@@ -305,7 +305,7 @@ export default function DashboardPage() {
             <div>
               <div className="ph">
                 <div>
-                  <div className="pt">{isEmy ? 'Bonjour Emy \ud83c\udf38' : 'Bonjour Edward \ud83d\udc4b'}</div>
+                  <div className="pt">{isEmy ? 'Bonjour Emy 🌸' : 'Bonjour Edward 👋'}</div>
                   <div className="ps">{new Date().toLocaleDateString('fr-FR', {weekday:'long',day:'numeric',month:'long'})}</div>
                 </div>
                 {isEmy && <button className="btn btn-n btn-sm" onClick={function() { openModal('cr', {}) }}>+ Nouveau CR</button>}
@@ -314,22 +314,22 @@ export default function DashboardPage() {
                 <div className="kc" style={{background:'#FFEB5A'}} onClick={function() { nav('chasse') }}>
                   <div className="kl">A contacter</div>
                   <div className="kv">{chasse.filter(function(p) { return p.status === 'to_contact' }).length}</div>
-                  <div className="ki">\ud83c\udfaf</div>
+                  <div className="ki">🎯</div>
                 </div>
                 <div className="kc" style={{background:'#FF82D7'}} onClick={function() { nav('crm') }}>
                   <div className="kl">Pipeline B2B</div>
                   <div className="kv">{prospects.filter(function(p) { return p.status !== 'won' && p.status !== 'lost' }).length}</div>
-                  <div className="ki">\u25ce</div>
+                  <div className="ki">◎</div>
                 </div>
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function() { nav('tasks') }}>
                   <div className="kl">Taches actives</div>
                   <div className="kv">{tasks.filter(function(t) { return t.status !== 'done' }).length}</div>
-                  <div className="ki">\u2713</div>
+                  <div className="ki">✓</div>
                 </div>
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function() { nav('reporting') }}>
                   <div className="kl">CRs soumis</div>
                   <div className="kv">{reports.length}</div>
-                  <div className="ki">\ud83d\udccb</div>
+                  <div className="ki">📋</div>
                 </div>
               </div>
               <div className="g2">
@@ -344,7 +344,7 @@ export default function DashboardPage() {
                       </div>
                     )
                   })}
-                  <button className="btn btn-y btn-sm" style={{marginTop:10}} onClick={function() { nav('tasks') }}>Voir toutes \u2192</button>
+                  <button className="btn btn-y btn-sm" style={{marginTop:10}} onClick={function() { nav('tasks') }}>Voir toutes →</button>
                 </div>
                 <div className="card">
                   <div className="ct">{isEmy ? 'Mon pipeline' : 'Prospects chauds'}</div>
@@ -356,16 +356,16 @@ export default function DashboardPage() {
                       </div>
                     )
                   })}
-                  <button className="btn btn-y btn-sm" style={{marginTop:10}} onClick={function() { nav('crm') }}>Voir le CRM \u2192</button>
+                  <button className="btn btn-y btn-sm" style={{marginTop:10}} onClick={function() { nav('crm') }}>Voir le CRM →</button>
                 </div>
               </div>
               <div className="card" style={{padding:0,overflow:'hidden'}}>
                 <div style={{background:'#191923',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <div className="yt" style={{color:'#FFEB5A',fontSize:16}}>\ud83d\udcc5 Planning {isEmy ? 'de ma semaine' : "d'Emy"}</div>
+                  <div className="yt" style={{color:'#FFEB5A',fontSize:16}}>📅 Planning {isEmy ? 'de ma semaine' : "d'Emy"}</div>
                   <div style={{display:'flex',gap:6}}>
-                    <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={function() { setPlanningWeek(function(w) { return w-1 }) }}>\u2190</button>
+                    <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={function() { setPlanningWeek(function(w) { return w-1 }) }}>←</button>
                     <span style={{color:'#FFEB5A',fontSize:11,fontWeight:900,minWidth:100,textAlign:'center'}}>{planningWeek===0 ? 'Cette semaine' : planningWeek < 0 ? 'Sem. -'+Math.abs(planningWeek) : 'Sem. +'+planningWeek}</span>
-                    <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={function() { setPlanningWeek(function(w) { return w+1 }) }}>\u2192</button>
+                    <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={function() { setPlanningWeek(function(w) { return w+1 }) }}>→</button>
                     {planningWeek !== 0 && <button className="btn btn-y btn-sm" onClick={function() { setPlanningWeek(0) }}>Auj.</button>}
                   </div>
                 </div>
@@ -395,14 +395,14 @@ export default function DashboardPage() {
               </div>
               {!isEmy && reports.length > 0 && (
                 <div className="card">
-                  <div className="ct">\ud83d\udccb Dernier CR d'Emy</div>
+                  <div className="ct">📋 Dernier CR d'Emy</div>
                   <div style={{fontWeight:900,fontSize:16}}>{reports[0].week}</div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:8}}>
                     <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{reports[0].prospects}</div><div className="yt" style={{fontSize:11,opacity:.5}}>Prospects</div></div>
                     <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{reports[0].rdv}</div><div className="yt" style={{fontSize:11,opacity:.5}}>RDV</div></div>
                     <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{reports[0].cmds}</div><div className="yt" style={{fontSize:11,opacity:.5}}>Commandes</div></div>
                   </div>
-                  <button className="btn btn-y btn-sm" style={{marginTop:8}} onClick={function() { nav('reporting') }}>Voir et repondre \u2192</button>
+                  <button className="btn btn-y btn-sm" style={{marginTop:8}} onClick={function() { nav('reporting') }}>Voir et repondre →</button>
                 </div>
               )}
             </div>
@@ -412,8 +412,8 @@ export default function DashboardPage() {
             <div>
               <div className="ph">
                 <div>
-                  <div className="pt">Tableau de Chasse \ud83c\udfaf</div>
-                  <div className="ps">{chasse.filter(function(p) { return p.status === 'to_contact' }).length} a contacter \u00b7 {chasse.length} total</div>
+                  <div className="pt">Tableau de Chasse 🎯</div>
+                  <div className="ps">{chasse.filter(function(p) { return p.status === 'to_contact' }).length} a contacter · {chasse.length} total</div>
                 </div>
                 <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
                   {isEmy && <span style={{fontWeight:900,fontSize:11}}>{contactedToday}/5 auj.</span>}
@@ -455,27 +455,27 @@ export default function DashboardPage() {
                           {p.status !== 'to_contact' && <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>}
                         </div>
                         <div style={{fontWeight:900,fontSize:15}}>{p.name}</div>
-                        <div style={{fontSize:11,opacity:.5}}>{p.arrondissement} \u00b7 {p.taille} emp.</div>
+                        <div style={{fontSize:11,opacity:.5}}>{p.arrondissement} · {p.taille} emp.</div>
                       </div>
                       <div style={{textAlign:'right',flexShrink:0}}>
-                        {p.valeur_event > 0 && <div style={{fontWeight:900,fontSize:13}}>~{p.valeur_event.toLocaleString()}\u20ac/event</div>}
-                        {p.valeur_mois > 0 && <div style={{fontWeight:900,fontSize:13}}>~{p.valeur_mois.toLocaleString()}\u20ac/mois</div>}
+                        {p.valeur_event > 0 && <div style={{fontWeight:900,fontSize:13}}>~{p.valeur_event.toLocaleString()}€/event</div>}
+                        {p.valeur_mois > 0 && <div style={{fontWeight:900,fontSize:13}}>~{p.valeur_mois.toLocaleString()}€/mois</div>}
                       </div>
                     </div>
                     <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:5,padding:'8px 10px',marginBottom:8,fontSize:12}}>
-                      \ud83d\udca1 {p.pitch}
+                      💡 {p.pitch}
                     </div>
                     <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:11,marginBottom:8,opacity:.7}}>
-                      {p.email && <span>\u2709\ufe0f {p.email}</span>}
-                      {p.phone && <span>\ud83d\udcde {p.phone}</span>}
-                      {p.site && <a href={'https://'+p.site} target="_blank" rel="noopener noreferrer" style={{color:'#005FFF',textDecoration:'none'}}>\ud83c\udf10 {p.site}</a>}
-                      {p.linkedin && <a href={p.linkedin.indexOf('http') === 0 ? p.linkedin : 'https://'+p.linkedin} target="_blank" rel="noopener noreferrer" style={{color:'#0077B5',fontWeight:900,textDecoration:'none'}}>\ud83d\udd17 LinkedIn</a>}
+                      {p.email && <span>✉️ {p.email}</span>}
+                      {p.phone && <span>📞 {p.phone}</span>}
+                      {p.site && <a href={'https://'+p.site} target="_blank" rel="noopener noreferrer" style={{color:'#005FFF',textDecoration:'none'}}>🌐 {p.site}</a>}
+                      {p.linkedin && <a href={p.linkedin.indexOf('http') === 0 ? p.linkedin : 'https://'+p.linkedin} target="_blank" rel="noopener noreferrer" style={{color:'#0077B5',fontWeight:900,textDecoration:'none'}}>🔗 LinkedIn</a>}
                     </div>
                     <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                      <button className="btn btn-p btn-sm" onClick={function() { generateEmail(p) }}>\u2709\ufe0f Email IA</button>
-                      {p.status === 'to_contact' && <button className="btn btn-g btn-sm" onClick={function() { contactProspect(p.id) }}>\u2713 Contacte</button>}
-                      {p.status === 'contacted' && <button className="btn btn-b btn-sm" onClick={function() { setChasse(function(prev) { return prev.map(function(x) { return x.id===p.id ? Object.assign({},x,{status:'nego'}) : x }) }); toast('Passe en nego') }}>\u2192 Nego</button>}
-                      {p.status === 'nego' && <button className="btn btn-g btn-sm" onClick={function() { setChasse(function(prev) { return prev.map(function(x) { return x.id===p.id ? Object.assign({},x,{status:'won'}) : x }) }); toast('\ud83c\udf89 Gagne!') }}>\u2713 Gagne</button>}
+                      <button className="btn btn-p btn-sm" onClick={function() { generateEmail(p) }}>✉️ Email IA</button>
+                      {p.status === 'to_contact' && <button className="btn btn-g btn-sm" onClick={function() { contactProspect(p.id) }}>✓ Contacte</button>}
+                      {p.status === 'contacted' && <button className="btn btn-b btn-sm" onClick={function() { setChasse(function(prev) { return prev.map(function(x) { return x.id===p.id ? Object.assign({},x,{status:'nego'}) : x }) }); toast('Passe en nego') }}>→ Nego</button>}
+                      {p.status === 'nego' && <button className="btn btn-g btn-sm" onClick={function() { setChasse(function(prev) { return prev.map(function(x) { return x.id===p.id ? Object.assign({},x,{status:'won'}) : x }) }); toast('🎉 Gagne!') }}>✓ Gagne</button>}
                     </div>
                   </div>
                 )
@@ -495,20 +495,20 @@ export default function DashboardPage() {
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:6}}>
                       <div>
                         <div style={{fontWeight:900,fontSize:14}}>{p.name}</div>
-                        <div style={{fontSize:11,opacity:.5}}>{p.category} \u00b7 {p.email}</div>
+                        <div style={{fontSize:11,opacity:.5}}>{p.category} · {p.email}</div>
                       </div>
                       <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>
                     </div>
-                    {p.nextDate && <div style={{fontSize:11,opacity:.6,color:p.nextDate<=today?'#CC0066':'inherit'}}>{p.nextDate<=today?'\u26a0\ufe0f ':''}{p.nextAction}</div>}
+                    {p.nextDate && <div style={{fontSize:11,opacity:.6,color:p.nextDate<=today?'#CC0066':'inherit'}}>{p.nextDate<=today?'⚠️ ':''}{p.nextAction}</div>}
                     {p.files && p.files.filter(function(f) { return f && f.trim() }).length > 0 && (
                       <div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:6}}>
                         {p.files.filter(function(f) { return f && f.trim() }).map(function(f, i) {
-                          return <span key={i} style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:3,padding:'2px 6px',fontSize:9,fontWeight:900}}>\ud83d\udce6 {f.slice(0,25)}</span>
+                          return <span key={i} style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:3,padding:'2px 6px',fontSize:9,fontWeight:900}}>📦 {f.slice(0,25)}</span>
                         })}
                       </div>
                     )}
                     <div style={{marginTop:6}}>
-                      <button className="btn btn-p btn-sm" onClick={function(e) { e.stopPropagation(); generateEmail(Object.assign({}, p, {cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category})) }}>\u2709\ufe0f Email IA</button>
+                      <button className="btn btn-p btn-sm" onClick={function(e) { e.stopPropagation(); generateEmail(Object.assign({}, p, {cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category})) }}>✉️ Email IA</button>
                     </div>
                   </div>
                 )
@@ -527,10 +527,10 @@ export default function DashboardPage() {
                   return (
                     <div key={c.id} className="card" style={{cursor:'pointer'}} onClick={function() { openModal('contact', Object.assign({}, c)) }}>
                       <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',padding:'2px 6px',border:'1.5px solid #191923',borderRadius:3,display:'inline-block',marginBottom:7,background:'#FFEB5A'}}>{CAT_ANN[c.cat]||c.cat}</div>
-                      {c.vip && <span style={{float:'right',fontSize:10}}>\u2b50 VIP</span>}
+                      {c.vip && <span style={{float:'right',fontSize:10}}>⭐ VIP</span>}
                       <div style={{fontWeight:900,fontSize:14}}>{c.name}</div>
-                      {c.phone && c.phone !== '\u2014' && <div style={{fontSize:11,marginTop:4}}>\ud83d\udcde {c.phone}</div>}
-                      {c.email && <div style={{fontSize:11,marginTop:2}}>\u2709\ufe0f {c.email}</div>}
+                      {c.phone && c.phone !== '—' && <div style={{fontSize:11,marginTop:4}}>📞 {c.phone}</div>}
+                      {c.email && <div style={{fontSize:11,marginTop:2}}>✉️ {c.email}</div>}
                       {c.notes && <div style={{fontSize:10,opacity:.4,marginTop:6,textTransform:'uppercase'}}>{c.notes}</div>}
                     </div>
                   )
@@ -554,16 +554,16 @@ export default function DashboardPage() {
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
                           <div style={{flex:1}}>
                             <div style={{fontSize:13,fontWeight:900}}>{t.title}</div>
-                            <div style={{fontSize:10,opacity:.5,marginTop:2}}>{t.deadline} \u00b7 {t.assignee}</div>
+                            <div style={{fontSize:10,opacity:.5,marginTop:2}}>{t.deadline} · {t.assignee}</div>
                           </div>
                           <div style={{display:'flex',gap:4}}>
                             <span className="badge" style={{color:t.status==='done'?'#009D3A':'#888',borderColor:t.status==='done'?'#009D3A':'#ccc'}}>{TASK_S[t.status]}</span>
                             <button className="btn btn-y btn-sm" onClick={function() {
                               var o = ['todo','in_progress','done']
                               setTasks(function(prev) { return prev.map(function(x) { return x.id !== t.id ? x : Object.assign({}, x, {status: o[Math.min(o.indexOf(x.status)+1,2)]}) }) })
-                            }}>\u2192</button>
-                            <button className="btn btn-sm" onClick={function() { openModal('task', Object.assign({}, t)) }}>\u270f\ufe0f</button>
-                            <button className="btn btn-sm btn-red" onClick={function() { setTasks(function(prev) { return prev.filter(function(x) { return x.id !== t.id }) }) }}>\u2715</button>
+                            }}>→</button>
+                            <button className="btn btn-sm" onClick={function() { openModal('task', Object.assign({}, t)) }}>✏️</button>
+                            <button className="btn btn-sm btn-red" onClick={function() { setTasks(function(prev) { return prev.filter(function(x) { return x.id !== t.id }) }) }}>✕</button>
                           </div>
                         </div>
                         {t.checklist && t.checklist.filter(function(c) { return c }).length > 0 && (
@@ -571,13 +571,13 @@ export default function DashboardPage() {
                             {t.checklist.filter(function(c) { return c }).map(function(item, ci) {
                               return (
                                 <div key={ci} style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
-                                  <input type="checkbox" checked={item.indexOf('\u2713 ') === 0} style={{width:13,height:13,cursor:'pointer'}}
+                                  <input type="checkbox" checked={item.indexOf('✓ ') === 0} style={{width:13,height:13,cursor:'pointer'}}
                                     onChange={function(e) {
                                       var nl = t.checklist.slice()
-                                      nl[ci] = e.target.checked ? '\u2713 '+item.replace('\u2713 ','') : item.replace('\u2713 ','')
+                                      nl[ci] = e.target.checked ? '✓ '+item.replace('✓ ','') : item.replace('✓ ','')
                                       setTasks(function(prev) { return prev.map(function(x) { return x.id===t.id ? Object.assign({},x,{checklist:nl}) : x }) })
                                     }} />
-                                  <span style={{fontSize:11,textDecoration:item.indexOf('\u2713 ')===0?'line-through':'none',opacity:item.indexOf('\u2713 ')===0?.4:1}}>{item.replace('\u2713 ','')}</span>
+                                  <span style={{fontSize:11,textDecoration:item.indexOf('✓ ')===0?'line-through':'none',opacity:item.indexOf('✓ ')===0?.4:1}}>{item.replace('✓ ','')}</span>
                                 </div>
                               )
                             })}
@@ -599,14 +599,14 @@ export default function DashboardPage() {
               </div>
               {!isEmy && (
                 <div className="card-y" style={{marginBottom:12}}>
-                  <div className="ct">\ud83d\udcdd Formulaire CR Emy</div>
+                  <div className="ct">📝 Formulaire CR Emy</div>
                   <div style={{fontSize:12,opacity:.7,marginBottom:8}}>Ce qu'Emy remplit chaque semaine :</div>
-                  <div style={{fontSize:11,opacity:.6,lineHeight:1.8}}>Semaine du \u00b7 Prospects contact\u00e9s \u00b7 RDV effectu\u00e9s \u00b7 Commandes \u00b7 Victoires \u00b7 Challenges \u00b7 Priorit\u00e9s S+1 \u00b7 Note pour Edward</div>
+                  <div style={{fontSize:11,opacity:.6,lineHeight:1.8}}>Semaine du · Prospects contactés · RDV effectués · Commandes · Victoires · Challenges · Priorités S+1 · Note pour Edward</div>
                 </div>
               )}
               {reports.length === 0 && (
                 <div className="card" style={{textAlign:'center',padding:40}}>
-                  <div style={{fontSize:40,marginBottom:10}}>\ud83d\udccb</div>
+                  <div style={{fontSize:40,marginBottom:10}}>📋</div>
                   <div style={{fontWeight:900,textTransform:'uppercase'}}>Aucun CR pour l'instant</div>
                   {isEmy && <button className="btn btn-y" style={{marginTop:14}} onClick={function() { openModal('cr', {}) }}>Creer le premier CR</button>}
                 </div>
@@ -623,10 +623,10 @@ export default function DashboardPage() {
                       <div style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{r.rdv}</div><div className="yt" style={{fontSize:11,opacity:.5}}>RDV</div></div>
                       <div style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{r.cmds}</div><div className="yt" style={{fontSize:11,opacity:.5}}>Commandes</div></div>
                     </div>
-                    {r.wins && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>\u2705 Victoires</div><div style={{fontSize:12}}>{r.wins}</div></div>}
-                    {r.challenges && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>\u26a1 Challenges</div><div style={{fontSize:12}}>{r.challenges}</div></div>}
-                    {r.next && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>\ud83c\udfaf Priorites S+1</div><div style={{fontSize:12}}>{r.next}</div></div>}
-                    {r.notes && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>\ud83d\udcac Note d'Emy</div><div style={{fontSize:12}}>{r.notes}</div></div>}
+                    {r.wins && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>✅ Victoires</div><div style={{fontSize:12}}>{r.wins}</div></div>}
+                    {r.challenges && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>⚡ Challenges</div><div style={{fontSize:12}}>{r.challenges}</div></div>}
+                    {r.next && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>🎯 Priorites S+1</div><div style={{fontSize:12}}>{r.next}</div></div>}
+                    {r.notes && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>💬 Note d'Emy</div><div style={{fontSize:12}}>{r.notes}</div></div>}
                     {r.feedback && <div style={{background:'#FF82D7',border:'2px solid #191923',borderRadius:5,padding:10}}><div className="yt" style={{fontSize:14,marginBottom:4}}>Retour d'Edward</div><div style={{fontSize:12}}>{r.feedback}</div></div>}
                     {!isEmy && !r.feedback && (
                       <div style={{marginTop:10}}>
@@ -635,7 +635,7 @@ export default function DashboardPage() {
                         <button className="btn btn-y btn-sm" style={{marginTop:6}} onClick={function() {
                           var el = document.getElementById('fb-'+r.id)
                           var v = el ? el.value : ''
-                          if (v) { setReports(function(prev) { return prev.map(function(x, j) { return j===i ? Object.assign({},x,{feedback:v,status:'read'}) : x }) }); toast('Retour envoye \u2713') }
+                          if (v) { setReports(function(prev) { return prev.map(function(x, j) { return j===i ? Object.assign({},x,{feedback:v,status:'read'}) : x }) }); toast('Retour envoye ✓') }
                         }}>Envoyer</button>
                       </div>
                     )}
@@ -648,7 +648,7 @@ export default function DashboardPage() {
           {page === 'vault' && (
             <div>
               <div className="ph">
-                <div><div className="pt">Coffre-fort \ud83d\udd10</div><div className="ps">Acces securises</div></div>
+                <div><div className="pt">Coffre-fort 🔐</div><div className="ps">Acces securises</div></div>
                 <button className="btn btn-y btn-sm" onClick={function() { openModal('vault', {}) }}>+ Ajouter</button>
               </div>
               {vault.map(function(v, i) {
@@ -658,10 +658,10 @@ export default function DashboardPage() {
                       <div style={{fontWeight:900,fontSize:13}}>{v.title}</div>
                       <a href={v.url} target="_blank" rel="noopener noreferrer" style={{fontSize:11,color:'#005FFF',textDecoration:'none'}} onClick={function(e) { e.stopPropagation() }}>{v.url}</a>
                       <div style={{fontSize:11}}>{v.user}</div>
-                      <div style={{fontFamily:'monospace',fontSize:11,cursor:'pointer'}} onClick={function() { setPwVisible(function(prev) { var n = Object.assign({}, prev); n[i] = !n[i]; return n }) }}>{pwVisible[i] ? (v.pw || '(vide)') : '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'}</div>
+                      <div style={{fontFamily:'monospace',fontSize:11,cursor:'pointer'}} onClick={function() { setPwVisible(function(prev) { var n = Object.assign({}, prev); n[i] = !n[i]; return n }) }}>{pwVisible[i] ? (v.pw || '(vide)') : '••••••••'}</div>
                       <div style={{display:'flex',gap:4}}>
-                        <button className="btn btn-sm" onClick={function() { openModal('vault', Object.assign({}, v)) }}>\u270f\ufe0f</button>
-                        <button className="btn btn-sm btn-red" onClick={function() { setVault(function(prev) { return prev.filter(function(x) { return x.id !== v.id }) }); toast('Supprime') }}>\u2715</button>
+                        <button className="btn btn-sm" onClick={function() { openModal('vault', Object.assign({}, v)) }}>✏️</button>
+                        <button className="btn btn-sm btn-red" onClick={function() { setVault(function(prev) { return prev.filter(function(x) { return x.id !== v.id }) }); toast('Supprime') }}>✕</button>
                       </div>
                     </div>
                   </div>
@@ -672,20 +672,20 @@ export default function DashboardPage() {
 
           {page === 'gmb' && (
             <div>
-              <div className="ph"><div><div className="pt">Google My Business</div><div className="ps">Avis \u00b7 Visibilite</div></div></div>
+              <div className="ph"><div><div className="pt">Google My Business</div><div className="ps">Avis · Visibilite</div></div></div>
               <div className="card-y">
-                <div className="ct">\ud83d\udd17 Connexion requise</div>
+                <div className="ct">🔗 Connexion requise</div>
                 <p style={{fontSize:13,marginBottom:14}}>Configure Google My Business pour voir tes avis.</p>
-                <button className="btn btn-n" onClick={function() { window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?client_id='+process.env.NEXT_PUBLIC_GOOGLE_GMB_CLIENT_ID+'&redirect_uri='+window.location.origin+'/api/auth/google/callback&response_type=code&scope=https://www.googleapis.com/auth/business.manage&access_type=offline&prompt=consent' }}>Se connecter avec Google \u2192</button>
+                <button className="btn btn-n" onClick={function() { window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?client_id='+process.env.NEXT_PUBLIC_GOOGLE_GMB_CLIENT_ID+'&redirect_uri='+window.location.origin+'/api/auth/google/callback&response_type=code&scope=https://www.googleapis.com/auth/business.manage&access_type=offline&prompt=consent' }}>Se connecter avec Google →</button>
               </div>
             </div>
           )}
 
-          {page === 'journal' && (
+          {page === 'journal' && !isEmy && (
             <div>
-              <div className="ph"><div><div className="pt">Journal d'Emy \ud83d\udcd3</div><div className="ps">Sessions \u00b7 Contacts \u00b7 Emails</div></div></div>
+              <div className="ph"><div><div className="pt">Journal d'Emy 📓</div><div className="ps">Sessions · Contacts · Emails</div></div></div>
               <div className="card" style={{marginBottom:12,padding:'12px 14px',background:'#191923',borderRadius:7}}>
-                <div className="yt" style={{fontSize:13,marginBottom:8,color:'#FF82D7'}}>\ud83d\udd50 Sessions de connexion</div>
+                <div className="yt" style={{fontSize:13,marginBottom:8,color:'#FF82D7'}}>🕐 Sessions de connexion</div>
                 {activityLog.filter(function(a) { return a.type === 'session_start' }).slice(0,10).map(function(a, i) {
                   return (
                     <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.1)'}}>
@@ -698,12 +698,12 @@ export default function DashboardPage() {
               </div>
               <div style={{display:'flex',gap:6,marginBottom:10}}>
                 <div className={journalFilter==='all'?'tag on':'tag'} onClick={function() { setJournalFilter('all') }}>Tout</div>
-                <div className={journalFilter==='email_copie'?'tag on':'tag'} onClick={function() { setJournalFilter('email_copie') }}>\u2709\ufe0f Emails</div>
-                <div className={journalFilter==='prospect_contacte'?'tag on':'tag'} onClick={function() { setJournalFilter('prospect_contacte') }}>\ud83d\udcde Contacts</div>
+                <div className={journalFilter==='email_copie'?'tag on':'tag'} onClick={function() { setJournalFilter('email_copie') }}>✉️ Emails</div>
+                <div className={journalFilter==='prospect_contacte'?'tag on':'tag'} onClick={function() { setJournalFilter('prospect_contacte') }}>📞 Contacts</div>
               </div>
               {activityLog.filter(function(a) { return a.type !== 'session_start' && (journalFilter === 'all' || a.type === journalFilter) }).length === 0 ? (
                 <div className="card" style={{textAlign:'center',padding:40,opacity:.4}}>
-                  <div style={{fontSize:32,marginBottom:8}}>\ud83d\udcd3</div>
+                  <div style={{fontSize:32,marginBottom:8}}>📓</div>
                   <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase'}}>Aucune activite</div>
                 </div>
               ) : activityLog.filter(function(a) { return a.type !== 'session_start' && (journalFilter === 'all' || a.type === journalFilter) }).map(function(a) {
@@ -713,7 +713,7 @@ export default function DashboardPage() {
                       <div>
                         <div style={{fontWeight:900,fontSize:13,marginBottom:4}}>{a.description}</div>
                         <span style={{fontSize:9,fontWeight:900,padding:'2px 6px',border:'1.5px solid #191923',borderRadius:3,background:a.user_role==='emy'?'#FF82D7':'#FFEB5A'}}>{a.user_name}</span>
-                        {a.prospect_name && <div style={{fontSize:11,opacity:.5,marginTop:4}}>\ud83c\udfaf {a.prospect_name}</div>}
+                        {a.prospect_name && <div style={{fontSize:11,opacity:.5,marginTop:4}}>🎯 {a.prospect_name}</div>}
                         {a.email_content && (
                           <details style={{marginTop:6}}>
                             <summary style={{cursor:'pointer',fontSize:11,fontWeight:900,opacity:.6}}>Voir l'email</summary>
@@ -735,11 +735,11 @@ export default function DashboardPage() {
       {modal === 'email' && (
         <div className="overlay" onClick={closeModal}>
           <div className="modal modal-lg" onClick={function(e) { e.stopPropagation() }}>
-            <div className="mh"><div className="mt">\u2709\ufe0f Email IA \u2014 {form.name}</div></div>
+            <div className="mh"><div className="mt">✉️ Email IA — {form.name}</div></div>
             <div className="mb">
               {generatingEmail && (
                 <div style={{textAlign:'center',padding:30}}>
-                  <div style={{fontSize:32,marginBottom:10}}>\u2728</div>
+                  <div style={{fontSize:32,marginBottom:10}}>✨</div>
                   <div style={{fontWeight:900,fontSize:13,textTransform:'uppercase'}}>Generation en cours...</div>
                 </div>
               )}
@@ -758,11 +758,11 @@ export default function DashboardPage() {
               {generatedEmail && (
                 <button className="btn btn-y" onClick={function() {
                   navigator.clipboard.writeText(generatedEmail)
-                  toast('Email copie ! \ud83d\udccb')
+                  toast('Email copie ! 📋')
                   logActivity('email_copie', 'Email copie pour ' + form.name, form.name, generatedEmail)
-                }}>\ud83d\udccb Copier</button>
+                }}>📋 Copier</button>
               )}
-              {generatedEmail && <button className="btn btn-p" onClick={function() { if (emailProspect) generateEmail(emailProspect) }}>\ud83d\udd04 Regenerer</button>}
+              {generatedEmail && <button className="btn btn-p" onClick={function() { if (emailProspect) generateEmail(emailProspect) }}>🔄 Regenerer</button>}
             </div>
           </div>
         </div>
@@ -777,7 +777,7 @@ export default function DashboardPage() {
               <div className="fg2">
                 <div className="fg"><label className="lbl">Assignee a</label><select className="inp" value={form.assignee||'emy'} onChange={function(e) { setForm(Object.assign({},form,{assignee:e.target.value})) }}><option value="emy">Emy</option><option value="edward">Edward</option></select></div>
                 <div className="fg"><label className="lbl">Deadline</label><input type="date" className="inp" value={form.deadline||''} onChange={function(e) { setForm(Object.assign({},form,{deadline:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">Priorite</label><select className="inp" value={form.priority||'medium'} onChange={function(e) { setForm(Object.assign({},form,{priority:e.target.value})) }}><option value="high">\ud83d\udd34 Haute</option><option value="medium">\ud83d\udfe1 Moyenne</option><option value="low">\ud83d\udfe2 Basse</option></select></div>
+                <div className="fg"><label className="lbl">Priorite</label><select className="inp" value={form.priority||'medium'} onChange={function(e) { setForm(Object.assign({},form,{priority:e.target.value})) }}><option value="high">🔴 Haute</option><option value="medium">🟡 Moyenne</option><option value="low">🟢 Basse</option></select></div>
                 <div className="fg"><label className="lbl">Statut</label><select className="inp" value={form.status||'todo'} onChange={function(e) { setForm(Object.assign({},form,{status:e.target.value})) }}><option value="todo">A faire</option><option value="in_progress">En cours</option><option value="done">Termine</option></select></div>
               </div>
               <div>
@@ -789,7 +789,7 @@ export default function DashboardPage() {
                   return (
                     <div key={i} style={{display:'flex',gap:6,marginBottom:5}}>
                       <input className="inp" value={item} onChange={function(e) { var c = (form.checklist||[]).slice(); c[i] = e.target.value; setForm(Object.assign({},form,{checklist:c})) }} placeholder={'Sous-tache '+(i+1)} style={{fontSize:12,padding:'5px 8px'}} />
-                      <button className="btn btn-sm btn-red" onClick={function() { setForm(Object.assign({},form,{checklist:(form.checklist||[]).filter(function(_,j) { return j!==i })})) }}>\u2715</button>
+                      <button className="btn btn-sm btn-red" onClick={function() { setForm(Object.assign({},form,{checklist:(form.checklist||[]).filter(function(_,j) { return j!==i })})) }}>✕</button>
                     </div>
                   )
                 })}
@@ -847,7 +847,7 @@ export default function DashboardPage() {
             <div className="mb">
               <div className="fg2">
                 <div className="fg"><label className="lbl">Categorie</label><select className="inp" value={form.cat||'food'} onChange={function(e) { setForm(Object.assign({},form,{cat:e.target.value})) }}><option value="food">Fournisseur food</option><option value="banque">Banque</option><option value="presse">Presse</option><option value="prestataire">Prestataire</option><option value="partenaire">Partenaire</option><option value="livraison">Livraison</option><option value="fournisseur">Fournisseur</option><option value="it">IT</option><option value="juridique">Juridique</option></select></div>
-                <div className="fg" style={{display:'flex',alignItems:'center',gap:8,paddingTop:22}}><input type="checkbox" checked={!!form.vip} onChange={function(e) { setForm(Object.assign({},form,{vip:e.target.checked})) }} style={{width:16,height:16}} /><span style={{fontSize:12}}>VIP \u2b50</span></div>
+                <div className="fg" style={{display:'flex',alignItems:'center',gap:8,paddingTop:22}}><input type="checkbox" checked={!!form.vip} onChange={function(e) { setForm(Object.assign({},form,{vip:e.target.checked})) }} style={{width:16,height:16}} /><span style={{fontSize:12}}>VIP ⭐</span></div>
                 <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Nom *</label><input className="inp" value={form.name||''} onChange={function(e) { setForm(Object.assign({},form,{name:e.target.value})) }} /></div>
                 <div className="fg"><label className="lbl">Telephone</label><input className="inp" value={form.phone||''} onChange={function(e) { setForm(Object.assign({},form,{phone:e.target.value})) }} /></div>
                 <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e) { setForm(Object.assign({},form,{email:e.target.value})) }} /></div>
@@ -866,7 +866,7 @@ export default function DashboardPage() {
       {modal === 'vault' && (
         <div className="overlay" onClick={closeModal}>
           <div className="modal" onClick={function(e) { e.stopPropagation() }}>
-            <div className="mh"><div className="mt">{form.id ? 'Modifier' : 'Nouvel acces'} \ud83d\udd10</div></div>
+            <div className="mh"><div className="mt">{form.id ? 'Modifier' : 'Nouvel acces'} 🔐</div></div>
             <div className="mb">
               <div className="fg2">
                 <div className="fg"><label className="lbl">Nom *</label><input className="inp" value={form.title||''} onChange={function(e) { setForm(Object.assign({},form,{title:e.target.value})) }} /></div>
@@ -895,10 +895,10 @@ export default function DashboardPage() {
                 <div className="fg"><label className="lbl">RDV</label><input type="number" className="inp" value={form.rdv||0} onChange={function(e) { setForm(Object.assign({},form,{rdv:parseInt(e.target.value)||0})) }} /></div>
                 <div className="fg"><label className="lbl">Commandes</label><input type="number" className="inp" value={form.cmds||0} onChange={function(e) { setForm(Object.assign({},form,{cmds:parseInt(e.target.value)||0})) }} /></div>
               </div>
-              <div className="fg"><label className="lbl">\u2705 Victoires</label><textarea className="inp" value={form.wins||''} onChange={function(e) { setForm(Object.assign({},form,{wins:e.target.value})) }} /></div>
-              <div className="fg"><label className="lbl">\u26a1 Challenges</label><textarea className="inp" value={form.challenges||''} onChange={function(e) { setForm(Object.assign({},form,{challenges:e.target.value})) }} /></div>
-              <div className="fg"><label className="lbl">\ud83c\udfaf Priorites S+1</label><textarea className="inp" value={form.next||''} onChange={function(e) { setForm(Object.assign({},form,{next:e.target.value})) }} /></div>
-              <div className="fg"><label className="lbl">\ud83d\udcac Note pour Edward</label><textarea className="inp" value={form.notes||''} onChange={function(e) { setForm(Object.assign({},form,{notes:e.target.value})) }} /></div>
+              <div className="fg"><label className="lbl">✅ Victoires</label><textarea className="inp" value={form.wins||''} onChange={function(e) { setForm(Object.assign({},form,{wins:e.target.value})) }} /></div>
+              <div className="fg"><label className="lbl">⚡ Challenges</label><textarea className="inp" value={form.challenges||''} onChange={function(e) { setForm(Object.assign({},form,{challenges:e.target.value})) }} /></div>
+              <div className="fg"><label className="lbl">🎯 Priorites S+1</label><textarea className="inp" value={form.next||''} onChange={function(e) { setForm(Object.assign({},form,{next:e.target.value})) }} /></div>
+              <div className="fg"><label className="lbl">💬 Note pour Edward</label><textarea className="inp" value={form.notes||''} onChange={function(e) { setForm(Object.assign({},form,{notes:e.target.value})) }} /></div>
             </div>
             <div className="mf"><button className="btn" onClick={closeModal}>Annuler</button><button className="btn btn-y" onClick={submitCR}>Soumettre a Edward</button></div>
           </div>
