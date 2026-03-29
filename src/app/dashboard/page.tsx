@@ -149,13 +149,8 @@ export default function DashboardPage() {
 
   useEffect(function() {
     if (!profile) return
-    // Load Zelty data
     setZeltyLoading(true)
-    fetch('/api/zelty').then(function(r) { return r.json() }).then(function(d) {
-      setZeltyData(d)
-      setZeltyLoading(false)
-    }).catch(function() { setZeltyLoading(false) })
-
+    fetch('/api/zelty').then(function(r) { return r.json() }).then(function(d) { setZeltyData(d); setZeltyLoading(false) }).catch(function() { setZeltyLoading(false) })
     sb().from('activity_log').select('*').order('created_at', {ascending: false}).limit(200).then(function(r) {
       if (r.data) setActivityLog(r.data)
     })
@@ -251,6 +246,12 @@ export default function DashboardPage() {
     return a.name.localeCompare(b.name)
   })
 
+  var zeltyCA = zeltyData && zeltyData.stats ? (zeltyData.stats[zeltyPeriod].ca/100).toFixed(2) + ' €' : '--'
+  var zeltyTickets = zeltyData && zeltyData.stats ? zeltyData.stats[zeltyPeriod].tickets : '--'
+  var zeltyAvg = zeltyData && zeltyData.stats ? (zeltyData.stats[zeltyPeriod].avg/100).toFixed(2) + ' €' : '--'
+  var zeltyUpdated = zeltyData && zeltyData.lastUpdated ? 'Mis à jour ' + new Date(zeltyData.lastUpdated).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : 'Données en temps réel'
+  var zeltyEvol = zeltyData && zeltyData.evolution && zeltyData.evolution[zeltyPeriod] !== null && zeltyData.evolution[zeltyPeriod] !== undefined ? (zeltyData.evolution[zeltyPeriod] >= 0 ? '+' : '') + zeltyData.evolution[zeltyPeriod] + '%' : '--'
+  var zeltyEvolColor = zeltyData && zeltyData.evolution && zeltyData.evolution[zeltyPeriod] !== null && zeltyData.evolution[zeltyPeriod] !== undefined ? (zeltyData.evolution[zeltyPeriod] >= 0 ? '#009D3A' : '#CC0066') : '#888'
   const NAV = [
     {id: 'dash', label: 'Dashboard', icon: '⚡'},
     {id: 'chasse', label: 'Tableau de chasse', icon: '🎯'},
@@ -262,12 +263,6 @@ export default function DashboardPage() {
     {id: 'gmb', label: 'Google My Biz.', icon: '⭐'},
     {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
   ]
-  var zeltyCA = zeltyData && zeltyData.stats ? (zeltyData.stats[zeltyPeriod].ca/100).toFixed(2) + ' €' : '--'
-  var zeltyTickets = zeltyData && zeltyData.stats ? zeltyData.stats[zeltyPeriod].tickets : '--'
-  var zeltyAvg = zeltyData && zeltyData.stats ? (zeltyData.stats[zeltyPeriod].avg/100).toFixed(2) + ' €' : '--'
-  var zeltyUpdated = zeltyData && zeltyData.lastUpdated ? 'Mis à jour ' + new Date(zeltyData.lastUpdated).toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : 'Données en temps réel'
-  var zeltyEvol = zeltyData && zeltyData.evolution && zeltyData.evolution[zeltyPeriod] !== null ? (zeltyData.evolution[zeltyPeriod] >= 0 ? '+' : '') + zeltyData.evolution[zeltyPeriod] + '%' : '--'
-  var zeltyEvolColor = zeltyData && zeltyData.evolution && zeltyData.evolution[zeltyPeriod] !== null ? (zeltyData.evolution[zeltyPeriod] >= 0 ? '#009D3A' : '#CC0066') : '#888'
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
@@ -328,8 +323,6 @@ export default function DashboardPage() {
               </div>
               {/* ZELTY WIDGET */}
               <div className="card" style={{padding:0,overflow:'hidden',marginBottom:12,border:'3px solid #191923',boxShadow:'4px 4px 0 #191923'}}>
-
-                {/* Header */}
                 <div style={{background:'#FF82D7',padding:'12px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,borderBottom:'2px solid #191923'}}>
                   <div style={{display:'flex',alignItems:'center',gap:10}}>
                     <span style={{fontSize:22}}>🟡</span>
@@ -342,105 +335,82 @@ export default function DashboardPage() {
                     {['day','week','month','year'].map(function(p) {
                       var labels = {day:'Auj.', week:'Semaine', month:'Mois', year:'Année'}
                       return (
-                        <div key={p} onClick={function() { setZeltyPeriod(p) }} style={{padding:'4px 10px',borderRadius:4,border:'2px solid #191923',background:zeltyPeriod===p?'#191923':'transparent',color:zeltyPeriod===p?'#FFEB5A':'#191923',fontSize:10,fontWeight:900,cursor:'pointer',textTransform:'uppercase',boxShadow:zeltyPeriod===p?'none':'1px 1px 0 #191923'}}>
+                        <div key={p} onClick={function() { setZeltyPeriod(p) }} style={{padding:'4px 10px',borderRadius:4,border:'2px solid #191923',background:zeltyPeriod===p?'#191923':'transparent',color:zeltyPeriod===p?'#FFEB5A':'#191923',fontSize:10,fontWeight:900,cursor:'pointer',textTransform:'uppercase'}}>
                           {labels[p]}
                         </div>
                       )
                     })}
-                    <div onClick={function() { setZeltyLoading(true); fetch('/api/zelty').then(function(r){return r.json()}).then(function(d){setZeltyData(d);setZeltyLoading(false)}).catch(function(){setZeltyLoading(false)}) }} style={{padding:'4px 8px',borderRadius:4,border:'2px solid #191923',background:'#FFEB5A',fontSize:12,cursor:'pointer',boxShadow:'1px 1px 0 #191923'}}>↻</div>
+                    <div onClick={function() { setZeltyLoading(true); fetch('/api/zelty').then(function(r){return r.json()}).then(function(d){setZeltyData(d);setZeltyLoading(false)}).catch(function(){setZeltyLoading(false)}) }} style={{padding:'4px 8px',borderRadius:4,border:'2px solid #191923',background:'#FFEB5A',fontSize:12,cursor:'pointer'}}>↻</div>
                   </div>
                 </div>
-
-                {zeltyLoading && (
-                  <div style={{padding:'24px',textAlign:'center',opacity:.4,fontSize:12,fontWeight:900,textTransform:'uppercase'}}>Chargement des données Zelty...</div>
-                )}
-
+                {zeltyLoading && <div style={{padding:'20px',textAlign:'center',opacity:.4,fontSize:12,fontWeight:900,textTransform:'uppercase'}}>Chargement...</div>}
                 {!zeltyLoading && zeltyData && zeltyData.error && (
-                  <div style={{padding:'12px 16px',background:'#FFEB5A',fontSize:11,fontWeight:900,color:'#191923'}}>
-                    {zeltyData.error === 'ZELTY_API_KEY manquante dans les variables Vercel'
-                      ? '🔑 Ajoute ZELTY_API_KEY dans Vercel → Settings → Environment Variables'
-                      : '⚠️ Erreur API Zelty : ' + zeltyData.error}
+                  <div style={{padding:'12px 16px',background:'#FFEB5A',fontSize:11,fontWeight:900}}>
+                    {zeltyData.error === 'ZELTY_API_KEY manquante dans les variables Vercel' ? '🔑 Ajoute ZELTY_API_KEY dans Vercel → Settings → Environment Variables' : '⚠️ ' + zeltyData.error}
                   </div>
                 )}
-
                 {!zeltyLoading && zeltyData && zeltyData.ok && (
                   <div>
-                    {/* KPIs */}
                     <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',borderBottom:'2px solid #191923'}}>
                       <div style={{padding:'14px 16px',borderRight:'2px solid #191923'}}>
                         <div style={{fontSize:20,marginBottom:4}}>💰</div>
-                        <div style={{fontWeight:900,fontSize:24,color:'#191923',lineHeight:1}}>{zeltyCA}</div>
-                        <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',letterSpacing:.5,marginTop:4}}>Chiffre d'affaires</div>
+                        <div style={{fontWeight:900,fontSize:22,lineHeight:1}}>{zeltyCA}</div>
+                        <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginTop:4}}>CA</div>
                       </div>
                       <div style={{padding:'14px 16px',borderRight:'2px solid #191923'}}>
                         <div style={{fontSize:20,marginBottom:4}}>🧾</div>
-                        <div style={{fontWeight:900,fontSize:24,color:'#191923',lineHeight:1}}>{zeltyTickets}</div>
-                        <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',letterSpacing:.5,marginTop:4}}>Tickets</div>
+                        <div style={{fontWeight:900,fontSize:22,lineHeight:1}}>{zeltyTickets}</div>
+                        <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginTop:4}}>Tickets</div>
                       </div>
                       <div style={{padding:'14px 16px',borderRight:'2px solid #191923'}}>
                         <div style={{fontSize:20,marginBottom:4}}>🛒</div>
-                        <div style={{fontWeight:900,fontSize:24,color:'#191923',lineHeight:1}}>{zeltyAvg}</div>
-                        <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',letterSpacing:.5,marginTop:4}}>Panier moyen</div>
+                        <div style={{fontWeight:900,fontSize:22,lineHeight:1}}>{zeltyAvg}</div>
+                        <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginTop:4}}>Panier moyen</div>
                       </div>
                       <div style={{padding:'14px 16px'}}>
                         <div style={{fontSize:20,marginBottom:4}}>📈</div>
-                        <div style={{fontWeight:900,fontSize:24,color:zeltyEvolColor,lineHeight:1}}>{zeltyEvol}</div>
-                        <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',letterSpacing:.5,marginTop:4}}>vs période préc.</div>
+                        <div style={{fontWeight:900,fontSize:22,color:zeltyEvolColor,lineHeight:1}}>{zeltyEvol}</div>
+                        <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginTop:4}}>vs période préc.</div>
                       </div>
                     </div>
-
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr'}}>
-                      {/* Top produits */}
                       <div style={{padding:'14px 16px',borderRight:'2px solid #191923'}}>
-                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:15,marginBottom:10,color:'#191923'}}>🏆 Top produits du mois</div>
+                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:15,marginBottom:10}}>🏆 Top produits</div>
                         {zeltyData.topProducts && zeltyData.topProducts.length > 0 ? zeltyData.topProducts.slice(0,6).map(function(p, i) {
                           var maxQty = zeltyData.topProducts[0].qty || 1
                           return (
                             <div key={p.name} style={{marginBottom:8}}>
                               <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
-                                <span style={{fontSize:11,fontWeight:i===0?900:400,color:'#191923'}}>{i+1}. {p.name}</span>
+                                <span style={{fontSize:11,fontWeight:i===0?900:400}}>{i+1}. {p.name}</span>
                                 <span style={{fontSize:11,fontWeight:900,background:'#FFEB5A',padding:'1px 6px',borderRadius:3,border:'1px solid #191923'}}>{p.qty}x</span>
                               </div>
-                              <div style={{height:4,background:'#EBEBEB',borderRadius:2,border:'1px solid #DEDEDE'}}>
-                                <div style={{height:'100%',background:i===0?'#FF82D7':'#191923',borderRadius:2,width:Math.round(p.qty/maxQty*100)+'%'}} />
+                              <div style={{height:4,background:'#EBEBEB',borderRadius:2}}>
+                                <div style={{height:'100%',background:i===0?'#FF82D7':'#191923',borderRadius:2,width:Math.round(p.qty/maxQty*100)+'%',opacity:i===0?1:0.5}} />
                               </div>
                             </div>
                           )
-                        }) : (
-                          <div style={{fontSize:11,opacity:.4}}>Aucune donnée ce mois</div>
-                        )}
+                        }) : <div style={{fontSize:11,opacity:.4}}>Aucune donnée</div>}
                       </div>
-
-                      {/* Heures de pointe */}
                       <div style={{padding:'14px 16px'}}>
-                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:15,marginBottom:10,color:'#191923'}}>⏰ Heures de pointe (aujourd'hui)</div>
-                        {zeltyData.peakHours && zeltyData.peakHours.filter(function(h){return h.count>0}).length > 0 ? (
-                          <div>
-                            {zeltyData.peakHours.filter(function(h){return h.count>0}).slice(0,8).map(function(h, i) {
-                              var maxCount = zeltyData.peakHours.filter(function(x){return x.count>0})[0].count || 1
-                              return (
-                                <div key={h.hour} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-                                  <span style={{fontSize:10,opacity:.5,width:36,flexShrink:0}}>{h.hour}h</span>
-                                  <div style={{flex:1,height:8,background:'#EBEBEB',borderRadius:2,border:'1px solid #DEDEDE'}}>
-                                    <div style={{height:'100%',background:i===0?'#FF82D7':'#191923',borderRadius:2,width:Math.round(h.count/maxCount*100)+'%',opacity:i===0?1:0.4+i*0.1}} />
-                                  </div>
-                                  <span style={{fontSize:10,fontWeight:900,width:20,textAlign:'right'}}>{h.count}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          <div style={{fontSize:11,opacity:.4}}>Aucun ticket enregistré aujourd'hui</div>
-                        )}
+                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:15,marginBottom:10}}>⏰ Heures de pointe</div>
+                        {zeltyData.peakHours && zeltyData.peakHours.filter(function(h){return h.count>0}).length > 0 ? zeltyData.peakHours.filter(function(h){return h.count>0}).slice(0,8).map(function(h, i) {
+                          var maxCount = zeltyData.peakHours.filter(function(x){return x.count>0})[0].count || 1
+                          return (
+                            <div key={h.hour} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                              <span style={{fontSize:10,opacity:.5,width:32,flexShrink:0}}>{h.hour}h</span>
+                              <div style={{flex:1,height:8,background:'#EBEBEB',borderRadius:2}}>
+                                <div style={{height:'100%',background:i===0?'#FF82D7':'#191923',borderRadius:2,width:Math.round(h.count/maxCount*100)+'%',opacity:i===0?1:0.4}} />
+                              </div>
+                              <span style={{fontSize:10,fontWeight:900,width:20,textAlign:'right'}}>{h.count}</span>
+                            </div>
+                          )
+                        }) : <div style={{fontSize:11,opacity:.4}}>Aucun ticket aujourd'hui</div>}
                       </div>
                     </div>
                   </div>
                 )}
-
                 {!zeltyLoading && !zeltyData && (
-                  <div style={{padding:'20px 16px',fontSize:11,opacity:.6}}>
-                    🔑 Ajoute ta clé <strong>ZELTY_API_KEY</strong> dans Vercel → Settings → Environment Variables pour activer ce widget.
-                  </div>
+                  <div style={{padding:'16px',fontSize:11,opacity:.6}}>🔑 Ajoute <strong>ZELTY_API_KEY</strong> dans Vercel → Settings → Environment Variables.</div>
                 )}
               </div>
 
@@ -527,6 +497,82 @@ export default function DashboardPage() {
                   })}
                 </div>
               </div>
+              {/* PLANNING SEMAINE */}
+              <div style={{borderRadius:7,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',marginBottom:10,overflow:'hidden'}}>
+                <div style={{background:'#FF82D7',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'2px solid #191923',flexWrap:'wrap',gap:8}}>
+                  <div className="yt" style={{fontSize:18,color:'#191923'}}>📅 Planning {isEmy ? 'de ma semaine' : "d'Emy"}</div>
+                  <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                    <button className="btn btn-sm" style={{background:'#191923',color:'#FFEB5A',border:'2px solid #191923'}} onClick={function() { setPlanningWeek(function(w) { return w-1 }) }}>←</button>
+                    <span style={{fontSize:11,fontWeight:900,minWidth:100,textAlign:'center'}}>{planningWeek===0 ? 'Cette semaine' : planningWeek < 0 ? 'Sem. -'+Math.abs(planningWeek) : 'Sem. +'+planningWeek}</span>
+                    <button className="btn btn-sm" style={{background:'#191923',color:'#FFEB5A',border:'2px solid #191923'}} onClick={function() { setPlanningWeek(function(w) { return w+1 }) }}>→</button>
+                    {planningWeek !== 0 && <button className="btn btn-y btn-sm" onClick={function() { setPlanningWeek(0) }}>Auj.</button>}
+                  </div>
+                </div>
+                <div style={{padding:'10px 14px',background:'#FFFFFF'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6}}>
+                    {['Lun','Mar','Mer','Jeu','Ven'].map(function(day, di) {
+                      var ws = new Date()
+                      var dow = ws.getDay() === 0 ? 6 : ws.getDay()-1
+                      ws.setDate(ws.getDate()-dow+(planningWeek*7))
+                      var dd = new Date(ws)
+                      dd.setDate(ws.getDate()+di)
+                      var ds = dd.toISOString().split('T')[0]
+                      var isToday = ds === new Date().toISOString().split('T')[0]
+                      var isPast = dd < new Date(new Date().toDateString())
+                      var isFriday = di === 4
+                      var dayTasks = tasks.filter(function(t) { return t.deadline === ds && t.assignee === 'emy' })
+                      var dayRelances = prospects.filter(function(p) { return p.nextDate === ds && p.status !== 'won' && p.status !== 'lost' })
+                      var hasLate = isPast && dayTasks.some(function(t){return t.status!=='done'})
+                      var allDone = dayTasks.length > 0 && dayTasks.every(function(t){return t.status==='done'})
+                      var borderColor = isToday ? '#005FFF' : hasLate ? '#CC0066' : allDone ? '#009D3A' : '#191923'
+                      var bgColor = isToday ? '#E8F0FF' : hasLate ? '#FFE8F0' : allDone ? '#E8F5E9' : '#FAFAFA'
+                      return (
+                        <div key={day} style={{borderRadius:5,border:'2px solid '+borderColor,background:bgColor,padding:'7px',minHeight:130}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5,paddingBottom:4,borderBottom:'1.5px solid '+borderColor}}>
+                            <div style={{fontFamily:"'Yellowtail',cursive",fontSize:13,color:borderColor}}>{day}</div>
+                            <div style={{fontSize:9,fontWeight:900,opacity:.5}}>{dd.getDate()}/{dd.getMonth()+1}</div>
+                          </div>
+                          <div style={{marginBottom:3}}>
+                            <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
+                              <input type="checkbox" checked={isToday ? contactedToday >= 5 : false} readOnly style={{width:11,height:11,accentColor:'#009D3A'}} />
+                              <span style={{fontSize:9,color:'#005FFF',fontWeight:900,textDecoration:isToday&&contactedToday>=5?'line-through':'none',opacity:isToday&&contactedToday>=5?.5:1}}>📞 5 prospects</span>
+                            </div>
+                            {dayRelances.length > 0 && (
+                              <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
+                                <input type="checkbox" readOnly style={{width:11,height:11,accentColor:'#CC0066'}} />
+                                <span style={{fontSize:9,color:'#CC0066',fontWeight:900}}>🔄 {dayRelances.length} relance{dayRelances.length>1?'s':''}</span>
+                              </div>
+                            )}
+                            {isFriday && (
+                              <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
+                                <input type="checkbox" checked={reports.length > 0} readOnly style={{width:11,height:11,accentColor:'#009D3A'}} />
+                                <span style={{fontSize:9,fontWeight:900,textDecoration:reports.length>0?'line-through':'none',opacity:reports.length>0?.5:1}}>📝 CR hebdo</span>
+                              </div>
+                            )}
+                          </div>
+                          {dayTasks.map(function(t) {
+                            return (
+                              <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:4,cursor:'pointer'}} onClick={function() {
+                                setTasks(function(prev) { return prev.map(function(x) { return x.id !== t.id ? x : Object.assign({}, x, {status: t.status === 'done' ? 'todo' : 'done'}) }) })
+                              }}>
+                                <input type="checkbox" checked={t.status === 'done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:t.priority==='high'?'#FF82D7':'#009D3A'}} />
+                                <span style={{fontSize:9,fontWeight:t.priority==='high'?900:400,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.3}}>{t.title}</span>
+                              </div>
+                            )
+                          })}
+                          {dayTasks.length === 0 && !isFriday && dayRelances.length === 0 && (
+                            <div style={{fontSize:9,opacity:.2,textAlign:'center',marginTop:8}}>—</div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div style={{display:'flex',gap:12,marginTop:8,fontSize:9,opacity:.4}}>
+                    <span>🔵 Aujourd'hui</span><span>🔴 En retard</span><span>🟢 Tout fait</span><span>☑ Cliquer pour cocher</span>
+                  </div>
+                </div>
+              </div>
+
               {!isEmy && reports.length > 0 && (
                 <div className="card">
                   <div className="ct">📋 Dernier CR d'Emy</div>
@@ -1042,89 +1088,4 @@ export default function DashboardPage() {
       <div className={toastMsg ? 'toast show' : 'toast'}>{toastMsg}</div>
     </div>
   )
-}              {/* PLANNING SEMAINE */}
-              <div style={{borderRadius:7,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',marginBottom:10,overflow:'hidden'}}>
-                <div style={{background:'#FF82D7',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'2px solid #191923',flexWrap:'wrap',gap:8}}>
-                  <div className="yt" style={{fontSize:18,color:'#191923'}}>📅 Planning {isEmy ? 'de ma semaine' : "d'Emy"}</div>
-                  <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                    <button className="btn btn-sm" style={{background:'#191923',color:'#FFEB5A',border:'2px solid #191923'}} onClick={function() { setPlanningWeek(function(w) { return w-1 }) }}>←</button>
-                    <span style={{fontSize:11,fontWeight:900,minWidth:100,textAlign:'center'}}>{planningWeek===0 ? 'Cette semaine' : planningWeek < 0 ? 'Sem. -'+Math.abs(planningWeek) : 'Sem. +'+planningWeek}</span>
-                    <button className="btn btn-sm" style={{background:'#191923',color:'#FFEB5A',border:'2px solid #191923'}} onClick={function() { setPlanningWeek(function(w) { return w+1 }) }}>→</button>
-                    {planningWeek !== 0 && <button className="btn btn-y btn-sm" onClick={function() { setPlanningWeek(0) }}>Auj.</button>}
-                  </div>
-                </div>
-                <div style={{padding:'10px 14px',background:'#FFFFFF'}}>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6}}>
-                    {['Lun','Mar','Mer','Jeu','Ven'].map(function(day, di) {
-                      var ws = new Date()
-                      var dow = ws.getDay() === 0 ? 6 : ws.getDay()-1
-                      ws.setDate(ws.getDate()-dow+(planningWeek*7))
-                      var dd = new Date(ws)
-                      dd.setDate(ws.getDate()+di)
-                      var ds = dd.toISOString().split('T')[0]
-                      var isToday = ds === new Date().toISOString().split('T')[0]
-                      var isPast = dd < new Date(new Date().toDateString())
-                      var isFriday = di === 4
-                      var dayTasks = tasks.filter(function(t) { return t.deadline === ds && t.assignee === 'emy' })
-                      var dayRelances = prospects.filter(function(p) { return p.nextDate === ds && p.status !== 'won' && p.status !== 'lost' })
-                      var hasLate = isPast && dayTasks.some(function(t){return t.status!=='done'})
-                      var allDone = dayTasks.length > 0 && dayTasks.every(function(t){return t.status==='done'})
-                      var borderColor = isToday ? '#005FFF' : hasLate ? '#CC0066' : allDone ? '#009D3A' : '#191923'
-                      var bgColor = isToday ? '#E8F0FF' : hasLate ? '#FFE8F0' : allDone ? '#E8F5E9' : '#FAFAFA'
-                      return (
-                        <div key={day} style={{borderRadius:5,border:'2px solid '+borderColor,background:bgColor,padding:'7px',minHeight:130}}>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,paddingBottom:4,borderBottom:'1.5px solid '+borderColor}}>
-                            <div style={{fontFamily:"'Yellowtail',cursive",fontSize:13,color:borderColor}}>{day}</div>
-                            <div style={{fontSize:9,fontWeight:900,opacity:.5}}>{dd.getDate()}/{dd.getMonth()+1}</div>
-                          </div>
-
-                          {/* To-do automatique quotidienne */}
-                          <div style={{marginBottom:4}}>
-                            <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
-                              <input type="checkbox" checked={contactedToday >= 5} readOnly style={{width:11,height:11,cursor:'default',accentColor:'#009D3A'}} />
-                              <span style={{fontSize:9,color:'#005FFF',fontWeight:900,textDecoration:contactedToday>=5?'line-through':'none',opacity:contactedToday>=5?.5:1}}>📞 5 prospects</span>
-                            </div>
-                            {dayRelances.length > 0 && (
-                              <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
-                                <input type="checkbox" readOnly style={{width:11,height:11,cursor:'default',accentColor:'#CC0066'}} />
-                                <span style={{fontSize:9,color:'#CC0066',fontWeight:900}}>🔄 {dayRelances.length} relance{dayRelances.length>1?'s':''}</span>
-                              </div>
-                            )}
-                            {isFriday && (
-                              <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
-                                <input type="checkbox" checked={reports.length > 0} readOnly style={{width:11,height:11,cursor:'default',accentColor:'#009D3A'}} />
-                                <span style={{fontSize:9,color:'#191923',fontWeight:900,textDecoration:reports.length>0?'line-through':'none',opacity:reports.length>0?.5:1}}>📝 CR hebdo</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Tâches avec checkboxes cochables */}
-                          {dayTasks.map(function(t) {
-                            return (
-                              <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:4,cursor:'pointer'}} onClick={function() {
-                                var o = ['todo','in_progress','done']
-                                setTasks(function(prev) { return prev.map(function(x) { return x.id !== t.id ? x : Object.assign({}, x, {status: t.status === 'done' ? 'todo' : 'done'}) }) })
-                              }}>
-                                <input type="checkbox" checked={t.status === 'done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:t.priority==='high'?'#FF82D7':'#009D3A'}} />
-                                <span style={{fontSize:9,fontWeight:t.priority==='high'?900:400,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.3}}>{t.title}</span>
-                              </div>
-                            )
-                          })}
-
-                          {dayTasks.length === 0 && !isFriday && dayRelances.length === 0 && (
-                            <div style={{fontSize:9,opacity:.25,textAlign:'center',marginTop:8}}>—</div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                  <div style={{display:'flex',gap:12,marginTop:8,fontSize:9,opacity:.5,flexWrap:'wrap'}}>
-                    <span>🔵 Aujourd'hui</span>
-                    <span>🔴 En retard</span>
-                    <span>🟢 Tout fait</span>
-                    <span>☑ Cliquer pour cocher/décocher</span>
-                  </div>
-                </div>
-              </div>
-
-
+}
