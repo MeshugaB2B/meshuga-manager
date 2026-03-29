@@ -862,41 +862,65 @@ export default function DashboardPage() {
               <div className="g2">
                 {/* LEFT: Config */}
                 <div>
-                  {/* Infos client */}
+                  {/* Infos client avec rattachement prospect */}
                   <div className="card" style={{marginBottom:10}}>
-                    <div className="ct">👤 Informations client</div>
-                    <div className="fg"><label className="lbl">N° Devis</label><input className="inp" value={devisNumero} onChange={function(e){setDevisNumero(e.target.value)}} /></div>
+                    <div className="ct">👤 Client</div>
+                    <div className="fg">
+                      <label className="lbl">Rattacher a un prospect existant</label>
+                      <select className="inp" onChange={function(e) {
+                        var pid = e.target.value
+                        if (!pid) return
+                        var p = prospects.filter(function(x){return String(x.id)===pid})[0]
+                        if (p) setDevisClient(Object.assign({},devisClient,{nom:p.name,contact:p.nextAction||'',email:p.email||'',prospectId:p.id}))
+                      }}>
+                        <option value="">-- Nouveau client ou choisir --</option>
+                        {prospects.map(function(p) {
+                          return <option key={p.id} value={p.id}>{p.name}</option>
+                        })}
+                      </select>
+                    </div>
                     <div className="fg"><label className="lbl">Entreprise *</label><input className="inp" value={devisClient.nom} onChange={function(e){setDevisClient(Object.assign({},devisClient,{nom:e.target.value}))}} placeholder="Wagram Events..." /></div>
-                    <div className="fg"><label className="lbl">Contact</label><input className="inp" value={devisClient.contact} onChange={function(e){setDevisClient(Object.assign({},devisClient,{contact:e.target.value}))}} placeholder="Marie Dupont" /></div>
-                    <div className="fg"><label className="lbl">Email</label><input className="inp" value={devisClient.email} onChange={function(e){setDevisClient(Object.assign({},devisClient,{email:e.target.value}))}} placeholder="contact@..." /></div>
+                    <div className="fg2">
+                      <div className="fg"><label className="lbl">Contact</label><input className="inp" value={devisClient.contact} onChange={function(e){setDevisClient(Object.assign({},devisClient,{contact:e.target.value}))}} placeholder="Marie Dupont" /></div>
+                      <div className="fg"><label className="lbl">Email</label><input className="inp" value={devisClient.email} onChange={function(e){setDevisClient(Object.assign({},devisClient,{email:e.target.value}))}} placeholder="contact@..." /></div>
+                    </div>
                     <div className="fg2">
                       <div className="fg"><label className="lbl">Date evenement</label><input type="date" className="inp" value={devisClient.date} onChange={function(e){setDevisClient(Object.assign({},devisClient,{date:e.target.value}))}} /></div>
                       <div className="fg"><label className="lbl">Lieu</label><input className="inp" value={devisClient.lieu} onChange={function(e){setDevisClient(Object.assign({},devisClient,{lieu:e.target.value}))}} placeholder="Paris 8e..." /></div>
                     </div>
+                    {!devisClient.prospectId && devisClient.nom && (
+                      <button className="btn btn-y btn-sm" style={{marginTop:4}} onClick={function() {
+                        var newP = {id:Date.now(),name:devisClient.nom,email:devisClient.email,phone:'',size:'',category:'Evenementiel',status:'contacted',nextAction:'Devis envoye',nextDate:'',notes:'Devis cree depuis editeur',ca:0,score:7,files:[]}
+                        setProspects(function(prev){return prev.concat([newP])})
+                        setDevisClient(Object.assign({},devisClient,{prospectId:newP.id}))
+                        toast('Prospect ajoute au CRM !')
+                      }}>+ Ajouter au CRM</button>
+                    )}
+                    <div className="fg" style={{marginTop:8}}><label className="lbl">N° Devis</label><input className="inp" value={devisNumero} onChange={function(e){setDevisNumero(e.target.value)}} /></div>
                   </div>
 
-                  {/* Format & personnes */}
+                  {/* Format */}
                   <div className="card" style={{marginBottom:10}}>
-                    <div className="ct">🎯 Format de l'evenement</div>
+                    <div className="ct">🎯 Format</div>
                     <div className="fg">
                       <label className="lbl">Nombre de personnes</label>
-                      <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                        <input type="number" className="inp" style={{width:100}} value={devisNbPersonnes} min="1" onChange={function(e){setDevisNbPersonnes(parseInt(e.target.value)||1)}} />
-                        <span style={{fontSize:12,opacity:.5}}>personnes</span>
-                      </div>
+                      <input type="number" className="inp" value={devisNbPersonnes} min="1" onChange={function(e){setDevisNbPersonnes(parseInt(e.target.value)||1)}} />
                     </div>
                     <div className="fg">
-                      <label className="lbl">Format sandwich</label>
+                      <label className="lbl">Format (indicatif)</label>
                       <div style={{display:'flex',gap:8}}>
                         <div onClick={function(){setDevisFormat('normal')}} style={{flex:1,padding:'10px',border:'2px solid '+(devisFormat==='normal'?'#191923':'#EBEBEB'),borderRadius:5,cursor:'pointer',background:devisFormat==='normal'?'#FFEB5A':'#FAFAFA',textAlign:'center'}}>
                           <div style={{fontWeight:900,fontSize:13}}>🥪 Normal</div>
-                          <div style={{fontSize:10,opacity:.6}}>1 sandwich / personne</div>
+                          <div style={{fontSize:10,opacity:.6}}>~1 / personne</div>
                         </div>
                         <div onClick={function(){setDevisFormat('mini')}} style={{flex:1,padding:'10px',border:'2px solid '+(devisFormat==='mini'?'#191923':'#EBEBEB'),borderRadius:5,cursor:'pointer',background:devisFormat==='mini'?'#FFEB5A':'#FAFAFA',textAlign:'center'}}>
                           <div style={{fontWeight:900,fontSize:13}}>🥙 Mini</div>
-                          <div style={{fontSize:10,opacity:.6}}>3 minis / personne</div>
+                          <div style={{fontSize:10,opacity:.6}}>~3 / personne</div>
                         </div>
                       </div>
+                    </div>
+                    <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:4,padding:'6px 10px',fontSize:10,opacity:.7}}>
+                      💡 Quantites conseillees : {devisFormat==='normal' ? devisNbPersonnes+' sandwichs' : (devisNbPersonnes*3)+' minis'} — ajustez librement ci-dessous
                     </div>
                   </div>
 
@@ -906,58 +930,54 @@ export default function DashboardPage() {
                     <div className="fg2">
                       <div className="fg">
                         <label className="lbl">Frais mise en place (HT)</label>
-                        <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                          <input type="number" className="inp" value={devisMiseEnPlace} onChange={function(e){setDevisMiseEnPlace(parseFloat(e.target.value)||0)}} />
-                          <span style={{fontSize:11,opacity:.5}}>€</span>
-                        </div>
+                        <input type="number" className="inp" value={devisMiseEnPlace} onChange={function(e){setDevisMiseEnPlace(parseFloat(e.target.value)||0)}} />
                       </div>
                       <div className="fg">
                         <label className="lbl">Remise mise en place (%)</label>
-                        <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                          <input type="number" className="inp" value={devisMiseEnPlaceRemise} min="0" max="100" onChange={function(e){setDevisMiseEnPlacePct(parseFloat(e.target.value)||0)}} />
-                          <span style={{fontSize:11,opacity:.5}}>%</span>
-                        </div>
+                        <input type="number" className="inp" value={devisMiseEnPlaceRemise} min="0" max="100" onChange={function(e){setDevisMiseEnPlacePct(parseFloat(e.target.value)||0)}} />
                       </div>
                     </div>
                     <div className="fg">
                       <label className="lbl">Remise sur le total (%)</label>
-                      <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                        <input type="number" className="inp" style={{width:100}} value={devisRemiseTotal} min="0" max="100" onChange={function(e){setDevisRemiseTotal(parseFloat(e.target.value)||0)}} />
-                        <span style={{fontSize:11,opacity:.5}}>% sur le total HT</span>
-                      </div>
+                      <input type="number" className="inp" value={devisRemiseTotal} min="0" max="100" onChange={function(e){setDevisRemiseTotal(parseFloat(e.target.value)||0)}} />
                     </div>
                   </div>
 
-                  {/* Notes */}
                   <div className="card">
-                    <div className="ct">📝 Notes & conditions</div>
-                    <textarea className="inp" value={devisNotes} onChange={function(e){setDevisNotes(e.target.value)}} placeholder="Conditions de paiement, details logistiques, mentions speciales..." style={{minHeight:80}} />
+                    <div className="ct">📝 Notes</div>
+                    <textarea className="inp" value={devisNotes} onChange={function(e){setDevisNotes(e.target.value)}} placeholder="Conditions de paiement, details logistiques..." style={{minHeight:70}} />
                   </div>
                 </div>
 
-                {/* RIGHT: Sandwich selector + recap */}
+                {/* RIGHT */}
                 <div>
                   <div className="card" style={{marginBottom:10}}>
-                    <div className="ct">🥪 Selection des sandwichs</div>
-                    <div style={{fontSize:11,opacity:.5,marginBottom:10}}>
-                      {devisFormat==='normal' ? devisNbPersonnes+' personnes = '+devisNbPersonnes+' sandwichs au total' : devisNbPersonnes+' personnes = '+(devisNbPersonnes*3)+' minis au total'}
+                    <div className="ct">🥪 Sandwichs</div>
+                    <div style={{fontSize:10,opacity:.5,marginBottom:8,background:'#F8F8F8',padding:'6px 8px',borderRadius:4}}>
+                      Conseille : {devisFormat==='normal' ? devisNbPersonnes : devisNbPersonnes*3} pieces — vous pouvez ajuster librement
                     </div>
-                    {(devisFormat==='normal' ? [{id:"hot_dog",nom:"Hot Dog",prix:7.56},{id:"grilled_cheese",nom:"Grilled Cheese",prix:7.56},{id:"egg_salad",nom:"Egg Salad",prix:8.51},{id:"chicken_caesar",nom:"Chicken Caesar",prix:11.34},{id:"tuna_melt",nom:"Tuna Melt",prix:11.34},{id:"pastrami",nom:"Pastrami",prix:14.18},{id:"smoked_salmon",nom:"Smoked Salmon",prix:13.23},{id:"lobster_roll",nom:"Lobster Roll",prix:20.79},{id:"pbn",nom:"PBN",prix:5.67}] : [{id:"hot_dog_m",nom:"Hot Dog Mini",prix:2.7},{id:"grilled_cheese_m",nom:"Grilled Cheese Mini",prix:2.87},{id:"egg_salad_m",nom:"Egg Salad Mini",prix:2.65},{id:"chicken_caesar_m",nom:"Chicken Caesar Mini",prix:3.35},{id:"tuna_melt_m",nom:"Tuna Melt Mini",prix:3.0},{id:"pastrami_m",nom:"Pastrami Mini",prix:3.8},{id:"smoked_salmon_m",nom:"Smoked Salmon Mini",prix:3.9},{id:"lobster_roll_m",nom:"Lobster Roll Mini",prix:7.5},{id:"pbn_m",nom:"PBN Mini",prix:2.7},{id:"mini_veggie",nom:"Mini Veggie",prix:4.72}]).map(function(s) {
+                    {(devisFormat==='normal' ? [{id:"hot_dog",nom:"Hot Dog",prix:7.56},{id:"grilled_cheese",nom:"Grilled Cheese",prix:7.56},{id:"egg_salad",nom:"Egg Salad",prix:8.51},{id:"chicken_caesar",nom:"Chicken Caesar",prix:11.34},{id:"tuna_melt",nom:"Tuna Melt",prix:11.34},{id:"pastrami",nom:"Pastrami",prix:14.18},{id:"smoked_salmon",nom:"Smoked Salmon",prix:13.23},{id:"lobster_roll",nom:"Lobster Roll",prix:20.79},{id:"pbn",nom:"PBN",prix:5.67}] : [{id:"hot_dog_m",nom:"Hot Dog Mini",prix:2.7},{id:"grilled_cheese_m",nom:"Grilled Cheese Mini",prix:2.87},{id:"egg_salad_m",nom:"Egg Salad Mini",prix:2.65},{id:"chicken_caesar_m",nom:"Chicken Caesar Mini",prix:3.35},{id:"tuna_melt_m",nom:"Tuna Melt Mini",prix:3.0},{id:"pastrami_m",nom:"Pastrami Mini",prix:3.8},{id:"smoked_salmon_m",nom:"Smoked Salmon Mini",prix:3.9},{id:"lobster_roll_m",nom:"Lobster Roll Mini",prix:7.5},{id:"pbn_m",nom:"PBN Mini",prix:2.7},{id:"mini_veggie",nom:"Salade Mini Veggie",prix:4.72}]).map(function(s) {
                       var existing = devisItems.filter(function(x){return x.id===s.id})[0]
                       var qty = existing ? existing.qte : 0
                       return (
-                        <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderBottom:'1px solid #EBEBEB'}}>
+                        <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 0',borderBottom:'1px solid #EBEBEB'}}>
                           <div style={{flex:1}}>
-                            <div style={{fontSize:12,fontWeight:900}}>{s.nom}</div>
-                            <div style={{fontSize:10,opacity:.5}}>{s.prix.toFixed(2)} € HT / unite</div>
+                            <div style={{fontSize:12,fontWeight:qty>0?900:400}}>{s.nom}</div>
+                            <div style={{fontSize:10,opacity:.5}}>{s.prix.toFixed(2)} EUR HT</div>
                           </div>
-                          <div style={{display:'flex',alignItems:'center',gap:6}}>
+                          <div style={{display:'flex',alignItems:'center',gap:5}}>
                             <button className="btn btn-sm" onClick={function(){
                               var newQty = Math.max(0, qty-1)
                               if (newQty===0) setDevisItems(devisItems.filter(function(x){return x.id!==s.id}))
                               else setDevisItems(devisItems.map(function(x){return x.id===s.id?Object.assign({},x,{qte:newQty,total_ht:newQty*s.prix}):x}))
                             }}>-</button>
-                            <span style={{fontWeight:900,fontSize:13,minWidth:24,textAlign:'center'}}>{qty}</span>
+                            <input type="number" min="0" style={{width:48,textAlign:'center',border:'2px solid #191923',borderRadius:4,padding:'3px',fontSize:12,fontWeight:900}} value={qty}
+                              onChange={function(e) {
+                                var newQty = parseInt(e.target.value)||0
+                                if (newQty===0) setDevisItems(devisItems.filter(function(x){return x.id!==s.id}))
+                                else if (qty===0) setDevisItems(devisItems.concat([{id:s.id,nom:s.nom,prix:s.prix,qte:newQty,total_ht:newQty*s.prix}]))
+                                else setDevisItems(devisItems.map(function(x){return x.id===s.id?Object.assign({},x,{qte:newQty,total_ht:newQty*s.prix}):x}))
+                              }} />
                             <button className="btn btn-y btn-sm" onClick={function(){
                               if (qty===0) setDevisItems(devisItems.concat([{id:s.id,nom:s.nom,prix:s.prix,qte:1,total_ht:s.prix}]))
                               else setDevisItems(devisItems.map(function(x){return x.id===s.id?Object.assign({},x,{qte:qty+1,total_ht:(qty+1)*s.prix}):x}))
@@ -966,15 +986,13 @@ export default function DashboardPage() {
                         </div>
                       )
                     })}
-                    <div style={{marginTop:10,padding:'8px',background:'#FFEB5A',borderRadius:5,border:'1.5px solid #191923',fontSize:11,fontWeight:900,textAlign:'center'}}>
-                      Total sandwichs selectionnes : {devisItems.reduce(function(s,x){return s+x.qte},0)} / {devisFormat==='normal'?devisNbPersonnes:devisNbPersonnes*3}
-                      {devisItems.reduce(function(s,x){return s+x.qte},0) !== (devisFormat==='normal'?devisNbPersonnes:devisNbPersonnes*3) && (
-                        <span style={{color:'#CC0066',marginLeft:8}}>⚠️ Verifier le total</span>
-                      )}
+                    <div style={{marginTop:8,padding:'7px 10px',background:'#FFEB5A',borderRadius:4,border:'1.5px solid #191923',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <span style={{fontSize:11,fontWeight:900}}>Total selectionne</span>
+                      <span style={{fontSize:13,fontWeight:900}}>{devisItems.reduce(function(s,x){return s+x.qte},0)} pieces</span>
                     </div>
                   </div>
 
-                  {/* RECAP FINANCIER */}
+                  {/* RECAP */}
                   {(function() {
                     var sandTotal = devisItems.reduce(function(s,x){return s+x.total_ht},0)
                     var mepApresRemise = devisMiseEnPlace * (1 - devisMiseEnPlaceRemise/100)
@@ -983,93 +1001,108 @@ export default function DashboardPage() {
                     var totalHT = sousTotal - remiseMontant
                     var tva = totalHT * 0.055
                     var totalTTC = totalHT + tva
+
+                    function printDevis() {
+                      var items = devisItems.map(function(x){return '<tr><td>'+x.nom+'</td><td style="text-align:center">'+x.qte+'</td><td style="text-align:right">'+x.prix.toFixed(2)+' EUR</td><td style="text-align:right">'+x.total_ht.toFixed(2)+' EUR</td></tr>'}).join('')
+                      var mepRow = mepApresRemise > 0 ? '<tr><td>Frais de mise en place / Show cooking'+(devisMiseEnPlaceRemise>0?' (-'+devisMiseEnPlaceRemise+'%)':'')+'</td><td></td><td></td><td style="text-align:right">'+mepApresRemise.toFixed(2)+' EUR</td></tr>' : ''
+                      var remiseRow = remiseMontant > 0 ? '<tr style="color:#CC0066"><td>Remise commerciale ('+devisRemiseTotal+'%)</td><td></td><td></td><td style="text-align:right">-'+remiseMontant.toFixed(2)+' EUR</td></tr>' : ''
+                      var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Devis '+devisNumero+'</title><style>'+
+                        'body{font-family:Arial,sans-serif;margin:0;padding:0;color:#191923}'+
+                        '@page{margin:1.5cm}'+
+                        '.header{background:#191923;color:#FFEB5A;padding:20px 30px;display:flex;justify-content:space-between;align-items:center}'+
+                        '.header h1{margin:0;font-size:28px;letter-spacing:2px}'+
+                        '.header .sub{font-size:11px;opacity:.6;margin-top:4px}'+
+                        '.devis-title{font-size:22px;font-weight:900}'+
+                        '.devis-num{font-size:11px;opacity:.6}'+
+                        '.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:20px 0}'+
+                        '.info-box{background:#F8F8F8;border-radius:6px;padding:14px;border:1px solid #DEDEDE}'+
+                        '.info-box h3{margin:0 0 8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.5}'+
+                        '.info-box .name{font-size:14px;font-weight:900;margin-bottom:4px}'+
+                        '.info-box .detail{font-size:11px;color:#666;margin-top:2px}'+
+                        'table{width:100%;border-collapse:collapse;margin:16px 0}'+
+                        'th{background:#191923;color:#FFEB5A;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px}'+
+                        'td{padding:8px 10px;font-size:11px;border-bottom:1px solid #EBEBEB}'+
+                        'tr:nth-child(even) td{background:#F8F8F8}'+
+                        '.totals{display:flex;justify-content:flex-end;margin-top:10px}'+
+                        '.totals-box{background:#F8F8F8;border-radius:6px;padding:16px;min-width:250px;border:1px solid #DEDEDE}'+
+                        '.total-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid #EBEBEB}'+
+                        '.total-final{display:flex;justify-content:space-between;padding:10px;background:#191923;border-radius:4px;margin-top:8px}'+
+                        '.total-final span{color:#FFEB5A;font-weight:900;font-size:14px}'+
+                        '.notes{margin-top:20px;background:#F8F8F8;border-radius:6px;padding:14px;border:1px solid #DEDEDE}'+
+                        '.notes h3{margin:0 0 6px;font-size:10px;text-transform:uppercase;opacity:.5}'+
+                        '.footer{margin-top:30px;padding-top:10px;border-top:1px solid #DEDEDE;font-size:9px;color:#888;text-align:center}'+
+                        '</style></head><body>'+
+                        '<div class="header">'+
+                        '<div><h1>MESHUGA</h1><div class="sub">CRAZY DELI &nbsp;|&nbsp; 3 rue Vavin, 75006 Paris</div></div>'+
+                        '<div style="text-align:right"><div class="devis-title">DEVIS</div><div class="devis-num">N° '+devisNumero+'<br/>Date : '+new Date().toLocaleDateString('fr-FR')+'</div></div>'+
+                        '</div>'+
+                        '<div class="info-grid">'+
+                        '<div class="info-box"><h3>Client</h3><div class="name">'+devisClient.nom+'</div><div class="detail">'+devisClient.contact+'</div><div class="detail">'+devisClient.email+'</div></div>'+
+                        '<div class="info-box"><h3>Evenement</h3><div class="detail">Date : '+devisClient.date+'</div><div class="detail">Lieu : '+devisClient.lieu+'</div><div class="detail">'+devisNbPersonnes+' personnes — Format : '+(devisFormat==='normal'?'Sandwich normal (~1/pers.)':'Mini (~3/pers.')+')</div></div>'+
+                        '</div>'+
+                        '<table><thead><tr><th>Designation</th><th style="text-align:center">Qte</th><th style="text-align:right">PU HT</th><th style="text-align:right">Total HT</th></tr></thead><tbody>'+
+                        items+mepRow+remiseRow+
+                        '</tbody></table>'+
+                        '<div class="totals"><div class="totals-box">'+
+                        '<div class="total-row"><span>Total HT</span><span>'+totalHT.toFixed(2)+' EUR</span></div>'+
+                        '<div class="total-row"><span>TVA 5,5%</span><span>'+tva.toFixed(2)+' EUR</span></div>'+
+                        '<div class="total-final"><span>TOTAL TTC</span><span>'+totalTTC.toFixed(2)+' EUR</span></div>'+
+                        '<div style="text-align:center;font-size:10px;opacity:.5;margin-top:6px">soit '+( totalTTC/devisNbPersonnes).toFixed(2)+' EUR TTC / personne</div>'+
+                        '</div></div>'+
+                        (devisNotes ? '<div class="notes"><h3>Notes et conditions</h3><p style="margin:0;font-size:11px;color:#444">'+devisNotes+'</p></div>' : '')+
+                        '<div class="footer">Meshuga Crazy Deli &nbsp;|&nbsp; 3 rue Vavin, 75006 Paris &nbsp;|&nbsp; edward@meshuga.fr &nbsp;|&nbsp; Devis valable 30 jours</div>'+
+                        '</body></html>'
+                      var w = window.open('', '_blank')
+                      w.document.write(html)
+                      w.document.close()
+                      w.focus()
+                      setTimeout(function(){w.print()}, 500)
+                    }
+
                     return (
                       <div className="card" style={{border:'3px solid #191923',boxShadow:'4px 4px 0 #191923'}}>
-                        <div className="ct">💰 Recapitulatif financier</div>
+                        <div className="ct">💰 Total</div>
                         <div style={{borderRadius:5,overflow:'hidden',marginBottom:10}}>
                           {devisItems.map(function(item) {
                             return (
-                              <div key={item.id} style={{display:'flex',justifyContent:'space-between',padding:'6px 8px',background:'#FAFAFA',borderBottom:'1px solid #EBEBEB'}}>
+                              <div key={item.id} style={{display:'flex',justifyContent:'space-between',padding:'6px 8px',borderBottom:'1px solid #EBEBEB',background:'#FAFAFA'}}>
                                 <span style={{fontSize:11}}>{item.nom} x{item.qte}</span>
                                 <span style={{fontSize:11,fontWeight:900}}>{item.total_ht.toFixed(2)} EUR</span>
                               </div>
                             )
                           })}
                           {devisMiseEnPlace > 0 && (
-                            <div style={{display:'flex',justifyContent:'space-between',padding:'6px 8px',background:'#FAFAFA',borderBottom:'1px solid #EBEBEB'}}>
+                            <div style={{display:'flex',justifyContent:'space-between',padding:'6px 8px',borderBottom:'1px solid #EBEBEB',background:'#FAFAFA'}}>
                               <span style={{fontSize:11}}>Mise en place{devisMiseEnPlaceRemise>0?' (-'+devisMiseEnPlaceRemise+'%)':''}</span>
                               <span style={{fontSize:11,fontWeight:900}}>{mepApresRemise.toFixed(2)} EUR</span>
                             </div>
                           )}
+                          {remiseMontant > 0 && (
+                            <div style={{display:'flex',justifyContent:'space-between',padding:'6px 8px',borderBottom:'1px solid #EBEBEB',background:'#FFF0F5'}}>
+                              <span style={{fontSize:11,color:'#CC0066'}}>Remise ({devisRemiseTotal}%)</span>
+                              <span style={{fontSize:11,fontWeight:900,color:'#CC0066'}}>-{remiseMontant.toFixed(2)} EUR</span>
+                            </div>
+                          )}
                         </div>
                         <div style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #EBEBEB'}}>
-                          <span style={{fontSize:12}}>Sous-total HT</span>
-                          <span style={{fontSize:12,fontWeight:900}}>{sousTotal.toFixed(2)} EUR</span>
-                        </div>
-                        {devisRemiseTotal > 0 && (
-                          <div style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #EBEBEB',color:'#CC0066'}}>
-                            <span style={{fontSize:12}}>Remise ({devisRemiseTotal}%)</span>
-                            <span style={{fontSize:12,fontWeight:900}}>-{remiseMontant.toFixed(2)} EUR</span>
-                          </div>
-                        )}
-                        <div style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #EBEBEB'}}>
-                          <span style={{fontSize:12}}>Total HT</span>
-                          <span style={{fontSize:12,fontWeight:900}}>{totalHT.toFixed(2)} EUR</span>
+                          <span style={{fontSize:12}}>Total HT</span><span style={{fontSize:12,fontWeight:900}}>{totalHT.toFixed(2)} EUR</span>
                         </div>
                         <div style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid #EBEBEB',opacity:.6}}>
-                          <span style={{fontSize:11}}>TVA 5,5%</span>
-                          <span style={{fontSize:11}}>{tva.toFixed(2)} EUR</span>
+                          <span style={{fontSize:11}}>TVA 5,5%</span><span style={{fontSize:11}}>{tva.toFixed(2)} EUR</span>
                         </div>
                         <div style={{display:'flex',justifyContent:'space-between',padding:'10px 8px',background:'#191923',borderRadius:5,marginTop:8}}>
                           <span style={{fontSize:14,fontWeight:900,color:'#FFEB5A'}}>TOTAL TTC</span>
                           <span style={{fontSize:18,fontWeight:900,color:'#FFEB5A'}}>{totalTTC.toFixed(2)} EUR</span>
                         </div>
-                        <div style={{marginTop:8,fontSize:10,opacity:.4,textAlign:'center'}}>{(totalTTC/devisNbPersonnes).toFixed(2)} EUR TTC / personne</div>
+                        <div style={{fontSize:10,opacity:.4,textAlign:'center',marginTop:4}}>{(totalTTC/devisNbPersonnes).toFixed(2)} EUR TTC / personne</div>
                         <button className="btn btn-n" style={{width:'100%',justifyContent:'center',marginTop:12,fontSize:11}} onClick={function() {
                           if (!devisClient.nom) { toast('Nom du client requis !'); return }
                           if (devisItems.length === 0) { toast('Selectionnez au moins un sandwich !'); return }
-                          setDevisGenerating(true)
-                          var payload = {
-                            numero: devisNumero,
-                            date: new Date().toLocaleDateString('fr-FR'),
-                            client_nom: devisClient.nom,
-                            client_contact: devisClient.contact,
-                            client_email: devisClient.email,
-                            event_date: devisClient.date,
-                            event_lieu: devisClient.lieu,
-                            nb_personnes: devisNbPersonnes,
-                            format: devisFormat === 'normal' ? '1 sandwich/personne' : '3 minis/personne',
-                            items: devisItems.map(function(x){return {nom:x.nom,qte:x.qte,pu_ht:x.prix,total_ht:x.total_ht}}),
-                            mise_en_place: mepApresRemise,
-                            remise_pct: devisRemiseTotal,
-                            remise_montant: remiseMontant,
-                            total_ht: totalHT,
-                            tva: tva,
-                            total_ttc: totalTTC,
-                            notes: devisNotes,
-                          }
-                          fetch('/api/devis', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-                            .then(function(r) {
-                              if (!r.ok) throw new Error('Erreur PDF')
-                              return r.blob()
-                            })
-                            .then(function(blob) {
-                              var url = URL.createObjectURL(blob)
-                              var a = document.createElement('a')
-                              a.href = url
-                              a.download = 'devis-meshuga-'+devisNumero+'.pdf'
-                              a.click()
-                              URL.revokeObjectURL(url)
-                              toast('PDF telecharge !')
-                              setDevisGenerating(false)
-                            })
-                            .catch(function(err) {
-                              toast('Erreur : ' + err.message)
-                              setDevisGenerating(false)
-                            })
+                          printDevis()
                         }}>
-                          {devisGenerating ? '⏳ Generation...' : '📥 Telecharger le devis PDF'}
+                          📥 Imprimer / Telecharger PDF
                         </button>
+                        <div style={{fontSize:9,opacity:.4,textAlign:'center',marginTop:4}}>Dans la fenetre d'impression, choisir "Enregistrer en PDF"</div>
                       </div>
                     )
                   })()}
