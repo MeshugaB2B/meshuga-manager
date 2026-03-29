@@ -440,7 +440,77 @@ export default function DashboardPage() {
                   <div className="ki">📋</div>
                 </div>
               </div>
-              <div className="g2">
+              
+              {/* ZELTY */}
+              <div className="card" style={{padding:0,overflow:'hidden',marginBottom:10}}>
+                <div style={{padding:'14px 16px',borderBottom:'1px solid #EBEBEB',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+                  <div className="yt" style={{fontSize:20,color:'#191923'}}>Zelty — Caisse</div>
+                  <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                    {['day','week','month','year'].map(function(p) {
+                      var labels = {day:'Auj.', week:'Sem.', month:'Mois', year:'Année'}
+                      return (
+                        <div key={p} onClick={function() { setZeltyPeriod(p) }} style={{padding:'4px 10px',borderRadius:4,border:'2px solid #191923',background:zeltyPeriod===p?'#FFEB5A':'#FFFFFF',color:'#191923',fontSize:10,fontWeight:900,cursor:'pointer',textTransform:'uppercase'}}>
+                          {labels[p]}
+                        </div>
+                      )
+                    })}
+                    <div onClick={function() { setZeltyLoading(true); fetch('/api/zelty').then(function(r){return r.json()}).then(function(d){setZeltyData(d);setZeltyLoading(false)}).catch(function(){setZeltyLoading(false)}) }} style={{padding:'4px 8px',borderRadius:4,border:'2px solid #191923',background:'#FF82D7',fontSize:12,cursor:'pointer'}}>&#8635;</div>
+                  </div>
+                </div>
+                {zeltyLoading && <div style={{padding:'20px',textAlign:'center',opacity:.3,fontSize:11,fontWeight:900}}>Chargement...</div>}
+                {!zeltyLoading && zeltyData && zeltyData.error && <div style={{padding:'12px 16px',fontSize:11,opacity:.6}}>{zeltyData.error}</div>}
+                {!zeltyLoading && zeltyData && zeltyData.ok && (
+                  <div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',borderBottom:'1px solid #EBEBEB'}}>
+                      {[{icon:'💰',v:zeltyCA,l:'CA'},{icon:'🧾',v:zeltyTickets,l:'Tickets'},{icon:'🛒',v:zeltyAvg,l:'Panier moyen'},{icon:'📈',v:zeltyEvol,l:'vs préc.',color:zeltyEvolColor}].map(function(k,i) {
+                        return (
+                          <div key={i} style={{padding:'12px 14px',borderRight:i<3?'1px solid #EBEBEB':'none'}}>
+                            <div style={{fontSize:16,marginBottom:3}}>{k.icon}</div>
+                            <div style={{fontWeight:900,fontSize:20,lineHeight:1,color:k.color||'#191923'}}>{k.v}</div>
+                            <div style={{fontSize:9,opacity:.4,textTransform:'uppercase',marginTop:3}}>{k.l}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr'}}>
+                      <div style={{padding:'12px 14px',borderRight:'1px solid #EBEBEB'}}>
+                        <div className="yt" style={{fontSize:15,marginBottom:8}}>Top produits</div>
+                        {zeltyData.topProducts && zeltyData.topProducts.length > 0 ? zeltyData.topProducts.slice(0,5).map(function(p,i) {
+                          var mx=zeltyData.topProducts[0].qty||1
+                          return (
+                            <div key={p.name} style={{marginBottom:6}}>
+                              <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                                <span style={{fontSize:10,fontWeight:i===0?900:400}}>{i+1}. {p.name}</span>
+                                <span style={{fontSize:9,fontWeight:900,background:'#FFEB5A',padding:'1px 5px',borderRadius:3,border:'1px solid #191923'}}>{p.qty}x</span>
+                              </div>
+                              <div style={{height:3,background:'#EBEBEB',borderRadius:2}}>
+                                <div style={{height:'100%',background:i===0?'#FF82D7':'#191923',borderRadius:2,width:Math.round(p.qty/mx*100)+'%',opacity:i===0?1:0.2}} />
+                              </div>
+                            </div>
+                          )
+                        }) : <div style={{fontSize:10,opacity:.3}}>Aucune donnée</div>}
+                      </div>
+                      <div style={{padding:'12px 14px'}}>
+                        <div className="yt" style={{fontSize:15,marginBottom:8}}>Heures de pointe</div>
+                        {zeltyData.peakHours && zeltyData.peakHours.filter(function(h){return h.count>0}).length > 0 ? zeltyData.peakHours.filter(function(h){return h.count>0}).slice(0,7).map(function(h,i) {
+                          var mx=zeltyData.peakHours.filter(function(x){return x.count>0})[0].count||1
+                          return (
+                            <div key={h.hour} style={{display:'flex',alignItems:'center',gap:8,marginBottom:5}}>
+                              <span style={{fontSize:9,opacity:.4,width:26,flexShrink:0}}>{h.hour}h</span>
+                              <div style={{flex:1,height:6,background:'#EBEBEB',borderRadius:2}}>
+                                <div style={{height:'100%',background:i===0?'#FF82D7':'#FFEB5A',borderRadius:2,width:Math.round(h.count/mx*100)+'%'}} />
+                              </div>
+                              <span style={{fontSize:9,fontWeight:900,width:16,textAlign:'right'}}>{h.count}</span>
+                            </div>
+                          )
+                        }) : <div style={{fontSize:10,opacity:.3}}>Aucun ticket</div>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {!zeltyLoading && !zeltyData && <div style={{padding:'14px 16px',fontSize:11,opacity:.4}}>Ajoute ZELTY_API_KEY dans Vercel pour activer.</div>}
+              </div>
+<div className="g2">
                 <div className="card">
                   <div className="ct">{isEmy ? 'Mes taches' : 'Taches equipe'}</div>
                   {tasks.filter(function(t) { return t.status !== 'done' }).slice(0,4).map(function(t) {
@@ -467,17 +537,17 @@ export default function DashboardPage() {
                   <button className="btn btn-y btn-sm" style={{marginTop:10}} onClick={function() { nav('crm') }}>Voir le CRM →</button>
                 </div>
               </div>
-              <div style={{borderRadius:7,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',marginBottom:10,overflow:'hidden'}}>
-                <div style={{background:'#FF82D7',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'2px solid #191923',flexWrap:'wrap',gap:8}}>
-                  <div className="yt" style={{fontSize:18,color:'#191923'}}>Planning {isEmy ? 'de ma semaine' : "d'Emy"}</div>
-                  <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                    <button className="btn btn-sm" style={{background:'#FFEB5A',border:'2px solid #191923'}} onClick={function() { setPlanningWeek(function(w) { return w-1 }) }}>&larr;</button>
+              <div className="card" style={{padding:0,overflow:'hidden',marginBottom:10}}>
+                <div style={{padding:'14px 16px',borderBottom:'1px solid #EBEBEB',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+                  <div className="yt" style={{fontSize:20,color:'#191923'}}>Planning {isEmy ? 'de ma semaine' : "d'Emy"}</div>
+                  <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                    <button className="btn btn-sm" style={{background:'#FFEB5A',border:'2px solid #191923'}} onClick={function() { setPlanningWeek(function(w) { return w-1 }) }}>←</button>
                     <span style={{fontSize:11,fontWeight:900,minWidth:100,textAlign:'center'}}>{planningWeek===0 ? 'Cette semaine' : planningWeek < 0 ? 'Sem. -'+Math.abs(planningWeek) : 'Sem. +'+planningWeek}</span>
-                    <button className="btn btn-sm" style={{background:'#FFEB5A',border:'2px solid #191923'}} onClick={function() { setPlanningWeek(function(w) { return w+1 }) }}>&rarr;</button>
+                    <button className="btn btn-sm" style={{background:'#FFEB5A',border:'2px solid #191923'}} onClick={function() { setPlanningWeek(function(w) { return w+1 }) }}>→</button>
                     {planningWeek !== 0 && <button className="btn btn-p btn-sm" onClick={function() { setPlanningWeek(0) }}>Auj.</button>}
                   </div>
                 </div>
-                <div style={{padding:'10px 14px',background:'#FFFFFF'}}>
+                <div style={{padding:'12px 14px'}}>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6}}>
                     {['Lun','Mar','Mer','Jeu','Ven'].map(function(day, di) {
                       var ws = new Date()
@@ -489,68 +559,87 @@ export default function DashboardPage() {
                       var isToday = ds === new Date().toISOString().split('T')[0]
                       var isPast = dd < new Date(new Date().toDateString())
                       var isFriday = di === 4
+                      var isMonday = di === 0
+                      var isWednesday = di === 2
                       var dayTasksEmy = tasks.filter(function(t) { return t.deadline === ds && t.assignee === 'emy' })
                       var dayTasksEdward = tasks.filter(function(t) { return t.deadline === ds && t.assignee === 'edward' })
                       var dayRelances = prospects.filter(function(p) { return p.nextDate === ds && p.status !== 'won' && p.status !== 'lost' })
                       var hasLate = isPast && dayTasksEmy.some(function(t){return t.status!=='done'})
                       var allDone = dayTasksEmy.length > 0 && dayTasksEmy.every(function(t){return t.status==='done'})
-                      var borderColor = isToday ? '#005FFF' : hasLate ? '#CC0066' : allDone ? '#009D3A' : '#DEDEDE'
-                      var bgColor = isToday ? '#EEF4FF' : hasLate ? '#FFF0F5' : allDone ? '#F0FFF4' : '#FAFAFA'
+                      var borderColor = isToday ? '#FF82D7' : hasLate ? '#CC0066' : allDone ? '#009D3A' : '#EBEBEB'
+                      var bgColor = isToday ? '#FFF5FB' : hasLate ? '#FFF0F5' : '#FFFFFF'
+
+                      var autoTodos = []
+                      autoTodos.push({key:'prospects', label:'Appeler 5 nouveaux prospects', done: isToday && contactedToday >= 5, urgent: false})
+                      autoTodos.push({key:'linkedin', label:'Envoyer 3 emails B2B', done: false, urgent: false})
+                      if (dayRelances.length > 0) {
+                        dayRelances.slice(0,2).forEach(function(p) {
+                          autoTodos.push({key:'relance-'+p.id, label:'Relancer : '+p.name, done: false, urgent: true})
+                        })
+                      }
+                      if (isMonday) autoTodos.push({key:'pipeline', label:'Revoir pipeline CRM complet', done: false, urgent: false})
+                      if (isMonday) autoTodos.push({key:'semaine', label:'Planifier objectifs de la semaine', done: false, urgent: false})
+                      if (isWednesday) autoTodos.push({key:'devis', label:'Suivre devis en attente de reponse', done: false, urgent: false})
+                      if (isWednesday) autoTodos.push({key:'gmb', label:'Verifier avis Google My Business', done: false, urgent: false})
+                      if (isFriday) autoTodos.push({key:'cr', label:'Remplir CR hebdomadaire', done: reports.length > 0 && reports[0].date === new Date().toLocaleDateString('fr-FR'), urgent: false})
+                      if (isFriday) autoTodos.push({key:'recap', label:'Bilan semaine + proposer 1 nouveaute', done: false, urgent: false})
+
                       return (
-                        <div key={day} style={{borderRadius:5,border:'2px solid '+borderColor,background:bgColor,padding:'7px',minHeight:130}}>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5,paddingBottom:4,borderBottom:'1.5px solid '+borderColor}}>
-                            <div className="yt" style={{fontSize:13,color:borderColor}}>{day}</div>
+                        <div key={day} style={{borderRadius:6,border:'2px solid '+borderColor,background:bgColor,padding:'8px',minHeight:170}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,paddingBottom:4,borderBottom:'1.5px solid '+borderColor}}>
+                            <div className="yt" style={{fontSize:14,color:isToday?'#FF82D7':hasLate?'#CC0066':allDone?'#009D3A':'#191923'}}>{day}</div>
                             <div style={{fontSize:9,fontWeight:900,opacity:.4}}>{dd.getDate()}/{dd.getMonth()+1}</div>
                           </div>
-                          <div style={{marginBottom:3}}>
-                            <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
-                              <input type="checkbox" checked={isToday ? contactedToday >= 5 : false} readOnly style={{width:11,height:11,accentColor:'#009D3A'}} />
-                              <span style={{fontSize:9,color:'#005FFF',fontWeight:900,textDecoration:isToday&&contactedToday>=5?'line-through':'none',opacity:isToday&&contactedToday>=5?.5:1}}>5 prospects</span>
-                            </div>
-                            {dayRelances.length > 0 && (
-                              <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
-                                <input type="checkbox" readOnly style={{width:11,height:11,accentColor:'#CC0066'}} />
-                                <span style={{fontSize:9,color:'#CC0066',fontWeight:900}}>{dayRelances.length} relance{dayRelances.length>1?'s':''}</span>
-                              </div>
-                            )}
-                            {isFriday && (
-                              <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
-                                <input type="checkbox" checked={reports.length > 0} readOnly style={{width:11,height:11,accentColor:'#009D3A'}} />
-                                <span style={{fontSize:9,fontWeight:900,textDecoration:reports.length>0?'line-through':'none',opacity:reports.length>0?.5:1}}>CR hebdo</span>
-                              </div>
-                            )}
-                          </div>
-                          {dayTasksEmy.map(function(t) {
+
+                          {autoTodos.map(function(todo) {
                             return (
-                              <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:4,cursor:'pointer'}} onClick={function() {
-                                setTasks(function(prev) { return prev.map(function(x) { return x.id !== t.id ? x : Object.assign({}, x, {status: t.status === 'done' ? 'todo' : 'done'}) }) })
-                              }}>
-                                <input type="checkbox" checked={t.status === 'done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#FF82D7'}} />
-                                <span style={{fontSize:9,fontWeight:t.priority==='high'?900:400,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.3}}>{t.title}</span>
+                              <div key={todo.key} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:4}}>
+                                <input type="checkbox" checked={!!todo.done} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:todo.urgent?'#CC0066':'#FF82D7'}} />
+                                <span style={{fontSize:8.5,fontWeight:todo.urgent?900:400,color:todo.urgent?'#CC0066':'#555',textDecoration:todo.done?'line-through':'none',opacity:todo.done?.35:1,lineHeight:1.3}}>{todo.label}</span>
                               </div>
                             )
                           })}
-                          {dayTasksEdward.length > 0 && (
-                            <div style={{borderTop:'1px dashed #DEDEDE',marginTop:4,paddingTop:4}}>
-                              {dayTasksEdward.map(function(t) {
+
+                          {dayTasksEmy.length > 0 && (
+                            <div style={{borderTop:'1px dashed #EBEBEB',marginTop:5,paddingTop:5}}>
+                              {dayTasksEmy.map(function(t) {
                                 return (
-                                  <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:3}}>
-                                    <input type="checkbox" checked={t.status === 'done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#FFEB5A'}} />
-                                    <span style={{fontSize:9,textDecoration:t.status==='done'?'line-through':'none',opacity:.5,lineHeight:1.3}}>&#128081; {t.title}</span>
+                                  <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:4,cursor:'pointer'}} onClick={function() {
+                                    setTasks(function(prev) { return prev.map(function(x) { return x.id !== t.id ? x : Object.assign({}, x, {status: t.status === 'done' ? 'todo' : 'done'}) }) })
+                                  }}>
+                                    <input type="checkbox" checked={t.status === 'done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#191923'}} />
+                                    <span style={{fontSize:8.5,fontWeight:t.priority==='high'?900:400,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.35:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.3}}>{t.title}</span>
                                   </div>
                                 )
                               })}
                             </div>
                           )}
-                          {dayTasksEmy.length === 0 && dayTasksEdward.length === 0 && !isFriday && dayRelances.length === 0 && (
-                            <div style={{fontSize:9,opacity:.2,textAlign:'center',marginTop:8}}>&mdash;</div>
+
+                          {dayTasksEdward.length > 0 && (
+                            <div style={{borderTop:'1px dashed #EBEBEB',marginTop:4,paddingTop:4}}>
+                              {dayTasksEdward.map(function(t) {
+                                return (
+                                  <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:3}}>
+                                    <input type="checkbox" checked={t.status==='done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#FFEB5A'}} />
+                                    <span style={{fontSize:8.5,opacity:.5,lineHeight:1.3,textDecoration:t.status==='done'?'line-through':'none'}}>&#128081; {t.title}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           )}
                         </div>
                       )
                     })}
                   </div>
+                  <div style={{display:'flex',gap:14,marginTop:8,fontSize:8.5,flexWrap:'wrap',opacity:.4}}>
+                    <span style={{color:'#FF82D7',fontWeight:900}}>&#9679; Aujourd&#39;hui</span>
+                    <span style={{color:'#CC0066',fontWeight:900}}>&#9679; En retard</span>
+                    <span style={{color:'#009D3A',fontWeight:900}}>&#9679; Tout fait</span>
+                    <span>&#9745; Cliquer pour cocher</span>
+                  </div>
                 </div>
               </div>
+
 
 {!isEmy && reports.length > 0 && (
                 <div className="card">
@@ -1154,230 +1243,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {page === 'devis' && (
-            <div>
-              <div className="ph">
-                <div><div className="pt">Devis</div><div className="ps">{devisView==='list' ? devisList.length+' devis' : 'Editeur'}</div></div>
-                <div style={{display:'flex',gap:6}}>
-                  {devisView==='edit' && <button className="btn btn-sm" onClick={function(){setDevisView('list')}}>← Liste</button>}
-                  <button className="btn btn-y btn-sm" onClick={function(){
-                    setDevisView('edit'); setDevisItems([]); setCurrentDevisId(null)
-                    setDevisClient({nom:'',contact:'',email:'',phone:'',date:'',lieu:'',prospectId:null})
-                    setDevisNbPersonnes(50); setDevisFormat('normal'); setDevisMiseEnPlace(1500)
-                    setDevisMiseEnPlacePct(0); setDevisRemiseTotal(0); setDevisNotes('')
-                    setDevisLivraison(0); setDevisLivraisonOffert(false); setDevisMepOffert(false)
-                    setDevisNumero('DEV-'+new Date().getFullYear()+'-'+String(devisList.length+1).padStart(3,'0'))
-                  }}>+ Nouveau devis</button>
-                </div>
-              </div>
-
-              {devisView === 'list' && (
-                <div>
-                  {devisList.length === 0 ? (
-                    <div className="card" style={{textAlign:'center',padding:40,opacity:.4}}>
-                      <div style={{fontSize:36,marginBottom:8}}>📄</div>
-                      <div style={{fontWeight:900,textTransform:'uppercase'}}>Aucun devis — cliquez + Nouveau devis</div>
-                    </div>
-                  ) : devisList.map(function(dv) {
-                    var sc={brouillon:'#888',envoye:'#005FFF',accepte:'#009D3A',refuse:'#CC0066',a_modifier:'#FF6B2B',facture:'#191923',paye:'#009D3A'}
-                    var sl={brouillon:'Brouillon',envoye:'Envoyé',accepte:'Accepté',refuse:'Refusé',a_modifier:'A modifier',facture:'Facturé',paye:'Payé'}
-                    return (
-                      <div key={dv.id} className="card" style={{marginBottom:8}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap',marginBottom:8}}>
-                          <div style={{flex:1}}>
-                            <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:3,flexWrap:'wrap'}}>
-                              <span style={{fontWeight:900,fontSize:14}}>{dv.numero}</span>
-                              <span className="badge" style={{color:sc[dv.statut]||'#888',borderColor:sc[dv.statut]||'#888'}}>{sl[dv.statut]||dv.statut}</span>
-                              {dv.facture_numero && <span className="badge" style={{color:'#191923',borderColor:'#191923'}}>{dv.facture_numero}</span>}
-                            </div>
-                            <div style={{fontWeight:900,fontSize:13}}>{dv.client_nom}</div>
-                            <div style={{fontSize:11,opacity:.4}}>{dv.event_date?new Date(dv.event_date).toLocaleDateString('fr-FR'):''} {dv.event_lieu?'· '+dv.event_lieu:''} · {dv.nb_personnes} pers.</div>
-                          </div>
-                          <div style={{textAlign:'right'}}>
-                            <div style={{fontWeight:900,fontSize:18}}>{parseFloat(dv.total_ttc||0).toFixed(2)} €</div>
-                            <div style={{fontSize:9,opacity:.4}}>TTC</div>
-                          </div>
-                        </div>
-                        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                          <button className="btn btn-sm" onClick={function(){
-                            setDevisView('edit'); setCurrentDevisId(dv.id); setDevisNumero(dv.numero)
-                            setDevisClient({nom:dv.client_nom,contact:dv.client_contact||'',email:dv.client_email||'',phone:dv.client_phone||'',date:dv.event_date||'',lieu:dv.event_lieu||'',prospectId:dv.prospect_id})
-                            setDevisNbPersonnes(dv.nb_personnes||50); setDevisFormat(dv.format||'normal')
-                            setDevisItems(dv.items||[]); setDevisMiseEnPlace(parseFloat(dv.mise_en_place||0))
-                            setDevisMiseEnPlacePct(parseFloat(dv.remise_mep_pct||0)); setDevisRemiseTotal(parseFloat(dv.remise_total_pct||0))
-                            setDevisNotes(dv.notes||''); setDevisLivraison(parseFloat(dv.livraison||0))
-                            setDevisLivraisonOffert(!!dv.livraison_offert); setDevisMepOffert(!!dv.mise_en_place_offert)
-                          }}>✏️ Modifier</button>
-                          {dv.statut==='brouillon'&&<button className="btn btn-p btn-sm" onClick={function(){updateDevisStatut(dv.id,'envoye','')}}>📤 Envoyé</button>}
-                          {dv.statut==='envoye'&&<span style={{display:'flex',gap:4}}>
-                            <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){updateDevisStatut(dv.id,'accepte','')}}>✓ Accepté</button>
-                            <button className="btn btn-sm btn-red" onClick={function(){updateDevisStatut(dv.id,'refuse','')}}>✕ Refusé</button>
-                            <button className="btn btn-sm" style={{background:'#FF6B2B',color:'#fff'}} onClick={function(){updateDevisStatut(dv.id,'a_modifier','')}}>✎ Modif.</button>
-                          </span>}
-                          {dv.statut==='accepte'&&!dv.facture_numero&&<button className="btn btn-n btn-sm" onClick={function(){
-                            var fn='FACT-'+new Date().getFullYear()+'-'+String(devisList.filter(function(x){return x.facture_numero}).length+1).padStart(3,'0')
-                            sb().from('devis').update({statut:'facture',facture_numero:fn,facture_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('Facture '+fn+' !')})
-                          }}>🧾 Facture</button>}
-                          {dv.statut==='facture'&&dv.paiement_statut!=='paye'&&<button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){
-                            sb().from('devis').update({paiement_statut:'paye',statut:'paye',solde_recu:true,solde_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('Payé !')})
-                          }}>💰 Payé</button>}
-                          <button className="btn btn-sm" onClick={function(){generateAndPrintDoc(dv,false)}}>📄 PDF</button>
-                          {dv.facture_numero&&<button className="btn btn-n btn-sm" onClick={function(){generateAndPrintDoc(dv,true)}}>🧾 Facture PDF</button>}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {devisView === 'edit' && (
-                <div className="g2">
-                  <div>
-                    <div className="card" style={{marginBottom:10}}>
-                      <div className="ct">Client</div>
-                      <div className="fg"><label className="lbl">Prospect existant</label>
-                        <select className="inp" value={devisClient.prospectId||''} onChange={function(e){
-                          var pid=e.target.value; if(!pid){setDevisClient(Object.assign({},devisClient,{prospectId:null}));return}
-                          var p=prospects.filter(function(x){return String(x.id)===pid})[0]
-                          if(p) setDevisClient(Object.assign({},devisClient,{nom:p.name,email:p.email||'',phone:p.phone||'',prospectId:p.id}))
-                        }}>
-                          <option value="">-- Nouveau client --</option>
-                          {prospects.map(function(p){return <option key={p.id} value={p.id}>{p.name}</option>})}
-                        </select>
-                      </div>
-                      <div className="fg"><label className="lbl">Entreprise *</label><input className="inp" value={devisClient.nom} onChange={function(e){setDevisClient(Object.assign({},devisClient,{nom:e.target.value}))}} /></div>
-                      <div className="fg2">
-                        <div className="fg"><label className="lbl">Contact</label><input className="inp" value={devisClient.contact} onChange={function(e){setDevisClient(Object.assign({},devisClient,{contact:e.target.value}))}} /></div>
-                        <div className="fg"><label className="lbl">Email</label><input className="inp" value={devisClient.email} onChange={function(e){setDevisClient(Object.assign({},devisClient,{email:e.target.value}))}} /></div>
-                      </div>
-                      <div className="fg2">
-                        <div className="fg"><label className="lbl">Date événement</label><input type="date" className="inp" value={devisClient.date} onChange={function(e){setDevisClient(Object.assign({},devisClient,{date:e.target.value}))}} /></div>
-                        <div className="fg"><label className="lbl">Lieu</label><input className="inp" value={devisClient.lieu} onChange={function(e){setDevisClient(Object.assign({},devisClient,{lieu:e.target.value}))}} /></div>
-                      </div>
-                      {!devisClient.prospectId&&devisClient.nom&&<button className="btn btn-y btn-sm" style={{marginTop:4}} onClick={function(){
-                        var np={id:Date.now(),name:devisClient.nom,email:devisClient.email,phone:'',size:'',category:'Evénementiel',status:'contacted',nextAction:'Devis envoyé',nextDate:'',notes:'',ca:0,score:7,files:[]}
-                        setProspects(function(prev){return prev.concat([np])}); setDevisClient(Object.assign({},devisClient,{prospectId:np.id})); toast('Prospect ajouté !')
-                      }}>+ Ajouter au CRM</button>}
-                      <div className="fg" style={{marginTop:8}}><label className="lbl">N° Devis</label><input className="inp" value={devisNumero} onChange={function(e){setDevisNumero(e.target.value)}} /></div>
-                    </div>
-
-                    <div className="card" style={{marginBottom:10}}>
-                      <div className="ct">Format</div>
-                      <div className="fg"><label className="lbl">Personnes</label><input type="number" className="inp" value={devisNbPersonnes} min="1" onChange={function(e){setDevisNbPersonnes(parseInt(e.target.value)||1)}} /></div>
-                      <div className="fg"><label className="lbl">Format</label>
-                        <div style={{display:'flex',gap:8}}>
-                          <div onClick={function(){setDevisFormat('normal')}} style={{flex:1,padding:'8px',border:'2px solid '+(devisFormat==='normal'?'#191923':'#EBEBEB'),borderRadius:5,cursor:'pointer',background:devisFormat==='normal'?'#FFEB5A':'#FAFAFA',textAlign:'center'}}>
-                            <div style={{fontWeight:900,fontSize:12}}>Normal</div><div style={{fontSize:10,opacity:.5}}>~1/pers.</div>
-                          </div>
-                          <div onClick={function(){setDevisFormat('mini')}} style={{flex:1,padding:'8px',border:'2px solid '+(devisFormat==='mini'?'#191923':'#EBEBEB'),borderRadius:5,cursor:'pointer',background:devisFormat==='mini'?'#FFEB5A':'#FAFAFA',textAlign:'center'}}>
-                            <div style={{fontWeight:900,fontSize:12}}>Mini</div><div style={{fontSize:10,opacity:.5}}>~3/pers.</div>
-                          </div>
-                        </div>
-                      </div>
-                      <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:4,padding:'5px 8px',fontSize:10}}>Conseillé : {devisFormat==='normal'?devisNbPersonnes:devisNbPersonnes*3} pièces</div>
-                    </div>
-
-                    <div className="card" style={{marginBottom:10}}>
-                      <div className="ct">Frais & Remises</div>
-                      <div style={{padding:'10px',border:'1.5px solid #EBEBEB',borderRadius:5,marginBottom:8}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                          <div style={{fontWeight:900,fontSize:12}}>Mise en place</div>
-                          <label style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer'}}>
-                            <input type="checkbox" checked={devisMepOffert} style={{width:14,height:14,accentColor:'#009D3A'}} onChange={function(e){setDevisMepOffert(e.target.checked)}} />
-                            <span style={{fontSize:11,fontWeight:900,color:devisMepOffert?'#009D3A':'#888'}}>Offert</span>
-                          </label>
-                        </div>
-                        <div style={{display:'flex',gap:6}}>
-                          <input type="number" className="inp" style={{flex:1}} value={devisMiseEnPlace} onChange={function(e){setDevisMiseEnPlace(parseFloat(e.target.value)||0)}} disabled={devisMepOffert} />
-                          <input type="number" className="inp" style={{width:60}} placeholder="%" value={devisMiseEnPlaceRemise} min="0" max="100" onChange={function(e){setDevisMiseEnPlacePct(parseFloat(e.target.value)||0)}} disabled={devisMepOffert} />
-                        </div>
-                      </div>
-                      <div style={{padding:'10px',border:'1.5px solid #EBEBEB',borderRadius:5,marginBottom:8}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                          <div style={{fontWeight:900,fontSize:12}}>Livraison</div>
-                          <label style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer'}}>
-                            <input type="checkbox" checked={devisLivraisonOffert} style={{width:14,height:14,accentColor:'#009D3A'}} onChange={function(e){setDevisLivraisonOffert(e.target.checked)}} />
-                            <span style={{fontSize:11,fontWeight:900,color:devisLivraisonOffert?'#009D3A':'#888'}}>Offert</span>
-                          </label>
-                        </div>
-                        <input type="number" className="inp" value={devisLivraison} onChange={function(e){setDevisLivraison(parseFloat(e.target.value)||0)}} disabled={devisLivraisonOffert} />
-                      </div>
-                      <div className="fg"><label className="lbl">Remise totale (%)</label><input type="number" className="inp" value={devisRemiseTotal} min="0" max="100" onChange={function(e){setDevisRemiseTotal(parseFloat(e.target.value)||0)}} /></div>
-                    </div>
-                    <div className="card"><div className="ct">Notes</div><textarea className="inp" value={devisNotes} onChange={function(e){setDevisNotes(e.target.value)}} style={{minHeight:60}} /></div>
-                  </div>
-
-                  <div>
-                    <div className="card" style={{marginBottom:10}}>
-                      <div className="ct">Sandwichs</div>
-                      <div style={{fontSize:10,opacity:.4,marginBottom:8,padding:'4px 8px',background:'#F8F8F8',borderRadius:4}}>Conseillé : {devisFormat==='normal'?devisNbPersonnes:devisNbPersonnes*3} pièces</div>
-                      {(devisFormat==='normal' ? [{id:"hot_dog",nom:"Hot Dog",prix:7.56},{id:"grilled_cheese",nom:"Grilled Cheese",prix:7.56},{id:"egg_salad",nom:"Egg Salad",prix:8.51},{id:"chicken_caesar",nom:"Chicken Caesar",prix:11.34},{id:"tuna_melt",nom:"Tuna Melt",prix:11.34},{id:"pastrami",nom:"Pastrami",prix:14.18},{id:"smoked_salmon",nom:"Smoked Salmon",prix:13.23},{id:"lobster_roll",nom:"Lobster Roll",prix:20.79},{id:"pbn",nom:"PBN",prix:5.67}] : [{id:"hot_dog_m",nom:"Hot Dog Mini",prix:2.7},{id:"grilled_cheese_m",nom:"Grilled Cheese Mini",prix:2.87},{id:"egg_salad_m",nom:"Egg Salad Mini",prix:2.65},{id:"chicken_caesar_m",nom:"Chicken Caesar Mini",prix:3.35},{id:"tuna_melt_m",nom:"Tuna Melt Mini",prix:3.0},{id:"pastrami_m",nom:"Pastrami Mini",prix:3.8},{id:"smoked_salmon_m",nom:"Smoked Salmon Mini",prix:3.9},{id:"lobster_roll_m",nom:"Lobster Roll Mini",prix:7.5},{id:"pbn_m",nom:"PBN Mini",prix:2.7},{id:"mini_veggie",nom:"Salade Mini Veggie",prix:4.72}]).map(function(s) {
-                        var ex=devisItems.filter(function(x){return x.id===s.id})[0]; var qty=ex?ex.qte:0
-                        function setQty(nq){
-                          if(nq<=0) setDevisItems(devisItems.filter(function(x){return x.id!==s.id}))
-                          else if(qty===0) setDevisItems(devisItems.concat([{id:s.id,nom:s.nom,prix:s.prix,qte:nq,total_ht:nq*s.prix}]))
-                          else setDevisItems(devisItems.map(function(x){return x.id===s.id?Object.assign({},x,{qte:nq,total_ht:nq*s.prix}):x}))
-                        }
-                        return (
-                          <div key={s.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',borderBottom:'1px solid #EBEBEB'}}>
-                            <div style={{flex:1}}><div style={{fontSize:12,fontWeight:qty>0?900:400}}>{s.nom}</div><div style={{fontSize:9,opacity:.4}}>{s.prix.toFixed(2)} € HT</div></div>
-                            <div style={{display:'flex',alignItems:'center',gap:5}}>
-                              <button className="btn btn-sm" onClick={function(){setQty(qty-1)}}>-</button>
-                              <input type="number" min="0" style={{width:46,textAlign:'center',border:'2px solid #191923',borderRadius:4,padding:'3px',fontSize:12,fontWeight:900}} value={qty} onChange={function(e){setQty(parseInt(e.target.value)||0)}} />
-                              <button className="btn btn-y btn-sm" onClick={function(){setQty(qty+1)}}>+</button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                      <div style={{marginTop:8,padding:'6px 10px',background:'#FFEB5A',borderRadius:4,border:'1.5px solid #191923',display:'flex',justifyContent:'space-between'}}>
-                        <span style={{fontSize:11,fontWeight:900}}>Total</span>
-                        <span style={{fontSize:13,fontWeight:900}}>{devisItems.reduce(function(s,x){return s+x.qte},0)} pièces</span>
-                      </div>
-                    </div>
-
-                    {(function() {
-                      var sandTotal=devisItems.reduce(function(s,x){return s+x.total_ht},0)
-                      var mepHT=devisMepOffert?devisMiseEnPlace:devisMiseEnPlace*(1-devisMiseEnPlaceRemise/100)
-                      var livHT=devisLivraisonOffert?devisLivraison:devisLivraison
-                      var sous=sandTotal+mepHT+livHT
-                      var rm=sous*devisRemiseTotal/100
-                      var ht=sous-rm; var tva=ht*0.055; var ttc=ht+tva
-                      return (
-                        <div className="card" style={{border:'3px solid #191923',boxShadow:'4px 4px 0 #191923'}}>
-                          <div className="ct">Récapitulatif</div>
-                          {devisItems.map(function(item){return <div key={item.id} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontSize:11,borderBottom:'1px solid #EBEBEB'}}><span>{item.nom} x{item.qte}</span><span style={{fontWeight:900}}>{item.total_ht.toFixed(2)}€</span></div>})}
-                          {devisMiseEnPlace>0&&<div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontSize:11,borderBottom:'1px solid #EBEBEB'}}><span style={{textDecoration:devisMepOffert?'line-through':'none',opacity:devisMepOffert?.5:1}}>Mise en place{devisMepOffert?<span style={{color:'#009D3A',marginLeft:4}}>OFFERT</span>:null}</span><span>{devisMiseEnPlace.toFixed(2)}€</span></div>}
-                          {devisLivraison>0&&<div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontSize:11,borderBottom:'1px solid #EBEBEB'}}><span style={{textDecoration:devisLivraisonOffert?'line-through':'none',opacity:devisLivraisonOffert?.5:1}}>Livraison{devisLivraisonOffert?<span style={{color:'#009D3A',marginLeft:4}}>OFFERT</span>:null}</span><span>{devisLivraison.toFixed(2)}€</span></div>}
-                          {rm>0&&<div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontSize:11,color:'#CC0066'}}><span>Remise ({devisRemiseTotal}%)</span><span>-{rm.toFixed(2)}€</span></div>}
-                          <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderTop:'2px solid #191923',marginTop:6,fontSize:12}}><span>Total HT</span><span style={{fontWeight:900}}>{ht.toFixed(2)}€</span></div>
-                          <div style={{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:11,opacity:.5}}><span>TVA 5,5%</span><span>{tva.toFixed(2)}€</span></div>
-                          <div style={{display:'flex',justifyContent:'space-between',padding:'10px 8px',background:'#FFEB5A',borderRadius:5,marginTop:8,border:'2px solid #191923'}}>
-                            <span className="yt" style={{fontSize:20}}>Total TTC</span>
-                            <span style={{fontWeight:900,fontSize:18}}>{ttc.toFixed(2)}€</span>
-                          </div>
-                          <div style={{fontSize:10,opacity:.35,textAlign:'center',marginTop:4}}>{(ttc/devisNbPersonnes).toFixed(2)}€ TTC/pers.</div>
-                          <div style={{display:'flex',gap:6,marginTop:12}}>
-                            <button className="btn btn-y" style={{flex:1,justifyContent:'center',fontSize:11}} onClick={function(){
-                              if(!devisClient.nom){toast('Nom requis !');return}
-                              if(devisItems.length===0){toast('Sélectionnez un sandwich !');return}
-                              var payload={numero:devisNumero,statut:'brouillon',prospect_id:devisClient.prospectId?String(devisClient.prospectId):null,client_nom:devisClient.nom,client_contact:devisClient.contact,client_email:devisClient.email,client_phone:devisClient.phone||'',event_date:devisClient.date||null,event_lieu:devisClient.lieu,nb_personnes:devisNbPersonnes,format:devisFormat,items:devisItems,mise_en_place:devisMiseEnPlace,mise_en_place_offert:devisMepOffert,livraison:devisLivraison,livraison_offert:devisLivraisonOffert,remise_mep_pct:devisMiseEnPlaceRemise,remise_total_pct:devisRemiseTotal,remise_montant:rm,total_ht:ht,tva:tva,total_ttc:ttc,notes:devisNotes,date_validite:new Date(Date.now()+30*24*60*60*1000).toISOString().split('T')[0]}
-                              if(currentDevisId) payload.id=currentDevisId
-                              saveDevisToSupabase(payload,function(saved){toast('Sauvegardé !');setCurrentDevisId(saved.id)})
-                            }}>💾 Sauvegarder</button>
-                            <button className="btn btn-p" style={{flex:1,justifyContent:'center',fontSize:11}} onClick={function(){
-                              if(!devisClient.nom){toast('Nom requis !');return}
-                              generateAndPrintDoc({items:devisItems,mep:devisMiseEnPlace,mep_offert:devisMepOffert,mep_remise:devisMiseEnPlaceRemise,liv:devisLivraison,liv_offert:devisLivraisonOffert,remise_pct:devisRemiseTotal,remise_montant:rm,total_ht:ht,tva:tva,total_ttc:ttc,client_nom:devisClient.nom,client_contact:devisClient.contact,client_email:devisClient.email,event_date:devisClient.date,event_lieu:devisClient.lieu,nb_personnes:devisNbPersonnes,format:devisFormat,numero:devisNumero,notes:devisNotes},false)
-                            }}>📄 PDF Devis</button>
-                          </div>
-                        </div>
-                      )
-                    })()}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
           {page === 'journal' && !isEmy && (
             <div>
               <div className="ph">
@@ -1610,5 +1475,6 @@ export default function DashboardPage() {
 
       <div className={toastMsg ? 'toast show' : 'toast'}>{toastMsg}</div>
     </div>
+
   )
 }
