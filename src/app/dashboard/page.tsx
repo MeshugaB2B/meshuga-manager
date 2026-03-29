@@ -251,7 +251,7 @@ export default function DashboardPage() {
     var remiseRow = remiseMontant > 0 ? '<tr style="color:#CC0066"><td>Remise commerciale ('+remisePct+'%)</td><td></td><td></td><td style="text-align:right">-'+remiseMontant.toFixed(2)+' EUR</td></tr>' : ''
 
     var condPaiement = isFacture ? 'Virement bancaire sous 30 jours' : '30% a la commande — Solde 72h avant evenement'
-    var validite = isFacture ? '' : '<p style="font-size:11px;color:#666"><strong>Validite :</strong> 30 jours a compter de la date d'emission</p>'
+    var validite = isFacture ? '' : '<p style="font-size:11px;color:#666"><strong>Validite :</strong> 30 jours a compter de la date d\'emission</p>'
 
     var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titre+' '+numero+'</title><style>'+
       'body{font-family:Arial,sans-serif;margin:0;padding:0;color:#191923;font-size:12px}'+
@@ -318,7 +318,7 @@ export default function DashboardPage() {
       (dv.notes ? '<div style="background:#F8F8F8;border-left:4px solid #FF82D7;padding:10px 14px;margin:12px 0;font-size:11px"><strong>Notes :</strong> '+dv.notes+'</div>' : '')+
       '<div class="legal">'+
       'SAS AEGIA FOOD — Capital social : 1 000 EUR — RCS Paris — SIRET 904 639 531 00014 — Code APE : 56.10C — TVA intracommunautaire : FR31904639531<br/>'+
-      (isFacture ? 'Conformement a la loi, tout retard de paiement entraine l'exigibilite de penalites d'un taux egal a 3 fois le taux d'interet legal, ainsi qu'une indemnite forfaitaire de 40 EUR pour frais de recouvrement.' : 'Devis valable 30 jours. Tout commencement d'execution vaut acceptation. TVA sur les produits alimentaires a taux reduit de 5,5%. Prix HT en euros.')+
+      (isFacture ? 'Conformement a la loi, tout retard de paiement entraine l'exigibilite de penalites d\'un taux egal a 3 fois le taux d\'interet legal, ainsi qu'une indemnite forfaitaire de 40 EUR pour frais de recouvrement.' : 'Devis valable 30 jours. Tout commencement d\'execution vaut acceptation. TVA sur les produits alimentaires a taux reduit de 5,5%. Prix HT en euros.')+
       '</div>'+
       '</div>'+
       '<div class="footer">SAS AEGIA FOOD — Meshuga Crazy Deli &nbsp;|&nbsp; 3 rue Vavin, 75006 Paris &nbsp;|&nbsp; edward@meshuga.fr</div>'+
