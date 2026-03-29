@@ -463,40 +463,7 @@ export default function DashboardPage() {
                   <button className="btn btn-y btn-sm" style={{marginTop:10}} onClick={function() { nav('crm') }}>Voir le CRM →</button>
                 </div>
               </div>
-              <div className="card" style={{padding:0,overflow:'hidden'}}>
-                <div style={{background:'#191923',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <div className="yt" style={{color:'#FFEB5A',fontSize:16}}>📅 Planning {isEmy ? 'de ma semaine' : "d'Emy"}</div>
-                  <div style={{display:'flex',gap:6}}>
-                    <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={function() { setPlanningWeek(function(w) { return w-1 }) }}>←</button>
-                    <span style={{color:'#FFEB5A',fontSize:11,fontWeight:900,minWidth:100,textAlign:'center'}}>{planningWeek===0 ? 'Cette semaine' : planningWeek < 0 ? 'Sem. -'+Math.abs(planningWeek) : 'Sem. +'+planningWeek}</span>
-                    <button className="btn btn-sm" style={{background:'rgba(255,255,255,.1)',border:'1.5px solid rgba(255,255,255,.2)',color:'#fff'}} onClick={function() { setPlanningWeek(function(w) { return w+1 }) }}>→</button>
-                    {planningWeek !== 0 && <button className="btn btn-y btn-sm" onClick={function() { setPlanningWeek(0) }}>Auj.</button>}
-                  </div>
-                </div>
-                <div style={{padding:'10px 14px',display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:5}}>
-                  {['Lun','Mar','Mer','Jeu','Ven'].map(function(day, di) {
-                    const ws = new Date()
-                    const dow = ws.getDay() === 0 ? 6 : ws.getDay()-1
-                    ws.setDate(ws.getDate()-dow+(planningWeek*7))
-                    const dd = new Date(ws)
-                    dd.setDate(ws.getDate()+di)
-                    const ds = dd.toISOString().split('T')[0]
-                    const isToday = ds === new Date().toISOString().split('T')[0]
-                    const dt = tasks.filter(function(t) { return t.deadline === ds && t.assignee === 'emy' })
-                    return (
-                      <div key={day} style={{borderRadius:5,border:'2px solid '+(isToday?'#005FFF':'#EBEBEB'),background:isToday?'#E3F0FF':'#FAFAFA',padding:'6px',minHeight:60}}>
-                        <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
-                          <div className="yt" style={{fontSize:11,color:isToday?'#005FFF':'#191923'}}>{day}</div>
-                          <div style={{fontSize:9,opacity:.4}}>{dd.getDate()}/{dd.getMonth()+1}</div>
-                        </div>
-                        {dt.length === 0 ? <div style={{fontSize:9,opacity:.25,textAlign:'center'}}>-</div> : dt.map(function(t) {
-                          return <div key={t.id} onClick={function() { nav('tasks') }} style={{cursor:'pointer',background:'rgba(0,95,255,.1)',borderLeft:'3px solid #005FFF',padding:'2px 4px',marginBottom:2,fontSize:9,fontWeight:900,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.title}</div>
-                        })}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
+
               {/* PLANNING SEMAINE */}
               <div style={{borderRadius:7,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',marginBottom:10,overflow:'hidden'}}>
                 <div style={{background:'#FF82D7',padding:'10px 16px',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'2px solid #191923',flexWrap:'wrap',gap:8}}>
@@ -520,10 +487,11 @@ export default function DashboardPage() {
                       var isToday = ds === new Date().toISOString().split('T')[0]
                       var isPast = dd < new Date(new Date().toDateString())
                       var isFriday = di === 4
-                      var dayTasks = tasks.filter(function(t) { return t.deadline === ds && t.assignee === 'emy' })
+                      var dayTasksEmy = tasks.filter(function(t) { return t.deadline === ds && t.assignee === 'emy' })
+                      var dayTasksEdward = tasks.filter(function(t) { return t.deadline === ds && t.assignee === 'edward' })
                       var dayRelances = prospects.filter(function(p) { return p.nextDate === ds && p.status !== 'won' && p.status !== 'lost' })
-                      var hasLate = isPast && dayTasks.some(function(t){return t.status!=='done'})
-                      var allDone = dayTasks.length > 0 && dayTasks.every(function(t){return t.status==='done'})
+                      var hasLate = isPast && dayTasksEmy.some(function(t){return t.status!=='done'})
+                      var allDone = dayTasksEmy.length > 0 && dayTasksEmy.every(function(t){return t.status==='done'})
                       var borderColor = isToday ? '#005FFF' : hasLate ? '#CC0066' : allDone ? '#009D3A' : '#191923'
                       var bgColor = isToday ? '#E8F0FF' : hasLate ? '#FFE8F0' : allDone ? '#E8F5E9' : '#FAFAFA'
                       return (
@@ -550,25 +518,37 @@ export default function DashboardPage() {
                               </div>
                             )}
                           </div>
-                          {dayTasks.map(function(t) {
+                          {dayTasksEmy.map(function(t) {
                             return (
                               <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:4,cursor:'pointer'}} onClick={function() {
                                 setTasks(function(prev) { return prev.map(function(x) { return x.id !== t.id ? x : Object.assign({}, x, {status: t.status === 'done' ? 'todo' : 'done'}) }) })
                               }}>
-                                <input type="checkbox" checked={t.status === 'done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:t.priority==='high'?'#FF82D7':'#009D3A'}} />
+                                <input type="checkbox" checked={t.status === 'done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#FF82D7'}} />
                                 <span style={{fontSize:9,fontWeight:t.priority==='high'?900:400,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.3}}>{t.title}</span>
                               </div>
                             )
                           })}
-                          {dayTasks.length === 0 && !isFriday && dayRelances.length === 0 && (
+                          {dayTasksEdward.length > 0 && (
+                            <div style={{borderTop:'1px dashed #DEDEDE',marginTop:4,paddingTop:4}}>
+                              {dayTasksEdward.map(function(t) {
+                                return (
+                                  <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:3}}>
+                                    <input type="checkbox" checked={t.status === 'done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#FFEB5A'}} />
+                                    <span style={{fontSize:9,textDecoration:t.status==='done'?'line-through':'none',opacity:.6,lineHeight:1.3}}>👑 {t.title}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                          {dayTasksEmy.length === 0 && dayTasksEdward.length === 0 && !isFriday && dayRelances.length === 0 && (
                             <div style={{fontSize:9,opacity:.2,textAlign:'center',marginTop:8}}>—</div>
                           )}
                         </div>
                       )
                     })}
                   </div>
-                  <div style={{display:'flex',gap:12,marginTop:8,fontSize:9,opacity:.4}}>
-                    <span>🔵 Aujourd'hui</span><span>🔴 En retard</span><span>🟢 Tout fait</span><span>☑ Cliquer pour cocher</span>
+                  <div style={{display:'flex',gap:12,marginTop:8,fontSize:9,opacity:.4,flexWrap:'wrap'}}>
+                    <span>🔵 Aujourd'hui</span><span>🔴 En retard</span><span>🟢 Tout fait</span><span>👑 Tâche Edward</span><span>☑ Cliquer pour cocher</span>
                   </div>
                 </div>
               </div>
