@@ -231,6 +231,43 @@ const ALL_PROSPECTS = [
   {id:'me03',cat:'medical',name:'Roche France',contact:'Office Manager',phone:'01 47 61 40 00',email:'paris@roche.com',site:'roche.com',linkedin:'',taille:'500+',arrondissement:'Paris 8e',valeur_event:2500,valeur_mois:1200,type:'Plateaux dejeuner',pitch:'Roche. Biotech et pharma.',status:'to_contact',score:8,contacted:false},
   {id:'me04',cat:'medical',name:'Novartis France',contact:'Facilities',phone:'01 55 47 60 00',email:'paris@novartis.com',site:'novartis.com',linkedin:'',taille:'500+',arrondissement:'Paris 10e',valeur_event:2500,valeur_mois:1200,type:'Plateaux dejeuner',pitch:'Novartis. Grande equipe Paris.',status:'to_contact',score:8,contacted:false},
   {id:'me05',cat:'medical',name:'Servier',contact:'Office Manager',phone:'01 55 72 60 00',email:'contact@servier.com',site:'servier.com',linkedin:'',taille:'500+',arrondissement:'Paris 8e',valeur_event:2500,valeur_mois:1200,type:'Plateaux dejeuner',pitch:'Servier. Labos francais independant.',status:'to_contact',score:8,contacted:false}
+  // AGENCES PUB
+  {id:'pub01',cat:'agence_pub',name:'TBWA\Paris',contact:'Office Manager',phone:'01 53 49 10 00',email:'contact@tbwa.com',site:'tbwa.fr',taille:'300',arrondissement:'Paris 8e',valeur_event:2500,valeur_mois:0,type:'Plateaux repas equipes & events clients',pitch:'Agence creative premium - equipes qui bossent tard, clients qui se regalent sur place. Meshuga = upgrade du plateau banal.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/tbwa-paris'},
+  {id:'pub02',cat:'agence_pub',name:'Havas Paris',contact:'Facilities Manager',phone:'01 58 47 90 00',email:'contact@havas.com',site:'havas.com',taille:'400',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:0,type:'Plateaux repas & events Havas Village',pitch:'Havas Village = concentration d agences. Fort potentiel multi-equipes. Meshuga = option traiteur premium recurrente.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/havas'},
+  {id:'pub03',cat:'agence_pub',name:'Publicis Conseil',contact:'Facilities Manager',phone:'01 44 43 70 00',email:'contact@publicis.com',site:'publicisgroupe.com',taille:'500',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:0,type:'Plateaux repas & events internes',pitch:'Publicis = hundreds of employees, client shows permanents. Meshuga = le traiteur qui impressionne les clients CAC40.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/publicis'},
+  {id:'pub04',cat:'agence_pub',name:'Ogilvy Paris',contact:'Office Manager',phone:'01 53 96 20 00',email:'contact@ogilvy.com',site:'ogilvy.com',taille:'200',arrondissement:'Paris 8e',valeur_event:2000,valeur_mois:0,type:'Dejeuners creatifs & client presentations',pitch:'Ogilvy = obsession du detail creatif. Nos sandwichs gastronomiques matchent parfaitement avec leur exigence qualite.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/ogilvy'},
+  // HOTELS
+  {id:'hot01',cat:'hotel',name:'Hotel Lutetia',contact:'F&B Manager',phone:'01 45 44 38 10',email:'fbmanager@lutetia.com',site:'hotellutetia.com',taille:'300',arrondissement:'Paris 6e',valeur_event:4000,valeur_mois:0,type:'Animations food & plateaux guests VIP',pitch:'Lutetia = voisin direct Paris 6e. Clientele internationale cherche authenticite locale. Meshuga = le deli NY a 5 minutes a pied.',score:10,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/hotel-lutetia'},
+  {id:'hot02',cat:'hotel',name:'Hotel Madison',contact:'Direction',phone:'01 40 51 60 00',email:'contact@hotel-madison.com',site:'hotel-madison.com',taille:'60',arrondissement:'Paris 6e',valeur_event:1200,valeur_mois:0,type:'Room service premium & events guests',pitch:'Hotel boutique Paris 6e - clientele CSP+++ internationale. Meshuga = experience food authentique a proposer aux guests.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'hot03',cat:'hotel',name:'Hotel Recamier',contact:'Direction',phone:'01 43 26 04 89',email:'contact@hotelrecamier.com',site:'hotelrecamier.com',taille:'30',arrondissement:'Paris 6e',valeur_event:800,valeur_mois:0,type:'Partenariat food & recommandations guests',pitch:'Place Saint-Sulpice - Paris 6e au coeur. Clientele internationale raffinee. Recommandation Meshuga = valeur ajoutee concierge.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  // INSTITUTIONS
+  {id:'ins01',cat:'institution',name:'Senat',contact:'Direction des services',phone:'01 42 34 20 00',email:'communication@senat.fr',site:'senat.fr',taille:'2000',arrondissement:'Paris 6e',valeur_event:5000,valeur_mois:0,type:'Cocktails dinatoires & events institutionnels',pitch:'Le Senat = voisin direct Paris 6e. Evenements institutionnels reguliers, receptions, visites officielles. Meshuga = le deli de reference du quartier.',score:10,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'ins02',cat:'institution',name:'Sciences Po Paris',contact:'Events Manager',phone:'01 45 49 50 50',email:'events@sciencespo.fr',site:'sciencespo.fr',taille:'500',arrondissement:'Paris 7e',valeur_event:3000,valeur_mois:0,type:'Cocktails conferences & evenements direction',pitch:'Sciences Po = think tank permanent, conferences quotidiennes, receptions diplomatiques. Meshuga = upgrade du traiteur institutionnel.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/school/sciences-po'},
+  {id:'ins03',cat:'institution',name:'Institut Pasteur',contact:'Direction communication',phone:'01 45 68 80 00',email:'communication@pasteur.fr',site:'pasteur.fr',taille:'2500',arrondissement:'Paris 15e',valeur_event:4000,valeur_mois:0,type:'Cocktails conferences scientifiques & remises prix',pitch:'Institut Pasteur = evenements scientifiques internationaux de prestige. Meshuga = traiteur premium qui sort des caterings basiques.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/institut-pasteur'},
+  // BANQUES
+  {id:'ban01',cat:'banque',name:'Goldman Sachs Paris',contact:'Facilities',phone:'01 53 57 24 24',email:'contact@gs.com',site:'goldmansachs.com',taille:'500',arrondissement:'Paris 8e',valeur_event:5000,valeur_mois:0,type:'Working lunches & client events',pitch:'Goldman Sachs = culture US transplantee. Nos pastrami et lobster rolls = parfaitement dans leur culture food newyorkaise.',score:10,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/goldman-sachs'},
+  {id:'ban02',cat:'banque',name:'JP Morgan Paris',contact:'Office Manager',phone:'01 40 15 55 00',email:'contact@jpmorgan.com',site:'jpmorgan.com',taille:'800',arrondissement:'Paris 8e',valeur_event:5000,valeur_mois:0,type:'Working lunches & events clients',pitch:'JP Morgan = culture NY forte. Meshuga = LE deli newyorkais de Paris, pitch ultra-evident pour leurs equipes americaines.',score:10,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/jpmorgan'},
+  {id:'ban03',cat:'banque',name:'Rothschild & Co',contact:'Office Manager',phone:'01 40 74 40 74',email:'contact@rothschildandco.com',site:'rothschildandco.com',taille:'500',arrondissement:'Paris 8e',valeur_event:4000,valeur_mois:0,type:'Dejeuners M&A & events clients VIP',pitch:'Rothschild = excellence absolue. Clients CAC40, deals a milliards. Meshuga = le seul traiteur a leur niveau d exigence.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/rothschild-and-co'},
+  {id:'ban04',cat:'banque',name:'Lazard Paris',contact:'Office Manager',phone:'01 44 13 01 11',email:'contact@lazard.com',site:'lazard.com',taille:'300',arrondissement:'Paris 8e',valeur_event:3500,valeur_mois:0,type:'Dejeuners M&A & client presentations',pitch:'Lazard = boutique M&A d elite. Exigence maximale. Meshuga = traiteur qui correspond a leur image premium.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/lazard'},
+  {id:'ban05',cat:'banque',name:'BNP Paribas CIB',contact:'Office Manager',phone:'01 40 14 45 46',email:'contact@bnpparibas.com',site:'cib.bnpparibas.com',taille:'3000',arrondissement:'Paris 16e',valeur_event:5000,valeur_mois:0,type:'Plateaux equipes trading & events clients',pitch:'CIB BNP = haute finance, equipes exigeantes. Meshuga = le traiteur premium qui sort du cliche.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/bnp-paribas'},
+  // TECH
+  {id:'tec01',cat:'tech',name:'Google France',contact:'Workplace Manager',phone:'01 42 68 53 00',email:'contact@google.com',site:'google.fr',taille:'1000',arrondissement:'Paris 9e',valeur_event:4000,valeur_mois:0,type:'Plateaux equipes & events Google',pitch:'Google Paris = culture food premium, equipes internationales, events reguliers. Meshuga = LE deli qui matche leur culture US.',score:10,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/google'},
+  {id:'tec02',cat:'tech',name:'Salesforce France',contact:'Workplace Manager',phone:'01 57 95 60 00',email:'contact@salesforce.com',site:'salesforce.com',taille:'600',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:0,type:'Ohana events & plateaux equipes',pitch:'Salesforce = culture Ohana, events permanents. Meshuga = le traiteur premium qui parle leur langue.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/salesforce'},
+  {id:'tec03',cat:'tech',name:'Meta France',contact:'Workplace Manager',phone:'',email:'contact@meta.com',site:'meta.com',taille:'500',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:0,type:'Events equipes & plateaux dejeuners',pitch:'Meta = culture Silicon Valley a Paris. Food premium. Meshuga = parfaitement aligne sur leurs valeurs.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/meta'},
+  {id:'tec04',cat:'tech',name:'Aircall',contact:'Workplace Manager',phone:'',email:'hello@aircall.io',site:'aircall.io',taille:'400',arrondissement:'Paris 9e',valeur_event:1500,valeur_mois:0,type:'Events equipes internationales',pitch:'Aircall = scale-up franco-americaine. Culture NY tres presente. Pastrami et lobster rolls = resonance immediate avec leurs equipes US.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/aircall'},
+  {id:'tec05',cat:'tech',name:'Mirakl',contact:'Office Manager',phone:'',email:'contact@mirakl.com',site:'mirakl.com',taille:'500',arrondissement:'Paris 2e',valeur_event:1500,valeur_mois:0,type:'All-hands & evenements equipes',pitch:'Mirakl = licorne francaise B2B. Equipes internationales, culture US. Meshuga = le deli NY a Paris, fit culturel immediat.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/mirakl'},
+  // LUXE
+  {id:'lux01',cat:'luxe',name:'LVMH Paris',contact:'Direction evenements',phone:'01 44 13 22 22',email:'evenements@lvmh.com',site:'lvmh.com',taille:'3000',arrondissement:'Paris 8e',valeur_event:8000,valeur_mois:0,type:'Plateaux direction & events Maisons',pitch:'LVMH = events de prestige permanents, budgets illimites. Meshuga = le seul traiteur casual-chic a leur hauteur.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/lvmh'},
+  {id:'lux02',cat:'luxe',name:'Kering',contact:'Events Manager',phone:'01 45 64 61 00',email:'events@kering.com',site:'kering.com',taille:'2000',arrondissement:'Paris 8e',valeur_event:6000,valeur_mois:0,type:'Events Maisons (Gucci, YSL, Balenciaga...)',pitch:'Kering = groupe luxe, evenements Maisons permanents. Notre positionnement premium unique = partenariat naturel.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/kering'},
+  {id:'lux03',cat:'luxe',name:'Chanel Paris',contact:'Direction protocole',phone:'01 40 07 14 00',email:'contact@chanel.com',site:'chanel.com',taille:'1500',arrondissement:'Paris 8e',valeur_event:10000,valeur_mois:0,type:'Events defile & receptions VIP',pitch:'Chanel = l absolu du luxe. Nos references presse (Telerama, Fooding, Paris Premiere) = credibilite immediate pour leurs equipes.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/chanel'},
+  {id:'lux04',cat:'luxe',name:'Hermes Paris',contact:'Office Manager direction',phone:'01 40 17 47 17',email:'contact@hermes.com',site:'hermes.com',taille:'2000',arrondissement:'Paris 8e',valeur_event:8000,valeur_mois:0,type:'Plateaux direction & events internes',pitch:'Hermes = artisanat, authenticite, excellence. Notre histoire artisanale (pastrami maison, lobster roll) = resonance directe.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/hermes-international'},
+  // CONSEIL SUPPLEMENTAIRE
+  {id:'co08',cat:'conseil',name:'Oliver Wyman Paris',contact:'Office Manager',phone:'01 45 02 30 00',email:'paris@oliverwyman.com',site:'oliverwyman.com',taille:'200',arrondissement:'Paris 8e',valeur_event:2500,valeur_mois:0,type:'Dejeuners strategy & client dinners',pitch:'Oliver Wyman = conseil strategique premium. Leurs consultants mangent bien et leurs clients aussi. Meshuga = upgrade immediat.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/oliver-wyman'},
+  {id:'co09',cat:'conseil',name:'Roland Berger Paris',contact:'Office Manager',phone:'01 53 67 09 09',email:'paris@rolandberger.com',site:'rolandberger.com',taille:'150',arrondissement:'Paris 8e',valeur_event:2000,valeur_mois:0,type:'Dejeuners strategy & pitches clients',pitch:'Roland Berger = cabinet premium a Paris. Culture de l excellence. Meshuga = traiteur qui parle leur langage qualite.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/roland-berger'},
+  // COWORKING SUPPLEMENTAIRE
+  {id:'cw11',cat:'coworking',name:'Wework Champs-Elysees',contact:'Community Lead',phone:'',email:'paris-cw@wework.com',site:'wework.com',taille:'800',arrondissement:'Paris 8e',valeur_event:2000,valeur_mois:0,type:'Events membres & plateaux',pitch:'WeWork = culture startup US, membres exigeants, events permanents. Meshuga = le traiteur qui parle leur langue newyorkaise.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/wework'},
+  {id:'cw12',cat:'coworking',name:'Spaces Paris Opera',contact:'Community Manager',phone:'01 84 25 00 01',email:'paris.opera@spacesworks.com',site:'spacesworks.com',taille:'500',arrondissement:'Paris 9e',valeur_event:1500,valeur_mois:0,type:'Plateaux membres & events networking',pitch:'Spaces = coworking premium IWG. Membres CSP+, events business reguliers. Meshuga = le partenaire food naturel.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:'linkedin.com/company/spaces-inc'},
+
 ]
 
 export default function DashboardPage() {
@@ -365,32 +402,67 @@ export default function DashboardPage() {
   }
 
   function contactProspect(id) {
-    const p = chasse.filter(function(x) { return x.id === id })[0]
-    setChasse(function(prev) { return prev.map(function(x) { return x.id === id ? Object.assign({}, x, {status: 'contacted', contacted: true}) : x }) })
-    setContactedToday(function(c) { return c + 1 })
-    if (p) {
-      setProspects(function(prev) { return prev.concat([{id: Date.now(), name: p.name, email: p.email, phone: p.phone, size: p.taille, category: CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat, status: 'contacted', nextAction: 'Relancer', nextDate: '', notes: p.pitch, ca: 0, score: p.score, files: []}]) })
-      logActivity('prospect_contacte', p.name + ' contacté et ajouté au CRM', p.name, null)
+    var pros = chasse.find(function(x) { return x.id === id })
+    var today = new Date().toISOString().split('T')[0]
+    var relDate = new Date(); relDate.setDate(relDate.getDate() + 3)
+    var relDateStr = relDate.toISOString().split('T')[0]
+    setChasse(function(prev) { return prev.map(function(x) { return x.id === id ? Object.assign({}, x, {status: 'contacted', contacted: true, contactedDate: today, lastAction: 'Contact le ' + today, relanceDate: relDateStr, relanceStatut: 'en_attente'}) : x }) })
+    setContactedToday(function(n) { return n + 1 })
+    if (pros) {
+      setTasks(function(prev) { return prev.concat([{id: 'rel-' + id + '-' + Date.now(), title: 'Relancer ' + pros.name, assignee: 'emy', priority: 'medium', status: 'todo', deadline: relDateStr, checklist: [], files: [], chasseId: id}]) })
     }
-    toast('✓ Prospect contacté!')
+    logActivity('prospect_contacte', 'Prospect contacte : ' + (pros ? pros.name : id), pros ? pros.name : id, null)
+    toast('Contacte ! Rappel de relance dans 3 jours')
   }
 
+  function relanceProspect(id) {
+    var pros = chasse.find(function(x) { return x.id === id })
+    var today = new Date().toISOString().split('T')[0]
+    var next = new Date(); next.setDate(next.getDate() + 7)
+    var nextStr = next.toISOString().split('T')[0]
+    setChasse(function(prev) { return prev.map(function(x) { return x.id === id ? Object.assign({}, x, {lastAction: 'Relance le ' + today, relanceDate: nextStr, relanceStatut: 'relance'}) : x }) })
+    setTasks(function(prev) { return prev.filter(function(t) { return t.chasseId !== id }).concat([{id: 'rel2-' + id + '-' + Date.now(), title: 'Suivi ' + (pros ? pros.name : id) + ' - en attente reponse', assignee: 'emy', priority: 'high', status: 'todo', deadline: nextStr, checklist: [], files: [], chasseId: id}]) })
+    logActivity('prospect_relance', 'Relance : ' + (pros ? pros.name : id), pros ? pros.name : id, null)
+    toast('Relance! Suivi dans 7 jours')
+  }
+
+  function reponseProspect(id, rep) {
+    var pros = chasse.find(function(x) { return x.id === id })
+    var today = new Date().toISOString().split('T')[0]
+    var newSt = rep === 'interesse' ? 'nego' : rep === 'lost' ? 'lost' : 'contacted'
+    var action = rep === 'interesse' ? 'Interesse !' : rep === 'lost' ? 'Pas interesse' : 'A rappeler'
+    setChasse(function(prev) { return prev.map(function(x) { return x.id === id ? Object.assign({}, x, {status: newSt, lastAction: action + ' - ' + today, relanceStatut: rep}) : x }) })
+    setTasks(function(prev) { return prev.filter(function(t) { return t.chasseId !== id }) })
+    if (rep === 'interesse' && pros) {
+      setTasks(function(prev) { return prev.concat([{id: 'nego-' + id + '-' + Date.now(), title: 'NEGO - Envoyer devis a ' + pros.name, assignee: 'emy', priority: 'high', status: 'todo', deadline: today, checklist: ['Preparer devis', 'Envoyer via module Devis', 'Fixer RDV'], files: [], chasseId: id}]) })
+      toast('Super ! En nego - devis a preparer !')
+    } else if (rep === 'rappeler' && pros) {
+      var next2 = new Date(); next2.setDate(next2.getDate() + 14)
+      setTasks(function(prev) { return prev.concat([{id: 'rap-' + id + '-' + Date.now(), title: 'Rappeler ' + pros.name + ' dans 2 semaines', assignee: 'emy', priority: 'medium', status: 'todo', deadline: next2.toISOString().split('T')[0], checklist: [], files: [], chasseId: id}]) })
+      toast('Rappel dans 2 semaines')
+    } else if (rep === 'lost') {
+      toast('OK, prospect archive.')
+    }
+  }
   async function generateEmail(p) {
     setEmailProspect(p)
     setGeneratingEmail(true)
     setGeneratedEmail('')
     openModal('email', p)
     const senderName = isEmy ? 'Emy, B2B Manager' : 'Edward, patron'
+    const senderSig = isEmy ? 'Emy' : 'Edward'
     const pressLinks = [
+      {name: 'Tres Tres Bon', url: 'https://www.facebook.com/watch/?v=648051137321383'},
+      {name: 'Telerama', url: 'https://www.telerama.fr/restos-loisirs/meshuga-de-la-street-food-de-haut-niveau-pres-du-jardin-du-luxembourg_cri-7043251.php'},
       {name: 'Konbini', url: 'https://www.konbini.com/food/on-a-teste-meshuga-le-deli-aux-sandwiches-les-plus-confort-du-moment/'},
-      {name: 'Magazine Acumen', url: 'https://magazine-acumen.com/en/gastronomie/meshuga-la-nouvelle-adresse-qui-fait-bouger-la-rive-gauche-parisienne/'},
-      {name: 'Do It In Paris', url: 'https://www.doitinparis.com/fr/food-et-drinks/restaurants/meshuga-le-meilleur-deli-de-paris'},
-      {name: 'le Guide du Fooding', url: 'https://lefooding.com/restaurants/meshuga'},
-      {name: 'Télérama', url: 'https://www.telerama.fr/sortir/meshuga-le-deli-qui-monte'},
-      {name: 'Très Très Bon', url: 'https://www.youtube.com/@TresTresBon'}
+      {name: 'Les Echos', url: 'https://www.lesechos.fr/weekend/gastronomie-vins/ou-manger-les-meilleurs-grilled-cheese-1873791'},
+      {name: 'Do It In Paris', url: 'https://www.doitinparis.com/fr/street-food-usa-paris-26393'},
+      {name: 'Grazia', url: 'https://www.grazia.fr/cuisine/surprenantes-regressives-ou-rafraichissantes-les-meilleures-adresses-ou-deguster-de-bonnes-glaces-cet-ete-a-paris-773498.html'},
+      {name: 'Magazine Acumen', url: 'https://magazine-acumen.com/gastronomie/meshuga-la-nouvelle-adresse-qui-fait-bouger-la-rive-gauche-parisienne/'}
     ]
     const pick3 = pressLinks.sort(function(){return Math.random()-0.5}).slice(0,3)
-    const prompt = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium.\n\nEcris un email de prospection B2B, texte brut UNIQUEMENT. REGLE : zero Markdown, zero URL, zero crochets. Cite 2-3 medias parmi ' + pick3.map(function(l){return l.name}).join(', ') + ' naturellement dans le texte (juste leur nom).\n\nProspect : ' + p.name + ' - ' + p.arrondissement + ' - ' + p.taille + ' employes.\nProposition : ' + p.type + '.\nAngle : ' + p.pitch + '\n\nEmail 6-8 lignes, concis, direct. Objet : en 1ere ligne.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
+    const pressNames = pick3.map(function(l){return l.name}).join(', ')
+    const prompt = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium cite par la presse parisienne.\n\nEcris un email B2B en FRANCAIS avec tous les accents. Texte brut UNIQUEMENT, zero Markdown, zero URL. Cite 1-2 medias parmi : ' + pressNames + '.\n\nProspect :\n- ' + p.name + ' (' + p.arrondissement + ', ' + p.taille + ' employes)\n- ' + p.type + '\n- ' + p.pitch + '\n\nEmail 6-8 lignes, Objet en 1ere ligne, ton direct.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
     try {
       const res = await fetch('/api/generate-email', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: prompt})})
       const data = await res.json()
