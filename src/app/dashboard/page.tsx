@@ -484,7 +484,7 @@ export default function DashboardPage() {
   const [chasseSearch, setChasseSearch] = useState('')
   const [chasseSort, setChasseSort] = useState('score')
   const [chasseStatus, setChasseStatus2] = useState('all')
-  const [chasse, setChasse] = useState(function(){ return ALL_PROSPECTS.map(function(p) { return Object.assign({}, p, {status:p.status||'to_contact',contacted:!!p.contacted,contactedDate:p.contactedDate||'',lastAction:p.lastAction||'',relanceDate:p.relanceDate||'',relanceStatut:p.relanceStatut||''}) }) }))
+  const [chasse, setChasse] = useState(function(){ return ALL_PROSPECTS.map(function(p) { return Object.assign({}, p, {status:p.status||'to_contact',contacted:!!p.contacted,contactedDate:p.contactedDate||'',lastAction:p.lastAction||'',relanceDate:p.relanceDate||'',relanceStatut:p.relanceStatut||''}) }) })
   const [generatingEmail, setGeneratingEmail] = useState(false)
   const [generatedEmail, setGeneratedEmail] = useState('')
   const [emailProspect, setEmailProspect] = useState(null)
