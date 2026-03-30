@@ -390,7 +390,8 @@ export default function DashboardPage() {
       {name: 'Très Très Bon', url: 'https://www.youtube.com/@TresTresBon'}
     ]
     const pick3 = pressLinks.sort(function(){return Math.random()-0.5}).slice(0,3)
-    const prompt = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium.\n\nEcris un email de prospection B2B, texte brut UNIQUEMENT. REGLE : zero Markdown, zero URL, zero crochets. Cite 2-3 medias parmi ' + pick3.map(function(l){return l.name}).join(', ') + ' naturellement dans le texte (juste leur nom).\n\nProspect : ' + p.name + ' - ' + p.arrondissement + ' - ' + p.taille + ' employes.\nProposition : ' + p.type + '.\nAngle : ' + p.pitch + '\n\nEmail 6-8 lignes, concis, direct. Objet : en 1ere ligne.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'   try {
+    const prompt = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium.\n\nEcris un email de prospection B2B, texte brut UNIQUEMENT. REGLE : zero Markdown, zero URL, zero crochets. Cite 2-3 medias parmi ' + pick3.map(function(l){return l.name}).join(', ') + ' naturellement dans le texte (juste leur nom).\n\nProspect : ' + p.name + ' - ' + p.arrondissement + ' - ' + p.taille + ' employes.\nProposition : ' + p.type + '.\nAngle : ' + p.pitch + '\n\nEmail 6-8 lignes, concis, direct. Objet : en 1ere ligne.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
+    try {
       const res = await fetch('/api/generate-email', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: prompt})})
       const data = await res.json()
       setGeneratedEmail(data.text || 'Erreur')
