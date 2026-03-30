@@ -1472,9 +1472,7 @@ export default function DashboardPage() {
                   <div style={{fontSize:11,color:'rgba(255,255,255,.6)'}}>Copier le lien client</div>
                 </div>
               </div>
-              <div style={{background:'#FFF',borderRadius:7,border:'2px solid #191923',overflow:'hidden',marginBottom:8,height:300}}>
-                <iframe src={'https://www.google.com/maps/embed/v1/place?key='+process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY+'&q=Meshuga+Crazy+Deli+Paris&zoom=16'} width='100%' height='300' style={{border:'none'}} allowFullScreen loading='lazy' />
-              </div>
+              
               <div className='card-y' style={{background:'#FFFBEA',border:'2px solid #FFEB5A'}}>
                 <div className='ct' style={{fontSize:13}}>💡 Booster les avis</div>
                 <p style={{fontSize:12,marginTop:6,lineHeight:1.6}}>Envoie le lien ci-dessous a chaque client B2B satisfait. Objectif : passer de 4.6 a 4.8+ pour dominer les recherches traiteur Paris 6e.</p>
