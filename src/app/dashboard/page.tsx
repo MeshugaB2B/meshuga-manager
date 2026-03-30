@@ -389,8 +389,20 @@ export default function DashboardPage() {
       {name: 'Télérama', url: 'https://www.telerama.fr/sortir/meshuga-le-deli-qui-monte'},
       {name: 'Très Très Bon', url: 'https://www.youtube.com/@TresTresBon'}
     ]
-    const pick3 = pressLinks.sort(()=>Math.random()-0.5).slice(0,3)
-    const prompt = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium : pastrami, lobster rolls, tuna melt, sandwichs gastronomiques.\n\nEcris un email de prospection B2B en texte brut. RÈGLE ABSOLUE : zéro Markdown, zéro URL visible, zéro crochets []. Cite 2-3 médias parmi ' + pick3.map(l=>l.name).join(', ') + ' en les glissant naturellement dans le texte — juste le nom du média dans la phrase, jamais d URL (ex: repérés par Konbini, ou cités dans le Guide du Fooding).\n\nProspect :\n- Entreprise : ' + p.name + '\n- Secteur : ' + (CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat) + '\n- Localisation : ' + p.arrondissement + '\n- Taille : ' + p.taille + ' employés\n- Proposition : ' + p.type + '\n- Angle : ' + p.pitch + '\n\nEmail 6-8 lignes max, ton direct, personnalisé. Commence par Objet : sur la 1ère ligne.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
+    const pick3 = pressLinks.sort(function(){return Math.random()-0.5}).slice(0,3)
+    const prompt = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium : pastrami, lobster rolls, tuna melt.
+
+Ecris un email de prospection B2B en texte brut UNIQUEMENT. REGLE ABSOLUE : zero Markdown, zero URL visible, zero crochets []. Cite naturellement 2-3 medias parmi ' + pick3.map(function(l){return l.name}).join(', ') + ' dans le texte, juste leur nom dans une phrase (ex: reperes par Konbini, ou cites dans le Guide du Fooding). Jamais de lien.
+
+Prospect :
+- Entreprise : ' + p.name + '
+- Secteur : ' + (CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat) + '
+- Taille : ' + p.taille + ' employes
+- Proposition : ' + p.type + '
+- Angle : ' + p.pitch + '
+
+Email 6-8 lignes, ton direct. Commence par Objet : sur la 1ere ligne.
+Signature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
     try {
       const res = await fetch('/api/generate-email', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: prompt})})
       const data = await res.json()
@@ -527,218 +539,27 @@ export default function DashboardPage() {
               <div className="g4">
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('devis')}}>
                   <div className="kl">Devis en cours</div>
-                  <div className="kv" style={{fontSize:20}}>{devisList.filter(function(d){return d.statut==='envoye'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
+                  <div className="kv" style={{fontSize:20}}>{devisList.filter(function(d){return d.statut==='envoye'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>&euro; HT</span></div>
                   <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:devisList.filter(function(d){return d.statut==='envoye'}).length>0?'#005FFF':'rgba(25,25,35,.35)'}}>{devisList.filter(function(d){return d.statut==='envoye'}).length} devis en attente</div>
-                  <div className="ki" style={{opacity:.1}}>💶</div>
+                  <div className="ki" style={{opacity:.1}}>&#128182;</div>
                 </div>
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('devis')}}>
-                  <div className="kl">CA B2B signé</div>
-                  <div className="kv" style={{fontSize:20}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'#00AA44'}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).length} contrats signés 🎉</div>
-                  <div className="ki" style={{opacity:.1}}>📈</div>
+                  <div className="kl">CA B2B sign&eacute;</div>
+                  <div className="kv" style={{fontSize:20}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>&euro; HT</span></div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'#00AA44'}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).length} contrats sign&eacute;s</div>
+                  <div className="ki" style={{opacity:.1}}>&#128200;</div>
                 </div>
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('chasse')}}>
-                  <div className="kl">Prospectés</div>
+                  <div className="kl">Prospect&eacute;s</div>
                   <div className="kv">{chasse.filter(function(p){return p.contacted}).length} <span style={{fontSize:16,fontWeight:400,opacity:.3}}>/ {chasse.length}</span></div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'rgba(25,25,35,.35)'}}>{chasse.length>0?Math.round(chasse.filter(function(p){return p.contacted}).length/chasse.length*100):0}% contactés</div>
-                  <div className="ki" style={{opacity:.1}}>🎯</div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'rgba(25,25,35,.35)'}}>{chasse.length>0?Math.round(chasse.filter(function(p){return p.contacted}).length/chasse.length*100):0}% contact&eacute;s</div>
+                  <div className="ki" style={{opacity:.1}}>&#127919;</div>
                 </div>
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('crm')}}>
                   <div className="kl">Pipeline actif</div>
                   <div className="kv">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length}</div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:prospects.filter(function(p){return p.status==='nego'}).length>0?'#FF82D7':'rgba(25,25,35,.35)'}}>{prospects.filter(function(p){return p.status==='nego'}).length>0?prospects.filter(function(p){return p.status==='nego'}).length+' en négo 🔥':'aucune négo en cours'}</div>
-                  <div className="ki" style={{opacity:.1}}>◎</div>
-                </div>
-              </div><div class="doc-num">'+new Date().toLocaleDateString('fr-FR')+'</div></div></div><div class="parties"><div class="party"><div class="party-label">Emetteur</div><div class="party-name">SAS AEGIA FOOD</div><div class="party-detail">Enseigne : Meshuga Crazy Deli</div><div class="party-detail">3 rue Vavin, 75006 Paris</div><div class="party-detail">SIRET : 904 639 531 00014</div><div class="party-detail">TVA : FR31904639531</div><div class="party-detail">hello@meshuga.fr</div></div><div class="party client"><div class="party-label">Client</div><div class="party-name">'+dv.client_nom+'</div>'+(dv.client_contact?'<div class="party-detail">'+dv.client_contact+'</div>':'')+(dv.client_email?'<div class="party-detail">'+dv.client_email+'</div>':'')+((dv.event_date||dv.event_lieu)?'<div class="party-detail" style="margin-top:5px"><strong>Ev&eacute;nement :</strong> '+(dv.event_date?new Date(dv.event_date).toLocaleDateString('fr-FR'):'')+(dv.event_lieu?' &mdash; '+dv.event_lieu:'')+'</div>':'')+'<div class="badge">'+dv.nb_personnes+' personnes</div></div></div><table><thead><tr><th style="text-align:left;width:52%">D&eacute;signation</th><th style="text-align:center;width:10%">Qte</th><th style="text-align:right;width:19%">PU HT</th><th style="text-align:right;width:19%">Total HT</th></tr></thead><tbody>'+items+mepRow+livRow+remRow+'</tbody></table><div class="totals-wrap"><div class="totals"><div class="t-row"><span>Total HT</span><span style="font-weight:900">'+totalHT.toFixed(2)+' EUR</span></div><div class="t-row gray"><span>TVA 5,5%</span><span>'+tva.toFixed(2)+' EUR</span></div><div class="t-final"><span class="lbl">Total TTC</span><span class="amt">'+totalTTC.toFixed(2)+' EUR</span></div><div class="per-person">soit '+parseFloat(totalTTC/dv.nb_personnes).toFixed(2)+' EUR TTC / personne</div></div></div><div class="rib"><div class="rib-title">'+(isFacture?'R&egrave;glement par virement bancaire':'Coordonn&eacute;es bancaires pour l&#39;acompte')+'</div><div class="rib-grid"><div class="rib-item"><label>Titulaire</label><span>SAS AEGIA FOOD</span></div><div class="rib-item"><label>Banque</label><span>Banque Populaire</span></div><div class="rib-item"><label>IBAN</label><span>FR76 1020 7000 8723 2175 3218 077</span></div><div class="rib-item"><label>BIC</label><span>CCBPFRPPMTG</span></div></div></div>'+(dv.notes?'<div class="notes"><strong>Notes :</strong> '+dv.notes+'</div>':'')+'<div class="cond-title">Conditions de r&egrave;glement</div><div class="cond">'+(isFacture?'Virement bancaire &mdash; 30% &agrave; la commande, solde 72h avant l&#39;&eacute;v&eacute;nement.':'30% &agrave; la commande, solde 72h avant l&#39;&eacute;v&eacute;nement. Devis valable 30 jours.')+'</div></div><div class="footer"><div class="legal">SAS AEGIA FOOD (enseigne Meshuga) &mdash; SASU &mdash; Capital social : 1 000 EUR &mdash; RCS Paris &mdash; SIRET 904 639 531 00014 &mdash; Code APE : 56.10C &mdash; TVA intracommunautaire : FR31904639531 &mdash; 3 rue Vavin, 75006 Paris<br>'+(isFacture?'Conform&eacute;ment &agrave; la loi, tout retard de paiement entra&icirc;ne l&#39;exigibilit&eacute; de p&eacute;nalit&eacute;s d&#39;un taux &eacute;gal &agrave; 3 fois le taux d&#39;int&eacute;r&ecirc;t l&eacute;gal, ainsi qu&#39;une indemnit&eacute; forfaitaire de 40 EUR pour frais de recouvrement.':'TVA sur les produits alimentaires &agrave; taux r&eacute;duit de 5,5%. Prix HT en euros. Tout commencement d&#39;ex&eacute;cution vaut acceptation du pr&eacute;sent devis.')+'</div><div class="pink-bar">meshuga &mdash; crazy deli &mdash; 3 rue vavin, paris 6e &mdash; hello@meshuga.fr</div></div></div><div class="no-print" style="text-align:center;padding:20px;background:#F8F8F8;border-top:2px solid #EBEBEB"><p style="margin-bottom:10px;font-size:11px;color:#888">Dans la fen&ecirc;tre d&#39;impression : d&eacute;cochez <strong>En-t&ecirc;tes et pieds de page</strong> puis <strong>Enregistrer en PDF</strong></p><button onclick="document.fonts.ready.then(function(){window.print()})" style="padding:11px 28px;background:#191923;color:#FFEB5A;border:none;border-radius:5px;font-size:13px;font-weight:900;cursor:pointer">&#128229; Imprimer / PDF</button></div></body></html>'
-    var w=window.open('','_blank'); w.document.write(html); w.document.close(); w.focus()
-  }
-
-  function contactProspect(id) {
-    const p = chasse.filter(function(x) { return x.id === id })[0]
-    setChasse(function(prev) { return prev.map(function(x) { return x.id === id ? Object.assign({}, x, {status: 'contacted', contacted: true}) : x }) })
-    setContactedToday(function(c) { return c + 1 })
-    if (p) {
-      setProspects(function(prev) { return prev.concat([{id: Date.now(), name: p.name, email: p.email, phone: p.phone, size: p.taille, category: CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat, status: 'contacted', nextAction: 'Relancer', nextDate: '', notes: p.pitch, ca: 0, score: p.score, files: []}]) })
-      logActivity('prospect_contacte', p.name + ' contacté et ajouté au CRM', p.name, null)
-    }
-    toast('✓ Prospect contacté!')
-  }
-
-  async function generateEmail(p) {
-    setEmailProspect(p)
-    setGeneratingEmail(true)
-    setGeneratedEmail('')
-    openModal('email', p)
-    const senderName = isEmy ? 'Emy, B2B Manager' : 'Edward, patron'
-    const pressLinks = [
-      {name: 'Konbini', url: 'https://www.konbini.com/food/on-a-teste-meshuga-le-deli-aux-sandwiches-les-plus-confort-du-moment/'},
-      {name: 'Magazine Acumen', url: 'https://magazine-acumen.com/en/gastronomie/meshuga-la-nouvelle-adresse-qui-fait-bouger-la-rive-gauche-parisienne/'},
-      {name: 'Do It In Paris', url: 'https://www.doitinparis.com/fr/food-et-drinks/restaurants/meshuga-le-meilleur-deli-de-paris'},
-      {name: 'Grazia', url: 'https://www.grazia.fr/food/restaurants/meshuga-paris-6'},
-      {name: 'le Guide du Fooding', url: 'https://lefooding.com/restaurants/meshuga'},
-      {name: 'Télérama', url: 'https://www.telerama.fr/sortir/meshuga-le-deli-qui-monte'},
-      {name: 'Très Très Bon', url: 'https://www.youtube.com/@TresTresBon'}
-    ]
-    const pick3 = pressLinks.sort(()=>Math.random()-0.5).slice(0,3)
-    const pressStr = pick3.map(l => l.name + ' : ' + l.url).join(' | ')
-    const prompt = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium : pastrami, lobster rolls, tuna melt, sandwichs gastronomiques. Spécialistes plateaux déjeuner B2B et catering événementiel Paris.\n\nTu dois écrire un email de prospection B2B. RÈGLES ABSOLUES DE FORMAT :\n1. AUCUN formatage Markdown (pas de **, pas de [], pas de liens entre parenthèses)\n2. Cite 2-3 médias qui nous ont repérés en les intégrant naturellement dans une phrase du corps du mail — juste leur nom, sans URL visible (ex : \"repérés par Konbini et Télérama\", ou \"après notre passage dans le Guide du Fooding\"). Les médias de référence : ' + pick3.map(l => l.name).join(', ') + '\n3. Email en texte brut, comme un vrai mail professionnel\n\nProspect :\n- Entreprise : ' + p.name + '\n- Secteur : ' + (CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat) + '\n- Localisation : ' + p.arrondissement + '\n- Taille : ' + p.taille + ' employés\n- Proposition : ' + p.type + '\n- Angle : ' + p.pitch + '\n\nEmail 6-8 lignes, personnalisé selon le secteur. Commence par "Objet : " sur la 1ère ligne.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
-    try {
-      const res = await fetch('/api/generate-email', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: prompt})})
-      const data = await res.json()
-      setGeneratedEmail(data.text || 'Erreur')
-    } catch(e) {
-      setGeneratedEmail('Erreur de connexion.')
-    }
-    setGeneratingEmail(false)
-  }
-
-  function saveTask() {
-    if (!form.title) { toast('Titre requis !'); return }
-    const t = Object.assign({}, form, {checklist: form.checklist || [], files: form.files || []})
-    if (form.id) { setTasks(function(prev) { return prev.map(function(x) { return x.id === form.id ? t : x }) }) }
-    else { setTasks(function(prev) { return prev.concat([Object.assign({}, t, {id: Date.now(), status: 'todo'})]) }) }
-    closeModal()
-  }
-
-  function saveProspect() {
-    if (!form.name) { toast('Nom requis !'); return }
-    const p = Object.assign({}, form, {files: form.files || []})
-    if (form.id) { setProspects(function(prev) { return prev.map(function(x) { return x.id === form.id ? p : x }) }) }
-    else { setProspects(function(prev) { return prev.concat([Object.assign({}, p, {id: Date.now(), status: 'to_contact', ca: 0})]) }) }
-    closeModal()
-  }
-
-  function saveContact() {
-    if (!form.name) { toast('Nom requis !'); return }
-    if (form.id) { setContacts(function(prev) { return prev.map(function(x) { return x.id === form.id ? Object.assign({}, form) : x }) }) }
-    else { setContacts(function(prev) { return prev.concat([Object.assign({}, form, {id: Date.now()})]) }) }
-    closeModal()
-  }
-
-  function saveVault() {
-    if (!form.title) { toast('Titre requis !'); return }
-    if (form.id) { setVault(function(prev) { return prev.map(function(x) { return x.id === form.id ? Object.assign({}, form) : x }) }) }
-    else { setVault(function(prev) { return prev.concat([Object.assign({}, form, {id: Date.now()})]) }) }
-    closeModal()
-  }
-
-  function submitCR() {
-    if (!form.week) { toast('Semaine requise !'); return }
-    const cr = Object.assign({}, form, {id: Date.now(), status: 'submitted', date: new Date().toLocaleDateString('fr-FR')})
-    setReports(function(prev) { return [cr].concat(prev) })
-    closeModal()
-  }
-
-  var chasseFiltered = chasse.filter(function(p) { return chasseCat === 'all' || p.cat === chasseCat })
-  if (chasseSearch) { chasseFiltered = chasseFiltered.filter(function(p) { return p.name.toLowerCase().indexOf(chasseSearch.toLowerCase()) >= 0 || (p.arrondissement && p.arrondissement.toLowerCase().indexOf(chasseSearch.toLowerCase()) >= 0) }) }
-  if (chasseStatus !== 'all') { chasseFiltered = chasseFiltered.filter(function(p) { return p.status === chasseStatus }) }
-  chasseFiltered = chasseFiltered.slice().sort(function(a, b) {
-    if (chasseSort === 'score') return b.score - a.score
-    if (chasseSort === 'valeur') return (b.valeur_event + b.valeur_mois*12) - (a.valeur_event + a.valeur_mois*12)
-    return a.name.localeCompare(b.name)
-  })
-
-  var zeltyCA = zeltyData && zeltyData.stats ? (zeltyData.stats[zeltyPeriod].ca/100).toFixed(2) + ' €' : '--'
-  var zeltyTickets = zeltyData && zeltyData.stats ? zeltyData.stats[zeltyPeriod].tickets : '--'
-  var zeltyAvg = zeltyData && zeltyData.stats ? (zeltyData.stats[zeltyPeriod].avg/100).toFixed(2) + ' €' : '--'
-  var zeltyUpdated = zeltyData && zeltyData.lastUpdated ? new Date(zeltyData.lastUpdated).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : '--'
-  var zeltyEvol = zeltyData && zeltyData.evolution && zeltyData.evolution[zeltyPeriod] !== null && zeltyData.evolution[zeltyPeriod] !== undefined ? (zeltyData.evolution[zeltyPeriod] >= 0 ? '+' : '') + zeltyData.evolution[zeltyPeriod] + '%' : '--'
-  var zeltyEvolColor = zeltyData && zeltyData.evolution && zeltyData.evolution[zeltyPeriod] !== null && zeltyData.evolution[zeltyPeriod] !== undefined ? (zeltyData.evolution[zeltyPeriod] >= 0 ? '#009D3A' : '#CC0066') : '#888'
-  const NAV = [
-    {id: 'dash', label: 'Dashboard', icon: '⚡'},
-    {id: 'chasse', label: 'Tableau de chasse', icon: '🎯'},
-    {id: 'crm', label: 'CRM Prospects', icon: '◎'},
-    {id: 'annuaire', label: 'Annuaire', icon: '📒'},
-    {id: 'tasks', label: 'Taches', icon: '✓'},
-    {id: 'reporting', label: 'Reporting', icon: '📋'},
-    {id: 'vault', label: 'Coffre-fort', icon: '🔐'},
-    {id: 'gmb', label: 'Google My Biz.', icon: '⭐'},
-    {id: 'devis', label: 'Devis', icon: '📄'},
-    {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
-  ]
-
-  return (
-    <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
-      <style>{G}</style>
-
-      {!profile && (
-        <div style={{position:'fixed',inset:0,background:'#FFEB5A',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999,flexDirection:'column',gap:16}}>
-          <div style={{fontSize:48}}>😬</div>
-          <div style={{fontWeight:900,fontSize:14,textTransform:'uppercase',letterSpacing:3}}>Chargement...</div>
-        </div>
-      )}
-
-      <div className="topbar">
-        <button className="hamburger" onClick={function() { setSidebarOpen(!sidebarOpen) }}>☰</button>
-        <span style={{fontWeight:900,fontSize:18,textTransform:'uppercase',letterSpacing:2,color:'#FFEB5A'}}>meshuga</span>
-        <span className="yt" style={{fontSize:13,color:'#FF82D7'}}>{isEmy ? 'Emy' : 'Edward'}</span>
-      </div>
-
-      <div className="shell">
-        <div className={sidebarOpen ? 'sidebar-overlay open' : 'sidebar-overlay'} onClick={function() { setSidebarOpen(false) }} />
-        <div className={sidebarOpen ? 'sidebar open' : 'sidebar'}>
-          <div className="sb-logo">
-            <div className="sb-stamp">😬</div>
-            <div>
-              <div style={{fontWeight:900,fontSize:18,textTransform:'uppercase',letterSpacing:2,lineHeight:1}}>meshuga</div>
-              <div className="yt" style={{fontSize:12,opacity:.45}}>B2B Manager</div>
-            </div>
-          </div>
-          <nav className="sb-nav">
-            {NAV.filter(function(n) { return !n.edwardOnly || !isEmy }).map(function(n) {
-              return (
-                <div key={n.id} className={page === n.id ? 'ni active' : 'ni'} onClick={function() { nav(n.id) }}>
-                  <span style={{fontSize:14}}>{n.icon}</span>{n.label}
-                </div>
-              )
-            })}
-          </nav>
-          <div style={{padding:'10px 12px 14px',borderTop:'3px solid #191923'}}>
-            <div style={{fontWeight:900,fontSize:11,textTransform:'uppercase',marginBottom:4}}>{profile && (profile.full_name || (profile.email && profile.email.split('@')[0]))}</div>
-            <div className="yt" style={{fontSize:11,opacity:.4,marginBottom:8}}>{isEmy ? 'B2B Manager' : 'The Big Boss'}</div>
-            <button className="btn btn-sm" style={{width:'100%',justifyContent:'center',opacity:.6}} onClick={function() { sb().auth.signOut().then(function() { window.location.href = '/login' }) }}>
-              ↩ Déconnexion
-            </button>
-          </div>
-        </div>
-
-        <div className="main">
-          <div className="strip" />
-
-          {page === 'dash' && (
-            <div>
-              <div className="ph">
-                <div>
-                  <div className="pt">{isEmy ? 'Bonjour Emy' : 'Bonjour Edward'}</div>
-                  <div className="ps">{new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}</div>
-                </div>
-                {isEmy && <button className="btn btn-p btn-sm" onClick={function(){openModal('cr',{})}}>+ Nouveau CR</button>}
-              </div>
-
-              <div className="g4">
-                <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('devis')}}>
-                  <div className="kl">Devis en cours</div>
-                  <div className="kv" style={{fontSize:20}}>{devisList.filter(function(d){return d.statut==='envoye'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:devisList.filter(function(d){return d.statut==='envoye'}).length>0?'#005FFF':'rgba(25,25,35,.35)'}}>{devisList.filter(function(d){return d.statut==='envoye'}).length} devis en attente</div>
-                  <div className="ki" style={{opacity:.1}}>💶</div>
-                </div>
-                <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('devis')}}>
-                  <div className="kl">CA B2B signé</div>
-                  <div className="kv" style={{fontSize:20}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'#00AA44'}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).length} contrats signés 🎉</div>
-                  <div className="ki" style={{opacity:.1}}>📈</div>
-                </div>
-                <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('chasse')}}>
-                  <div className="kl">Prospectés</div>
-                  <div className="kv">{chasse.filter(function(p){return p.contacted}).length} <span style={{fontSize:16,fontWeight:400,opacity:.3}}>/ {chasse.length}</span></div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'rgba(25,25,35,.35)'}}>{chasse.length>0?Math.round(chasse.filter(function(p){return p.contacted}).length/chasse.length*100):0}% contactés</div>
-                  <div className="ki" style={{opacity:.1}}>🎯</div>
-                </div>
-                <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('crm')}}>
-                  <div className="kl">Pipeline actif</div>
-                  <div className="kv">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length}</div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:prospects.filter(function(p){return p.status==='nego'}).length>0?'#FF82D7':'rgba(25,25,35,.35)'}}>{prospects.filter(function(p){return p.status==='nego'}).length>0?prospects.filter(function(p){return p.status==='nego'}).length+' en négo 🔥':'aucune négo en cours'}</div>
-                  <div className="ki" style={{opacity:.1}}>◎</div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:prospects.filter(function(p){return p.status==='nego'}).length>0?'#FF82D7':'rgba(25,25,35,.35)'}}>{prospects.filter(function(p){return p.status==='nego'}).length>0?prospects.filter(function(p){return p.status==='nego'}).length+' en n&eacute;go':'aucune n&eacute;go'}</div>
+                  <div className="ki" style={{opacity:.1}}>&#9678;</div>
                 </div>
               </div>
 
