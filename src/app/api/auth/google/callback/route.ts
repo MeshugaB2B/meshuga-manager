@@ -15,26 +15,44 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard?page=gmb&gmb=error&reason=' + (error || 'no_code'), request.url))
   }
 
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_GMB_CLIENT_ID || ''
+  const clientSecret = process.env.GOOGLE_GMB_CLIENT_SECRET || ''
+  const redirectUri = 'https://meshuga-manager.vercel.app/api/auth/google/callback'
+
+  // Debug: verifier les valeurs
+  console.log('CLIENT_ID prefix:', clientId.substring(0, 20))
+  console.log('CLIENT_SECRET prefix:', clientSecret.substring(0, 10))
+  console.log('REDIRECT_URI:', redirectUri)
+  console.log('CODE length:', code.length)
+
   try {
-    const redirectUri = request.nextUrl.origin + '/api/auth/google/callback'
+    const body = new URLSearchParams({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code',
+    })
+
+    console.log('Posting to token endpoint...')
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: process.env.NEXT_PUBLIC_GOOGLE_GMB_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_GMB_CLIENT_SECRET!,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code',
-      }),
+      body: body.toString(),
     })
 
-    const tokens = await tokenRes.json()
+    const tokenText = await tokenRes.text()
+    console.log('Token response status:', tokenRes.status)
+    console.log('Token response:', tokenText.substring(0, 200))
+
+    let tokens: any
+    try { tokens = JSON.parse(tokenText) } catch { tokens = { error: tokenText } }
+
     if (!tokenRes.ok || !tokens.access_token) {
-      return NextResponse.redirect(new URL('/dashboard?page=gmb&gmb=error&reason=token_failed', request.url))
+      const reason = tokens.error_description || tokens.error || 'token_failed_' + tokenRes.status
+      return NextResponse.redirect(new URL('/dashboard?page=gmb&gmb=error&reason=' + encodeURIComponent(reason), request.url))
     }
 
-    // Stocker dans Supabase (upsert sur id=1)
     await sb.from('gmb_tokens').upsert({
       id: 1,
       access_token: tokens.access_token,
@@ -45,6 +63,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(new URL('/dashboard?page=gmb&gmb=connected', request.url))
   } catch (e: any) {
+    console.log('Exception:', e.message)
     return NextResponse.redirect(new URL('/dashboard?page=gmb&gmb=error&reason=' + encodeURIComponent(e.message), request.url))
   }
 }
