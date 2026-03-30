@@ -1214,31 +1214,45 @@ export default function DashboardPage() {
                 <div><div className="pt">CRM Prospects</div><div className="ps">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length} actifs · {prospects.length} total</div></div>
                 <button className="btn btn-y btn-sm" onClick={function() { openModal('prospect', {status:'to_contact',ca:0,files:[]}) }}>+ Nouveau</button>
               </div>
-              <div className="g4" style={{marginBottom:10}}>
-                <div className="kc" style={{background:'#FFFFFF',cursor:'default'}}>
-                  <div className="kl">Total pipeline</div>
-                  <div className="kv">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length}</div>
-                  <div style={{fontSize:10,opacity:.4,marginTop:2}}>{prospects.filter(function(p){return p.status==='nego'}).length} en négo</div>
-                  <div className="ki" style={{opacity:.08}}>◎</div>
+              {/* KPI CRM */}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8,marginBottom:10}}>
+                <div className='kc' style={{background:'#FFF',gridColumn:'1/-1'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                    <div className='kl'>CA B2B signé</div>
+                    <div style={{display:'flex',gap:4}}>
+                      {['month','year','all'].map(function(per){return(
+                        <button key={per} className='btn btn-sm' style={{fontSize:9,padding:'2px 7px',background:crmPeriod===per?'#191923':'transparent',color:crmPeriod===per?'#FFEB5A':'inherit'}} onClick={function(){setCrmPeriod(per)}}>{per==='month'?'Ce mois':per==='year'?'Cette année':'Total'}</button>
+                      )})}
+                    </div>
+                  </div>
+                  <div className='kv' style={{fontSize:22,color:'#009D3A'}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
+                  <div style={{fontFamily:'Yellowtail,cursive',fontSize:11,opacity:.5}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).length} contrats signés</div>
                 </div>
-                <div className="kc" style={{background:'#FFFFFF',cursor:'default'}}>
-                  <div className="kl">Clients gagnés</div>
-                  <div className="kv" style={{color:'#009D3A'}}>{prospects.filter(function(p){return p.status==='won'}).length}</div>
-                  <div style={{fontSize:10,opacity:.4,marginTop:2}}>CA : {prospects.filter(function(p){return p.status==='won'}).reduce(function(s,p){return s+(p.ca||0)},0).toLocaleString('fr-FR')} €</div>
-                  <div className="ki" style={{opacity:.08}}>🏆</div>
-                </div>
-                <div className="kc" style={{background:'#FFFFFF',cursor:'default'}}>
-                  <div className="kl">Relances à faire</div>
-                  <div className="kv" style={{color:prospects.filter(function(p){return p.nextDate&&p.nextDate<=new Date().toISOString().split('T')[0]&&p.status!=='won'&&p.status!=='lost'}).length>0?'#CC0066':'#191923'}}>{prospects.filter(function(p){return p.nextDate&&p.nextDate<=new Date().toISOString().split('T')[0]&&p.status!=='won'&&p.status!=='lost'}).length}</div>
-                  <div style={{fontSize:10,opacity:.4,marginTop:2}}>en retard</div>
-                  <div className="ki" style={{opacity:.08}}>⚠️</div>
-                </div>
-                <div className="kc" style={{background:'#FFFFFF',cursor:'default'}}>
-                  <div className="kl">Taux conversion</div>
-                  <div className="kv">{prospects.length>0?Math.round(prospects.filter(function(p){return p.status==='won'}).length/prospects.length*100):0}%</div>
-                  <div style={{fontSize:10,opacity:.4,marginTop:2}}>{prospects.filter(function(p){return p.status==='lost'}).length} perdus</div>
-                  <div className="ki" style={{opacity:.08}}>📈</div>
-                </div>
+                <div className='kc' style={{background:'#FFF',cursor:'pointer'}} onClick={function(){setCrmFilter(function(f){return f==='nego'?'all':'nego'})}}><div className='kl'>En négo</div><div className='kv' style={{color:'#FF82D7'}}>{prospects.filter(function(p){return p.status==='nego'}).length}</div><div className='ki' style={{opacity:.08}}>🔥</div></div>
+                <div className='kc' style={{background:'#FFF'}}><div className='kl'>Devis à valider</div><div className='kv' style={{color:'#005FFF'}}>{devisList.filter(function(d){return d.statut==='envoye'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:11,opacity:.4}}>€</span></div><div style={{fontFamily:'Yellowtail,cursive',fontSize:11,color:devisList.filter(function(d){return d.statut==='envoye'}).length>0?'#005FFF':'rgba(25,25,35,.35)'}}>{devisList.filter(function(d){return d.statut==='envoye'}).length} en attente</div></div>
+                <div className='kc' style={{background:'#FFF',cursor:'pointer'}} onClick={function(){setCrmFilter(function(f){return f==='contacted'?'all':'contacted'})}}><div className='kl'>Contactés</div><div className='kv' style={{color:'#005FFF'}}>{prospects.filter(function(p){return p.status==='contacted'}).length}</div></div>
+                <div className='kc' style={{background:'#FFF',cursor:'pointer'}} onClick={function(){setCrmFilter(function(f){return f==='won'?'all':'won'})}}><div className='kl'>Gagnés</div><div className='kv' style={{color:'#009D3A'}}>{prospects.filter(function(p){return p.status==='won'}).length}</div><div className='ki' style={{opacity:.08}}>🏆</div></div>
+                <div className='kc' style={{background:'#FFF'}}><div className='kl'>Conversion</div><div className='kv'>{prospects.length>0?Math.round(prospects.filter(function(p){return p.status==='won'}).length/prospects.length*100):0}<span style={{fontSize:14,fontWeight:400}}>%</span></div><div className='ki' style={{opacity:.08}}>📈</div></div>
+              </div>
+              <div style={{background:'#191923',borderRadius:7,padding:'12px 14px',marginBottom:10,color:'#fff'}}>
+                <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:1,marginBottom:8,color:'#FFEB5A'}}>💡 Actions prioritaires</div>
+                {(function(){
+                  var acts=[];var tod=new Date().toISOString().split('T')[0];
+                  var late=prospects.filter(function(p){return p.nextDate&&p.nextDate<=tod&&p.status!=='won'&&p.status!=='lost'})
+                  var denv=devisList.filter(function(d){return d.statut==='envoye'})
+                  var neg=prospects.filter(function(p){return p.status==='nego'})
+                  if(late.length>0)acts.push({e:'🔴',t:'URGENT — '+late.length+' relance(s) en retard : '+late.slice(0,2).map(function(p){return p.name}).join(', ')})
+                  if(denv.length>0)acts.push({e:'💶',t:'Relancer '+denv.length+' devis — '+denv.reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0).toLocaleString('fr-FR')+'€ HT'})
+                  if(neg.length>0)acts.push({e:'🔥',t:neg.length+' en négo — '+neg.slice(0,2).map(function(p){return p.name}).join(', ')})
+                  if(prospects.filter(function(p){return p.status==='to_contact'}).length>20)acts.push({e:'🎯',t:prospects.filter(function(p){return p.status==='to_contact'}).length+' jamais contactés — 5 appels/jour'})
+                  if(acts.length===0)acts.push({e:'✅',t:'Pipeline en bonne santé !'})
+                  return acts.map(function(a,i){return(
+                    <div key={i} style={{display:'flex',gap:8,alignItems:'flex-start',marginBottom:4,paddingBottom:4,borderBottom:i<acts.length-1?'1px solid rgba(255,255,255,.08)':'none'}}>
+                      <span style={{fontSize:14,flexShrink:0}}>{a.e}</span>
+                      <span style={{fontSize:12,lineHeight:1.4,opacity:.9}}>{a.t}</span>
+                    </div>
+                  )})
+                })()}
               </div>
               {prospects.map(function(p) {
                 return (
