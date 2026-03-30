@@ -1,4 +1,4 @@
-'use client'
+'use client' // build-fix
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 
