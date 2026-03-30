@@ -461,6 +461,51 @@ const ALL_PROSPECTS = [
   {id:'asso03',cat:'institution',name:'CCI Paris Ile-de-France',contact:'Direction',phone:'01 55 65 35 35',email:'contact@cci.fr',site:'cci-paris-idf.fr',taille:'500',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:0,type:'Evenements entreprises & networking',pitch:'CCI Paris = reseau entreprises. Events networking, remises prix. Meshuga = traiteur entreprises de ref.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
   {id:'asso04',cat:'institution',name:'Medef Paris',contact:'Direction',phone:'01 53 59 19 19',email:'contact@medef.fr',site:'medef.fr',taille:'200',arrondissement:'Paris 8e',valeur_event:2500,valeur_mois:0,type:'Events patronaux & assemblee',pitch:'Medef = federation patronale. AG, dinners debats. Meshuga = food premium de reference.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
 
+  {id:'av26',cat:'avocats',name:'Gorrissen Federspiel',contact:'Direction',phone:'01 44 44 60 00',email:'paris@gorrissenfederspiel.com',site:'gorrissenfederspiel.com',taille:'60',arrondissement:'Paris 8e',valeur_event:1200,valeur_mois:0,type:'Client lunches & working',pitch:'Cabinet scandinave premium Paris. Dejeuners working quotidiens. Meshuga = upgrade immediat.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'av27',cat:'avocats',name:'Lacourte Raquin Tatar',contact:'Direction',phone:'01 44 90 20 20',email:'contact@lrt-avocats.com',site:'lrt-avocats.com',taille:'80',arrondissement:'Paris 8e',valeur_event:1200,valeur_mois:0,type:'Dejeuners equipes & clients',pitch:'Cabinet mid-market premium. Culture qualite. Meshuga = le traiteur qui correspond.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'av28',cat:'avocats',name:'Goodwin Paris',contact:'Direction',phone:'01 73 06 40 00',email:'paris@goodwinlaw.com',site:'goodwinlaw.com',taille:'100',arrondissement:'Paris 8e',valeur_event:1500,valeur_mois:0,type:'Working lunches & pitches VC',pitch:'Goodwin = cabinet tech & VC international. Clientele startups et VCs. Meshuga = food startup premium.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'av29',cat:'avocats',name:'Orrick Paris',contact:'Direction',phone:'01 53 53 75 00',email:'paris@orrick.com',site:'orrick.com',taille:'100',arrondissement:'Paris 8e',valeur_event:1500,valeur_mois:0,type:'Working lunches & events clients',pitch:'Orrick = cabinet tech & finance US. Culture silicon valley. Meshuga = NY deli = resonance.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'av30',cat:'avocats',name:'Willkie Farr Paris',contact:'Direction',phone:'01 53 43 45 00',email:'paris@willkie.com',site:'willkie.com',taille:'80',arrondissement:'Paris 8e',valeur_event:1800,valeur_mois:0,type:'M&A lunches & client presentations',pitch:'Willkie = M&A premium international. Exigence maximale. Meshuga = traiteur a leur niveau.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'st28',cat:'startup',name:'Doctolib',contact:'Direction',phone:'',email:'workplace@doctolib.fr',site:'doctolib.fr',taille:'1000',arrondissement:'Paris 19e',valeur_event:2500,valeur_mois:0,type:'All-hands & events equipes',pitch:'Doctolib = licorne sante. Culture startup premium. Meshuga = food premium pour leurs events.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'st29',cat:'startup',name:'Alan',contact:'Direction',phone:'',email:'hello@alan.com',site:'alan.com',taille:'300',arrondissement:'Paris 10e',valeur_event:1500,valeur_mois:0,type:'All-hands & culture food',pitch:'Alan = assurance sante premium tech. Culture transparence et qualite. Meshuga = le choix premium.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'st30',cat:'startup',name:'Payfit',contact:'Direction',phone:'',email:'contact@payfit.com',site:'payfit.com',taille:'500',arrondissement:'Paris 8e',valeur_event:1500,valeur_mois:0,type:'Events equipes & all-hands',pitch:'Payfit = SaaS RH croissance. Culture startup premium europeenne. Meshuga = food events de reference.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'st31',cat:'startup',name:'Qonto',contact:'Direction',phone:'',email:'hello@qonto.com',site:'qonto.com',taille:'700',arrondissement:'Paris 9e',valeur_event:2000,valeur_mois:0,type:'All-hands & events culture',pitch:'Qonto = fintech europeenne premium. Culture fond premium. Meshuga = le traiteur qui match.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'st32',cat:'startup',name:'Contentsquare',contact:'Direction',phone:'',email:'contact@contentsquare.com',site:'contentsquare.com',taille:'800',arrondissement:'Paris 2e',valeur_event:2000,valeur_mois:0,type:'Events equipes internationales',pitch:'Contentsquare = licorne analytics. Equipes monde entier. Culture US-French. Meshuga = food premium.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'st33',cat:'startup',name:'Back Market',contact:'Direction',phone:'',email:'contact@backmarket.fr',site:'backmarket.fr',taille:'700',arrondissement:'Paris 11e',valeur_event:1500,valeur_mois:0,type:'Events impact & equipes',pitch:'Back Market = marketplace reconditionne premium. Culture impact positive. Meshuga = artisan premium.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'st34',cat:'startup',name:'Exotec',contact:'Direction',phone:'',email:'contact@exotec.com',site:'exotec.com',taille:'400',arrondissement:'Paris 8e',valeur_event:1500,valeur_mois:0,type:'Events tech & equipes',pitch:'Exotec = robotique logistique scale-up. Culture ingenierie premium. Meshuga = food de reference.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'st35',cat:'startup',name:'Ivalua',contact:'Direction',phone:'',email:'contact@ivalua.com',site:'ivalua.com',taille:'300',arrondissement:'Paris 8e',valeur_event:1500,valeur_mois:0,type:'Working lunches & events clients',pitch:'Ivalua = procurement SaaS. Clients grands groupes. Exigence premium. Meshuga = upgrade.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'tec17',cat:'tech',name:'SAP France',contact:'Direction',phone:'01 41 10 35 00',email:'contact@sap.com',site:'sap.com',taille:'1000',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:0,type:'Events clients & equipes',pitch:'SAP = ERP mondial. Events clients grands comptes reguliers. Meshuga = traiteur premium tech.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'tec18',cat:'tech',name:'Oracle France',contact:'Direction',phone:'01 57 60 60 60',email:'contact@oracle.com',site:'oracle.com',taille:'800',arrondissement:'Paris 8e',valeur_event:2500,valeur_mois:0,type:'Working lunches & events clients',pitch:'Oracle = cloud & data premium. Clients enterprises. Meshuga = le choix premium evident.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'tec19',cat:'tech',name:'Cisco France',contact:'Direction',phone:'01 58 04 60 00',email:'contact@cisco.com',site:'cisco.fr',taille:'600',arrondissement:'Paris 8e',valeur_event:2500,valeur_mois:0,type:'Events tech & equipes',pitch:'Cisco = networking mondial. Events equipes reguliers. Meshuga = food premium US culture.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'tec20',cat:'tech',name:'IBM France',contact:'Direction',phone:'01 49 05 70 00',email:'contact@fr.ibm.com',site:'ibm.com',taille:'1500',arrondissement:'Paris 15e',valeur_event:3000,valeur_mois:0,type:'Events innovation & equipes',pitch:'IBM = tech historique, culture innovation. Events reguliers. Meshuga = traiteur premium.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'tec21',cat:'tech',name:'Capgemini Cloud',contact:'Direction',phone:'01 47 54 50 00',email:'contact@capgemini.com',site:'capgemini.com',taille:'2000',arrondissement:'Paris 8e',valeur_event:2500,valeur_mois:0,type:'Events tech & culture',pitch:'Capgemini = services tech premium. Events cloud & innovation. Meshuga = le choix.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'co17',cat:'conseil',name:'Sia Partners',contact:'Direction',phone:'01 44 54 77 00',email:'contact@sia-partners.com',site:'sia-partners.com',taille:'500',arrondissement:'Paris 8e',valeur_event:2000,valeur_mois:0,type:'Working lunches & events clients',pitch:'Sia Partners = conseil management premium. Clients secteur public & prive. Meshuga = upgrade.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'co18',cat:'conseil',name:'Advancy',contact:'Direction',phone:'01 73 05 03 00',email:'contact@advancy.com',site:'advancy.com',taille:'80',arrondissement:'Paris 8e',valeur_event:1800,valeur_mois:0,type:'Dejeuners strategy & client presentations',pitch:'Advancy = boutique conseil strategy. Clientele grands groupes. Exigence qualite. Meshuga = le choix.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'co19',cat:'conseil',name:'Square Management',contact:'Direction',phone:'01 55 33 55 00',email:'contact@squaremanagement.com',site:'squaremanagement.com',taille:'200',arrondissement:'Paris 8e',valeur_event:1500,valeur_mois:0,type:'Dejeuners equipes & client meetings',pitch:'Square = conseil management premium. Equipes exigeantes. Meshuga = traiteur qui correspond.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'co20',cat:'conseil',name:'Colombus Consulting',contact:'Direction',phone:'01 53 27 14 14',email:'contact@colombus-consulting.com',site:'colombus-consulting.com',taille:'200',arrondissement:'Paris 8e',valeur_event:1500,valeur_mois:0,type:'Working lunches & events',pitch:'Colombus = conseil digital & data. Culture innovation. Meshuga = food premium naturel.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'med07',cat:'medias',name:'Les Echos Evenements',contact:'Direction',phone:'01 49 53 65 65',email:'events@lesechos.fr',site:'lesechos.fr',taille:'200',arrondissement:'Paris 10e',valeur_event:3000,valeur_mois:0,type:'Conferences premium & forums',pitch:'Les Echos Events = conferences B2B premium. Clients grands groupes. Meshuga = traiteur qui correspond.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'med08',cat:'medias',name:'Forbes France',contact:'Direction',phone:'01 83 79 45 00',email:'contact@forbes.fr',site:'forbes.fr',taille:'50',arrondissement:'Paris 8e',valeur_event:2000,valeur_mois:0,type:'Events Forbes & dejeuners',pitch:'Forbes France = media business premium. Dejeuners redaction, events abonnes. Meshuga = evidence.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'med09',cat:'medias',name:'Challenges',contact:'Direction',phone:'01 44 88 34 34',email:'contact@challenges.fr',site:'challenges.fr',taille:'200',arrondissement:'Paris 15e',valeur_event:1500,valeur_mois:0,type:'Conferences & events redaction',pitch:'Challenges = hebdo economique premium. Conferences, rencontres dirigeants. Meshuga = food reference.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'cw21',cat:'coworking',name:'The Bureau Paris',contact:'Direction',phone:'01 84 80 29 00',email:'contact@thebureau.fr',site:'thebureau.fr',taille:'200',arrondissement:'Paris 9e',valeur_event:1200,valeur_mois:0,type:'Events membres & networking',pitch:'The Bureau = coworking concept store. Membres creatifs premium. Meshuga = le food partenaire ideal.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'cw22',cat:'coworking',name:'Mozaic Paris',contact:'Direction',phone:'01 53 20 15 15',email:'contact@mozaic.com',site:'mozaic.com',taille:'150',arrondissement:'Paris 9e',valeur_event:1000,valeur_mois:0,type:'Plateaux membres & events',pitch:'Mozaic = coworking premium Paris 9e. Communaute pro. Meshuga = traiteur naturel.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'cw23',cat:'coworking',name:'Lhôtel Coworking',contact:'Direction',phone:'01 40 21 22 00',email:'contact@lhotel.fr',site:'lhotel.fr',taille:'100',arrondissement:'Paris 6e',valeur_event:900,valeur_mois:0,type:'Events membres Paris 6e',pitch:'Coworking boutique Paris 6e. Membres premium, voisins de Meshuga. Partenariat naturel.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'san07',cat:'medical',name:'Biomérieux France',contact:'Direction',phone:'04 78 87 20 00',email:'contact@biomerieux.fr',site:'biomerieux.fr',taille:'500',arrondissement:'Lyon / Paris 8e',valeur_event:2000,valeur_mois:0,type:'Events scientifiques & direction',pitch:'Biomerieux = diagnostics medicaux. Conferences scientifiques Paris. Meshuga = traiteur premium.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'san08',cat:'medical',name:'Ipsen France',contact:'Direction',phone:'01 58 33 50 00',email:'contact@ipsen.com',site:'ipsen.com',taille:'500',arrondissement:'Paris 8e',valeur_event:2500,valeur_mois:0,type:'Events direction & conferences',pitch:'Ipsen = pharma mid-cap premium. Conferences medicales Paris. Meshuga = upgrade traiteur.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'ass06',cat:'banque',name:'CNP Assurances',contact:'Direction',phone:'01 42 18 88 88',email:'contact@cnp.fr',site:'cnp.fr',taille:'1000',arrondissement:'Paris 15e',valeur_event:2000,valeur_mois:0,type:'Events direction & AG',pitch:'CNP = 1er assureur vie France. AG, evenements direction. Meshuga = traiteur de reference.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'ass07',cat:'banque',name:'MMA Assurances',contact:'Direction',phone:'01 44 69 20 00',email:'contact@mma.fr',site:'mma.fr',taille:'500',arrondissement:'Paris 9e',valeur_event:1500,valeur_mois:0,type:'Events equipes & direction',pitch:'MMA = assureur premium. Seminaires, events direction. Meshuga = upgrade immediat.',score:6,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'tra04',cat:'conseil',name:'Renault Groupe',contact:'Direction',phone:'01 76 84 04 04',email:'contact@renault.com',site:'renault.com',taille:'3000',arrondissement:'Boulogne',valeur_event:3000,valeur_mois:0,type:'Events presse & direction',pitch:'Renault = constructeur iconique. Events presse, lancements. Meshuga = food premium reference.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'tra05',cat:'conseil',name:'RATP Dev',contact:'Direction',phone:'01 58 77 40 40',email:'contact@ratp.fr',site:'ratp.fr',taille:'2000',arrondissement:'Paris 12e',valeur_event:2000,valeur_mois:0,type:'Events direction & corporates',pitch:'RATP = mobilite premium. Evenements direction, partenaires. Meshuga = traiteur qui correspond.',score:6,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'rp05',cat:'agence_pub',name:'Edelman Paris',contact:'Direction',phone:'01 40 15 13 00',email:'contact@edelman.com',site:'edelman.com',taille:'100',arrondissement:'Paris 8e',valeur_event:1800,valeur_mois:0,type:'Events presse & clients',pitch:'Edelman = agence RP mondiale. Clients marques premium. Events presse reguliers. Meshuga = ref.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'rp06',cat:'agence_pub',name:'Brunswick Group',contact:'Direction',phone:'01 53 96 83 83',email:'contact@brunswickgroup.com',site:'brunswickgroup.com',taille:'60',arrondissement:'Paris 8e',valeur_event:2000,valeur_mois:0,type:'Events presse & financiers',pitch:'Brunswick = RP financiere & corporate premium. Clients CAC40. Meshuga = traiteur a leur niveau.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'rp07',cat:'agence_pub',name:'Havas PR Paris',contact:'Direction',phone:'01 58 47 84 00',email:'contact@havaspr.com',site:'havaspr.com',taille:'80',arrondissement:'Paris 8e',valeur_event:1500,valeur_mois:0,type:'Events presse & partenaires',pitch:'Havas PR = RP premium. Dejeuners journalistes, events marques. Meshuga = food reference.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'sport03',cat:'conseil',name:'Accor Arena',contact:'Direction',phone:'01 72 60 36 36',email:'contact@accor-arena.com',site:'accor-arena.com',taille:'200',arrondissement:'Paris 12e',valeur_event:5000,valeur_mois:0,type:'Hospitalite VIP & events',pitch:'Accor Arena = salle concerts & events majeurs Paris. Loges VIP, catering premium. Meshuga = food iconic.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'sport04',cat:'conseil',name:'Racing 92',contact:'Direction',phone:'01 47 82 15 00',email:'contact@racing92.fr',site:'racing92.fr',taille:'100',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:0,type:'Loges VIP & events corporate',pitch:'Racing 92 = rugby premium. Loges Defcar, events partenaires. Meshuga = food premium matchday.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'aut01',cat:'conseil',name:'BPI France',contact:'Direction',phone:'01 41 79 80 00',email:'contact@bpifrance.fr',site:'bpifrance.fr',taille:'1000',arrondissement:'Paris 15e',valeur_event:3000,valeur_mois:0,type:'Events startups & innovation',pitch:'BPI = banque publique investissement. French Tech, events startups. Meshuga = food innovation.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'aut02',cat:'conseil',name:'Business France',contact:'Direction',phone:'01 40 73 30 00',email:'contact@businessfrance.fr',site:'businessfrance.fr',taille:'500',arrondissement:'Paris 8e',valeur_event:2000,valeur_mois:0,type:'Events export & reception etrangers',pitch:'Business France = agence export. Receptions delegations etrangeres. Meshuga = vitrine gastronomie.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'aut03',cat:'conseil',name:'Choose Paris Region',contact:'Direction',phone:'01 42 68 13 26',email:'contact@chooseparisregion.fr',site:'chooseparisregion.fr',taille:'100',arrondissement:'Paris 8e',valeur_event:2000,valeur_mois:0,type:'Events investisseurs etrangers',pitch:'Choose Paris = agence attration. Receptions investisseurs monde entier. Meshuga = ambassadeur food.',score:9,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'aut04',cat:'conseil',name:'INRAE Paris',contact:'Direction',phone:'01 42 75 90 00',email:'contact@inrae.fr',site:'inrae.fr',taille:'300',arrondissement:'Paris 15e',valeur_event:1500,valeur_mois:0,type:'Colloques scientifiques & receptions',pitch:'INRAE = recherche agro premium. Colloques, seminaires. Meshuga = food artisan qui correspond.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+  {id:'aut05',cat:'conseil',name:'CNRS Paris',contact:'Direction',phone:'01 44 96 40 00',email:'contact@cnrs.fr',site:'cnrs.fr',taille:'500',arrondissement:'Paris 16e',valeur_event:2000,valeur_mois:0,type:'Colloques & evenements scientifiques',pitch:'CNRS = recherche fondamentale. Colloques, remises prix. Meshuga = excellence gastronomique.',score:7,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
+
 ]
 
 export default function DashboardPage() {
@@ -655,7 +700,7 @@ export default function DashboardPage() {
     ]
     const pick3 = pressLinks.sort(function(){return Math.random()-0.5}).slice(0,3)
     const pressNames = pick3.map(function(l){return l.name}).join(', ')
-    const prompt = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium cite par la presse parisienne.\n\nEcris un email B2B en FRANCAIS avec tous les accents. Texte brut UNIQUEMENT, zero Markdown, zero URL. Cite 1-2 medias parmi : ' + pressNames + '.\n\nProspect :\n- ' + p.name + ' (' + p.arrondissement + ', ' + p.taille + ' employes)\n- ' + p.type + '\n- ' + p.pitch + '\n\nEmail 6-8 lignes, Objet en 1ere ligne, ton direct.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
+    const prompt = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (3 rue Vavin, Paris 6e, face au Luxembourg). Restaurant new-yorkais gastronomique : pastrami, lobster roll, tuna melt, grilled cheese.\n\nRedige un email de prospection B2B en FRANCAIS. Utilise les accents : e accent, a accent, c cedille, etc. STRICTEMENT texte brut - zero Markdown, zero URL, zero crochets.\n\nCite exactement 1 ou 2 de ces medias dans le corps du texte (juste leurs noms, integres naturellement dans une phrase) : ' + pressNames + '.\nExemple : 'reperes par Konbini et salues dans les Echos' ou 'mentionnes par Telerama'\n\nProspect :\n- ' + p.name + ' (' + p.arrondissement + ', ' + p.taille + ' employes)\n- Secteur : ' + (CATS_MAP[p.cat]?CATS_MAP[p.cat].label:p.cat) + '\n- Proposition : ' + p.type + '\n- Angle : ' + p.pitch + '\n\nFormat : 1ere ligne = Objet: [titre accrocheur]. Puis corps 5-7 lignes max, ton direct et personnalise.\nSignature : ' + senderSig + ' | Meshuga Crazy Deli | 3 rue Vavin, Paris 6e'
     try {
       const res = await fetch('/api/generate-email', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: prompt})})
       const data = await res.json()
@@ -1115,12 +1160,23 @@ export default function DashboardPage() {
                       {p.site && <a href={'https://'+p.site} target="_blank" rel="noopener noreferrer" style={{color:'#005FFF',textDecoration:'none'}}>🌐 {p.site}</a>}
                       {p.linkedin && <a href={p.linkedin.indexOf('http') === 0 ? p.linkedin : 'https://'+p.linkedin} target="_blank" rel="noopener noreferrer" style={{color:'#0077B5',fontWeight:900,textDecoration:'none'}}>🔗 LinkedIn</a>}
                     </div>
-                    <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                    <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
                       <button className="btn btn-p btn-sm" onClick={function() { generateEmail(p) }}>✉️ Email IA</button>
-                      {p.status === 'to_contact' && <button className="btn btn-g btn-sm" onClick={function() { contactProspect(p.id) }}>✓ Contacte</button>}
-                      {p.status === 'contacted' && <button className="btn btn-b btn-sm" onClick={function() { setChasse(function(prev) { return prev.map(function(x) { return x.id===p.id ? Object.assign({},x,{status:'nego'}) : x }) }); toast('Passe en nego') }}>→ Nego</button>}
-                      {p.status === 'nego' && <button className="btn btn-g btn-sm" onClick={function() { setChasse(function(prev) { return prev.map(function(x) { return x.id===p.id ? Object.assign({},x,{status:'won'}) : x }) }); toast('🎉 Gagne!') }}>✓ Gagne</button>}
+                      <button className="btn btn-sm" style={{fontSize:10,background:'#FFEB5A',border:'2px solid #191923'}} onClick={function() { openModal('editChasse', Object.assign({},p)) }}>✏️ Modifier</button>
+                      {p.status === 'to_contact' && <button className="btn btn-g btn-sm" onClick={function() { contactProspect(p.id) }}>📞 Contacté</button>}
+                      {p.status === 'contacted' && (
+                        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                          {(!p.relanceStatut || p.relanceStatut === 'en_attente') && <button className="btn btn-sm" style={{background:'#005FFF',color:'#fff',fontSize:10}} onClick={function() { relanceProspect(p.id) }}>↩ Relancer</button>}
+                          {p.relanceStatut === 'relance' && <span style={{fontSize:9,fontWeight:900,padding:'3px 7px',background:'#FF6B2B',color:'#fff',borderRadius:3}}>↩ Relancé</span>}
+                          <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function() { reponseProspect(p.id,'interesse') }}>✅ Intéressé</button>
+                          <button className="btn btn-sm" style={{background:'#FF6B2B',color:'#fff',fontSize:10}} onClick={function() { reponseProspect(p.id,'rappeler') }}>📞 Rappeler</button>
+                          <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function() { reponseProspect(p.id,'lost') }}>✗ Non</button>
+                        </div>
+                      )}
+                      {p.status === 'nego' && <button className="btn btn-g btn-sm" onClick={function() { setChasse(function(prev) { return prev.map(function(x) { return x.id===p.id ? Object.assign({},x,{status:'won'}) : x }) }); toast('🎉 Gagné!') }}>🏆 Gagné!</button>}
+                      {p.status === 'won' && <span style={{fontSize:9,fontWeight:900,padding:'3px 8px',background:'#009D3A',color:'#fff',borderRadius:3}}>🏆 Client</span>}
                     </div>
+                    {p.lastAction && <div style={{fontSize:9,opacity:.45,marginTop:4,fontStyle:'italic'}}>{'→ '+p.lastAction+(p.relanceDate?' · relance '+p.relanceDate:'')}</div>}
                   </div>
                 )
               })}
@@ -1130,30 +1186,75 @@ export default function DashboardPage() {
           {page === 'crm' && (
             <div>
               <div className="ph">
-                <div><div className="pt">CRM Prospects</div><div className="ps">{prospects.length} prospects</div></div>
+                <div><div className="pt">CRM Prospects</div><div className="ps">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length} actifs · {prospects.length} total</div></div>
                 <button className="btn btn-y btn-sm" onClick={function() { openModal('prospect', {status:'to_contact',ca:0,files:[]}) }}>+ Nouveau</button>
+              </div>
+              <div className="g4" style={{marginBottom:10}}>
+                <div className="kc" style={{background:'#FFFFFF',cursor:'default'}}>
+                  <div className="kl">Total pipeline</div>
+                  <div className="kv">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length}</div>
+                  <div style={{fontSize:10,opacity:.4,marginTop:2}}>{prospects.filter(function(p){return p.status==='nego'}).length} en négo</div>
+                  <div className="ki" style={{opacity:.08}}>◎</div>
+                </div>
+                <div className="kc" style={{background:'#FFFFFF',cursor:'default'}}>
+                  <div className="kl">Clients gagnés</div>
+                  <div className="kv" style={{color:'#009D3A'}}>{prospects.filter(function(p){return p.status==='won'}).length}</div>
+                  <div style={{fontSize:10,opacity:.4,marginTop:2}}>CA : {prospects.filter(function(p){return p.status==='won'}).reduce(function(s,p){return s+(p.ca||0)},0).toLocaleString('fr-FR')} €</div>
+                  <div className="ki" style={{opacity:.08}}>🏆</div>
+                </div>
+                <div className="kc" style={{background:'#FFFFFF',cursor:'default'}}>
+                  <div className="kl">Relances à faire</div>
+                  <div className="kv" style={{color:prospects.filter(function(p){return p.nextDate&&p.nextDate<=new Date().toISOString().split('T')[0]&&p.status!=='won'&&p.status!=='lost'}).length>0?'#CC0066':'#191923'}}>{prospects.filter(function(p){return p.nextDate&&p.nextDate<=new Date().toISOString().split('T')[0]&&p.status!=='won'&&p.status!=='lost'}).length}</div>
+                  <div style={{fontSize:10,opacity:.4,marginTop:2}}>en retard</div>
+                  <div className="ki" style={{opacity:.08}}>⚠️</div>
+                </div>
+                <div className="kc" style={{background:'#FFFFFF',cursor:'default'}}>
+                  <div className="kl">Taux conversion</div>
+                  <div className="kv">{prospects.length>0?Math.round(prospects.filter(function(p){return p.status==='won'}).length/prospects.length*100):0}%</div>
+                  <div style={{fontSize:10,opacity:.4,marginTop:2}}>{prospects.filter(function(p){return p.status==='lost'}).length} perdus</div>
+                  <div className="ki" style={{opacity:.08}}>📈</div>
+                </div>
               </div>
               {prospects.map(function(p) {
                 return (
-                  <div key={p.id} className="card" style={{cursor:'pointer',marginBottom:8}} onClick={function() { openModal('prospect', Object.assign({}, p)) }}>
+                  <div key={p.id} className="card" style={{marginBottom:8}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:6}}>
-                      <div>
-                        <div style={{fontWeight:900,fontSize:14}}>{p.name}</div>
+                      <div style={{flex:1}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:3}}>
+                          <div style={{fontWeight:900,fontSize:14,cursor:'pointer'}} onClick={function(){openModal('prospect',Object.assign({},p))}}>{p.name}</div>
+                          <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>
+                        </div>
                         <div style={{fontSize:11,opacity:.5}}>{p.category} · {p.email}</div>
                       </div>
-                      <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>
+                      <div style={{display:'flex',gap:4,flexShrink:0}}>
+                        <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){openModal('prospect',Object.assign({},p))}}>✏️</button>
+                        <button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={function(e){e.stopPropagation();generateEmail(Object.assign({},p,{cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category}))}}>✉️ Email</button>
+                      </div>
                     </div>
-                    {p.nextDate && <div style={{fontSize:11,opacity:.6,color:p.nextDate<=today?'#CC0066':'inherit'}}>{p.nextDate<=today?'⚠️ ':''}{p.nextAction}</div>}
-                    {p.files && p.files.filter(function(f) { return f && f.trim() }).length > 0 && (
+                    {p.nextDate && <div style={{fontSize:11,opacity:.6,marginBottom:4,color:p.nextDate<=new Date().toISOString().split('T')[0]?'#CC0066':'inherit'}}>{p.nextDate<=new Date().toISOString().split('T')[0]?'⚠️ ':''}{p.nextAction} — {p.nextDate}</div>}
+                    <div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:4}}>
+                      {p.status==='to_contact' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function(){
+                        var today=new Date().toISOString().split('T')[0]
+                        var rel=new Date();rel.setDate(rel.getDate()+7)
+                        setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'contacted',nextDate:rel.toISOString().split('T')[0],nextAction:'Relance J+7'}):x})})
+                        setTasks(function(prev){return prev.concat([{id:'crm-rel-'+p.id+'-'+Date.now(),title:'Relancer '+p.name,assignee:'emy',priority:'medium',status:'todo',deadline:rel.toISOString().split('T')[0],checklist:[],files:[]}])})
+                        toast('Contacté ✓ — relance dans 7 jours')
+                      }}>📞 Contacté</button>}
+                      {p.status==='contacted' && <button className="btn btn-sm" style={{background:'#005FFF',color:'#fff',fontSize:10}} onClick={function(){
+                        var rel=new Date();rel.setDate(rel.getDate()+7)
+                        setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{nextDate:rel.toISOString().split('T')[0],nextAction:'2ème relance'}):x})})
+                        setTasks(function(prev){return prev.concat([{id:'crm-rel2-'+p.id+'-'+Date.now(),title:'2ème relance '+p.name,assignee:'emy',priority:'high',status:'todo',deadline:rel.toISOString().split('T')[0],checklist:[],files:[]}])})
+                        toast('Relancé ✓')
+                      }}>↩ Relancer</button>}
+                      {p.status==='contacted' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'nego'}):x})});toast('En négo !')}}>✅ Intéressé → Négo</button>}
+                      {p.status==='contacted' && <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'lost'}):x})});toast('Archivé')}}>✗ Non</button>}
+                      {p.status==='nego' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'won'}):x})});toast('🏆 Gagné !')}}>🏆 Gagné</button>}
+                    </div>
+                    {p.files && p.files.filter(function(f){return f&&f.trim()}).length>0 && (
                       <div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:6}}>
-                        {p.files.filter(function(f) { return f && f.trim() }).map(function(f, i) {
-                          return <span key={i} style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:3,padding:'2px 6px',fontSize:9,fontWeight:900}}>📦 {f.slice(0,25)}</span>
-                        })}
+                        {p.files.filter(function(f){return f&&f.trim()}).map(function(f,i){return <span key={i} style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:3,padding:'2px 6px',fontSize:9,fontWeight:900}}>📦 {f.slice(0,25)}</span>})}
                       </div>
                     )}
-                    <div style={{marginTop:6}}>
-                      <button className="btn btn-p btn-sm" onClick={function(e) { e.stopPropagation(); generateEmail(Object.assign({}, p, {cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category})) }}>✉️ Email IA</button>
-                    </div>
                   </div>
                 )
               })}
@@ -1750,7 +1851,50 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {modal === 'cr' && (
+              {modal === 'editChasse' && (
+          <div className="overlay" onClick={closeModal}>
+            <div className="modal modal-xl" onClick={function(e) { e.stopPropagation() }}>
+              <div className="mh"><div className="mt">✏️ Modifier — {form.name}</div></div>
+              <div className="mb">
+                <div className="fg2">
+                  <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Nom entreprise *</label><input className="inp" value={form.name||''} onChange={function(e){setForm(Object.assign({},form,{name:e.target.value}))}} /></div>
+                  <div className="fg"><label className="lbl">Téléphone</label><input className="inp" value={form.phone||''} onChange={function(e){setForm(Object.assign({},form,{phone:e.target.value}))}} /></div>
+                  <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e){setForm(Object.assign({},form,{email:e.target.value}))}} /></div>
+                  <div className="fg"><label className="lbl">Contact (nom)</label><input className="inp" value={form.contact||''} onChange={function(e){setForm(Object.assign({},form,{contact:e.target.value}))}} /></div>
+                  <div className="fg"><label className="lbl">Site web</label><input className="inp" value={form.site||''} onChange={function(e){setForm(Object.assign({},form,{site:e.target.value}))}} /></div>
+                  <div className="fg"><label className="lbl">LinkedIn</label><input className="inp" placeholder="linkedin.com/company/..." value={form.linkedin||''} onChange={function(e){setForm(Object.assign({},form,{linkedin:e.target.value}))}} /></div>
+                  <div className="fg"><label className="lbl">Arrondissement</label><input className="inp" value={form.arrondissement||''} onChange={function(e){setForm(Object.assign({},form,{arrondissement:e.target.value}))}} /></div>
+                  <div className="fg"><label className="lbl">Taille (nb employés)</label><input className="inp" value={form.taille||''} onChange={function(e){setForm(Object.assign({},form,{taille:e.target.value}))}} /></div>
+                  <div className="fg"><label className="lbl">Valeur / event (€)</label><input type="number" className="inp" value={form.valeur_event||0} onChange={function(e){setForm(Object.assign({},form,{valeur_event:parseInt(e.target.value)||0}))}} /></div>
+                  <div className="fg"><label className="lbl">Score (/10)</label><input type="number" min="1" max="10" className="inp" value={form.score||5} onChange={function(e){setForm(Object.assign({},form,{score:parseInt(e.target.value)||5}))}} /></div>
+                  <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Type de proposition</label><input className="inp" value={form.type||''} onChange={function(e){setForm(Object.assign({},form,{type:e.target.value}))}} /></div>
+                  <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Angle / pitch</label><textarea className="inp" style={{minHeight:60}} value={form.pitch||''} onChange={function(e){setForm(Object.assign({},form,{pitch:e.target.value}))}} /></div>
+                  <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Notes internes</label><textarea className="inp" style={{minHeight:60}} value={form.notes||''} onChange={function(e){setForm(Object.assign({},form,{notes:e.target.value}))}} /></div>
+                  <div className="fg" style={{gridColumn:'1/-1'}}>
+                    <label className="lbl">Statut</label>
+                    <select className="inp" value={form.status||'to_contact'} onChange={function(e){setForm(Object.assign({},form,{status:e.target.value}))}}>
+                      <option value="to_contact">À contacter</option>
+                      <option value="contacted">Contacté</option>
+                      <option value="nego">En négo</option>
+                      <option value="won">Gagné</option>
+                      <option value="lost">Perdu</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="mf">
+                <button className="btn" onClick={closeModal}>Annuler</button>
+                <button className="btn btn-y" onClick={function(){
+                  setChasse(function(prev){ return prev.map(function(x){ return x.id===form.id ? Object.assign({},x,form) : x }) })
+                  toast('Prospect mis à jour ✓')
+                  closeModal()
+                }}>💾 Sauvegarder</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+{modal === 'cr' && (
         <div className="overlay" onClick={closeModal}>
           <div className="modal" onClick={function(e) { e.stopPropagation() }}>
             <div className="mh"><div className="mt">Compte-rendu hebdomadaire</div></div>
