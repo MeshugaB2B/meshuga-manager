@@ -385,14 +385,12 @@ export default function DashboardPage() {
       {name: 'Konbini', url: 'https://www.konbini.com/food/on-a-teste-meshuga-le-deli-aux-sandwiches-les-plus-confort-du-moment/'},
       {name: 'Magazine Acumen', url: 'https://magazine-acumen.com/en/gastronomie/meshuga-la-nouvelle-adresse-qui-fait-bouger-la-rive-gauche-parisienne/'},
       {name: 'Do It In Paris', url: 'https://www.doitinparis.com/fr/food-et-drinks/restaurants/meshuga-le-meilleur-deli-de-paris'},
-      {name: 'Grazia', url: 'https://www.grazia.fr/food/restaurants/meshuga-paris-6'},
       {name: 'le Guide du Fooding', url: 'https://lefooding.com/restaurants/meshuga'},
       {name: 'Télérama', url: 'https://www.telerama.fr/sortir/meshuga-le-deli-qui-monte'},
       {name: 'Très Très Bon', url: 'https://www.youtube.com/@TresTresBon'}
     ]
     const pick3 = pressLinks.sort(()=>Math.random()-0.5).slice(0,3)
-    const pressStr = pick3.map(l => l.name + ' : ' + l.url).join(' | ')
-    const prompt = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium : pastrami, lobster rolls, tuna melt, sandwichs gastronomiques. Spécialistes plateaux déjeuner B2B et catering événementiel Paris.\n\nTu dois écrire un email de prospection B2B. RÈGLES ABSOLUES DE FORMAT :\n1. AUCUN formatage Markdown (pas de **, pas de [], pas de liens entre parenthèses)\n2. Cite 2-3 médias qui nous ont repérés en les intégrant naturellement dans une phrase du corps du mail — juste leur nom, sans URL visible (ex : \"repérés par Konbini et Télérama\", ou \"après notre passage dans le Guide du Fooding\"). Les médias de référence : ' + pick3.map(l => l.name).join(', ') + '\n3. Email en texte brut, comme un vrai mail professionnel\n\nProspect :\n- Entreprise : ' + p.name + '\n- Secteur : ' + (CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat) + '\n- Localisation : ' + p.arrondissement + '\n- Taille : ' + p.taille + ' employés\n- Proposition : ' + p.type + '\n- Angle : ' + p.pitch + '\n\nEmail 6-8 lignes, personnalisé selon le secteur. Commence par "Objet : " sur la 1ère ligne.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
+    const prompt = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (Paris 6e, 3 rue Vavin). Restaurant new-yorkais premium : pastrami, lobster rolls, tuna melt, sandwichs gastronomiques.\n\nEcris un email de prospection B2B en texte brut. RÈGLE ABSOLUE : zéro Markdown, zéro URL visible, zéro crochets []. Cite 2-3 médias parmi ' + pick3.map(l=>l.name).join(', ') + ' en les glissant naturellement dans le texte — juste le nom du média dans la phrase, jamais d URL (ex: repérés par Konbini, ou cités dans le Guide du Fooding).\n\nProspect :\n- Entreprise : ' + p.name + '\n- Secteur : ' + (CATS_MAP[p.cat] ? CATS_MAP[p.cat].label : p.cat) + '\n- Localisation : ' + p.arrondissement + '\n- Taille : ' + p.taille + ' employés\n- Proposition : ' + p.type + '\n- Angle : ' + p.pitch + '\n\nEmail 6-8 lignes max, ton direct, personnalisé. Commence par Objet : sur la 1ère ligne.\nSignature : ' + senderSig + ' | 3 rue Vavin, Paris 6e'
     try {
       const res = await fetch('/api/generate-email', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: prompt})})
       const data = await res.json()
@@ -718,25 +716,29 @@ export default function DashboardPage() {
               </div>
 
               <div className="g4">
-                <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('chasse')}}>
-                  <div className="kl">A contacter</div>
-                  <div className="kv">{chasse.filter(function(p){return p.status==='to_contact'}).length}</div>
-                  <div className="ki">&#127919;</div>
-                </div>
-                <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('crm')}}>
-                  <div className="kl">Pipeline B2B</div>
-                  <div className="kv">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length}</div>
-                  <div className="ki">&#9678;</div>
-                </div>
-                <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('tasks')}}>
-                  <div className="kl">Tâches actives</div>
-                  <div className="kv">{tasks.filter(function(t){return t.status!=='done'}).length}</div>
-                  <div className="ki">&#10003;</div>
+                <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('devis')}}>
+                  <div className="kl">Devis en cours</div>
+                  <div className="kv" style={{fontSize:20}}>{devisList.filter(function(d){return d.statut==='envoye'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:devisList.filter(function(d){return d.statut==='envoye'}).length>0?'#005FFF':'rgba(25,25,35,.35)'}}>{devisList.filter(function(d){return d.statut==='envoye'}).length} devis en attente</div>
+                  <div className="ki" style={{opacity:.1}}>💶</div>
                 </div>
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('devis')}}>
-                  <div className="kl">Devis signés</div>
-                  <div className="kv">{reports.length}</div>
-                  <div className="ki">&#128203;</div>
+                  <div className="kl">CA B2B signé</div>
+                  <div className="kv" style={{fontSize:20}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'#00AA44'}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).length} contrats signés 🎉</div>
+                  <div className="ki" style={{opacity:.1}}>📈</div>
+                </div>
+                <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('chasse')}}>
+                  <div className="kl">Prospectés</div>
+                  <div className="kv">{chasse.filter(function(p){return p.contacted}).length} <span style={{fontSize:16,fontWeight:400,opacity:.3}}>/ {chasse.length}</span></div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'rgba(25,25,35,.35)'}}>{chasse.length>0?Math.round(chasse.filter(function(p){return p.contacted}).length/chasse.length*100):0}% contactés</div>
+                  <div className="ki" style={{opacity:.1}}>🎯</div>
+                </div>
+                <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('crm')}}>
+                  <div className="kl">Pipeline actif</div>
+                  <div className="kv">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length}</div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:prospects.filter(function(p){return p.status==='nego'}).length>0?'#FF82D7':'rgba(25,25,35,.35)'}}>{prospects.filter(function(p){return p.status==='nego'}).length>0?prospects.filter(function(p){return p.status==='nego'}).length+' en négo 🔥':'aucune négo en cours'}</div>
+                  <div className="ki" style={{opacity:.1}}>◎</div>
                 </div>
               </div>
 
