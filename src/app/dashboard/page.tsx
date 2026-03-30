@@ -1457,53 +1457,31 @@ export default function DashboardPage() {
           {page === 'gmb' && (
             <div>
               <div className='ph'>
-                <div><div className='pt'>Google My Business</div><div className='ps'>Avis · Visibilité Meshuga</div></div>
-                <a href='https://business.google.com' target='_blank' rel='noopener noreferrer' className='btn btn-sm btn-n' style={{textDecoration:'none',fontSize:11}}>Gérer sur Google →</a>
+                <div><div className='pt'>Google My Business</div><div className='ps'>Avis · Visibilite · Meshuga</div></div>
+                <a href='https://business.google.com' target='_blank' rel='noopener noreferrer' className='btn btn-sm'>Gerer la fiche →</a>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8,marginBottom:10}}>
-                <a href='https://search.google.com/local/reviews?placeid=ChIJN9oegop5wkcRwz1xFqRjFrI' target='_blank' rel='noopener noreferrer' className='kc' style={{background:'#FFF',textDecoration:'none',cursor:'pointer',display:'block'}}>
-                  <div className='kl'>Voir tous les avis</div>
-                  <div className='kv' style={{color:'#FFEB5A',textShadow:'0 0 1px #999'}}>★★★★★</div>
-                  <div style={{fontSize:11,opacity:.5,marginTop:2}}>Ouvrir Google Maps</div>
-                </a>
-                <a href='https://search.google.com/local/writereview?placeid=ChIJN9oegop5wkcRwz1xFqRjFrI' target='_blank' rel='noopener noreferrer' className='kc' style={{background:'#191923',color:'#FFEB5A',textDecoration:'none',cursor:'pointer',display:'block'}}>
-                  <div className='kl' style={{color:'rgba(255,235,90,.7)'}}>Demander un avis</div>
-                  <div style={{fontSize:20,margin:'6px 0'}}>📲</div>
-                  <div style={{fontSize:11,opacity:.6}}>Copier le lien client</div>
-                </a>
+                <div className='kc' style={{background:'#191923',cursor:'pointer'}} onClick={function(){window.open('https://www.google.com/maps/place/?q=place_id:ChIJN9oegop5wkcRwz1xFqRjFrI','_blank')}}>
+                  <div className='kl' style={{color:'rgba(255,235,90,.8)'}}>Voir les avis Google</div>
+                  <div className='kv' style={{color:'#FFEB5A',fontSize:24}}>★★★★★</div>
+                  <div style={{fontSize:11,color:'rgba(255,255,255,.5)',marginTop:4}}>Ouvrir sur Google Maps →</div>
+                </div>
+                <div className='kc' style={{background:'#005FFF',cursor:'pointer'}} onClick={function(){navigator.clipboard.writeText('https://g.page/r/CUKxo2Ia8TH1EBM/review');toast('Lien avis copie !')}}>
+                  <div className='kl' style={{color:'rgba(255,255,255,.8)'}}>Demander un avis</div>
+                  <div style={{fontSize:28,margin:'6px 0'}}>📲</div>
+                  <div style={{fontSize:11,color:'rgba(255,255,255,.6)'}}>Copier le lien client</div>
+                </div>
               </div>
-              <div style={{background:'#FFF',borderRadius:7,border:'2px solid #191923',overflow:'hidden',marginBottom:10}}>
-                <iframe
-                  title='Meshuga Google Maps'
-                  src='https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2625.4!2d2.3321!3d48.8446!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x47e6705b9e1edd37%3A0xb216634a156135c3!2sMeshuga!5e0!3m2!1sfr!2sfr!4v1'
-                  width='100%'
-                  height='200'
-                  style={{border:'none',display:'block'}}
-                  loading='lazy'
-                  referrerPolicy='no-referrer-when-downgrade'
-                />
+              <div style={{background:'#FFF',borderRadius:7,border:'2px solid #191923',overflow:'hidden',marginBottom:8,height:300}}>
+                <iframe src={'https://www.google.com/maps/embed/v1/place?key='+process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY+'&q=Meshuga+Crazy+Deli+Paris&zoom=16'} width='100%' height='300' style={{border:'none'}} allowFullScreen loading='lazy' />
               </div>
-              <div style={{background:'#F8F8F8',borderRadius:7,padding:'12px 14px',border:'1.5px solid #DEDEDE'}}>
-                <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:1,marginBottom:10,color:'#191923'}}>🔗 Liens utiles</div>
-                {[
-                  {label:'📋 Copier lien avis client', action:'copy', url:'https://g.page/r/CbMxYaQacdcxEAI/review'},
-                  {label:'📊 Google Business Dashboard', url:'https://business.google.com'},
-                  {label:'📷 Ajouter des photos', url:'https://business.google.com/photos'},
-                  {label:'💬 Répondre aux avis', url:'https://business.google.com/reviews'},
-                ].map(function(item, i) {
-                  return (
-                    <div key={i} style={{marginBottom:6}}>
-                      {item.action === 'copy' ? (
-                        <button className='btn btn-sm' style={{width:'100%',textAlign:'left',justifyContent:'flex-start'}} onClick={function(){
-                          navigator.clipboard.writeText(item.url)
-                          toast('Lien copié ! Envoie-le à tes clients 📲')
-                        }}>{item.label}</button>
-                      ) : (
-                        <a href={item.url} target='_blank' rel='noopener noreferrer' style={{display:'block',padding:'6px 10px',background:'#FFF',border:'1.5px solid #DEDEDE',borderRadius:4,fontSize:12,color:'#191923',textDecoration:'none',fontWeight:700}}>{item.label} →</a>
-                      )}
-                    </div>
-                  )
-                })}
+              <div className='card-y' style={{background:'#FFFBEA',border:'2px solid #FFEB5A'}}>
+                <div className='ct' style={{fontSize:13}}>💡 Booster les avis</div>
+                <p style={{fontSize:12,marginTop:6,lineHeight:1.6}}>Envoie le lien ci-dessous a chaque client B2B satisfait. Objectif : passer de 4.6 a 4.8+ pour dominer les recherches traiteur Paris 6e.</p>
+                <div style={{marginTop:10,display:'flex',gap:8,flexWrap:'wrap'}}>
+                  <button className='btn btn-sm btn-y' onClick={function(){navigator.clipboard.writeText('https://g.page/r/CUKxo2Ia8TH1EBM/review');toast('Lien avis copie !')}}>📋 Copier lien avis</button>
+                  <button className='btn btn-sm' onClick={function(){window.open('https://www.google.com/maps/place/?q=place_id:ChIJN9oegop5wkcRwz1xFqRjFrI','_blank')}}>Voir ma fiche →</button>
+                </div>
               </div>
             </div>
           )}
