@@ -1,111 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextResponse } from 'next/server'
 
-const sb = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const PLACE_ID = 'ChIJ42mS4btvwkcROqjf-D9TutU'
 
-async function getValidToken(): Promise<string | null> {
-  const { data } = await sb.from('gmb_tokens').select('*').eq('id', 1).single()
-  if (!data) return null
-
-  // Token encore valide ?
-  if (new Date(data.expires_at) > new Date(Date.now() + 60000)) {
-    return data.access_token
-  }
-
-  // Rafraichir avec le refresh_token
-  if (!data.refresh_token) return null
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: process.env.NEXT_PUBLIC_GOOGLE_GMB_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_GMB_CLIENT_SECRET!,
-      refresh_token: data.refresh_token,
-      grant_type: 'refresh_token',
-    }),
-  })
-
-  const tokens = await res.json()
-  if (!res.ok || !tokens.access_token) return null
-
-  await sb.from('gmb_tokens').update({
-    access_token: tokens.access_token,
-    expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
-    updated_at: new Date().toISOString(),
-  }).eq('id', 1)
-
-  return tokens.access_token
-}
-
-export async function GET(request: NextRequest) {
-  const token = await getValidToken()
-
-  if (!token) {
-    return NextResponse.json({ connected: false })
-  }
-
-  try {
-    // Recuperer les comptes GMB
-    const accountsRes = await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
-      headers: { Authorization: 'Bearer ' + token }
-    })
-    if (!accountsRes.ok) {
-      return NextResponse.json({ connected: false, error: 'accounts_failed' })
-    }
-    const accountsData = await accountsRes.json()
-    const account = accountsData.accounts?.[0]
-    if (!account) return NextResponse.json({ connected: true, reviews: [], stats: null })
-
-    const accountName = account.name
-
-    // Recuperer les etablissements
-    const locRes = await fetch(
-      'https://mybusinessbusinessinformation.googleapis.com/v1/' + accountName + '/locations?readMask=name,title,storefrontAddress',
-      { headers: { Authorization: 'Bearer ' + token } }
-    )
-    const locData = locRes.ok ? await locRes.json() : {}
-    const location = locData.locations?.[0]
-    if (!location) return NextResponse.json({ connected: true, reviews: [], stats: null, accountName })
-
-    const locationName = location.name
-
-    // Recuperer les avis
-    const reviewsRes = await fetch(
-      'https://mybusiness.googleapis.com/v4/' + locationName + '/reviews?pageSize=50',
-      { headers: { Authorization: 'Bearer ' + token } }
-    )
-    const reviewsData = reviewsRes.ok ? await reviewsRes.json() : {}
-    const reviews = reviewsData.reviews || []
-
-    // Stats
-    const totalRating = reviews.reduce((s: number, r: any) => {
-      const map: Record<string, number> = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 }
-      return s + (map[r.starRating] || 0)
-    }, 0)
-    const avgRating = reviews.length > 0 ? Math.round(totalRating / reviews.length * 10) / 10 : 0
-    const withReply = reviews.filter((r: any) => r.reviewReply).length
-
+export async function GET() {
+  const mapsKey = process.env.GOOGLE_MAPS_SERVER_KEY || ''
+  if (!mapsKey) {
     return NextResponse.json({
-      connected: true,
-      locationName,
-      avgRating,
-      totalReviews: reviews.length,
-      withoutReply: reviews.length - withReply,
-      reviews: reviews.slice(0, 20).map((r: any) => ({
-        id: r.reviewId,
-        author: r.reviewer?.displayName || 'Anonyme',
-        rating: { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 }[r.starRating] || 0,
-        text: r.comment || '',
-        date: r.createTime,
-        hasReply: !!r.reviewReply,
-        reply: r.reviewReply?.comment || '',
-      }))
+      ok: true, mock: true, rating: 4.6, totalRatings: 234, withoutReply: 3,
+      reviews: [
+        { author: 'Marine B.', rating: 5, text: 'Le meilleur Tuna Melt de Paris ! Commande pour notre team building 30 personnes, service impeccable.', date: '2026-03-28', replied: false },
+        { author: 'Thomas R.', rating: 5, text: 'Pour notre reunion equipe, tout le monde a adore. Le pastrami maison est incroyable.', date: '2026-03-25', replied: true },
+        { author: 'Sophie M.', rating: 4, text: 'Tres bon, le Lobster Roll est exceptionnel. Un peu attente aux heures de pointe.', date: '2026-03-22', replied: false },
+        { author: 'Pierre D.', rating: 5, text: 'On commande regulierement pour nos events corporate. Qualite constante, equipe reactive.', date: '2026-03-20', replied: true },
+        { author: 'Julie K.', rating: 5, text: 'Parfait pour dejeuner affaires. Le Grilled Cheese est une tuerie. Recommande !', date: '2026-03-18', replied: false },
+      ]
     })
-  } catch (e: any) {
-    return NextResponse.json({ connected: false, error: e.message })
   }
+  try {
+    const url = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=' + PLACE_ID + '&fields=name,rating,user_ratings_total,reviews&language=fr&key=' + mapsKey
+    const res = await fetch(url, { cache: 'no-store' })
+    const data = await res.json()
+    if (data.status !== 'OK') return NextResponse.json({ ok: false, error: data.status })
+    const place = data.result
+    const reviews = (place.reviews || []).map((r: any) => ({
+      author: r.author_name, rating: r.rating, text: r.text,
+      date: new Date(r.time * 1000).toISOString().split('T')[0],
+      replied: false, profilePhoto: r.profile_photo_url,
+    }))
+    return NextResponse.json({ ok: true, mock: false, rating: place.rating, totalRatings: place.user_ratings_total, withoutReply: reviews.filter((r: any) => !r.replied).length, reviews })
+  } catch (e: any) { return NextResponse.json({ ok: false, error: e.message }) }
 }
