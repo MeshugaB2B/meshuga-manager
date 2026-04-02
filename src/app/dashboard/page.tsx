@@ -581,6 +581,9 @@ export default function DashboardPage() {
   const [gmbData, setGmbData] = useState(null)
   const [gmbLoading, setGmbLoading] = useState(false)
   const [gmbFilter, setGmbFilter] = useState('all')
+  const [instaData, setInstaData] = useState(null)
+  const [instaLoading, setInstaLoading] = useState(false)
+  const [instaTab, setInstaTab] = useState('comments')
 
   useEffect(function() {
     async function load() {
@@ -621,6 +624,17 @@ export default function DashboardPage() {
     }).catch(function() {
       setGmbLoading(false)
       setGmbData({ok: false, error: 'Erreur de connexion GMB'})
+    })
+  }, [page])
+
+  useEffect(function() {
+    if (page !== 'instagram') return
+    setInstaLoading(true)
+    fetch('/api/instagram').then(function(r) { return r.json() }).then(function(d) {
+      setInstaData(d)
+      setInstaLoading(false)
+    }).catch(function() {
+      setInstaLoading(false)
     })
   }, [page])
 
@@ -732,7 +746,7 @@ export default function DashboardPage() {
     const senderName = isEmy ? 'Emy, B2B Manager' : 'Edward, patron'
     const senderSig = isEmy ? 'Emy' : 'Edward'
     const pressLinks = [
-      {name: 'Paris Première', url: 'https://parisienne.lexpress.fr/gastronomie/meshuga-le-deli-new-yorkais-de-la-rive-gauche/'},
+      {name: 'Paris Première', url: 'https://www.facebook.com/watch/?v=648051137321383'},
       {name: 'Telerama', url: 'https://www.telerama.fr/restos-loisirs/meshuga-de-la-street-food-de-haut-niveau-pres-du-jardin-du-luxembourg_cri-7043251.php'},
       {name: 'Konbini', url: 'https://www.konbini.com/food/on-a-teste-meshuga-le-deli-aux-sandwiches-les-plus-confort-du-moment/'},
       {name: 'Les Echos', url: 'https://www.lesechos.fr/weekend/gastronomie-vins/ou-manger-les-meilleurs-grilled-cheese-1873791'},
@@ -819,6 +833,7 @@ export default function DashboardPage() {
     {id: 'gmb', label: 'Google My Biz.', icon: '⭐'},
     {id: 'devis', label: 'Devis', icon: '📄'},
     {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
+    {id: 'instagram', label: 'Instagram', icon: '📸'},
   ]
 
   return (
@@ -1512,7 +1527,7 @@ export default function DashboardPage() {
                       </button>
                     )})}
                   </div>
-                  {gmbData.reviews.filter(function(r){
+                  {gmbData.reviews.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date)}).filter(function(r){
                     if(gmbFilter==='noreply') return !r.replied
                     if(gmbFilter==='5') return r.rating===5
                     if(gmbFilter==='4') return r.rating===4
@@ -1536,7 +1551,15 @@ export default function DashboardPage() {
                           ✍️ Repondre sur Google Business
                         </button>
                       )}
-                      {r.replied && <div style={{fontSize:11,color:'#009D3A',marginTop:4,fontWeight:700}}>✅ Repondu</div>}
+                      {r.replied && (
+                        <div style={{marginTop:8,borderLeft:'3px solid #009D3A',paddingLeft:10,background:'#F0FFF4',borderRadius:'0 4px 4px 0',padding:'8px 10px'}}>
+                          <div style={{fontSize:10,fontWeight:900,color:'#009D3A',marginBottom:3}}>✅ Réponse de Meshuga :</div>
+                          {r.reply_text
+                            ? <div style={{fontSize:12,lineHeight:1.5,color:'#333'}}>{r.reply_text}</div>
+                            : <div style={{fontSize:11,color:'#009D3A',fontStyle:'italic'}}>Réponse envoyée sur Google Business</div>
+                          }
+                        </div>
+                      )}
                     </div>
                   )})}
                   <div style={{textAlign:'center',padding:'12px 0',opacity:.4,fontSize:12}}>
@@ -1552,7 +1575,7 @@ export default function DashboardPage() {
               <div className="ph">
                 <div><div className="pt">Devis</div><div className="ps">{devisView==='list'?devisList.length+' devis':'Editeur'}</div></div>
                 <div style={{display:'flex',gap:6}}>
-                  {devisView==='edit'&&<button className="btn btn-sm" onClick={function(){setDevisView('list')}}>&#8592; Liste</button>}
+                  {devisView==='edit'&&<button className="btn btn-p btn-sm" onClick={function(){setDevisView('list')}}>&#8592; Fermer l'éditeur</button>}
                   <button className="btn btn-y btn-sm" onClick={function(){
                     setDevisView('edit');setDevisItems([]);setCurrentDevisId(null)
                     setDevisClient({nom:'',contact:'',email:'',phone:'',date:'',lieu:'',prospectId:null})
@@ -1613,6 +1636,11 @@ export default function DashboardPage() {
                           }}>&#128176; Payé</button>}
                           <button className="btn btn-sm" onClick={function(){generateAndPrintDoc(dv,false)}}>&#128196; PDF</button>
                           {dv.facture_numero&&<button className="btn btn-n btn-sm" onClick={function(){generateAndPrintDoc(dv,true)}}>&#129534; Facture PDF</button>}
+                          <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){
+                            if(window.confirm('Supprimer ce devis ? Cette action est irréversible.')){
+                              sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Devis supprimé')})
+                            }
+                          }}>&#128465; Supprimer</button>
                         </div>
                       </div>
                     )
@@ -1764,6 +1792,132 @@ export default function DashboardPage() {
                       )
                     })()}
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {page === 'instagram' && (
+            <div>
+              <div className="ph">
+                <div>
+                  <div className="pt">Instagram 📸</div>
+                  <div className="ps">Commentaires et messages</div>
+                </div>
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  {instaData && instaData.mock && <span style={{fontSize:10,background:'#FF6B2B',color:'#fff',padding:'2px 6px',borderRadius:3,fontWeight:900}}>DEMO</span>}
+                  <a href="https://www.instagram.com/meshuga.deli/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p">Ouvrir Instagram →</a>
+                </div>
+              </div>
+
+              {instaLoading && (
+                <div style={{textAlign:'center',padding:60,opacity:.4}}>
+                  <div style={{fontSize:36}}>📸</div>
+                  <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',marginTop:8}}>Chargement...</div>
+                </div>
+              )}
+
+              {!instaLoading && instaData && !instaData.ok && (
+                <div className="card" style={{borderLeft:'4px solid #FF6B2B',padding:'16px 20px'}}>
+                  <div style={{fontWeight:900,marginBottom:6}}>⚙️ Configuration requise</div>
+                  <div style={{fontSize:12,opacity:.7,lineHeight:1.7}}>
+                    Pour connecter Instagram :<br/>
+                    1. Crée une app Meta sur <a href="https://developers.facebook.com" target="_blank" style={{color:'#005FFF'}}>developers.facebook.com</a><br/>
+                    2. Active <strong>Instagram Graph API</strong> + permissions <code>instagram_basic</code>, <code>instagram_manage_comments</code>, <code>pages_messaging</code><br/>
+                    3. Ajoute <strong>INSTAGRAM_ACCESS_TOKEN</strong> dans tes variables Vercel<br/>
+                    4. Redéploie
+                  </div>
+                </div>
+              )}
+
+              {!instaLoading && instaData && instaData.ok && (
+                <div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
+                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
+                      <div className="kl">Abonnés</div>
+                      <div className="kv" style={{fontSize:24,color:'#FF82D7'}}>{instaData.followers ? instaData.followers.toLocaleString('fr-FR') : '--'}</div>
+                    </div>
+                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
+                      <div className="kl">Posts</div>
+                      <div className="kv" style={{fontSize:24}}>{instaData.mediaCount || '--'}</div>
+                    </div>
+                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
+                      <div className="kl">Messages non lus</div>
+                      <div className="kv" style={{fontSize:24,color:instaData.unreadMessages>0?'#CC0066':'#191923'}}>{instaData.unreadMessages || 0}</div>
+                    </div>
+                  </div>
+
+                  <div style={{display:'flex',gap:6,marginBottom:10}}>
+                    {['comments','messages','media'].map(function(tab){return(
+                      <button key={tab} className={'btn btn-sm'+(instaTab===tab?' btn-p':'')} onClick={function(){setInstaTab(tab)}}>
+                        {tab==='comments'?'💬 Commentaires':tab==='messages'?'✉️ Messages':'📷 Posts'}
+                      </button>
+                    )})}
+                  </div>
+
+                  {instaTab === 'comments' && (
+                    <div>
+                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Commentaires récents</div>
+                      {(instaData.comments||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun commentaire récent</div>}
+                      {(instaData.comments||[]).map(function(c,i){return(
+                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(c.replied?'#009D3A':'#FFEB5A')}}>
+                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                            <div style={{fontWeight:900,fontSize:13}}>@{c.username}</div>
+                            <div style={{fontSize:10,opacity:.4}}>{c.date}</div>
+                          </div>
+                          <div style={{fontSize:12,marginBottom:6,lineHeight:1.5}}>{c.text}</div>
+                          <div style={{fontSize:10,opacity:.5,marginBottom:c.replied?6:0}}>📸 {c.postCaption || 'Post Instagram'}</div>
+                          {c.replied
+                            ? <div style={{fontSize:11,color:'#009D3A',fontWeight:700}}>✅ Répondu</div>
+                            : <a href={'https://www.instagram.com/p/'+(c.shortcode||'')} target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{fontSize:10,marginTop:4}}>↗ Répondre sur Instagram</a>
+                          }
+                        </div>
+                      )})}
+                    </div>
+                  )}
+
+                  {instaTab === 'messages' && (
+                    <div>
+                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Messages directs</div>
+                      {(instaData.messages||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun message récent</div>}
+                      {(instaData.messages||[]).map(function(m,i){return(
+                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(m.read?'#EBEBEB':'#FF82D7')}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                            <div style={{flex:1}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                                <div style={{fontWeight:900,fontSize:13}}>@{m.username}</div>
+                                {!m.read && <span style={{fontSize:9,background:'#FF82D7',padding:'1px 5px',borderRadius:3,fontWeight:900,color:'#191923'}}>NOUVEAU</span>}
+                              </div>
+                              <div style={{fontSize:12,lineHeight:1.5,color:'#444'}}>{m.lastMessage}</div>
+                            </div>
+                            <div style={{fontSize:10,opacity:.4,flexShrink:0}}>{m.date}</div>
+                          </div>
+                          <a href="https://www.instagram.com/direct/inbox/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p" style={{fontSize:10,marginTop:8}}>↗ Répondre sur Instagram</a>
+                        </div>
+                      )})}
+                    </div>
+                  )}
+
+                  {instaTab === 'media' && (
+                    <div>
+                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Posts récents</div>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+                        {(instaData.media||[]).map(function(p,i){return(
+                          <a key={i} href={p.permalink} target="_blank" rel="noopener noreferrer" style={{textDecoration:'none',color:'inherit'}}>
+                            <div className="card" style={{padding:10,cursor:'pointer'}}>
+                              {p.thumbnailUrl && <img src={p.thumbnailUrl} alt="" style={{width:'100%',aspectRatio:'1',objectFit:'cover',borderRadius:4,marginBottom:6}} />}
+                              {!p.thumbnailUrl && <div style={{width:'100%',aspectRatio:'1',background:'#FFEB5A',borderRadius:4,marginBottom:6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>📷</div>}
+                              <div style={{fontSize:11,display:'flex',justifyContent:'space-between'}}>
+                                <span>❤️ {p.likes||0}</span>
+                                <span>💬 {p.comments||0}</span>
+                              </div>
+                              <div style={{fontSize:10,opacity:.4,marginTop:3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{p.caption||''}</div>
+                            </div>
+                          </a>
+                        )})}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
