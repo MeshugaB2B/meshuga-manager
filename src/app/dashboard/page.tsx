@@ -578,6 +578,9 @@ export default function DashboardPage() {
   const [crmFilter, setCrmFilter] = useState('all')
   const [crmPeriod, setCrmPeriod] = useState('all')
   const [crmSearch, setCrmSearch] = useState('')
+  const [gmbData, setGmbData] = useState(null)
+  const [gmbLoading, setGmbLoading] = useState(false)
+  const [gmbFilter, setGmbFilter] = useState('all')
 
   useEffect(function() {
     async function load() {
@@ -604,8 +607,22 @@ export default function DashboardPage() {
     sb().from('activity_log').select('*').order('created_at', {ascending: false}).limit(200).then(function(r) {
       if (r.data) setActivityLog(r.data)
     })
-    sb().from('activity_log').insert({user_role: profile.role, user_name: profile.full_name || profile.role, type: 'session_start', description: 'Connexion', prospect_name: null, email_content: null})
+    sb().from('activity_log').insert({user_role: profile.role, user_name: profile.full_name || profile.role, type: 'session_start', description: 'Connexion au B2B Manager', prospect_name: null, email_content: null}).then(function(r) {
+      if (r.error) { console.warn('[Journal] session_start insert error:', r.error.message) }
+    })
   }, [profile])
+
+  useEffect(function() {
+    if (page !== 'gmb') return
+    setGmbLoading(true)
+    fetch('/api/gmb').then(function(r) { return r.json() }).then(function(d) {
+      setGmbData(d)
+      setGmbLoading(false)
+    }).catch(function() {
+      setGmbLoading(false)
+      setGmbData({ok: false, error: 'Erreur de connexion GMB'})
+    })
+  }, [page])
 
   const toast = function(msg) { setToastMsg(msg); setTimeout(function() { setToastMsg('') }, 2800) }
   const openModal = function(id, data) { setForm(data || {}); setModal(id) }
@@ -715,7 +732,7 @@ export default function DashboardPage() {
     const senderName = isEmy ? 'Emy, B2B Manager' : 'Edward, patron'
     const senderSig = isEmy ? 'Emy' : 'Edward'
     const pressLinks = [
-      {name: 'Tres Tres Bon', url: 'https://www.facebook.com/watch/?v=648051137321383'},
+      {name: 'Paris Première', url: 'https://parisienne.lexpress.fr/gastronomie/meshuga-le-deli-new-yorkais-de-la-rive-gauche/'},
       {name: 'Telerama', url: 'https://www.telerama.fr/restos-loisirs/meshuga-de-la-street-food-de-haut-niveau-pres-du-jardin-du-luxembourg_cri-7043251.php'},
       {name: 'Konbini', url: 'https://www.konbini.com/food/on-a-teste-meshuga-le-deli-aux-sandwiches-les-plus-confort-du-moment/'},
       {name: 'Les Echos', url: 'https://www.lesechos.fr/weekend/gastronomie-vins/ou-manger-les-meilleurs-grilled-cheese-1873791'},
@@ -730,6 +747,9 @@ export default function DashboardPage() {
       const res = await fetch('/api/generate-email', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: prompt})})
       const data = await res.json()
       setGeneratedEmail(data.text || 'Erreur')
+      if (data.text) {
+        logActivity('email_genere', 'Email IA généré pour ' + p.name, p.name, null)
+      }
     } catch(e) {
       setGeneratedEmail('Erreur de connexion.')
     }
