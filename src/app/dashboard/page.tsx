@@ -620,16 +620,32 @@ export default function DashboardPage() {
   }, [profile])
 
   useEffect(function() {
+    if (!profile) return
     var startTime = Date.now()
-    var sessionId = 'sess-' + startTime
-    function handleUnload() {
+    var inactivityTimer = null
+    var INACTIVITY_MS = 20 * 60 * 1000
+    function closeSession() {
       var duration = Math.round((Date.now() - startTime) / 60000)
-      if (profile && duration > 0) {
-        logActivity('session_end', 'Fin de session — durée : ' + duration + ' min', null, null)
-      }
+      if (duration < 1) duration = 1
+      logActivity('session_end', 'Fin de session — durée : ' + duration + ' min', null, null)
     }
-    window.addEventListener('beforeunload', handleUnload)
-    return function() { window.removeEventListener('beforeunload', handleUnload) }
+    function resetTimer() {
+      if (inactivityTimer) clearTimeout(inactivityTimer)
+      inactivityTimer = setTimeout(function() {
+        closeSession()
+        startTime = Date.now()
+        logActivity('session_start', 'Reprise de session (inactivité)', null, null)
+      }, INACTIVITY_MS)
+    }
+    var events = ['mousedown','keydown','scroll','touchstart']
+    events.forEach(function(e) { window.addEventListener(e, resetTimer, true) })
+    window.addEventListener('beforeunload', closeSession)
+    resetTimer()
+    return function() {
+      events.forEach(function(e) { window.removeEventListener(e, resetTimer, true) })
+      window.removeEventListener('beforeunload', closeSession)
+      if (inactivityTimer) clearTimeout(inactivityTimer)
+    }
   }, [profile])
 
   useEffect(function() {
@@ -948,8 +964,8 @@ export default function DashboardPage() {
                 {isEmy && <button className="btn btn-p btn-sm" onClick={function(){openModal('cr',{})}}>+ Nouveau CR</button>}
               </div>
 
-              <div className="g4">
-                <div className="kc" style={{background:'#FFFFFF',gridColumn:'span 2',cursor:'pointer'}} onClick={function(){nav('devis')}}>
+              <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:10,marginBottom:10}}>
+                <div className="kc" style={{background:'#FFFFFF',cursor:'pointer'}} onClick={function(){nav('devis')}}>
                   <div className="kl" style={{fontSize:11}}>Pipeline B2B 🎯</div>
                   <div style={{display:'flex',gap:20,alignItems:'flex-end',marginTop:8,flexWrap:'wrap'}}>
                     <div>
@@ -995,7 +1011,7 @@ export default function DashboardPage() {
               {/* TACHES DU JOUR */}
               <div className="card" style={{marginBottom:10,borderLeft:'4px solid #FF82D7'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                  <div className="yt" style={{fontSize:18}}>📋 Tâches</div>
+                  <div className="yt" style={{fontSize:22}}>📋 Tâches</div>
                   <button className="btn btn-p btn-sm" style={{fontWeight:900}} onClick={function(){openModal('task',{assignee:isEmy?'emy':'edward',priority:'medium',status:'todo',checklist:[],files:[],deadline:new Date().toISOString().split('T')[0]})}}>+ Tâche</button>
                 </div>
                 {(function(){
@@ -1004,7 +1020,7 @@ export default function DashboardPage() {
                   var lateTasks=tasks.filter(function(t){return t.deadline&&t.deadline<today&&t.status!=='done'})
                   var upcoming=tasks.filter(function(t){var d=new Date(t.deadline||'9999');var n=new Date();n.setDate(n.getDate()+7);return t.deadline>today&&d<=n&&t.status!=='done'}).slice(0,3)
                   if(todayTasks.length===0&&lateTasks.length===0){
-                    return <div style={{fontSize:12,opacity:.4,padding:'8px 0'}}>✅ Aucune tâche urgente aujourd'hui !</div>
+                    return <div style={{fontSize:15,opacity:.5,padding:'10px 0'}}>✅ Aucune tâche urgente aujourd'hui !</div>
                   }
                   return(
                     <div>
@@ -1012,8 +1028,8 @@ export default function DashboardPage() {
                         <div key={t.id} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 8px',marginBottom:4,background:'#FFE5E5',borderRadius:5,border:'1px solid #CC0066'}}>
                           <input type="checkbox" onChange={function(){setTasks(function(prev){return prev.map(function(x){return x.id===t.id?Object.assign({},x,{status:'done'}):x})})}} style={{cursor:'pointer'}} />
                           <div style={{flex:1}}>
-                            <div style={{fontSize:15,fontWeight:900,color:'#CC0066'}}>⚠️ {t.title}</div>
-                            <div style={{fontSize:12,opacity:.6}}>{t.assignee} · Deadline dépassée : {t.deadline}</div>
+                            <div style={{fontSize:17,fontWeight:900,color:'#CC0066'}}>⚠️ {t.title}</div>
+                            <div style={{fontSize:14,opacity:.7}}>{t.assignee} · Deadline dépassée : {t.deadline}</div>
                           </div>
                         </div>
                       )})}
@@ -1098,8 +1114,8 @@ export default function DashboardPage() {
                         <div key={day} style={{borderRadius:6,border:'2px solid '+borderColor,overflow:'hidden',display:'flex',flexDirection:'column'}}>
                           <div style={{background:headerBg,padding:'6px 8px',borderBottom:'1px solid '+borderColor}}>
                             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                              <div className="yt" style={{fontSize:18,color:headerColor}}>{day}</div>
-                              <div style={{fontSize:11,fontWeight:900,opacity:.7,color:headerColor}}>{dd.getDate()}/{dd.getMonth()+1}</div>
+                              <div className="yt" style={{fontSize:20,color:headerColor}}>{day}</div>
+                              <div style={{fontSize:13,fontWeight:900,opacity:.7,color:headerColor}}>{dd.getDate()}/{dd.getMonth()+1}</div>
                             </div>
                           </div>
                           <div style={{padding:'7px',flex:1,background:'#FFFFFF',minHeight:200}}>
@@ -1107,7 +1123,7 @@ export default function DashboardPage() {
                               return(
                                 <div key={todo.key} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:4}}>
                                   <input type="checkbox" checked={!!todo.done} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:todo.urgent?'#CC0066':'#FF82D7'}}/>
-                                  <span style={{fontSize:11,fontWeight:todo.urgent?900:500,color:todo.urgent?'#CC0066':'#333',textDecoration:todo.done?'line-through':'none',opacity:todo.done?.4:1,lineHeight:1.4}}>{todo.label}</span>
+                                  <span style={{fontSize:13,fontWeight:todo.urgent?900:500,color:todo.urgent?'#CC0066':'#333',textDecoration:todo.done?'line-through':'none',opacity:todo.done?.4:1,lineHeight:1.4}}>{todo.label}</span>
                                 </div>
                               )
                             })}
@@ -1119,7 +1135,7 @@ export default function DashboardPage() {
                                       setTasks(function(prev){return prev.map(function(x){return x.id!==t.id?x:Object.assign({},x,{status:t.status==='done'?'todo':'done'})})})
                                     }}>
                                       <input type="checkbox" checked={t.status==='done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#191923'}}/>
-                                      <span style={{fontSize:11,fontWeight:t.priority==='high'?900:600,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.4}}>{t.title}</span>
+                                      <span style={{fontSize:13,fontWeight:t.priority==='high'?900:600,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.4}}>{t.title}</span>
                                     </div>
                                   )
                                 })}
@@ -1131,7 +1147,7 @@ export default function DashboardPage() {
                                   return(
                                     <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:3}}>
                                       <input type="checkbox" checked={t.status==='done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#FFEB5A'}}/>
-                                      <span style={{fontSize:11,fontWeight:600,opacity:.6,lineHeight:1.4,textDecoration:t.status==='done'?'line-through':'none'}}>&#128081; {t.title}</span>
+                                      <span style={{fontSize:13,fontWeight:600,opacity:.6,lineHeight:1.4,textDecoration:t.status==='done'?'line-through':'none'}}>&#128081; {t.title}</span>
                                     </div>
                                   )
                                 })}
@@ -1235,7 +1251,7 @@ export default function DashboardPage() {
                       {p.status === 'to_contact' && <button className="btn btn-g btn-sm" onClick={function() { contactProspect(p.id) }}>📞 Contacté</button>}
                       {p.status === 'contacted' && (
                         <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                          {(!p.relanceStatut || p.relanceStatut === 'en_attente') && <button className="btn btn-sm" style={{background:'#005FFF',color:'#fff',fontSize:10}} onClick={function() { relanceProspect(p.id) }}>↩ Relancer</button>}
+                          {(!p.relanceStatut || p.relanceStatut === 'en_attente') && <button className="btn btn-sm" style={{background:'#005FFF',color:'#fff',fontSize:11}} onClick={function() { relanceProspect(p.id) }}>↩ Relancer</button>}
                           {p.relanceStatut === 'relance' && <span style={{fontSize:9,fontWeight:900,padding:'3px 7px',background:'#FF6B2B',color:'#fff',borderRadius:3}}>↩ Relancé</span>}
                           <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function() { reponseProspect(p.id,'interesse') }}>✅ Intéressé</button>
                           <button className="btn btn-sm" style={{background:'#FF6B2B',color:'#fff',fontSize:10}} onClick={function() { reponseProspect(p.id,'rappeler') }}>📞 Rappeler</button>
@@ -1364,9 +1380,9 @@ export default function DashboardPage() {
                         <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:3}}>
                           <div style={{fontWeight:900,fontSize:14,cursor:'pointer'}} onClick={function(){openModal('prospect',Object.assign({},p))}}>{p.name}</div>
                           <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>
-                          {p.temperature && <span style={{fontSize:10,fontWeight:900,color:tempColors[p.temperature]||'#888'}}>{tempLabel[p.temperature]||''}</span>}
+                          {p.temperature && <span style={{fontSize:12,fontWeight:900,color:tempColors[p.temperature]||'#888'}}>{tempLabel[p.temperature]||''}</span>}
                         </div>
-                        <div style={{fontSize:11,opacity:.5}}>{p.category} · {p.email}</div>
+                        <div style={{fontSize:12,opacity:.8,fontWeight:500}}>{p.category} · {p.email}</div>
                       </div>
                       <div style={{display:'flex',gap:4,flexShrink:0}}>
                         <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){openModal('prospect',Object.assign({},p))}}>✏️</button>
@@ -1384,10 +1400,10 @@ export default function DashboardPage() {
                       )})}
                     </div>
 
-                    {p.nextDate && <div style={{fontSize:11,marginBottom:6,color:isLate?'#CC0066':'#555',fontWeight:isLate?900:400}}>{isLate?'⚠️ RETARD — ':''}{p.nextAction} — {p.nextDate}</div>}
+                    {p.nextDate && <div style={{fontSize:13,fontWeight:600,marginBottom:6,color:isLate?'#CC0066':'#555',fontWeight:isLate?900:400}}>{isLate?'⚠️ RETARD — ':''}{p.nextAction} — {p.nextDate}</div>}
 
                     <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                      {p.status==='contacted' && <button className="btn btn-sm" style={{background:'#005FFF',color:'#fff',fontSize:10}} onClick={function(){
+                      {p.status==='contacted' && <button className="btn btn-sm" style={{background:'#005FFF',color:'#fff',fontSize:11}} onClick={function(){
                         var rel=new Date();rel.setDate(rel.getDate()+7)
                         setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{nextDate:rel.toISOString().split('T')[0],nextAction:'2ème relance'}):x})})
                         toast('Relancé ✓')
@@ -2238,925 +2254,10 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {page === 'instagram' && (
-            <div>
-              <div className="ph">
-                <div>
-                  <div className="pt">Instagram 📸</div>
-                  <div className="ps">Commentaires et messages</div>
-                </div>
-                <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                  {instaData && instaData.mock && <span style={{fontSize:10,background:'#FF6B2B',color:'#fff',padding:'2px 6px',borderRadius:3,fontWeight:900}}>DEMO</span>}
-                  <a href="https://www.instagram.com/meshuga.deli/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p">Ouvrir Instagram →</a>
-                </div>
-              </div>
-
-              {instaLoading && (
-                <div style={{textAlign:'center',padding:60,opacity:.4}}>
-                  <div style={{fontSize:36}}>📸</div>
-                  <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',marginTop:8}}>Chargement...</div>
-                </div>
-              )}
-
-              {!instaLoading && instaData && !instaData.ok && (
-                <div className="card" style={{borderLeft:'4px solid #FF6B2B',padding:'16px 20px'}}>
-                  <div style={{fontWeight:900,marginBottom:6}}>⚙️ Configuration requise</div>
-                  <div style={{fontSize:12,opacity:.7,lineHeight:1.7}}>
-                    Pour connecter Instagram :<br/>
-                    1. Crée une app Meta sur <a href="https://developers.facebook.com" target="_blank" style={{color:'#005FFF'}}>developers.facebook.com</a><br/>
-                    2. Active <strong>Instagram Graph API</strong> + permissions <code>instagram_basic</code>, <code>instagram_manage_comments</code>, <code>pages_messaging</code><br/>
-                    3. Ajoute <strong>INSTAGRAM_ACCESS_TOKEN</strong> dans tes variables Vercel<br/>
-                    4. Redéploie
-                  </div>
-                </div>
-              )}
-
-              {!instaLoading && instaData && instaData.ok && (
-                <div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
-                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
-                      <div className="kl">Abonnés</div>
-                      <div className="kv" style={{fontSize:24,color:'#FF82D7'}}>{instaData.followers ? instaData.followers.toLocaleString('fr-FR') : '--'}</div>
-                    </div>
-                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
-                      <div className="kl">Posts</div>
-                      <div className="kv" style={{fontSize:24}}>{instaData.mediaCount || '--'}</div>
-                    </div>
-                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
-                      <div className="kl">Messages non lus</div>
-                      <div className="kv" style={{fontSize:24,color:instaData.unreadMessages>0?'#CC0066':'#191923'}}>{instaData.unreadMessages || 0}</div>
-                    </div>
-                  </div>
-
-                  <div style={{display:'flex',gap:6,marginBottom:10}}>
-                    {['comments','messages','media'].map(function(tab){return(
-                      <button key={tab} className={'btn btn-sm'+(instaTab===tab?' btn-p':'')} onClick={function(){setInstaTab(tab)}}>
-                        {tab==='comments'?'💬 Commentaires':tab==='messages'?'✉️ Messages':'📷 Posts'}
-                      </button>
-                    )})}
-                  </div>
-
-                  {instaTab === 'comments' && (
-                    <div>
-                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Commentaires récents</div>
-                      {(instaData.comments||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun commentaire récent</div>}
-                      {(instaData.comments||[]).map(function(c,i){return(
-                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(c.replied?'#009D3A':'#FFEB5A')}}>
-                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                            <div style={{fontWeight:900,fontSize:13}}>@{c.username}</div>
-                            <div style={{fontSize:10,opacity:.4}}>{c.date}</div>
-                          </div>
-                          <div style={{fontSize:12,marginBottom:6,lineHeight:1.5}}>{c.text}</div>
-                          <div style={{fontSize:10,opacity:.5,marginBottom:c.replied?6:0}}>📸 {c.postCaption || 'Post Instagram'}</div>
-                          {c.replied
-                            ? <div style={{fontSize:11,color:'#009D3A',fontWeight:700}}>✅ Répondu</div>
-                            : <a href={'https://www.instagram.com/p/'+(c.shortcode||'')} target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{fontSize:10,marginTop:4}}>↗ Répondre sur Instagram</a>
-                          }
-                        </div>
-                      )})}
-                    </div>
-                  )}
-
-                  {instaTab === 'messages' && (
-                    <div>
-                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Messages directs</div>
-                      {(instaData.messages||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun message récent</div>}
-                      {(instaData.messages||[]).map(function(m,i){return(
-                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(m.read?'#EBEBEB':'#FF82D7')}}>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
-                            <div style={{flex:1}}>
-                              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
-                                <div style={{fontWeight:900,fontSize:13}}>@{m.username}</div>
-                                {!m.read && <span style={{fontSize:9,background:'#FF82D7',padding:'1px 5px',borderRadius:3,fontWeight:900,color:'#191923'}}>NOUVEAU</span>}
-                              </div>
-                              <div style={{fontSize:12,lineHeight:1.5,color:'#444'}}>{m.lastMessage}</div>
-                            </div>
-                            <div style={{fontSize:10,opacity:.4,flexShrink:0}}>{m.date}</div>
-                          </div>
-                          <a href="https://www.instagram.com/direct/inbox/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p" style={{fontSize:10,marginTop:8}}>↗ Répondre sur Instagram</a>
-                        </div>
-                      )})}
-                    </div>
-                  )}
-
-                  {instaTab === 'media' && (
-                    <div>
-                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Posts récents</div>
-                      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
-                        {(instaData.media||[]).map(function(p,i){return(
-                          <a key={i} href={p.permalink} target="_blank" rel="noopener noreferrer" style={{textDecoration:'none',color:'inherit'}}>
-                            <div className="card" style={{padding:10,cursor:'pointer'}}>
-                              {p.thumbnailUrl && <img src={p.thumbnailUrl} alt="" style={{width:'100%',aspectRatio:'1',objectFit:'cover',borderRadius:4,marginBottom:6}} />}
-                              {!p.thumbnailUrl && <div style={{width:'100%',aspectRatio:'1',background:'#FFEB5A',borderRadius:4,marginBottom:6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>📷</div>}
-                              <div style={{fontSize:11,display:'flex',justifyContent:'space-between'}}>
-                                <span>❤️ {p.likes||0}</span>
-                                <span>💬 {p.comments||0}</span>
-                              </div>
-                              <div style={{fontSize:10,opacity:.4,marginTop:3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{p.caption||''}</div>
-                            </div>
-                          </a>
-                        )})}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {page === 'journal' && !isEmy && (
-            <div>
-              <div className="ph">
-                <div><div className="pt">Journal d'Emy 📓</div><div className="ps">Sessions · Actions · Export</div></div>
-                <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){
-                  var rows = activityLog.filter(function(a){
-                    var ok1 = !journalDateFrom || a.created_at >= journalDateFrom
-                    var ok2 = !journalDateTo || a.created_at <= journalDateTo+'T23:59:59'
-                    return ok1 && ok2
-                  })
-                  var csv = 'Date,Heure,Utilisateur,Type,Detail\n' + rows.map(function(a){
-                    var dt = a.created_at ? new Date(a.created_at) : new Date()
-                    return [dt.toLocaleDateString('fr-FR'), dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}), a.user_name||'', a.type||'', (a.description||'').replace(/,/g,' ')].join(',')
-                  }).join('\n')
-                  var blob = new Blob([csv],{type:'text/csv'})
-                  var url = URL.createObjectURL(blob)
-                  var el = document.createElement('a')
-                  el.href=url;el.download='journal-'+new Date().toISOString().split('T')[0]+'.csv';el.click()
-                }}>📥 Export CSV</button>
-              </div>
-
-              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12}}>
-                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
-                  <div className="kl">Sessions ce mois</div>
-                  <div className="kv" style={{fontSize:22}}>{activityLog.filter(function(a){return a.type==='session_start'&&a.created_at&&a.created_at.startsWith(new Date().toISOString().slice(0,7))}).length}</div>
-                </div>
-                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
-                  <div className="kl">Actions ce mois</div>
-                  <div className="kv" style={{fontSize:22}}>{activityLog.filter(function(a){return a.type!=='session_start'&&a.type!=='session_end'&&a.created_at&&a.created_at.startsWith(new Date().toISOString().slice(0,7))}).length}</div>
-                </div>
-                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
-                  <div className="kl">Prospects contactés</div>
-                  <div className="kv" style={{fontSize:22,color:'#009D3A'}}>{activityLog.filter(function(a){return a.type==='prospect_contacte'}).length}</div>
-                </div>
-                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
-                  <div className="kl">Emails IA générés</div>
-                  <div className="kv" style={{fontSize:22,color:'#FF82D7'}}>{activityLog.filter(function(a){return a.type==='email_genere'||a.type==='email_copie'}).length}</div>
-                </div>
-              </div>
-
-              <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
-                <select className="inp" style={{width:'auto',padding:'5px 10px',fontSize:11}} value={journalUser} onChange={function(e){setJournalUser(e.target.value)}}>
-                  <option value="all">Tous les utilisateurs</option>
-                  <option value="emy">Emy</option>
-                  <option value="edward">Edward</option>
-                </select>
-                <select className="inp" style={{width:'auto',padding:'5px 10px',fontSize:11}} value={journalFilter} onChange={function(e){setJournalFilter(e.target.value)}}>
-                  <option value="all">Toutes les actions</option>
-                  <option value="session_start">Sessions uniquement</option>
-                  <option value="prospect_contacte">Prospects contactés</option>
-                  <option value="email_copie">Emails copiés</option>
-                  <option value="email_genere">Emails IA</option>
-                </select>
-                <input type="date" className="inp" style={{width:140,fontSize:11,padding:'5px 8px'}} value={journalDateFrom} onChange={function(e){setJournalDateFrom(e.target.value)}} />
-                <span style={{fontSize:11,opacity:.3}}>→</span>
-                <input type="date" className="inp" style={{width:140,fontSize:11,padding:'5px 8px'}} value={journalDateTo} onChange={function(e){setJournalDateTo(e.target.value)}} />
-                {(journalDateFrom||journalDateTo)&&<button className="btn btn-sm" onClick={function(){setJournalDateFrom('');setJournalDateTo('')}}>✕ Reset</button>}
-              </div>
-
-              {(function(){
-                var filtered = activityLog.filter(function(a){
-                  var mType = journalFilter==='all' || a.type===journalFilter
-                  var mUser = journalUser==='all' || (a.user_name&&a.user_name.toLowerCase().indexOf(journalUser)>-1)
-                  var mFrom = !journalDateFrom || a.created_at >= journalDateFrom
-                  var mTo = !journalDateTo || a.created_at <= journalDateTo+'T23:59:59'
-                  return mType && mUser && mFrom && mTo
-                })
-                if(filtered.length===0) return <div style={{textAlign:'center',padding:40,opacity:.4,fontSize:13}}>Aucune activité pour ces filtres</div>
-
-                var byDay = {}
-                filtered.forEach(function(a){
-                  var d = a.created_at ? a.created_at.split('T')[0] : 'inconnu'
-                  if(!byDay[d]) byDay[d] = []
-                  byDay[d].push(a)
-                })
-
-                return Object.keys(byDay).sort(function(a,b){return b.localeCompare(a)}).map(function(day){
-                  var dayLogs = byDay[day]
-                  var sessions = dayLogs.filter(function(a){return a.type==='session_start'})
-                  var sessionEnds = dayLogs.filter(function(a){return a.type==='session_end'})
-                  var actions = dayLogs.filter(function(a){return a.type!=='session_start'&&a.type!=='session_end'})
-                  var dayLabel = new Date(day+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})
-
-                  return(
-                    <div key={day} style={{marginBottom:16}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,padding:'7px 12px',background:'#F5F5F5',borderRadius:6}}>
-                        <div style={{fontWeight:900,fontSize:13,flex:1}}>{dayLabel}</div>
-                        {sessions.length>0&&<span style={{fontSize:10,background:'#005FFF',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{sessions.length} session{sessions.length>1?'s':''}</span>}
-                        {actions.length>0&&<span style={{fontSize:10,background:'#FFEB5A',border:'1px solid #191923',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{actions.length} action{actions.length>1?'s':''}</span>}
-                      </div>
-
-                      {sessions.length>0&&(
-                        <div style={{marginBottom:10}}>
-                          {sessions.map(function(s,si){
-                            var endLog = sessionEnds[si]
-                            var duration = endLog ? endLog.description : null
-                            var startTime = s.created_at ? new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : ''
-                            var endTime = endLog && endLog.created_at ? new Date(endLog.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : null
-                            return(
-                              <div key={si} style={{display:'flex',alignItems:'center',gap:12,padding:'8px 12px',background:'#EBF3FF',borderRadius:6,borderLeft:'3px solid #005FFF',marginBottom:4}}>
-                                <div style={{fontSize:20}}>🔐</div>
-                                <div style={{flex:1}}>
-                                  <div style={{fontWeight:900,fontSize:13}}>{s.user_name}</div>
-                                  <div style={{fontSize:11,color:'#555',marginTop:1}}>
-                                    Connexion : <strong>{startTime}</strong>
-                                    {endTime&&<span> → <strong>{endTime}</strong></span>}
-                                    {duration&&<span style={{marginLeft:8,color:'#005FFF',fontWeight:700}}>{duration}</span>}
-                                  </div>
-                                </div>
-                                <div style={{fontSize:11,fontWeight:900,color:endTime?'#009D3A':'#FF6B2B',background:endTime?'#D0F5E0':'#FFF3E0',padding:'3px 8px',borderRadius:4}}>
-                                  {endTime?'✅ Terminée':'🟢 En cours'}
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-
-                      {actions.length>0&&(
-                        <div style={{background:'#FAFAFA',borderRadius:6,overflow:'hidden',border:'1px solid #EBEBEB'}}>
-                          {actions.map(function(a,ai){
-                            var tl={email_copie:'📋 Email copié',prospect_contacte:'📞 Contact',email_genere:'✉️ Email IA',prospect_relance:'↩ Relance',devis_cree:'📄 Devis',session_end:'🔒 Fin session'}
-                            var tc={email_copie:'#FFE5F7',prospect_contacte:'#D0F5E0',email_genere:'#FFE5F7',prospect_relance:'#EBF3FF',devis_cree:'#FFEB5A'}
-                            var label = tl[a.type] || a.type
-                            var bg = tc[a.type] || '#F0F0F0'
-                            var time = a.created_at ? new Date(a.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : ''
-                            return(
-                              <div key={ai} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 12px',borderBottom:ai<actions.length-1?'1px solid #F0F0F0':'none'}}>
-                                <span style={{fontSize:9,background:bg,color:'#191923',padding:'3px 7px',borderRadius:3,fontWeight:900,whiteSpace:'nowrap',minWidth:75,textAlign:'center'}}>{label}</span>
-                                <div style={{flex:1}}>
-                                  <div style={{fontSize:12,fontWeight:700}}>{a.prospect_name||a.description||a.type}</div>
-                                  {a.description&&a.prospect_name&&<div style={{fontSize:10,opacity:.45,marginTop:1}}>{a.description}</div>}
-                                </div>
-                                <span style={{fontSize:10,opacity:.4,flexShrink:0}}>{time}</span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
-              })()}
-            </div>
-          )}
-
-          {page === 'instagram' && (
-            <div>
-              <div className="ph">
-                <div>
-                  <div className="pt">Instagram 📸</div>
-                  <div className="ps">Commentaires et messages</div>
-                </div>
-                <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                  {instaData && instaData.mock && <span style={{fontSize:10,background:'#FF6B2B',color:'#fff',padding:'2px 6px',borderRadius:3,fontWeight:900}}>DEMO</span>}
-                  <a href="https://www.instagram.com/meshuga.deli/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p">Ouvrir Instagram →</a>
-                </div>
-              </div>
-
-              {instaLoading && (
-                <div style={{textAlign:'center',padding:60,opacity:.4}}>
-                  <div style={{fontSize:36}}>📸</div>
-                  <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',marginTop:8}}>Chargement...</div>
-                </div>
-              )}
-
-              {!instaLoading && instaData && !instaData.ok && (
-                <div className="card" style={{borderLeft:'4px solid #FF6B2B',padding:'16px 20px'}}>
-                  <div style={{fontWeight:900,marginBottom:6}}>⚙️ Configuration requise</div>
-                  <div style={{fontSize:12,opacity:.7,lineHeight:1.7}}>
-                    Pour connecter Instagram :<br/>
-                    1. Crée une app Meta sur <a href="https://developers.facebook.com" target="_blank" style={{color:'#005FFF'}}>developers.facebook.com</a><br/>
-                    2. Active <strong>Instagram Graph API</strong> + permissions <code>instagram_basic</code>, <code>instagram_manage_comments</code>, <code>pages_messaging</code><br/>
-                    3. Ajoute <strong>INSTAGRAM_ACCESS_TOKEN</strong> dans tes variables Vercel<br/>
-                    4. Redéploie
-                  </div>
-                </div>
-              )}
-
-              {!instaLoading && instaData && instaData.ok && (
-                <div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
-                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
-                      <div className="kl">Abonnés</div>
-                      <div className="kv" style={{fontSize:24,color:'#FF82D7'}}>{instaData.followers ? instaData.followers.toLocaleString('fr-FR') : '--'}</div>
-                    </div>
-                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
-                      <div className="kl">Posts</div>
-                      <div className="kv" style={{fontSize:24}}>{instaData.mediaCount || '--'}</div>
-                    </div>
-                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
-                      <div className="kl">Messages non lus</div>
-                      <div className="kv" style={{fontSize:24,color:instaData.unreadMessages>0?'#CC0066':'#191923'}}>{instaData.unreadMessages || 0}</div>
-                    </div>
-                  </div>
-
-                  <div style={{display:'flex',gap:6,marginBottom:10}}>
-                    {['comments','messages','media'].map(function(tab){return(
-                      <button key={tab} className={'btn btn-sm'+(instaTab===tab?' btn-p':'')} onClick={function(){setInstaTab(tab)}}>
-                        {tab==='comments'?'💬 Commentaires':tab==='messages'?'✉️ Messages':'📷 Posts'}
-                      </button>
-                    )})}
-                  </div>
-
-                  {instaTab === 'comments' && (
-                    <div>
-                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Commentaires récents</div>
-                      {(instaData.comments||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun commentaire récent</div>}
-                      {(instaData.comments||[]).map(function(c,i){return(
-                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(c.replied?'#009D3A':'#FFEB5A')}}>
-                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                            <div style={{fontWeight:900,fontSize:13}}>@{c.username}</div>
-                            <div style={{fontSize:10,opacity:.4}}>{c.date}</div>
-                          </div>
-                          <div style={{fontSize:12,marginBottom:6,lineHeight:1.5}}>{c.text}</div>
-                          <div style={{fontSize:10,opacity:.5,marginBottom:c.replied?6:0}}>📸 {c.postCaption || 'Post Instagram'}</div>
-                          {c.replied
-                            ? <div style={{fontSize:11,color:'#009D3A',fontWeight:700}}>✅ Répondu</div>
-                            : <a href={'https://www.instagram.com/p/'+(c.shortcode||'')} target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{fontSize:10,marginTop:4}}>↗ Répondre sur Instagram</a>
-                          }
-                        </div>
-                      )})}
-                    </div>
-                  )}
-
-                  {instaTab === 'messages' && (
-                    <div>
-                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Messages directs</div>
-                      {(instaData.messages||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun message récent</div>}
-                      {(instaData.messages||[]).map(function(m,i){return(
-                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(m.read?'#EBEBEB':'#FF82D7')}}>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
-                            <div style={{flex:1}}>
-                              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
-                                <div style={{fontWeight:900,fontSize:13}}>@{m.username}</div>
-                                {!m.read && <span style={{fontSize:9,background:'#FF82D7',padding:'1px 5px',borderRadius:3,fontWeight:900,color:'#191923'}}>NOUVEAU</span>}
-                              </div>
-                              <div style={{fontSize:12,lineHeight:1.5,color:'#444'}}>{m.lastMessage}</div>
-                            </div>
-                            <div style={{fontSize:10,opacity:.4,flexShrink:0}}>{m.date}</div>
-                          </div>
-                          <a href="https://www.instagram.com/direct/inbox/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p" style={{fontSize:10,marginTop:8}}>↗ Répondre sur Instagram</a>
-                        </div>
-                      )})}
-                    </div>
-                  )}
-
-                  {instaTab === 'media' && (
-                    <div>
-                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Posts récents</div>
-                      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
-                        {(instaData.media||[]).map(function(p,i){return(
-                          <a key={i} href={p.permalink} target="_blank" rel="noopener noreferrer" style={{textDecoration:'none',color:'inherit'}}>
-                            <div className="card" style={{padding:10,cursor:'pointer'}}>
-                              {p.thumbnailUrl && <img src={p.thumbnailUrl} alt="" style={{width:'100%',aspectRatio:'1',objectFit:'cover',borderRadius:4,marginBottom:6}} />}
-                              {!p.thumbnailUrl && <div style={{width:'100%',aspectRatio:'1',background:'#FFEB5A',borderRadius:4,marginBottom:6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>📷</div>}
-                              <div style={{fontSize:11,display:'flex',justifyContent:'space-between'}}>
-                                <span>❤️ {p.likes||0}</span>
-                                <span>💬 {p.comments||0}</span>
-                              </div>
-                              <div style={{fontSize:10,opacity:.4,marginTop:3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{p.caption||''}</div>
-                            </div>
-                          </a>
-                        )})}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {page === 'journal' && !isEmy && (
-            <div>
-              <div className="ph">
-                <div><div className="pt">Journal d'Emy 📓</div><div className="ps">Activité · Sessions · Actions</div></div>
-                <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){
-                  var rows = activityLog.filter(function(a){
-                    var inFrom = !journalDateFrom || a.created_at >= journalDateFrom
-                    var inTo = !journalDateTo || a.created_at <= journalDateTo+'T23:59:59'
-                    return inFrom && inTo
-                  })
-                  var csv = 'Date,Utilisateur,Type,Description\n' + rows.map(function(a){
-                    return [new Date(a.created_at).toLocaleString('fr-FR'),a.user_name||'',a.type||'',a.description||''].join(',')
-                  }).join('\n')
-                  var blob = new Blob([csv],{type:'text/csv'})
-                  var url = URL.createObjectURL(blob)
-                  var el = document.createElement('a')
-                  el.href=url;el.download='journal-emy-'+new Date().toISOString().split('T')[0]+'.csv';el.click()
-                }}>📥 Export CSV</button>
-              </div>
-
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:12}}>
-                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
-                  <div className="kl">Sessions aujourd'hui</div>
-                  <div className="kv" style={{fontSize:22}}>{activityLog.filter(function(a){return a.type==='session_start'&&a.created_at&&a.created_at.startsWith(new Date().toISOString().split('T')[0])}).length}</div>
-                </div>
-                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
-                  <div className="kl">Actions ce mois</div>
-                  <div className="kv" style={{fontSize:22}}>{activityLog.filter(function(a){return a.created_at&&a.created_at.startsWith(new Date().toISOString().slice(0,7))}).length}</div>
-                </div>
-                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
-                  <div className="kl">Emails générés</div>
-                  <div className="kv" style={{fontSize:22,color:'#FF82D7'}}>{activityLog.filter(function(a){return a.type==='email_genere'||a.type==='email_copie'}).length}</div>
-                </div>
-              </div>
-
-              <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
-                <select className="inp" style={{width:'auto',padding:'5px 10px',fontSize:11}} value={journalUser} onChange={function(e){setJournalUser(e.target.value)}}>
-                  <option value="all">Tous</option>
-                  <option value="emy">Emy</option>
-                  <option value="edward">Edward</option>
-                </select>
-                <select className="inp" style={{width:'auto',padding:'5px 10px',fontSize:11}} value={journalFilter} onChange={function(e){setJournalFilter(e.target.value)}}>
-                  <option value="all">Toutes actions</option>
-                  <option value="session_start">Sessions</option>
-                  <option value="email_copie">Emails copiés</option>
-                  <option value="prospect_contacte">Contactés</option>
-                  <option value="email_genere">Emails IA</option>
-                </select>
-                <input type="date" className="inp" style={{width:135,fontSize:11,padding:'5px 8px'}} value={journalDateFrom} onChange={function(e){setJournalDateFrom(e.target.value)}} />
-                <span style={{fontSize:11,opacity:.4}}>→</span>
-                <input type="date" className="inp" style={{width:135,fontSize:11,padding:'5px 8px'}} value={journalDateTo} onChange={function(e){setJournalDateTo(e.target.value)}} />
-                {(journalDateFrom||journalDateTo)&&<button className="btn btn-sm" onClick={function(){setJournalDateFrom('');setJournalDateTo('')}}>✕</button>}
-              </div>
-
-              {(function(){
-                var filtered = activityLog.filter(function(a){
-                  var mType = journalFilter==='all'||a.type===journalFilter
-                  var mUser = journalUser==='all'||(a.user_name&&a.user_name.toLowerCase().indexOf(journalUser)>-1)
-                  var mFrom = !journalDateFrom||a.created_at>=journalDateFrom
-                  var mTo = !journalDateTo||a.created_at<=journalDateTo+'T23:59:59'
-                  return mType&&mUser&&mFrom&&mTo
-                })
-                if(filtered.length===0)return <div style={{textAlign:'center',padding:40,opacity:.4,fontSize:12}}>Aucune activité pour ces filtres</div>
-                var byDay = {}
-                filtered.forEach(function(a){
-                  var d = a.created_at ? a.created_at.split('T')[0] : 'inconnu'
-                  if(!byDay[d])byDay[d]=[]
-                  byDay[d].push(a)
-                })
-                return Object.keys(byDay).sort(function(a,b){return b.localeCompare(a)}).map(function(day){
-                  var dayLogs = byDay[day]
-                  var sessions = dayLogs.filter(function(a){return a.type==='session_start'})
-                  var actions = dayLogs.filter(function(a){return a.type!=='session_start'})
-                  var dayLabel = new Date(day+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})
-                  return(
-                    <div key={day} style={{marginBottom:14}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,padding:'5px 10px',background:'#F5F5F5',borderRadius:5}}>
-                        <div style={{fontWeight:900,fontSize:13}}>{dayLabel}</div>
-                        <span style={{fontSize:9,background:'#FFEB5A',border:'1px solid #191923',borderRadius:3,padding:'1px 5px',fontWeight:900}}>{dayLogs.length}</span>
-                        {sessions.length>0&&<span style={{fontSize:10,color:'#005FFF',fontWeight:700}}>{sessions.length} session(s)</span>}
-                      </div>
-                      {sessions.length>0&&(
-                        <div style={{padding:'6px 10px',background:'#EBF3FF',borderRadius:5,borderLeft:'3px solid #005FFF',marginBottom:6}}>
-                          <div style={{fontSize:10,fontWeight:900,color:'#005FFF',marginBottom:3}}>🔐 Connexions</div>
-                          {sessions.map(function(s,si){return(
-                            <div key={si} style={{display:'flex',gap:8,fontSize:11,padding:'1px 0'}}>
-                              <span style={{fontWeight:700}}>{s.user_name}</span>
-                              <span style={{opacity:.5}}>{s.created_at?new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):''}</span>
-                            </div>
-                          )})}
-                        </div>
-                      )}
-                      {actions.map(function(a,ai){
-                        var tl={email_copie:'📋 Copié',prospect_contacte:'📞 Contact',email_genere:'✉️ Email IA',prospect_relance:'↩ Relance',devis_cree:'📄 Devis'}
-                        var tc={email_copie:'#FF82D7',prospect_contacte:'#D0F5E0',email_genere:'#FFE5F7',prospect_relance:'#EBF3FF',devis_cree:'#FFEB5A'}
-                        var label=tl[a.type]||a.type
-                        var color=tc[a.type]||'#F0F0F0'
-                        return(
-                          <div key={ai} style={{display:'flex',alignItems:'flex-start',gap:8,padding:'5px 0',borderBottom:'1px solid #F5F5F5'}}>
-                            <span style={{fontSize:9,background:color,color:'#191923',padding:'2px 5px',borderRadius:3,fontWeight:900,whiteSpace:'nowrap',minWidth:70,textAlign:'center'}}>{label}</span>
-                            <div style={{flex:1}}>
-                              <div style={{fontSize:12,fontWeight:700}}>{a.prospect_name||a.description||a.type}</div>
-                              {a.description&&a.prospect_name&&<div style={{fontSize:10,opacity:.5}}>{a.description}</div>}
-                            </div>
-                            <span style={{fontSize:10,opacity:.4,flexShrink:0}}>{a.created_at?new Date(a.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):''}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })
-              })()}
-            </div>
-          )}
-
-          {page === 'instagram' && (
-            <div>
-              <div className="ph">
-                <div>
-                  <div className="pt">Instagram 📸</div>
-                  <div className="ps">Commentaires et messages</div>
-                </div>
-                <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                  {instaData && instaData.mock && <span style={{fontSize:10,background:'#FF6B2B',color:'#fff',padding:'2px 6px',borderRadius:3,fontWeight:900}}>DEMO</span>}
-                  <a href="https://www.instagram.com/meshuga.deli/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p">Ouvrir Instagram →</a>
-                </div>
-              </div>
-
-              {instaLoading && (
-                <div style={{textAlign:'center',padding:60,opacity:.4}}>
-                  <div style={{fontSize:36}}>📸</div>
-                  <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',marginTop:8}}>Chargement...</div>
-                </div>
-              )}
-
-              {!instaLoading && instaData && !instaData.ok && (
-                <div className="card" style={{borderLeft:'4px solid #FF6B2B',padding:'16px 20px'}}>
-                  <div style={{fontWeight:900,marginBottom:6}}>⚙️ Configuration requise</div>
-                  <div style={{fontSize:12,opacity:.7,lineHeight:1.7}}>
-                    Pour connecter Instagram :<br/>
-                    1. Crée une app Meta sur <a href="https://developers.facebook.com" target="_blank" style={{color:'#005FFF'}}>developers.facebook.com</a><br/>
-                    2. Active <strong>Instagram Graph API</strong> + permissions <code>instagram_basic</code>, <code>instagram_manage_comments</code>, <code>pages_messaging</code><br/>
-                    3. Ajoute <strong>INSTAGRAM_ACCESS_TOKEN</strong> dans tes variables Vercel<br/>
-                    4. Redéploie
-                  </div>
-                </div>
-              )}
-
-              {!instaLoading && instaData && instaData.ok && (
-                <div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
-                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
-                      <div className="kl">Abonnés</div>
-                      <div className="kv" style={{fontSize:24,color:'#FF82D7'}}>{instaData.followers ? instaData.followers.toLocaleString('fr-FR') : '--'}</div>
-                    </div>
-                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
-                      <div className="kl">Posts</div>
-                      <div className="kv" style={{fontSize:24}}>{instaData.mediaCount || '--'}</div>
-                    </div>
-                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
-                      <div className="kl">Messages non lus</div>
-                      <div className="kv" style={{fontSize:24,color:instaData.unreadMessages>0?'#CC0066':'#191923'}}>{instaData.unreadMessages || 0}</div>
-                    </div>
-                  </div>
-
-                  <div style={{display:'flex',gap:6,marginBottom:10}}>
-                    {['comments','messages','media'].map(function(tab){return(
-                      <button key={tab} className={'btn btn-sm'+(instaTab===tab?' btn-p':'')} onClick={function(){setInstaTab(tab)}}>
-                        {tab==='comments'?'💬 Commentaires':tab==='messages'?'✉️ Messages':'📷 Posts'}
-                      </button>
-                    )})}
-                  </div>
-
-                  {instaTab === 'comments' && (
-                    <div>
-                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Commentaires récents</div>
-                      {(instaData.comments||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun commentaire récent</div>}
-                      {(instaData.comments||[]).map(function(c,i){return(
-                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(c.replied?'#009D3A':'#FFEB5A')}}>
-                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                            <div style={{fontWeight:900,fontSize:13}}>@{c.username}</div>
-                            <div style={{fontSize:10,opacity:.4}}>{c.date}</div>
-                          </div>
-                          <div style={{fontSize:12,marginBottom:6,lineHeight:1.5}}>{c.text}</div>
-                          <div style={{fontSize:10,opacity:.5,marginBottom:c.replied?6:0}}>📸 {c.postCaption || 'Post Instagram'}</div>
-                          {c.replied
-                            ? <div style={{fontSize:11,color:'#009D3A',fontWeight:700}}>✅ Répondu</div>
-                            : <a href={'https://www.instagram.com/p/'+(c.shortcode||'')} target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{fontSize:10,marginTop:4}}>↗ Répondre sur Instagram</a>
-                          }
-                        </div>
-                      )})}
-                    </div>
-                  )}
-
-                  {instaTab === 'messages' && (
-                    <div>
-                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Messages directs</div>
-                      {(instaData.messages||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun message récent</div>}
-                      {(instaData.messages||[]).map(function(m,i){return(
-                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(m.read?'#EBEBEB':'#FF82D7')}}>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
-                            <div style={{flex:1}}>
-                              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
-                                <div style={{fontWeight:900,fontSize:13}}>@{m.username}</div>
-                                {!m.read && <span style={{fontSize:9,background:'#FF82D7',padding:'1px 5px',borderRadius:3,fontWeight:900,color:'#191923'}}>NOUVEAU</span>}
-                              </div>
-                              <div style={{fontSize:12,lineHeight:1.5,color:'#444'}}>{m.lastMessage}</div>
-                            </div>
-                            <div style={{fontSize:10,opacity:.4,flexShrink:0}}>{m.date}</div>
-                          </div>
-                          <a href="https://www.instagram.com/direct/inbox/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p" style={{fontSize:10,marginTop:8}}>↗ Répondre sur Instagram</a>
-                        </div>
-                      )})}
-                    </div>
-                  )}
-
-                  {instaTab === 'media' && (
-                    <div>
-                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Posts récents</div>
-                      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
-                        {(instaData.media||[]).map(function(p,i){return(
-                          <a key={i} href={p.permalink} target="_blank" rel="noopener noreferrer" style={{textDecoration:'none',color:'inherit'}}>
-                            <div className="card" style={{padding:10,cursor:'pointer'}}>
-                              {p.thumbnailUrl && <img src={p.thumbnailUrl} alt="" style={{width:'100%',aspectRatio:'1',objectFit:'cover',borderRadius:4,marginBottom:6}} />}
-                              {!p.thumbnailUrl && <div style={{width:'100%',aspectRatio:'1',background:'#FFEB5A',borderRadius:4,marginBottom:6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>📷</div>}
-                              <div style={{fontSize:11,display:'flex',justifyContent:'space-between'}}>
-                                <span>❤️ {p.likes||0}</span>
-                                <span>💬 {p.comments||0}</span>
-                              </div>
-                              <div style={{fontSize:10,opacity:.4,marginTop:3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{p.caption||''}</div>
-                            </div>
-                          </a>
-                        )})}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {page === 'journal' && !isEmy && (
-            <div>
-              <div className="ph"><div><div className="pt">Journal d'Emy 📓</div><div className="ps">Sessions · Contacts · Emails</div></div></div>
-              <div className="card" style={{marginBottom:12}}>
-                <div className="yt" style={{fontSize:13,marginBottom:8,color:'#FF82D7'}}>🕐 Sessions de connexion</div>
-                {activityLog.filter(function(a) { return a.type === 'session_start' }).slice(0,10).map(function(a, i) {
-                  return (
-                    <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'5px 0',borderBottom:'1px solid rgba(255,255,255,.1)'}}>
-                      <div style={{fontSize:12,fontWeight:900}}>{a.user_name}</div>
-                      <div style={{fontSize:11,opacity:.5}}>{new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
-                    </div>
-                  )
-                })}
-                {activityLog.filter(function(a) { return a.type === 'session_start' }).length === 0 && <div style={{fontSize:11,opacity:.4}}>Aucune session</div>}
-              </div>
-              <div style={{display:'flex',gap:6,marginBottom:10}}>
-                <div className={journalFilter==='all'?'tag on':'tag'} onClick={function() { setJournalFilter('all') }}>Tout</div>
-                <div className={journalFilter==='email_copie'?'tag on':'tag'} onClick={function() { setJournalFilter('email_copie') }}>✉️ Emails</div>
-                <div className={journalFilter==='prospect_contacte'?'tag on':'tag'} onClick={function() { setJournalFilter('prospect_contacte') }}>📞 Contacts</div>
-              </div>
-              {activityLog.filter(function(a) { return a.type !== 'session_start' && (journalFilter === 'all' || a.type === journalFilter) }).length === 0 ? (
-                <div className="card" style={{textAlign:'center',padding:40,opacity:.4}}>
-                  <div style={{fontSize:32,marginBottom:8}}>📓</div>
-                  <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase'}}>Aucune activite</div>
-                </div>
-              ) : activityLog.filter(function(a) { return a.type !== 'session_start' && (journalFilter === 'all' || a.type === journalFilter) }).map(function(a) {
-                return (
-                  <div key={a.id || a.created_at} className="card" style={{padding:'12px 14px',marginBottom:8}}>
-                    <div style={{display:'flex',justifyContent:'space-between',gap:8}}>
-                      <div>
-                        <div style={{fontWeight:900,fontSize:13,marginBottom:4}}>{a.description}</div>
-                        <span style={{fontSize:9,fontWeight:900,padding:'2px 6px',border:'1.5px solid #191923',borderRadius:3,background:a.user_role==='emy'?'#FF82D7':'#FFEB5A'}}>{a.user_name}</span>
-                        {a.prospect_name && <div style={{fontSize:11,opacity:.5,marginTop:4}}>🎯 {a.prospect_name}</div>}
-                        {a.email_content && (
-                          <details style={{marginTop:6}}>
-                            <summary style={{cursor:'pointer',fontSize:11,fontWeight:900,opacity:.6}}>Voir l'email</summary>
-                            <div style={{background:'#F8F8F8',border:'1.5px solid #DEDEDE',borderRadius:5,padding:10,marginTop:6,fontSize:12,whiteSpace:'pre-wrap'}}>{a.email_content}</div>
-                          </details>
-                        )}
-                      </div>
-                      <div style={{fontSize:10,opacity:.4,flexShrink:0}}>{new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
         </div>
       </div>
 
-      {modal === 'email' && (
-        <div className="overlay" onClick={closeModal}>
-          <div className="modal modal-lg" onClick={function(e) { e.stopPropagation() }}>
-            <div className="mh"><div className="mt">✉️ Email IA — {form.name}</div></div>
-            <div className="mb">
-              {generatingEmail && (
-                <div style={{textAlign:'center',padding:30}}>
-                  <div style={{fontSize:32,marginBottom:10}}>✨</div>
-                  <div style={{fontWeight:900,fontSize:13,textTransform:'uppercase'}}>Generation en cours...</div>
-                </div>
-              )}
-              {!generatingEmail && generatedEmail && (
-                <div>
-                  <div className="lbl" style={{marginBottom:6}}>Email genere - modifie avant d'envoyer</div>
-                  <textarea className="inp" style={{minHeight:280,fontFamily:'Arial,sans-serif',fontSize:13,lineHeight:1.6}} value={generatedEmail} onChange={function(e) { setGeneratedEmail(e.target.value) }} />
-                  <div style={{background:'#FFEB5A',border:'2px solid #191923',borderRadius:5,padding:10,fontSize:12,marginTop:8}}>
-                    Copie et envoie depuis <strong>{isEmy ? 'emy@meshuga.fr' : 'edward@meshuga.fr'}</strong>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="mf">
-              <button className="btn" onClick={closeModal}>Fermer</button>
-              {generatedEmail && (
-                <button className="btn btn-y" onClick={function() {
-                  navigator.clipboard.writeText(generatedEmail)
-                  toast('Email copie ! 📋')
-                  logActivity('email_copie', 'Email copie pour ' + form.name, form.name, generatedEmail)
-                }}>📋 Copier</button>
-              )}
-              {generatedEmail && <button className="btn btn-p" onClick={function() { if (emailProspect) generateEmail(emailProspect) }}>🔄 Regenerer</button>}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modal === 'task' && (
-        <div className="overlay" onClick={closeModal}>
-          <div className="modal modal-lg" onClick={function(e) { e.stopPropagation() }}>
-            <div className="mh"><div className="mt">{form.id ? 'Modifier' : 'Nouvelle tache'}</div></div>
-            <div className="mb">
-              <div className="fg"><label className="lbl">Titre *</label><input className="inp" value={form.title||''} onChange={function(e) { setForm(Object.assign({},form,{title:e.target.value})) }} /></div>
-              <div className="fg2">
-                <div className="fg"><label className="lbl">Assignee a</label><select className="inp" value={form.assignee||'emy'} onChange={function(e) { setForm(Object.assign({},form,{assignee:e.target.value})) }}><option value="emy">Emy</option><option value="edward">Edward</option></select></div>
-                <div className="fg"><label className="lbl">Deadline</label><input type="date" className="inp" value={form.deadline||''} onChange={function(e) { setForm(Object.assign({},form,{deadline:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">Priorite</label><select className="inp" value={form.priority||'medium'} onChange={function(e) { setForm(Object.assign({},form,{priority:e.target.value})) }}><option value="high">🔴 Haute</option><option value="medium">🟡 Moyenne</option><option value="low">🟢 Basse</option></select></div>
-                <div className="fg"><label className="lbl">Statut</label><select className="inp" value={form.status||'todo'} onChange={function(e) { setForm(Object.assign({},form,{status:e.target.value})) }}><option value="todo">A faire</option><option value="in_progress">En cours</option><option value="done">Termine</option></select></div>
-              </div>
-              <div>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                  <div className="lbl" style={{margin:0}}>Sous-taches</div>
-                  <button className="btn btn-y btn-sm" onClick={function() { setForm(Object.assign({},form,{checklist:(form.checklist||[]).concat([''])})) }}>+ Ajouter</button>
-                </div>
-                {(form.checklist||[]).map(function(item, i) {
-                  return (
-                    <div key={i} style={{display:'flex',gap:6,marginBottom:5}}>
-                      <input className="inp" value={item} onChange={function(e) { var c = (form.checklist||[]).slice(); c[i] = e.target.value; setForm(Object.assign({},form,{checklist:c})) }} placeholder={'Sous-tache '+(i+1)} style={{fontSize:12,padding:'5px 8px'}} />
-                      <button className="btn btn-sm btn-red" onClick={function() { setForm(Object.assign({},form,{checklist:(form.checklist||[]).filter(function(_,j) { return j!==i })})) }}>✕</button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-            <div className="mf">
-              {form.id && <button className="btn btn-red" onClick={function() { setTasks(function(prev) { return prev.filter(function(x) { return x.id!==form.id }) }); closeModal() }}>Supprimer</button>}
-              <button className="btn" onClick={closeModal}>Annuler</button>
-              <button className="btn btn-y" onClick={saveTask}>Sauvegarder</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modal === 'prospect' && (
-        <div className="overlay" onClick={closeModal}>
-          <div className="modal modal-xl" onClick={function(e) { e.stopPropagation() }}>
-            <div className="mh"><div className="mt">{form.id ? form.name : 'Nouveau prospect'}</div></div>
-            <div className="mb">
-              <div className="fg2">
-                <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Entreprise *</label><input className="inp" value={form.name||''} onChange={function(e) { setForm(Object.assign({},form,{name:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e) { setForm(Object.assign({},form,{email:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">Telephone</label><input className="inp" value={form.phone||''} onChange={function(e) { setForm(Object.assign({},form,{phone:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">Categorie</label><select className="inp" value={form.category||''} onChange={function(e) { setForm(Object.assign({},form,{category:e.target.value})) }}><option value="">-</option><option>Evenementiel</option><option>Corporate</option><option>Startup</option><option>Avocats</option><option>Conseil</option><option>Hotellerie</option><option>Tech</option><option>Institution</option><option>Autre</option></select></div>
-                <div className="fg"><label className="lbl">Statut</label><select className="inp" value={form.status||'to_contact'} onChange={function(e) { setForm(Object.assign({},form,{status:e.target.value})) }}><option value="to_contact">A contacter</option><option value="contacted">Contacte</option><option value="nego">Nego</option><option value="won">Gagne</option><option value="lost">Perdu</option></select></div>
-                <div className="fg" style={{gridColumn:'1/-1'}}>
-                  <label className="lbl">Prochaine relance</label>
-                  <div style={{display:'flex',gap:6}}>
-                    <input type="date" className="inp" style={{flex:1}} value={form.nextDate||''} onChange={function(e) { setForm(Object.assign({},form,{nextDate:e.target.value})) }} />
-                    <button className="btn btn-sm" onClick={function() { var d=new Date();d.setDate(d.getDate()+7);setForm(Object.assign({},form,{nextDate:d.toISOString().split('T')[0]})) }}>+7j</button>
-                    <button className="btn btn-sm" onClick={function() { var d=new Date();d.setDate(d.getDate()+14);setForm(Object.assign({},form,{nextDate:d.toISOString().split('T')[0]})) }}>+14j</button>
-                  </div>
-                  <input className="inp" style={{marginTop:6}} value={form.nextAction||''} onChange={function(e) { setForm(Object.assign({},form,{nextAction:e.target.value})) }} placeholder="Action prevue..." />
-                </div>
-                <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Notes</label><textarea className="inp" value={form.notes||''} onChange={function(e) { setForm(Object.assign({},form,{notes:e.target.value})) }} /></div>
-                <div className="fg" style={{gridColumn:'1/-1'}}>
-                  <label className="lbl">Documents joints</label>
-                  <textarea className="inp" style={{minHeight:55}} value={(form.files||[]).join('\n')} onChange={function(e) { setForm(Object.assign({},form,{files:e.target.value.split('\n')})) }} placeholder="Devis_2026.pdf" />
-                </div>
-              </div>
-            </div>
-            <div className="mf">
-              {form.id && <button className="btn btn-red" onClick={function() { setProspects(function(prev) { return prev.filter(function(x) { return x.id!==form.id }) }); closeModal() }}>Supprimer</button>}
-              <button className="btn" onClick={closeModal}>Annuler</button>
-              <button className="btn btn-y" onClick={saveProspect}>Sauvegarder</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modal === 'contact' && (
-        <div className="overlay" onClick={closeModal}>
-          <div className="modal" onClick={function(e) { e.stopPropagation() }}>
-            <div className="mh"><div className="mt">{form.id ? 'Modifier' : 'Nouveau contact'}</div></div>
-            <div className="mb">
-              <div className="fg2">
-                <div className="fg"><label className="lbl">Categorie</label><select className="inp" value={form.cat||'food'} onChange={function(e) { setForm(Object.assign({},form,{cat:e.target.value})) }}><option value="food">Fournisseur food</option><option value="banque">Banque</option><option value="presse">Presse</option><option value="prestataire">Prestataire</option><option value="partenaire">Partenaire</option><option value="livraison">Livraison</option><option value="fournisseur">Fournisseur</option><option value="it">IT</option><option value="juridique">Juridique</option></select></div>
-                <div className="fg" style={{display:'flex',alignItems:'center',gap:8,paddingTop:22}}><input type="checkbox" checked={!!form.vip} onChange={function(e) { setForm(Object.assign({},form,{vip:e.target.checked})) }} style={{width:16,height:16}} /><span style={{fontSize:12}}>VIP ⭐</span></div>
-                <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Nom *</label><input className="inp" value={form.name||''} onChange={function(e) { setForm(Object.assign({},form,{name:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">Telephone</label><input className="inp" value={form.phone||''} onChange={function(e) { setForm(Object.assign({},form,{phone:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e) { setForm(Object.assign({},form,{email:e.target.value})) }} /></div>
-                <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Notes</label><textarea className="inp" value={form.notes||''} onChange={function(e) { setForm(Object.assign({},form,{notes:e.target.value})) }} /></div>
-              </div>
-            </div>
-            <div className="mf">
-              {form.id && <button className="btn btn-red" onClick={function() { setContacts(function(prev) { return prev.filter(function(x) { return x.id!==form.id }) }); closeModal() }}>Supprimer</button>}
-              <button className="btn" onClick={closeModal}>Annuler</button>
-              <button className="btn btn-y" onClick={saveContact}>Sauvegarder</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-              {modal === 'chasse_edit' && (
-          <div className="overlay" onClick={closeModal}>
-            <div className="modal modal-lg" onClick={function(e) { e.stopPropagation() }}>
-              <div className="mh"><div className="mt">✏️ Modifier — {form.name}</div></div>
-              <div className="mb">
-                <div className="fg2">
-                  <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Nom *</label><input className="inp" value={form.name||''} onChange={function(e){setForm(Object.assign({},form,{name:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Téléphone</label><input className="inp" value={form.phone||''} onChange={function(e){setForm(Object.assign({},form,{phone:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e){setForm(Object.assign({},form,{email:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Contact (nom)</label><input className="inp" value={form.contact||''} onChange={function(e){setForm(Object.assign({},form,{contact:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Site web</label><input className="inp" value={form.site||''} onChange={function(e){setForm(Object.assign({},form,{site:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">LinkedIn</label><input className="inp" value={form.linkedin||''} onChange={function(e){setForm(Object.assign({},form,{linkedin:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Arrondissement</label><input className="inp" value={form.arrondissement||''} onChange={function(e){setForm(Object.assign({},form,{arrondissement:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Taille (employés)</label><input className="inp" value={form.taille||''} onChange={function(e){setForm(Object.assign({},form,{taille:e.target.value}))}} /></div>
-                  <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Type de proposition</label><input className="inp" value={form.type||''} onChange={function(e){setForm(Object.assign({},form,{type:e.target.value}))}} /></div>
-                  <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Pitch / Angle</label><textarea className="inp" value={form.pitch||''} onChange={function(e){setForm(Object.assign({},form,{pitch:e.target.value}))}} style={{minHeight:70}} /></div>
-                  <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Notes</label><textarea className="inp" value={form.notes||''} onChange={function(e){setForm(Object.assign({},form,{notes:e.target.value}))}} style={{minHeight:60}} /></div>
-                  <div className="fg"><label className="lbl">Score (1-10)</label><input type="number" min="1" max="10" className="inp" value={form.score||7} onChange={function(e){setForm(Object.assign({},form,{score:parseInt(e.target.value)||7}))}} /></div>
-                  <div className="fg"><label className="lbl">Valeur estimée / event (€)</label><input type="number" className="inp" value={form.valeur_event||0} onChange={function(e){setForm(Object.assign({},form,{valeur_event:parseInt(e.target.value)||0}))}} /></div>
-                </div>
-              </div>
-              <div className="mf">
-                <button className="btn" onClick={closeModal}>Annuler</button>
-                <button className="btn btn-y" onClick={function(){
-                  setChasse(function(prev){return prev.map(function(x){return x.id===form.id?Object.assign({},x,form):x})})
-                  toast('Prospect mis à jour ✓')
-                  closeModal()
-                }}>💾 Sauvegarder</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {modal === 'vault' && (
-        <div className="overlay" onClick={closeModal}>
-          <div className="modal" onClick={function(e) { e.stopPropagation() }}>
-            <div className="mh"><div className="mt">{form.id ? 'Modifier' : 'Nouvel acces'} 🔐</div></div>
-            <div className="mb">
-              <div className="fg2">
-                <div className="fg"><label className="lbl">Nom *</label><input className="inp" value={form.title||''} onChange={function(e) { setForm(Object.assign({},form,{title:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">URL</label><input className="inp" value={form.url||''} onChange={function(e) { setForm(Object.assign({},form,{url:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">Identifiant</label><input className="inp" value={form.user||''} onChange={function(e) { setForm(Object.assign({},form,{user:e.target.value})) }} /></div>
-                <div className="fg"><label className="lbl">Mot de passe</label><input type="password" className="inp" value={form.pw||''} onChange={function(e) { setForm(Object.assign({},form,{pw:e.target.value})) }} /></div>
-              </div>
-            </div>
-            <div className="mf">
-              {form.id && <button className="btn btn-red" onClick={function() { setVault(function(prev) { return prev.filter(function(x) { return x.id!==form.id }) }); closeModal() }}>Supprimer</button>}
-              <button className="btn" onClick={closeModal}>Annuler</button>
-              <button className="btn btn-y" onClick={saveVault}>Sauvegarder</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-              {modal === 'editChasse' && (
-          <div className="overlay" onClick={closeModal}>
-            <div className="modal modal-xl" onClick={function(e) { e.stopPropagation() }}>
-              <div className="mh"><div className="mt">✏️ Modifier — {form.name}</div></div>
-              <div className="mb">
-                <div className="fg2">
-                  <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Nom entreprise *</label><input className="inp" value={form.name||''} onChange={function(e){setForm(Object.assign({},form,{name:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Téléphone</label><input className="inp" value={form.phone||''} onChange={function(e){setForm(Object.assign({},form,{phone:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e){setForm(Object.assign({},form,{email:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Contact (nom)</label><input className="inp" value={form.contact||''} onChange={function(e){setForm(Object.assign({},form,{contact:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Site web</label><input className="inp" value={form.site||''} onChange={function(e){setForm(Object.assign({},form,{site:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">LinkedIn</label><input className="inp" placeholder="linkedin.com/company/..." value={form.linkedin||''} onChange={function(e){setForm(Object.assign({},form,{linkedin:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Arrondissement</label><input className="inp" value={form.arrondissement||''} onChange={function(e){setForm(Object.assign({},form,{arrondissement:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Taille (nb employés)</label><input className="inp" value={form.taille||''} onChange={function(e){setForm(Object.assign({},form,{taille:e.target.value}))}} /></div>
-                  <div className="fg"><label className="lbl">Valeur / event (€)</label><input type="number" className="inp" value={form.valeur_event||0} onChange={function(e){setForm(Object.assign({},form,{valeur_event:parseInt(e.target.value)||0}))}} /></div>
-                  <div className="fg"><label className="lbl">Score (/10)</label><input type="number" min="1" max="10" className="inp" value={form.score||5} onChange={function(e){setForm(Object.assign({},form,{score:parseInt(e.target.value)||5}))}} /></div>
-                  <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Type de proposition</label><input className="inp" value={form.type||''} onChange={function(e){setForm(Object.assign({},form,{type:e.target.value}))}} /></div>
-                  <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Angle / pitch</label><textarea className="inp" style={{minHeight:60}} value={form.pitch||''} onChange={function(e){setForm(Object.assign({},form,{pitch:e.target.value}))}} /></div>
-                  <div className="fg" style={{gridColumn:'1/-1'}}><label className="lbl">Notes internes</label><textarea className="inp" style={{minHeight:60}} value={form.notes||''} onChange={function(e){setForm(Object.assign({},form,{notes:e.target.value}))}} /></div>
-                  <div className="fg" style={{gridColumn:'1/-1'}}>
-                    <label className="lbl">Statut</label>
-                    <select className="inp" value={form.status||'to_contact'} onChange={function(e){setForm(Object.assign({},form,{status:e.target.value}))}}>
-                      <option value="to_contact">À contacter</option>
-                      <option value="contacted">Contacté</option>
-                      <option value="nego">En négo</option>
-                      <option value="won">Gagné</option>
-                      <option value="lost">Perdu</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-              <div className="mf">
-                <button className="btn" onClick={closeModal}>Annuler</button>
-                <button className="btn btn-y" onClick={function(){
-                  setChasse(function(prev){ return prev.map(function(x){ return x.id===form.id ? Object.assign({},x,form) : x }) })
-                  toast('Prospect mis à jour ✓')
-                  closeModal()
-                }}>💾 Sauvegarder</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-{modal === 'cr' && (
+      {modal === 'cr' && (
         <div className="overlay" onClick={closeModal}>
           <div className="modal" onClick={function(e) { e.stopPropagation() }}>
             <div className="mh"><div className="mt">Compte-rendu hebdomadaire</div></div>
