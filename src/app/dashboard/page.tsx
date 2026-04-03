@@ -552,7 +552,7 @@ export default function DashboardPage() {
   const [journalDateFrom, setJournalDateFrom] = useState('')
   const [journalDateTo, setJournalDateTo] = useState('')
   const [planningWeek, setPlanningWeek] = useState(0)
-  const [planningView, setPlanningView] = useState('sem')
+  const [planningView, setPlanningView] = useState('auj')
   const [chasseCat, setChasseChasse] = useState('all')
   const [chasseSearch, setChasseSearch] = useState('')
   const [chasseSort, setChasseSort] = useState('score')
@@ -617,6 +617,19 @@ export default function DashboardPage() {
     sb().from('activity_log').insert({user_role: profile.role, user_name: profile.full_name || profile.role, type: 'session_start', description: 'Connexion au B2B Manager', prospect_name: null, email_content: null}).then(function(r) {
       if (r.error) { console.warn('[Journal] session_start insert error:', r.error.message) }
     })
+  }, [profile])
+
+  useEffect(function() {
+    var startTime = Date.now()
+    var sessionId = 'sess-' + startTime
+    function handleUnload() {
+      var duration = Math.round((Date.now() - startTime) / 60000)
+      if (profile && duration > 0) {
+        logActivity('session_end', 'Fin de session — durée : ' + duration + ' min', null, null)
+      }
+    }
+    window.addEventListener('beforeunload', handleUnload)
+    return function() { window.removeEventListener('beforeunload', handleUnload) }
   }, [profile])
 
   useEffect(function() {
@@ -767,13 +780,15 @@ export default function DashboardPage() {
       toast('OK, prospect archive.')
     }
   }
-  async function generateEmail(p) {
+  async function generateEmail(p, emailType) {
     setEmailProspect(p)
     setGeneratingEmail(true)
     setGeneratedEmail('')
     openModal('email', p)
     const senderName = isEmy ? 'Emy, B2B Manager' : 'Edward, patron'
     const senderSig = isEmy ? 'Emy' : 'Edward'
+    const isRelance = emailType === 'relance'
+    const isDevisRelance = emailType === 'devis_relance'
     const pressLinks = [
       {name: 'Paris Première', url: 'https://www.facebook.com/watch/?v=648051137321383'},
       {name: 'Telerama', url: 'https://www.telerama.fr/restos-loisirs/meshuga-de-la-street-food-de-haut-niveau-pres-du-jardin-du-luxembourg_cri-7043251.php'},
@@ -785,7 +800,17 @@ export default function DashboardPage() {
     ]
     const pick3 = pressLinks.sort(function(){return Math.random()-0.5}).slice(0,3)
     const pressNames = pick3.map(function(l){return l.name}).join(', ')
-    const prompt = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (3 rue Vavin Paris 6e). Deli new-yorkais premium.\n\nREGLES : 1) FRANCAIS accents. 2) Texte brut zero Markdown. 3) Cite 2 medias parmi ' + pick3.map(function(l){return l.name}).join(', ') + ' et apres chaque nom son URL entre parentheses. URLs : ' + pick3.map(function(l){return l.name+'('+l.url+')'}).join(' | ') + '.\n\nProspect : ' + p.name + ' | ' + (CATS_MAP[p.cat]?CATS_MAP[p.cat].label:p.cat) + ' | ' + p.arrondissement + '\n' + p.type + '\n' + p.pitch + '\n\nObjet 1ere ligne. 6-8 lignes. Mentionne Tuna Melt ou Lobster Roll. Fin = appel action.\nSignature : ' + senderSig + ' | Meshuga | 3 rue Vavin Paris 6e'
+    var baseContext = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (3 rue Vavin Paris 6e). Deli new-yorkais premium, NY-style, Paris 6e, connu par '+pressNames+'.\n\n'
+    var prospectInfo = 'Prospect : '+p.name+' ('+p.category+')'+( p.size?' — '+p.size+' personnes':'')+'\n'
+    var relanceContext = ''
+    if (isRelance) {
+      relanceContext = 'TU ECRIS UN EMAIL DE RELANCE (2ème contact). Tu as déjà contacté ce prospect. Fais référence à ton précédent email sans le répéter. Sois plus direct, rappelle la valeur, crée urgence légère. Objet : Re: ou Relance. Max 120 mots.\n'
+    } else if (isDevisRelance) {
+      relanceContext = 'TU ECRIS UN EMAIL DE RELANCE DEVIS. Tu as envoyé un devis à ce prospect. Rappelle le devis avec douceur, demande si des questions, propose un appel rapide. Ton chaleureux mais pro. Max 120 mots.\n'
+    } else {
+      relanceContext = 'TU ECRIS UN PREMIER CONTACT. Email de prospection chaleureux, personnalisé, court (150 mots max). Montre que tu connais leur univers. Propose un plateau déjeuner ou event.\n'
+    }
+    const prompt = baseContext + prospectInfo + relanceContext + 'Presse: '+pressNames+' (liens: '+pick3.map(function(l){return l.name+': '+l.url}).join(', ')+').\nSignature: '+senderSig+'.\nRéponds UNIQUEMENT avec le corps de l\'email, sans "Objet:" en dehors de la ligne objet, en français professionnel.'
     try {
       const res = await fetch('/api/generate-email', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: prompt})})
       const data = await res.json()
@@ -857,7 +882,6 @@ export default function DashboardPage() {
     {id: 'crm', label: 'CRM Prospects', icon: '◎'},
     {id: 'devis', label: 'Devis', icon: '📄'},
     {id: 'annuaire', label: 'Annuaire', icon: '📒'},
-    {id: 'tasks', label: 'Taches', icon: '✓'},
     {id: 'reporting', label: 'Reporting', icon: '📋'},
     {id: 'vault', label: 'Coffre-fort', icon: '🔐'},
     {id: 'gmb', label: 'Google My Biz.', icon: '⭐'},
@@ -925,11 +949,25 @@ export default function DashboardPage() {
               </div>
 
               <div className="g4">
-                <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('devis')}}>
-                  <div className="kl">Devis en cours</div>
-                  <div className="kv" style={{fontSize:20}}>{devisList.filter(function(d){return d.statut==='envoye'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:devisList.filter(function(d){return d.statut==='envoye'}).length>0?'#005FFF':'rgba(25,25,35,.35)'}}>{devisList.filter(function(d){return d.statut==='envoye'}).length} devis en attente</div>
-                  <div className="ki" style={{opacity:.1}}>💶</div>
+                <div className="kc" style={{background:'#FFFFFF',gridColumn:'span 2',cursor:'pointer'}} onClick={function(){nav('devis')}}>
+                  <div className="kl">Pipeline B2B actif 🎯</div>
+                  <div style={{display:'flex',gap:16,alignItems:'flex-end',marginTop:6,flexWrap:'wrap'}}>
+                    <div>
+                      <div className="kv" style={{fontSize:22,lineHeight:1}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'}).length}</div>
+                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:10,color:'#005FFF',marginTop:2}}>devis en attente</div>
+                    </div>
+                    <div style={{fontWeight:900,fontSize:18,opacity:.2,paddingBottom:2}}>·</div>
+                    <div>
+                      <div className="kv" style={{fontSize:22,lineHeight:1,color:'#CC6600'}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||d.montantHT||0)},0).toLocaleString('fr-FR',{maximumFractionDigits:0})} <span style={{fontSize:10}}>€ HT</span></div>
+                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:10,color:'#CC6600',marginTop:2}}>CA potentiel</div>
+                    </div>
+                    <div style={{fontWeight:900,fontSize:18,opacity:.2,paddingBottom:2}}>·</div>
+                    <div>
+                      <div className="kv" style={{fontSize:22,lineHeight:1,color:'#FF82D7'}}>{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length}</div>
+                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:10,color:'#FF82D7',marginTop:2}}>prospects actifs</div>
+                    </div>
+                  </div>
+                  <div className="ki" style={{opacity:.05}}>🎯</div>
                 </div>
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('devis')}}>
                   <div className="kl">CA B2B signé</div>
@@ -949,12 +987,7 @@ export default function DashboardPage() {
                   <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'rgba(25,25,35,.35)'}}>{chasse.length>0?Math.round(chasse.filter(function(p){return p.contacted}).length/chasse.length*100):0}% contactés</div>
                   <div className="ki" style={{opacity:.1}}>🎯</div>
                 </div>
-                <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('crm')}}>
-                  <div className="kl">Pipeline actif</div>
-                  <div className="kv">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length}</div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:prospects.filter(function(p){return p.status==='nego'}).length>0?'#FF82D7':'rgba(25,25,35,.35)'}}>{prospects.filter(function(p){return p.status==='nego'}).length>0?prospects.filter(function(p){return p.status==='nego'}).length+' en négo':'aucune négo'}</div>
-                  <div className="ki" style={{opacity:.1}}>◎</div>
-                </div>
+
               </div>
 
 
@@ -1005,8 +1038,8 @@ export default function DashboardPage() {
                   <div className="yt" style={{fontSize:22}}>Planning {isEmy?"de ma semaine":"d'Emy"}</div>
                   <div style={{display:'flex',gap:4,alignItems:'center',flexWrap:'wrap'}}>
                     <div style={{display:'flex',background:'#EBEBEB',borderRadius:5,overflow:'hidden'}}>
-                      {['3j','sem','2sem'].map(function(v){return(
-                        <button key={v} style={{padding:'4px 10px',fontSize:10,fontWeight:900,background:planningView===v?'#191923':'transparent',color:planningView===v?'#FFEB5A':'#191923',border:'none',cursor:'pointer'}} onClick={function(){setPlanningView(v)}}>{v==='3j'?'3 jours':v==='sem'?'Semaine':'2 semaines'}</button>
+                      {['auj','3j','sem'].map(function(v){return(
+                        <button key={v} style={{padding:'4px 10px',fontSize:10,fontWeight:900,background:planningView===v?'#191923':'transparent',color:planningView===v?'#FFEB5A':'#191923',border:'none',cursor:'pointer'}} onClick={function(){setPlanningView(v)}}>{v==='auj'?'Aujourd\'hui':v==='3j'?'3 jours':'Semaine'}</button>
                       )})}
                     </div>
                     <button className="btn btn-sm btn-y" onClick={function(){setPlanningWeek(function(w){return w-1})}}>&#8592;</button>
@@ -1017,8 +1050,8 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div style={{padding:'12px 14px'}}>
-                  <div style={{display:'grid',gridTemplateColumns:planningView==='3j'?'repeat(3,1fr)':'repeat(5,1fr)',gap:6}}>
-                    {(planningView==='3j'?['Lun','Mar','Mer']:['Lun','Mar','Mer','Jeu','Ven']).map(function(day,di){
+                  <div style={{display:'grid',gridTemplateColumns:planningView==='auj'?'1fr':planningView==='3j'?'repeat(3,1fr)':'repeat(5,1fr)',gap:6}}>
+                    {(planningView==='auj'?[['Lun','Mar','Mer','Jeu','Ven'][new Date().getDay()===0?4:new Date().getDay()-1]]:planningView==='3j'?['Lun','Mar','Mer']:['Lun','Mar','Mer','Jeu','Ven']).map(function(day,di){
                       var ws=new Date()
                       var dow=ws.getDay()===0?6:ws.getDay()-1
                       ws.setDate(ws.getDate()-dow+(planningWeek*7))
@@ -1241,23 +1274,23 @@ export default function DashboardPage() {
                 var periodLabel = crmPeriod==='month'?'Ce mois':crmPeriod==='year'?'Cette année':'Total'
                 var pipeCA = devisList.filter(function(d){return d.statut==='envoye'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0)
                 return (
-                  <div style={{background:'linear-gradient(135deg,#FFF5FF 0%,#FFE5F7 100%)',borderRadius:10,padding:'18px 20px',marginBottom:12,border:'3px solid #191923',boxShadow:'4px 4px 0 #FF82D7'}}>
+                  <div style={{background:'#FFFFFF',borderRadius:10,padding:'18px 20px',marginBottom:12,border:'1.5px solid #EBEBEB',boxShadow:'0 2px 8px rgba(0,0,0,.06)'}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:10}}>
                       <div>
-                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#CC0066',marginBottom:4}}>💰 Commission Emy</div>
-                        <div style={{fontSize:11,color:'rgba(150,0,80,.5)',textTransform:'uppercase',letterSpacing:1}}>{periodLabel} · 5% du CA signé</div>
+                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#191923',marginBottom:4}}>💰 Commission Emy</div>
+                        <div style={{fontSize:11,color:'rgba(25,25,35,.5)',textTransform:'uppercase',letterSpacing:1}}>{periodLabel} · 5% du CA signé</div>
                       </div>
                       <div style={{display:'flex',gap:4}}>
                         {['month','year','all'].map(function(per){return(
-                          <button key={per} className="btn btn-sm" style={{fontSize:9,padding:'3px 8px',background:crmPeriod===per?'#FFEB5A':'rgba(255,255,255,.1)',color:crmPeriod===per?'#191923':'#fff',border:'1.5px solid '+(crmPeriod===per?'#191923':'rgba(255,255,255,.2)')}} onClick={function(){setCrmPeriod(per)}}>{per==='month'?'Mois':per==='year'?'Année':'Total'}</button>
+                          <button key={per} className="btn btn-sm" style={{fontSize:9,padding:'3px 8px',background:crmPeriod===per?'#191923':'#F5F5F5',color:crmPeriod===per?'#FFEB5A':'#555',border:'1.5px solid '+(crmPeriod===per?'#191923':'#DDD')}} onClick={function(){setCrmPeriod(per)}}>{per==='month'?'Mois':per==='year'?'Année':'Total'}</button>
                         )})}
                       </div>
                     </div>
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:14}}>
-                      <div style={{background:'#fff',border:'1.5px solid #FFB3E0',borderRadius:7,padding:'12px 14px'}}>
-                        <div style={{fontSize:10,color:'rgba(150,0,80,.5)',marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>CA B2B signé</div>
+                      <div style={{background:'#F8F9FF',border:'1.5px solid #DDEEFF',borderRadius:7,padding:'12px 14px'}}>
+                        <div style={{fontSize:10,color:'rgba(25,25,35,.4)',marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>CA B2B signé</div>
                         <div style={{fontWeight:900,fontSize:24,color:'#191923'}}>{caTotal.toLocaleString('fr-FR',{minimumFractionDigits:0})} <span style={{fontSize:12,opacity:.5}}>€ HT</span></div>
-                        <div style={{fontSize:10,color:'rgba(150,0,80,.4)',marginTop:2}}>{devisList.filter(filterFn).length} contrats</div>
+                        <div style={{fontSize:10,color:'rgba(25,25,35,.35)',marginTop:2}}>{devisList.filter(filterFn).length} contrats</div>
                       </div>
                       <div style={{background:'#FFEB5A',borderRadius:7,padding:'12px 14px',border:'2px solid rgba(255,255,255,.3)'}}>
                         <div style={{fontSize:10,color:'rgba(25,25,35,.5)',marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>🎉 Commission</div>
@@ -1337,7 +1370,7 @@ export default function DashboardPage() {
                       </div>
                       <div style={{display:'flex',gap:4,flexShrink:0}}>
                         <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){openModal('prospect',Object.assign({},p))}}>✏️</button>
-                        <button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={function(e){e.stopPropagation();generateEmail(Object.assign({},p,{cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category}))}}>✉️ Email</button>
+                        <button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={function(e){e.stopPropagation();generateEmail(Object.assign({},p,{cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category}),p.status==='contacted'||p.status==='nego'?'relance':'first')}}>✉️ {p.status==='contacted'||p.status==='nego'?'Relance email':'Email'}</button>
                       </div>
                     </div>
 
@@ -1933,6 +1966,278 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {page === 'instagram' && (
+            <div>
+              <div className="ph">
+                <div>
+                  <div className="pt">Instagram 📸</div>
+                  <div className="ps">Commentaires et messages</div>
+                </div>
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  {instaData && instaData.mock && <span style={{fontSize:10,background:'#FF6B2B',color:'#fff',padding:'2px 6px',borderRadius:3,fontWeight:900}}>DEMO</span>}
+                  <a href="https://www.instagram.com/meshuga.deli/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p">Ouvrir Instagram →</a>
+                </div>
+              </div>
+
+              {instaLoading && (
+                <div style={{textAlign:'center',padding:60,opacity:.4}}>
+                  <div style={{fontSize:36}}>📸</div>
+                  <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',marginTop:8}}>Chargement...</div>
+                </div>
+              )}
+
+              {!instaLoading && instaData && !instaData.ok && (
+                <div className="card" style={{borderLeft:'4px solid #FF6B2B',padding:'16px 20px'}}>
+                  <div style={{fontWeight:900,marginBottom:6}}>⚙️ Configuration requise</div>
+                  <div style={{fontSize:12,opacity:.7,lineHeight:1.7}}>
+                    Pour connecter Instagram :<br/>
+                    1. Crée une app Meta sur <a href="https://developers.facebook.com" target="_blank" style={{color:'#005FFF'}}>developers.facebook.com</a><br/>
+                    2. Active <strong>Instagram Graph API</strong> + permissions <code>instagram_basic</code>, <code>instagram_manage_comments</code>, <code>pages_messaging</code><br/>
+                    3. Ajoute <strong>INSTAGRAM_ACCESS_TOKEN</strong> dans tes variables Vercel<br/>
+                    4. Redéploie
+                  </div>
+                </div>
+              )}
+
+              {!instaLoading && instaData && instaData.ok && (
+                <div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
+                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
+                      <div className="kl">Abonnés</div>
+                      <div className="kv" style={{fontSize:24,color:'#FF82D7'}}>{instaData.followers ? instaData.followers.toLocaleString('fr-FR') : '--'}</div>
+                    </div>
+                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
+                      <div className="kl">Posts</div>
+                      <div className="kv" style={{fontSize:24}}>{instaData.mediaCount || '--'}</div>
+                    </div>
+                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
+                      <div className="kl">Messages non lus</div>
+                      <div className="kv" style={{fontSize:24,color:instaData.unreadMessages>0?'#CC0066':'#191923'}}>{instaData.unreadMessages || 0}</div>
+                    </div>
+                  </div>
+
+                  <div style={{display:'flex',gap:6,marginBottom:10}}>
+                    {['comments','messages','media'].map(function(tab){return(
+                      <button key={tab} className={'btn btn-sm'+(instaTab===tab?' btn-p':'')} onClick={function(){setInstaTab(tab)}}>
+                        {tab==='comments'?'💬 Commentaires':tab==='messages'?'✉️ Messages':'📷 Posts'}
+                      </button>
+                    )})}
+                  </div>
+
+                  {instaTab === 'comments' && (
+                    <div>
+                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Commentaires récents</div>
+                      {(instaData.comments||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun commentaire récent</div>}
+                      {(instaData.comments||[]).map(function(c,i){return(
+                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(c.replied?'#009D3A':'#FFEB5A')}}>
+                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                            <div style={{fontWeight:900,fontSize:13}}>@{c.username}</div>
+                            <div style={{fontSize:10,opacity:.4}}>{c.date}</div>
+                          </div>
+                          <div style={{fontSize:12,marginBottom:6,lineHeight:1.5}}>{c.text}</div>
+                          <div style={{fontSize:10,opacity:.5,marginBottom:c.replied?6:0}}>📸 {c.postCaption || 'Post Instagram'}</div>
+                          {c.replied
+                            ? <div style={{fontSize:11,color:'#009D3A',fontWeight:700}}>✅ Répondu</div>
+                            : <a href={'https://www.instagram.com/p/'+(c.shortcode||'')} target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{fontSize:10,marginTop:4}}>↗ Répondre sur Instagram</a>
+                          }
+                        </div>
+                      )})}
+                    </div>
+                  )}
+
+                  {instaTab === 'messages' && (
+                    <div>
+                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Messages directs</div>
+                      {(instaData.messages||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun message récent</div>}
+                      {(instaData.messages||[]).map(function(m,i){return(
+                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(m.read?'#EBEBEB':'#FF82D7')}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                            <div style={{flex:1}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                                <div style={{fontWeight:900,fontSize:13}}>@{m.username}</div>
+                                {!m.read && <span style={{fontSize:9,background:'#FF82D7',padding:'1px 5px',borderRadius:3,fontWeight:900,color:'#191923'}}>NOUVEAU</span>}
+                              </div>
+                              <div style={{fontSize:12,lineHeight:1.5,color:'#444'}}>{m.lastMessage}</div>
+                            </div>
+                            <div style={{fontSize:10,opacity:.4,flexShrink:0}}>{m.date}</div>
+                          </div>
+                          <a href="https://www.instagram.com/direct/inbox/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p" style={{fontSize:10,marginTop:8}}>↗ Répondre sur Instagram</a>
+                        </div>
+                      )})}
+                    </div>
+                  )}
+
+                  {instaTab === 'media' && (
+                    <div>
+                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Posts récents</div>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+                        {(instaData.media||[]).map(function(p,i){return(
+                          <a key={i} href={p.permalink} target="_blank" rel="noopener noreferrer" style={{textDecoration:'none',color:'inherit'}}>
+                            <div className="card" style={{padding:10,cursor:'pointer'}}>
+                              {p.thumbnailUrl && <img src={p.thumbnailUrl} alt="" style={{width:'100%',aspectRatio:'1',objectFit:'cover',borderRadius:4,marginBottom:6}} />}
+                              {!p.thumbnailUrl && <div style={{width:'100%',aspectRatio:'1',background:'#FFEB5A',borderRadius:4,marginBottom:6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>📷</div>}
+                              <div style={{fontSize:11,display:'flex',justifyContent:'space-between'}}>
+                                <span>❤️ {p.likes||0}</span>
+                                <span>💬 {p.comments||0}</span>
+                              </div>
+                              <div style={{fontSize:10,opacity:.4,marginTop:3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{p.caption||''}</div>
+                            </div>
+                          </a>
+                        )})}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {page === 'journal' && !isEmy && (
+            <div>
+              <div className="ph">
+                <div><div className="pt">Journal d'Emy 📓</div><div className="ps">Sessions · Actions · Export</div></div>
+                <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){
+                  var rows = activityLog.filter(function(a){
+                    var ok1 = !journalDateFrom || a.created_at >= journalDateFrom
+                    var ok2 = !journalDateTo || a.created_at <= journalDateTo+'T23:59:59'
+                    return ok1 && ok2
+                  })
+                  var csv = 'Date,Heure,Utilisateur,Type,Detail\n' + rows.map(function(a){
+                    var dt = a.created_at ? new Date(a.created_at) : new Date()
+                    return [dt.toLocaleDateString('fr-FR'), dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}), a.user_name||'', a.type||'', (a.description||'').replace(/,/g,' ')].join(',')
+                  }).join('\n')
+                  var blob = new Blob([csv],{type:'text/csv'})
+                  var url = URL.createObjectURL(blob)
+                  var el = document.createElement('a')
+                  el.href=url;el.download='journal-'+new Date().toISOString().split('T')[0]+'.csv';el.click()
+                }}>📥 Export CSV</button>
+              </div>
+
+              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12}}>
+                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
+                  <div className="kl">Sessions ce mois</div>
+                  <div className="kv" style={{fontSize:22}}>{activityLog.filter(function(a){return a.type==='session_start'&&a.created_at&&a.created_at.startsWith(new Date().toISOString().slice(0,7))}).length}</div>
+                </div>
+                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
+                  <div className="kl">Actions ce mois</div>
+                  <div className="kv" style={{fontSize:22}}>{activityLog.filter(function(a){return a.type!=='session_start'&&a.type!=='session_end'&&a.created_at&&a.created_at.startsWith(new Date().toISOString().slice(0,7))}).length}</div>
+                </div>
+                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
+                  <div className="kl">Prospects contactés</div>
+                  <div className="kv" style={{fontSize:22,color:'#009D3A'}}>{activityLog.filter(function(a){return a.type==='prospect_contacte'}).length}</div>
+                </div>
+                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
+                  <div className="kl">Emails IA générés</div>
+                  <div className="kv" style={{fontSize:22,color:'#FF82D7'}}>{activityLog.filter(function(a){return a.type==='email_genere'||a.type==='email_copie'}).length}</div>
+                </div>
+              </div>
+
+              <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
+                <select className="inp" style={{width:'auto',padding:'5px 10px',fontSize:11}} value={journalUser} onChange={function(e){setJournalUser(e.target.value)}}>
+                  <option value="all">Tous les utilisateurs</option>
+                  <option value="emy">Emy</option>
+                  <option value="edward">Edward</option>
+                </select>
+                <select className="inp" style={{width:'auto',padding:'5px 10px',fontSize:11}} value={journalFilter} onChange={function(e){setJournalFilter(e.target.value)}}>
+                  <option value="all">Toutes les actions</option>
+                  <option value="session_start">Sessions uniquement</option>
+                  <option value="prospect_contacte">Prospects contactés</option>
+                  <option value="email_copie">Emails copiés</option>
+                  <option value="email_genere">Emails IA</option>
+                </select>
+                <input type="date" className="inp" style={{width:140,fontSize:11,padding:'5px 8px'}} value={journalDateFrom} onChange={function(e){setJournalDateFrom(e.target.value)}} />
+                <span style={{fontSize:11,opacity:.3}}>→</span>
+                <input type="date" className="inp" style={{width:140,fontSize:11,padding:'5px 8px'}} value={journalDateTo} onChange={function(e){setJournalDateTo(e.target.value)}} />
+                {(journalDateFrom||journalDateTo)&&<button className="btn btn-sm" onClick={function(){setJournalDateFrom('');setJournalDateTo('')}}>✕ Reset</button>}
+              </div>
+
+              {(function(){
+                var filtered = activityLog.filter(function(a){
+                  var mType = journalFilter==='all' || a.type===journalFilter
+                  var mUser = journalUser==='all' || (a.user_name&&a.user_name.toLowerCase().indexOf(journalUser)>-1)
+                  var mFrom = !journalDateFrom || a.created_at >= journalDateFrom
+                  var mTo = !journalDateTo || a.created_at <= journalDateTo+'T23:59:59'
+                  return mType && mUser && mFrom && mTo
+                })
+                if(filtered.length===0) return <div style={{textAlign:'center',padding:40,opacity:.4,fontSize:13}}>Aucune activité pour ces filtres</div>
+
+                var byDay = {}
+                filtered.forEach(function(a){
+                  var d = a.created_at ? a.created_at.split('T')[0] : 'inconnu'
+                  if(!byDay[d]) byDay[d] = []
+                  byDay[d].push(a)
+                })
+
+                return Object.keys(byDay).sort(function(a,b){return b.localeCompare(a)}).map(function(day){
+                  var dayLogs = byDay[day]
+                  var sessions = dayLogs.filter(function(a){return a.type==='session_start'})
+                  var sessionEnds = dayLogs.filter(function(a){return a.type==='session_end'})
+                  var actions = dayLogs.filter(function(a){return a.type!=='session_start'&&a.type!=='session_end'})
+                  var dayLabel = new Date(day+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})
+
+                  return(
+                    <div key={day} style={{marginBottom:16}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8,padding:'7px 12px',background:'#F5F5F5',borderRadius:6}}>
+                        <div style={{fontWeight:900,fontSize:13,flex:1}}>{dayLabel}</div>
+                        {sessions.length>0&&<span style={{fontSize:10,background:'#005FFF',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{sessions.length} session{sessions.length>1?'s':''}</span>}
+                        {actions.length>0&&<span style={{fontSize:10,background:'#FFEB5A',border:'1px solid #191923',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{actions.length} action{actions.length>1?'s':''}</span>}
+                      </div>
+
+                      {sessions.length>0&&(
+                        <div style={{marginBottom:10}}>
+                          {sessions.map(function(s,si){
+                            var endLog = sessionEnds[si]
+                            var duration = endLog ? endLog.description : null
+                            var startTime = s.created_at ? new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : ''
+                            var endTime = endLog && endLog.created_at ? new Date(endLog.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : null
+                            return(
+                              <div key={si} style={{display:'flex',alignItems:'center',gap:12,padding:'8px 12px',background:'#EBF3FF',borderRadius:6,borderLeft:'3px solid #005FFF',marginBottom:4}}>
+                                <div style={{fontSize:20}}>🔐</div>
+                                <div style={{flex:1}}>
+                                  <div style={{fontWeight:900,fontSize:13}}>{s.user_name}</div>
+                                  <div style={{fontSize:11,color:'#555',marginTop:1}}>
+                                    Connexion : <strong>{startTime}</strong>
+                                    {endTime&&<span> → <strong>{endTime}</strong></span>}
+                                    {duration&&<span style={{marginLeft:8,color:'#005FFF',fontWeight:700}}>{duration}</span>}
+                                  </div>
+                                </div>
+                                <div style={{fontSize:11,fontWeight:900,color:endTime?'#009D3A':'#FF6B2B',background:endTime?'#D0F5E0':'#FFF3E0',padding:'3px 8px',borderRadius:4}}>
+                                  {endTime?'✅ Terminée':'🟢 En cours'}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {actions.length>0&&(
+                        <div style={{background:'#FAFAFA',borderRadius:6,overflow:'hidden',border:'1px solid #EBEBEB'}}>
+                          {actions.map(function(a,ai){
+                            var tl={email_copie:'📋 Email copié',prospect_contacte:'📞 Contact',email_genere:'✉️ Email IA',prospect_relance:'↩ Relance',devis_cree:'📄 Devis',session_end:'🔒 Fin session'}
+                            var tc={email_copie:'#FFE5F7',prospect_contacte:'#D0F5E0',email_genere:'#FFE5F7',prospect_relance:'#EBF3FF',devis_cree:'#FFEB5A'}
+                            var label = tl[a.type] || a.type
+                            var bg = tc[a.type] || '#F0F0F0'
+                            var time = a.created_at ? new Date(a.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : ''
+                            return(
+                              <div key={ai} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 12px',borderBottom:ai<actions.length-1?'1px solid #F0F0F0':'none'}}>
+                                <span style={{fontSize:9,background:bg,color:'#191923',padding:'3px 7px',borderRadius:3,fontWeight:900,whiteSpace:'nowrap',minWidth:75,textAlign:'center'}}>{label}</span>
+                                <div style={{flex:1}}>
+                                  <div style={{fontSize:12,fontWeight:700}}>{a.prospect_name||a.description||a.type}</div>
+                                  {a.description&&a.prospect_name&&<div style={{fontSize:10,opacity:.45,marginTop:1}}>{a.description}</div>}
+                                </div>
+                                <span style={{fontSize:10,opacity:.4,flexShrink:0}}>{time}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              })()}
             </div>
           )}
 
