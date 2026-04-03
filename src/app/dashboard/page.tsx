@@ -548,7 +548,11 @@ export default function DashboardPage() {
   const [contactedToday, setContactedToday] = useState(0)
   const [activityLog, setActivityLog] = useState([])
   const [journalFilter, setJournalFilter] = useState('all')
+  const [journalUser, setJournalUser] = useState('all')
+  const [journalDateFrom, setJournalDateFrom] = useState('')
+  const [journalDateTo, setJournalDateTo] = useState('')
   const [planningWeek, setPlanningWeek] = useState(0)
+  const [planningView, setPlanningView] = useState('sem')
   const [chasseCat, setChasseChasse] = useState('all')
   const [chasseSearch, setChasseSearch] = useState('')
   const [chasseSort, setChasseSort] = useState('score')
@@ -933,6 +937,12 @@ export default function DashboardPage() {
                   <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'#00AA44'}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).length} contrats signés</div>
                   <div className="ki" style={{opacity:.1}}>📈</div>
                 </div>
+                <div className="kc" style={{background:'#FFF8E7',cursor:'pointer',border:'1.5px solid #FFEB5A'}} onClick={function(){nav('devis')}}>
+                  <div className="kl">CA à closer 🎯</div>
+                  <div className="kv" style={{fontSize:20,color:'#CC6600'}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='accepte'}).reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR',{maximumFractionDigits:0})} <span style={{fontSize:10}}>€</span></div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'#CC6600',opacity:.7}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='accepte'}).length} devis en attente</div>
+                  <div className="ki" style={{opacity:.1}}>🎯</div>
+                </div>
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('chasse')}}>
                   <div className="kl">Prospectés</div>
                   <div className="kv">{chasse.filter(function(p){return p.contacted}).length} <span style={{fontSize:16,fontWeight:400,opacity:.3}}>/ {chasse.length}</span></div>
@@ -949,21 +959,66 @@ export default function DashboardPage() {
 
 
 
+              {/* TACHES DU JOUR */}
+              <div className="card" style={{marginBottom:10,borderLeft:'4px solid #FF82D7'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                  <div className="yt" style={{fontSize:18}}>📋 Tâches</div>
+                  <button className="btn btn-p btn-sm" style={{fontWeight:900}} onClick={function(){openModal('task',{assignee:isEmy?'emy':'edward',priority:'medium',status:'todo',checklist:[],files:[],deadline:new Date().toISOString().split('T')[0]})}}>+ Tâche</button>
+                </div>
+                {(function(){
+                  var today=new Date().toISOString().split('T')[0]
+                  var todayTasks=tasks.filter(function(t){return t.deadline===today&&t.status!=='done'})
+                  var lateTasks=tasks.filter(function(t){return t.deadline&&t.deadline<today&&t.status!=='done'})
+                  var upcoming=tasks.filter(function(t){var d=new Date(t.deadline||'9999');var n=new Date();n.setDate(n.getDate()+7);return t.deadline>today&&d<=n&&t.status!=='done'}).slice(0,3)
+                  if(todayTasks.length===0&&lateTasks.length===0){
+                    return <div style={{fontSize:12,opacity:.4,padding:'8px 0'}}>✅ Aucune tâche urgente aujourd'hui !</div>
+                  }
+                  return(
+                    <div>
+                      {lateTasks.slice(0,3).map(function(t){return(
+                        <div key={t.id} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 8px',marginBottom:4,background:'#FFE5E5',borderRadius:5,border:'1px solid #CC0066'}}>
+                          <input type="checkbox" onChange={function(){setTasks(function(prev){return prev.map(function(x){return x.id===t.id?Object.assign({},x,{status:'done'}):x})})}} style={{cursor:'pointer'}} />
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:12,fontWeight:900,color:'#CC0066'}}>⚠️ {t.title}</div>
+                            <div style={{fontSize:10,opacity:.6}}>{t.assignee} · Deadline dépassée : {t.deadline}</div>
+                          </div>
+                        </div>
+                      )})}
+                      {todayTasks.map(function(t){return(
+                        <div key={t.id} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 8px',marginBottom:4,background:'#FFF8E7',borderRadius:5,border:'1px solid #FFEB5A'}}>
+                          <input type="checkbox" onChange={function(){setTasks(function(prev){return prev.map(function(x){return x.id===t.id?Object.assign({},x,{status:'done'}):x})})}} style={{cursor:'pointer'}} />
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:12,fontWeight:900}}>{t.title}</div>
+                            <div style={{fontSize:10,opacity:.6}}>{t.assignee} · Priorité : {t.priority}</div>
+                          </div>
+                        </div>
+                      )})}
+                      {upcoming.length>0&&<div style={{fontSize:10,opacity:.4,marginTop:4}}>+ {upcoming.length} tâche(s) cette semaine</div>}
+                    </div>
+                  )
+                })()}
+              </div>
+
               {/* PLANNING */}
               <div className="card" style={{padding:0,overflow:'hidden',marginBottom:10}}>
                 <div style={{padding:'14px 16px',borderBottom:'1px solid #EBEBEB',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-                  <div className="yt" style={{fontSize:26}}>Planning {isEmy?"de ma semaine":"d'Emy"}</div>
-                  <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                  <div className="yt" style={{fontSize:22}}>Planning {isEmy?"de ma semaine":"d'Emy"}</div>
+                  <div style={{display:'flex',gap:4,alignItems:'center',flexWrap:'wrap'}}>
+                    <div style={{display:'flex',background:'#EBEBEB',borderRadius:5,overflow:'hidden'}}>
+                      {['3j','sem','2sem'].map(function(v){return(
+                        <button key={v} style={{padding:'4px 10px',fontSize:10,fontWeight:900,background:planningView===v?'#191923':'transparent',color:planningView===v?'#FFEB5A':'#191923',border:'none',cursor:'pointer'}} onClick={function(){setPlanningView(v)}}>{v==='3j'?'3 jours':v==='sem'?'Semaine':'2 semaines'}</button>
+                      )})}
+                    </div>
                     <button className="btn btn-sm btn-y" onClick={function(){setPlanningWeek(function(w){return w-1})}}>&#8592;</button>
-                    <span style={{fontSize:11,fontWeight:900,minWidth:110,textAlign:'center'}}>{planningWeek===0?'Cette semaine':planningWeek<0?'Sem. -'+Math.abs(planningWeek):'Sem. +'+planningWeek}</span>
+                    <span style={{fontSize:11,fontWeight:900,minWidth:100,textAlign:'center'}}>{planningWeek===0?'Cette semaine':planningWeek<0?'Sem. -'+Math.abs(planningWeek):'Sem. +'+planningWeek}</span>
                     <button className="btn btn-sm btn-y" onClick={function(){setPlanningWeek(function(w){return w+1})}}>&#8594;</button>
                     {planningWeek!==0&&<button className="btn btn-p btn-sm" onClick={function(){setPlanningWeek(0)}}>Auj.</button>}
-                    <button className="btn btn-p btn-sm" style={{fontWeight:900,fontSize:14}} onClick={function(){openModal('task',{assignee:'emy',priority:'medium',status:'todo',checklist:[],files:[],deadline:new Date().toISOString().split('T')[0]})}}>+ Tâche</button>
+                    <button className="btn btn-p btn-sm" style={{fontWeight:900}} onClick={function(){openModal('task',{assignee:'emy',priority:'medium',status:'todo',checklist:[],files:[],deadline:new Date().toISOString().split('T')[0]})}}>+ Tâche</button>
                   </div>
                 </div>
                 <div style={{padding:'12px 14px'}}>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6}}>
-                    {['Lun','Mar','Mer','Jeu','Ven'].map(function(day,di){
+                  <div style={{display:'grid',gridTemplateColumns:planningView==='3j'?'repeat(3,1fr)':'repeat(5,1fr)',gap:6}}>
+                    {(planningView==='3j'?['Lun','Mar','Mer']:['Lun','Mar','Mer','Jeu','Ven']).map(function(day,di){
                       var ws=new Date()
                       var dow=ws.getDay()===0?6:ws.getDay()-1
                       ws.setDate(ws.getDate()-dow+(planningWeek*7))
@@ -1182,14 +1237,15 @@ export default function DashboardPage() {
                   return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'
                 }
                 var caTotal = devisList.filter(filterFn).reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0)
-                var commission = caTotal * 0.05
+                var commission = caTotal * 0.10
                 var periodLabel = crmPeriod==='month'?'Ce mois':crmPeriod==='year'?'Cette année':'Total'
+                var pipeCA = devisList.filter(function(d){return d.statut==='envoye'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0)
                 return (
-                  <div style={{background:'linear-gradient(135deg,#191923 60%,#FF82D7)',borderRadius:10,padding:'18px 20px',marginBottom:12,border:'3px solid #191923',boxShadow:'4px 4px 0 #FF82D7'}}>
+                  <div style={{background:'linear-gradient(135deg,#FFF5FF 0%,#FFE5F7 100%)',borderRadius:10,padding:'18px 20px',marginBottom:12,border:'3px solid #191923',boxShadow:'4px 4px 0 #FF82D7'}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:10}}>
                       <div>
-                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#FFEB5A',marginBottom:4}}>💰 Commission Emy</div>
-                        <div style={{fontSize:11,color:'rgba(255,235,90,.5)',textTransform:'uppercase',letterSpacing:1}}>{periodLabel} · 5% du CA signé</div>
+                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#CC0066',marginBottom:4}}>💰 Commission Emy</div>
+                        <div style={{fontSize:11,color:'rgba(150,0,80,.5)',textTransform:'uppercase',letterSpacing:1}}>{periodLabel} · 5% du CA signé</div>
                       </div>
                       <div style={{display:'flex',gap:4}}>
                         {['month','year','all'].map(function(per){return(
@@ -1198,10 +1254,10 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:14}}>
-                      <div style={{background:'rgba(255,255,255,.07)',borderRadius:7,padding:'12px 14px'}}>
-                        <div style={{fontSize:10,color:'rgba(255,255,255,.5)',marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>CA B2B signé</div>
-                        <div style={{fontWeight:900,fontSize:24,color:'#fff'}}>{caTotal.toLocaleString('fr-FR',{minimumFractionDigits:0})} <span style={{fontSize:12,opacity:.5}}>€ HT</span></div>
-                        <div style={{fontSize:10,color:'rgba(255,255,255,.4)',marginTop:2}}>{devisList.filter(filterFn).length} contrats</div>
+                      <div style={{background:'#fff',border:'1.5px solid #FFB3E0',borderRadius:7,padding:'12px 14px'}}>
+                        <div style={{fontSize:10,color:'rgba(150,0,80,.5)',marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>CA B2B signé</div>
+                        <div style={{fontWeight:900,fontSize:24,color:'#191923'}}>{caTotal.toLocaleString('fr-FR',{minimumFractionDigits:0})} <span style={{fontSize:12,opacity:.5}}>€ HT</span></div>
+                        <div style={{fontSize:10,color:'rgba(150,0,80,.4)',marginTop:2}}>{devisList.filter(filterFn).length} contrats</div>
                       </div>
                       <div style={{background:'#FFEB5A',borderRadius:7,padding:'12px 14px',border:'2px solid rgba(255,255,255,.3)'}}>
                         <div style={{fontSize:10,color:'rgba(25,25,35,.5)',marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>🎉 Commission</div>
@@ -1209,13 +1265,22 @@ export default function DashboardPage() {
                         <div style={{fontSize:10,color:'rgba(25,25,35,.4)',marginTop:2}}>Bravo Emy 🚀</div>
                       </div>
                     </div>
-                  </div>
+                  {pipeCA>0&&(
+                    <div style={{marginTop:10,padding:'8px 12px',background:'#EBF3FF',borderRadius:6,border:'1.5px solid #005FFF',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <div>
+                        <div style={{fontSize:10,fontWeight:900,color:'#005FFF',textTransform:'uppercase',letterSpacing:.5}}>🔄 Pipeline en attente</div>
+                        <div style={{fontSize:11,color:'#555',marginTop:2}}>{devisList.filter(function(d){return d.statut==='envoye'}).length} devis non signés</div>
+                      </div>
+                      <div style={{fontWeight:900,fontSize:20,color:'#005FFF'}}>{pipeCA.toLocaleString('fr-FR',{maximumFractionDigits:0})} € <span style={{fontSize:10,opacity:.5}}>HT</span></div>
+                    </div>
+                  )}
+                </div>
                 )
               })()}
 
               {/* ACTIONS PRIORITAIRES */}
-              <div style={{background:'#191923',borderRadius:7,padding:'12px 14px',marginBottom:10,color:'#fff'}}>
-                <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:1,marginBottom:8,color:'#FFEB5A'}}>💡 Actions prioritaires</div>
+              <div style={{background:'#FFF9E5',borderRadius:7,padding:'12px 14px',marginBottom:10,border:'1.5px solid #FFEB5A'}}>
+                <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:1,marginBottom:8,color:'#191923'}}>💡 Actions prioritaires</div>
                 {(function(){
                   var acts=[];var tod=new Date().toISOString().split('T')[0];
                   var late=prospects.filter(function(p){return p.nextDate&&p.nextDate<=tod&&p.status!=='won'&&p.status!=='lost'})
@@ -1230,7 +1295,7 @@ export default function DashboardPage() {
                   return acts.map(function(a,idx2){return(
                     <div key={idx2} style={{display:'flex',gap:8,alignItems:'flex-start',marginBottom:4,paddingBottom:4,borderBottom:idx2<acts.length-1?'1px solid rgba(255,255,255,.08)':'none'}}>
                       <span style={{fontSize:14,flexShrink:0}}>{a.e}</span>
-                      <span style={{fontSize:12,lineHeight:1.4,opacity:.9}}>{a.t}</span>
+                      <span style={{fontSize:12,lineHeight:1.4,opacity:.85}}>{a.t}</span>
                     </div>
                   )})
                 })()}
@@ -1868,6 +1933,247 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {page === 'instagram' && (
+            <div>
+              <div className="ph">
+                <div>
+                  <div className="pt">Instagram 📸</div>
+                  <div className="ps">Commentaires et messages</div>
+                </div>
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  {instaData && instaData.mock && <span style={{fontSize:10,background:'#FF6B2B',color:'#fff',padding:'2px 6px',borderRadius:3,fontWeight:900}}>DEMO</span>}
+                  <a href="https://www.instagram.com/meshuga.deli/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p">Ouvrir Instagram →</a>
+                </div>
+              </div>
+
+              {instaLoading && (
+                <div style={{textAlign:'center',padding:60,opacity:.4}}>
+                  <div style={{fontSize:36}}>📸</div>
+                  <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',marginTop:8}}>Chargement...</div>
+                </div>
+              )}
+
+              {!instaLoading && instaData && !instaData.ok && (
+                <div className="card" style={{borderLeft:'4px solid #FF6B2B',padding:'16px 20px'}}>
+                  <div style={{fontWeight:900,marginBottom:6}}>⚙️ Configuration requise</div>
+                  <div style={{fontSize:12,opacity:.7,lineHeight:1.7}}>
+                    Pour connecter Instagram :<br/>
+                    1. Crée une app Meta sur <a href="https://developers.facebook.com" target="_blank" style={{color:'#005FFF'}}>developers.facebook.com</a><br/>
+                    2. Active <strong>Instagram Graph API</strong> + permissions <code>instagram_basic</code>, <code>instagram_manage_comments</code>, <code>pages_messaging</code><br/>
+                    3. Ajoute <strong>INSTAGRAM_ACCESS_TOKEN</strong> dans tes variables Vercel<br/>
+                    4. Redéploie
+                  </div>
+                </div>
+              )}
+
+              {!instaLoading && instaData && instaData.ok && (
+                <div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
+                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
+                      <div className="kl">Abonnés</div>
+                      <div className="kv" style={{fontSize:24,color:'#FF82D7'}}>{instaData.followers ? instaData.followers.toLocaleString('fr-FR') : '--'}</div>
+                    </div>
+                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
+                      <div className="kl">Posts</div>
+                      <div className="kv" style={{fontSize:24}}>{instaData.mediaCount || '--'}</div>
+                    </div>
+                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
+                      <div className="kl">Messages non lus</div>
+                      <div className="kv" style={{fontSize:24,color:instaData.unreadMessages>0?'#CC0066':'#191923'}}>{instaData.unreadMessages || 0}</div>
+                    </div>
+                  </div>
+
+                  <div style={{display:'flex',gap:6,marginBottom:10}}>
+                    {['comments','messages','media'].map(function(tab){return(
+                      <button key={tab} className={'btn btn-sm'+(instaTab===tab?' btn-p':'')} onClick={function(){setInstaTab(tab)}}>
+                        {tab==='comments'?'💬 Commentaires':tab==='messages'?'✉️ Messages':'📷 Posts'}
+                      </button>
+                    )})}
+                  </div>
+
+                  {instaTab === 'comments' && (
+                    <div>
+                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Commentaires récents</div>
+                      {(instaData.comments||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun commentaire récent</div>}
+                      {(instaData.comments||[]).map(function(c,i){return(
+                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(c.replied?'#009D3A':'#FFEB5A')}}>
+                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                            <div style={{fontWeight:900,fontSize:13}}>@{c.username}</div>
+                            <div style={{fontSize:10,opacity:.4}}>{c.date}</div>
+                          </div>
+                          <div style={{fontSize:12,marginBottom:6,lineHeight:1.5}}>{c.text}</div>
+                          <div style={{fontSize:10,opacity:.5,marginBottom:c.replied?6:0}}>📸 {c.postCaption || 'Post Instagram'}</div>
+                          {c.replied
+                            ? <div style={{fontSize:11,color:'#009D3A',fontWeight:700}}>✅ Répondu</div>
+                            : <a href={'https://www.instagram.com/p/'+(c.shortcode||'')} target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{fontSize:10,marginTop:4}}>↗ Répondre sur Instagram</a>
+                          }
+                        </div>
+                      )})}
+                    </div>
+                  )}
+
+                  {instaTab === 'messages' && (
+                    <div>
+                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Messages directs</div>
+                      {(instaData.messages||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun message récent</div>}
+                      {(instaData.messages||[]).map(function(m,i){return(
+                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(m.read?'#EBEBEB':'#FF82D7')}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                            <div style={{flex:1}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                                <div style={{fontWeight:900,fontSize:13}}>@{m.username}</div>
+                                {!m.read && <span style={{fontSize:9,background:'#FF82D7',padding:'1px 5px',borderRadius:3,fontWeight:900,color:'#191923'}}>NOUVEAU</span>}
+                              </div>
+                              <div style={{fontSize:12,lineHeight:1.5,color:'#444'}}>{m.lastMessage}</div>
+                            </div>
+                            <div style={{fontSize:10,opacity:.4,flexShrink:0}}>{m.date}</div>
+                          </div>
+                          <a href="https://www.instagram.com/direct/inbox/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p" style={{fontSize:10,marginTop:8}}>↗ Répondre sur Instagram</a>
+                        </div>
+                      )})}
+                    </div>
+                  )}
+
+                  {instaTab === 'media' && (
+                    <div>
+                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Posts récents</div>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+                        {(instaData.media||[]).map(function(p,i){return(
+                          <a key={i} href={p.permalink} target="_blank" rel="noopener noreferrer" style={{textDecoration:'none',color:'inherit'}}>
+                            <div className="card" style={{padding:10,cursor:'pointer'}}>
+                              {p.thumbnailUrl && <img src={p.thumbnailUrl} alt="" style={{width:'100%',aspectRatio:'1',objectFit:'cover',borderRadius:4,marginBottom:6}} />}
+                              {!p.thumbnailUrl && <div style={{width:'100%',aspectRatio:'1',background:'#FFEB5A',borderRadius:4,marginBottom:6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>📷</div>}
+                              <div style={{fontSize:11,display:'flex',justifyContent:'space-between'}}>
+                                <span>❤️ {p.likes||0}</span>
+                                <span>💬 {p.comments||0}</span>
+                              </div>
+                              <div style={{fontSize:10,opacity:.4,marginTop:3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{p.caption||''}</div>
+                            </div>
+                          </a>
+                        )})}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {page === 'journal' && !isEmy && (
+            <div>
+              <div className="ph">
+                <div><div className="pt">Journal d'Emy 📓</div><div className="ps">Activité · Sessions · Actions</div></div>
+                <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){
+                  var rows = activityLog.filter(function(a){
+                    var inFrom = !journalDateFrom || a.created_at >= journalDateFrom
+                    var inTo = !journalDateTo || a.created_at <= journalDateTo+'T23:59:59'
+                    return inFrom && inTo
+                  })
+                  var csv = 'Date,Utilisateur,Type,Description\n' + rows.map(function(a){
+                    return [new Date(a.created_at).toLocaleString('fr-FR'),a.user_name||'',a.type||'',a.description||''].join(',')
+                  }).join('\n')
+                  var blob = new Blob([csv],{type:'text/csv'})
+                  var url = URL.createObjectURL(blob)
+                  var el = document.createElement('a')
+                  el.href=url;el.download='journal-emy-'+new Date().toISOString().split('T')[0]+'.csv';el.click()
+                }}>📥 Export CSV</button>
+              </div>
+
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:12}}>
+                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
+                  <div className="kl">Sessions aujourd'hui</div>
+                  <div className="kv" style={{fontSize:22}}>{activityLog.filter(function(a){return a.type==='session_start'&&a.created_at&&a.created_at.startsWith(new Date().toISOString().split('T')[0])}).length}</div>
+                </div>
+                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
+                  <div className="kl">Actions ce mois</div>
+                  <div className="kv" style={{fontSize:22}}>{activityLog.filter(function(a){return a.created_at&&a.created_at.startsWith(new Date().toISOString().slice(0,7))}).length}</div>
+                </div>
+                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
+                  <div className="kl">Emails générés</div>
+                  <div className="kv" style={{fontSize:22,color:'#FF82D7'}}>{activityLog.filter(function(a){return a.type==='email_genere'||a.type==='email_copie'}).length}</div>
+                </div>
+              </div>
+
+              <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap',alignItems:'center'}}>
+                <select className="inp" style={{width:'auto',padding:'5px 10px',fontSize:11}} value={journalUser} onChange={function(e){setJournalUser(e.target.value)}}>
+                  <option value="all">Tous</option>
+                  <option value="emy">Emy</option>
+                  <option value="edward">Edward</option>
+                </select>
+                <select className="inp" style={{width:'auto',padding:'5px 10px',fontSize:11}} value={journalFilter} onChange={function(e){setJournalFilter(e.target.value)}}>
+                  <option value="all">Toutes actions</option>
+                  <option value="session_start">Sessions</option>
+                  <option value="email_copie">Emails copiés</option>
+                  <option value="prospect_contacte">Contactés</option>
+                  <option value="email_genere">Emails IA</option>
+                </select>
+                <input type="date" className="inp" style={{width:135,fontSize:11,padding:'5px 8px'}} value={journalDateFrom} onChange={function(e){setJournalDateFrom(e.target.value)}} />
+                <span style={{fontSize:11,opacity:.4}}>→</span>
+                <input type="date" className="inp" style={{width:135,fontSize:11,padding:'5px 8px'}} value={journalDateTo} onChange={function(e){setJournalDateTo(e.target.value)}} />
+                {(journalDateFrom||journalDateTo)&&<button className="btn btn-sm" onClick={function(){setJournalDateFrom('');setJournalDateTo('')}}>✕</button>}
+              </div>
+
+              {(function(){
+                var filtered = activityLog.filter(function(a){
+                  var mType = journalFilter==='all'||a.type===journalFilter
+                  var mUser = journalUser==='all'||(a.user_name&&a.user_name.toLowerCase().indexOf(journalUser)>-1)
+                  var mFrom = !journalDateFrom||a.created_at>=journalDateFrom
+                  var mTo = !journalDateTo||a.created_at<=journalDateTo+'T23:59:59'
+                  return mType&&mUser&&mFrom&&mTo
+                })
+                if(filtered.length===0)return <div style={{textAlign:'center',padding:40,opacity:.4,fontSize:12}}>Aucune activité pour ces filtres</div>
+                var byDay = {}
+                filtered.forEach(function(a){
+                  var d = a.created_at ? a.created_at.split('T')[0] : 'inconnu'
+                  if(!byDay[d])byDay[d]=[]
+                  byDay[d].push(a)
+                })
+                return Object.keys(byDay).sort(function(a,b){return b.localeCompare(a)}).map(function(day){
+                  var dayLogs = byDay[day]
+                  var sessions = dayLogs.filter(function(a){return a.type==='session_start'})
+                  var actions = dayLogs.filter(function(a){return a.type!=='session_start'})
+                  var dayLabel = new Date(day+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})
+                  return(
+                    <div key={day} style={{marginBottom:14}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,padding:'5px 10px',background:'#F5F5F5',borderRadius:5}}>
+                        <div style={{fontWeight:900,fontSize:13}}>{dayLabel}</div>
+                        <span style={{fontSize:9,background:'#FFEB5A',border:'1px solid #191923',borderRadius:3,padding:'1px 5px',fontWeight:900}}>{dayLogs.length}</span>
+                        {sessions.length>0&&<span style={{fontSize:10,color:'#005FFF',fontWeight:700}}>{sessions.length} session(s)</span>}
+                      </div>
+                      {sessions.length>0&&(
+                        <div style={{padding:'6px 10px',background:'#EBF3FF',borderRadius:5,borderLeft:'3px solid #005FFF',marginBottom:6}}>
+                          <div style={{fontSize:10,fontWeight:900,color:'#005FFF',marginBottom:3}}>🔐 Connexions</div>
+                          {sessions.map(function(s,si){return(
+                            <div key={si} style={{display:'flex',gap:8,fontSize:11,padding:'1px 0'}}>
+                              <span style={{fontWeight:700}}>{s.user_name}</span>
+                              <span style={{opacity:.5}}>{s.created_at?new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):''}</span>
+                            </div>
+                          )})}
+                        </div>
+                      )}
+                      {actions.map(function(a,ai){
+                        var tl={email_copie:'📋 Copié',prospect_contacte:'📞 Contact',email_genere:'✉️ Email IA',prospect_relance:'↩ Relance',devis_cree:'📄 Devis'}
+                        var tc={email_copie:'#FF82D7',prospect_contacte:'#D0F5E0',email_genere:'#FFE5F7',prospect_relance:'#EBF3FF',devis_cree:'#FFEB5A'}
+                        var label=tl[a.type]||a.type
+                        var color=tc[a.type]||'#F0F0F0'
+                        return(
+                          <div key={ai} style={{display:'flex',alignItems:'flex-start',gap:8,padding:'5px 0',borderBottom:'1px solid #F5F5F5'}}>
+                            <span style={{fontSize:9,background:color,color:'#191923',padding:'2px 5px',borderRadius:3,fontWeight:900,whiteSpace:'nowrap',minWidth:70,textAlign:'center'}}>{label}</span>
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:12,fontWeight:700}}>{a.prospect_name||a.description||a.type}</div>
+                              {a.description&&a.prospect_name&&<div style={{fontSize:10,opacity:.5}}>{a.description}</div>}
+                            </div>
+                            <span style={{fontSize:10,opacity:.4,flexShrink:0}}>{a.created_at?new Date(a.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):''}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })
+              })()}
             </div>
           )}
 
