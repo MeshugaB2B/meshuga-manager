@@ -1324,32 +1324,23 @@ export default function DashboardPage() {
                 <div><div className="pt">Annuaire</div><div className="ps">{contacts.length} contacts</div></div>
                 <div style={{display:'flex',gap:6}}>
                   <button className="btn btn-y btn-sm" onClick={function() { openModal('contact', {cat:'food',vip:false}) }}>+ Ajouter</button>
-                  <label className="btn btn-sm" style={{cursor:'pointer',background:'#FFEB5A',border:'2px solid #191923'}}>
-                    📥 Import CSV
-                    <input type="file" accept=".csv,.vcf" style={{display:'none'}} onChange={function(e){
-                      var file = e.target.files && e.target.files[0]
-                      if (!file) return
-                      var reader = new FileReader()
-                      reader.onload = function(ev) {
-                        var text = ev.target.result
-                        var lines2 = text.split('
-').filter(function(l){return l.trim()})
-                        var imported = []
-                        lines2.slice(1).forEach(function(line) {
-                          var cols = line.split(',').map(function(c){return c.replace(/"/g,'').trim()})
-                          if (cols[0]) {
-                            imported.push({id: Date.now() + Math.random(), cat: 'prestataire', name: cols[0]||'', phone: cols[1]||'', email: cols[2]||'', notes: cols[3]||'', vip: false})
-                          }
-                        })
-                        if (imported.length > 0) {
-                          setContacts(function(prev) { return prev.concat(imported) })
-                          toast(imported.length + ' contacts importés !')
-                        }
-                      }
-                      reader.readAsText(file)
-                      e.target.value = ''
-                    }} />
-                  </label>
+                  <button className="btn btn-sm" style={{background:'#FFEB5A',border:'2px solid #191923'}} onClick={function(){document.getElementById('csv-imp').click()}}>📥 Import CSV</button>
+                  <input id="csv-imp" type="file" accept=".csv" style={{display:'none'}} onChange={function(e){
+                    var f=e.target&&e.target.files&&e.target.files[0]
+                    if(!f)return
+                    var r=new FileReader()
+                    r.onload=function(ev){
+                      var raw=ev.target?String(ev.target.result):''
+                      var rows=raw.split('\n').filter(function(l){return l.trim()})
+                      var added=rows.slice(1).map(function(row){
+                        var c=row.split(',').map(function(x){return x.replace(/"/g,'').trim()})
+                        return {id:Date.now()+Math.random(),cat:'prestataire',name:c[0]||'',phone:c[1]||'',email:c[2]||'',notes:c[3]||'',vip:false}
+                      }).filter(function(c){return c.name})
+                      if(added.length>0){setContacts(function(prev){return prev.concat(added)});toast(added.length+' contacts importés !')}
+                    }
+                    r.readAsText(f)
+                    e.target.value=''
+                  }} />
                 </div>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:12}}>
@@ -1538,7 +1529,7 @@ export default function DashboardPage() {
                       </button>
                     )})}
                   </div>
-                  {gmbData.reviews.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date)}).filter(function(r){
+                  {gmbData.reviews.slice().sort(function(a,b){return new Date(b.date).getTime()-new Date(a.date).getTime()}).filter(function(r){
                     if(gmbFilter==='noreply') return !r.replied
                     if(gmbFilter==='5') return r.rating===5
                     if(gmbFilter==='4') return r.rating===4
@@ -1610,7 +1601,7 @@ export default function DashboardPage() {
                     var archives = devisList.filter(function(d){return d.statut==='paye'||d.statut==='refuse'||d.statut==='brouillon'})
                     var sc={brouillon:'#888',envoye:'#005FFF',accepte:'#009D3A',refuse:'#CC0066',a_modifier:'#FF6B2B',facture:'#191923',paye:'#009D3A'}
                     var sl={brouillon:'Brouillon',envoye:'Envoyé',accepte:'Accepté',refuse:'Refusé',a_modifier:'À modifier',facture:'Facturé',paye:'Soldé'}
-                    function renderCard(dv) {
+                    var renderCard = function(dv) {
                       var col=sc[dv.statut]||'#888'
                       return(
                         <div key={dv.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+col}}>
@@ -1796,7 +1787,7 @@ export default function DashboardPage() {
                       {(devisFormat==='normal'?[{id:"hot_dog",nom:"Hot Dog",prix:7.56},{id:"grilled_cheese",nom:"Grilled Cheese",prix:7.56},{id:"egg_salad",nom:"Egg Salad",prix:8.51},{id:"chicken_caesar",nom:"Chicken Caesar",prix:11.34},{id:"tuna_melt",nom:"Tuna Melt",prix:11.34},{id:"pastrami",nom:"Pastrami",prix:14.18},{id:"smoked_salmon",nom:"Smoked Salmon",prix:13.23},{id:"lobster_roll",nom:"Lobster Roll",prix:20.79},{id:"pbn",nom:"PBN",prix:5.67}]:[{id:"hot_dog_m",nom:"Hot Dog Mini",prix:2.7},{id:"grilled_cheese_m",nom:"Grilled Cheese Mini",prix:2.87},{id:"egg_salad_m",nom:"Egg Salad Mini",prix:2.65},{id:"chicken_caesar_m",nom:"Chicken Caesar Mini",prix:3.35},{id:"tuna_melt_m",nom:"Tuna Melt Mini",prix:3.0},{id:"pastrami_m",nom:"Pastrami Mini",prix:3.8},{id:"smoked_salmon_m",nom:"Smoked Salmon Mini",prix:3.9},{id:"lobster_roll_m",nom:"Lobster Roll Mini",prix:7.5},{id:"pbn_m",nom:"PBN Mini",prix:2.7},{id:"mini_veggie",nom:"Salade Mini Veggie",prix:4.72}]).map(function(s){
                         var ex=devisItems.filter(function(x){return x.id===s.id})[0]
                         var qty=ex?ex.qte:0
-                        function setQty(nq){
+                        var setQty = function(nq){
                           if(nq<=0)setDevisItems(devisItems.filter(function(x){return x.id!==s.id}))
                           else if(qty===0)setDevisItems(devisItems.concat([{id:s.id,nom:s.nom,prix:s.prix,qte:nq,total_ht:nq*s.prix}]))
                           else setDevisItems(devisItems.map(function(x){return x.id===s.id?Object.assign({},x,{qte:nq,total_ht:nq*s.prix}):x}))
