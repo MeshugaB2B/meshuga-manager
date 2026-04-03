@@ -964,42 +964,42 @@ export default function DashboardPage() {
                 {isEmy && <button className="btn btn-p btn-sm" onClick={function(){openModal('cr',{})}}>+ Nouveau CR</button>}
               </div>
 
-              <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:10,marginBottom:10}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
                 <div className="kc" style={{background:'#FFFFFF',cursor:'pointer'}} onClick={function(){nav('devis')}}>
-                  <div className="kl" style={{fontSize:11}}>Pipeline B2B 🎯</div>
-                  <div style={{display:'flex',gap:20,alignItems:'flex-end',marginTop:8,flexWrap:'wrap'}}>
+                  <div className="kl" style={{fontSize:10,textTransform:"uppercase",letterSpacing:.5}}>Pipeline B2B 🎯</div>
+                  <div style={{display:'flex',gap:12,alignItems:'flex-end',marginTop:6,flexWrap:'wrap'}}>
                     <div>
-                      <div className="kv" style={{fontSize:28,lineHeight:1}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'}).length}</div>
-                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:12,color:'#005FFF',marginTop:3}}>devis en attente</div>
+                      <div className="kv" style={{fontSize:30,lineHeight:1}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'}).length}</div>
+                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,color:'#005FFF',marginTop:2}}>devis en attente</div>
                     </div>
-                    <div style={{fontWeight:900,fontSize:20,opacity:.2,paddingBottom:3}}>·</div>
+                    <div style={{fontWeight:900,fontSize:14,opacity:.2,paddingBottom:2}}>·</div>
                     <div>
-                      <div className="kv" style={{fontSize:28,lineHeight:1,color:'#CC6600'}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||d.montantHT||0)},0).toLocaleString('fr-FR',{maximumFractionDigits:0})} <span style={{fontSize:12}}>€ HT</span></div>
-                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:12,color:'#CC6600',marginTop:3}}>CA potentiel</div>
+                      <div className="kv" style={{fontSize:30,lineHeight:1,color:'#CC6600'}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||d.montantHT||0)},0).toLocaleString('fr-FR',{maximumFractionDigits:0})} <span style={{fontSize:12}}>€ HT</span></div>
+                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,color:'#CC6600',marginTop:2}}>CA potentiel</div>
                     </div>
-                    <div style={{fontWeight:900,fontSize:20,opacity:.2,paddingBottom:3}}>·</div>
+                    <div style={{fontWeight:900,fontSize:14,opacity:.2,paddingBottom:2}}>·</div>
                     <div>
-                      <div className="kv" style={{fontSize:28,lineHeight:1,color:'#FF82D7'}}>{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length}</div>
-                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:12,color:'#FF82D7',marginTop:3}}>prospects actifs</div>
+                      <div className="kv" style={{fontSize:30,lineHeight:1,color:'#FF82D7'}}>{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length}</div>
+                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,color:'#FF82D7',marginTop:2}}>prospects actifs</div>
                     </div>
                   </div>
                   <div className="ki" style={{opacity:.05}}>🎯</div>
                 </div>
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('devis')}}>
                   <div className="kl">CA B2B signé</div>
-                  <div className="kv" style={{fontSize:26}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
+                  <div className="kv" style={{fontSize:30}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
                   <div style={{fontFamily:"'Yellowtail',cursive",fontSize:13,marginTop:4,color:'#00AA44'}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).length} contrats signés</div>
                   <div className="ki" style={{opacity:.1}}>📈</div>
                 </div>
-                <div className="kc" style={{background:'#FFF8E7',cursor:'pointer',border:'1.5px solid #FFEB5A'}} onClick={function(){nav('devis')}}>
+                <div className="kc" style={{background:'#FFFFFF',cursor:'pointer'}} onClick={function(){nav('devis')}}>
                   <div className="kl">CA à closer 🎯</div>
-                  <div className="kv" style={{fontSize:20,color:'#CC6600'}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='accepte'}).reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR',{maximumFractionDigits:0})} <span style={{fontSize:10}}>€</span></div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:13,marginTop:4,color:'#CC6600',opacity:.7}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='accepte'}).length} devis en attente</div>
+                  <div className="kv" style={{fontSize:30}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='accepte'}).reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR',{maximumFractionDigits:0})} <span style={{fontSize:10}}>€</span></div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:13,marginTop:4,opacity:.7}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='accepte'}).length} devis en attente</div>
                   <div className="ki" style={{opacity:.1}}>🎯</div>
                 </div>
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('chasse')}}>
                   <div className="kl">Prospectés</div>
-                  <div className="kv">{chasse.filter(function(p){return p.contacted}).length} <span style={{fontSize:16,fontWeight:400,opacity:.3}}>/ {chasse.length}</span></div>
+                  <div className="kv" style={{fontSize:30}}>{chasse.filter(function(p){return p.contacted}).length} <span style={{fontSize:16,fontWeight:400,opacity:.3}}>/ {chasse.length}</span></div>
                   <div style={{fontFamily:"'Yellowtail',cursive",fontSize:13,marginTop:4,color:'rgba(25,25,35,.35)'}}>{chasse.length>0?Math.round(chasse.filter(function(p){return p.contacted}).length/chasse.length*100):0}% contactés</div>
                   <div className="ki" style={{opacity:.1}}>🎯</div>
                 </div>
@@ -1118,12 +1118,12 @@ export default function DashboardPage() {
                               <div style={{fontSize:13,fontWeight:900,opacity:.7,color:headerColor}}>{dd.getDate()}/{dd.getMonth()+1}</div>
                             </div>
                           </div>
-                          <div style={{padding:'7px',flex:1,background:'#FFFFFF',minHeight:200}}>
+                          <div style={{padding:planningView==='auj'?'14px':'7px',flex:1,background:'#FFFFFF',minHeight:planningView==='auj'?280:200}}>
                             {autoTodos.map(function(todo){
                               return(
-                                <div key={todo.key} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:4}}>
+                                <div key={todo.key} style={{display:'flex',alignItems:'flex-start',gap:planningView==='auj'?8:4,margi4,marginBottom:4}}>
                                   <input type="checkbox" checked={!!todo.done} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:todo.urgent?'#CC0066':'#FF82D7'}}/>
-                                  <span style={{fontSize:13,fontWeight:todo.urgent?900:500,color:todo.urgent?'#CC0066':'#333',textDecoration:todo.done?'line-through':'none',opacity:todo.done?.4:1,lineHeight:1.4}}>{todo.label}</span>
+                                  <span style={{fontSize:planningView==='auj'?16:13,fontWeight:todo.urgent?900:500,color:todo.urgent?'#CC0066':'#333',textDecoration:todo.done?'line-through':'none',opacity:todo.done?.4:1,lineHeight:1.4}}>{todo.label}</span>
                                 </div>
                               )
                             })}
@@ -1135,7 +1135,7 @@ export default function DashboardPage() {
                                       setTasks(function(prev){return prev.map(function(x){return x.id!==t.id?x:Object.assign({},x,{status:t.status==='done'?'todo':'done'})})})
                                     }}>
                                       <input type="checkbox" checked={t.status==='done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#191923'}}/>
-                                      <span style={{fontSize:13,fontWeight:t.priority==='high'?900:600,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.4}}>{t.title}</span>
+                                      <span style={{fontSize:planningView==='auj'?16:13,fontWeight:t.priority==='high'?900:600,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.4}}>{t.title}</span>
                                     </div>
                                   )
                                 })}
@@ -1294,7 +1294,7 @@ export default function DashboardPage() {
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:10}}>
                       <div>
                         <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#191923',marginBottom:4}}>💰 Commission Emy</div>
-                        <div style={{fontSize:11,color:'rgba(25,25,35,.5)',textTransform:'uppercase',letterSpacing:1}}>{periodLabel} · 5% du CA signé</div>
+                        <div style={{fontSize:11,color:'rgba(25,25,35,.7)',textTransform:'uppercase',letterSpacing:1}}>{periodLabel} · 5% du CA signé</div>
                       </div>
                       <div style={{display:'flex',gap:4}}>
                         {['month','year','all'].map(function(per){return(
@@ -1304,14 +1304,14 @@ export default function DashboardPage() {
                     </div>
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:14}}>
                       <div style={{background:'#F8F9FF',border:'1.5px solid #DDEEFF',borderRadius:7,padding:'12px 14px'}}>
-                        <div style={{fontSize:10,color:'rgba(25,25,35,.4)',marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>CA B2B signé</div>
+                        <div style={{fontSize:12,color:'rgba(25,25,35,.7)',fontWeight:900,marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>CA B2B signé</div>
                         <div style={{fontWeight:900,fontSize:24,color:'#191923'}}>{caTotal.toLocaleString('fr-FR',{minimumFractionDigits:0})} <span style={{fontSize:12,opacity:.5}}>€ HT</span></div>
-                        <div style={{fontSize:10,color:'rgba(25,25,35,.35)',marginTop:2}}>{devisList.filter(filterFn).length} contrats</div>
+                        <div style={{fontSize:10,color:'#444',fontWeight:600,marginTop:2}}>{devisList.filter(filterFn).length} contrats</div>
                       </div>
                       <div style={{background:'#FFEB5A',borderRadius:7,padding:'12px 14px',border:'2px solid rgba(255,255,255,.3)'}}>
-                        <div style={{fontSize:10,color:'rgba(25,25,35,.5)',marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>🎉 Commission</div>
+                        <div style={{fontSize:12,color:'rgba(25,25,35,.7)',fontWeight:900,marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>🎉 Commission</div>
                         <div style={{fontWeight:900,fontSize:24,color:'#191923'}}>{commission.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} <span style={{fontSize:12,opacity:.5}}>€</span></div>
-                        <div style={{fontSize:10,color:'rgba(25,25,35,.4)',marginTop:2}}>Bravo Emy 🚀</div>
+                        <div style={{fontSize:10,color:'#333',fontWeight:700,marginTop:2}}>Bravo Emy 🚀</div>
                       </div>
                     </div>
                   {pipeCA>0&&(
@@ -1386,7 +1386,7 @@ export default function DashboardPage() {
                       </div>
                       <div style={{display:'flex',gap:4,flexShrink:0}}>
                         <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){openModal('prospect',Object.assign({},p))}}>✏️</button>
-                        <button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={function(e){e.stopPropagation();generateEmail(Object.assign({},p,{cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category}),p.status==='contacted'||p.status==='nego'?'relance':'first')}}>✉️ {p.status==='contacted'||p.status==='nego'?'Relance email':'Email'}</button>
+                        <button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={function(e){e.stopPropagation();generateEmail(Object.assign({},p,{cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category}),p.status==='contacted'||p.status==='nego'?'relance':'first')}}>{p.status==='contacted'||p.status==='nego'?'✉️ Relance':'✉️ Email'}</button>
                       </div>
                     </div>
 
@@ -2212,13 +2212,15 @@ export default function DashboardPage() {
                               var startT = s.created_at ? new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : ''
                               var endT = endLog&&endLog.created_at ? new Date(endLog.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : null
                               var dur = endLog ? (endLog.description||'').replace('Fin de session — ','') : null
-                              var isOpen = !endLog
+                              var sessionAge = s.created_at ? (Date.now() - new Date(s.created_at).getTime()) : 0
+                              var isOpen = !endLog && sessionAge < 20 * 60 * 1000
                               return(
                                 <div key={si} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:'#EBF3FF',borderRadius:5,borderLeft:'3px solid #005FFF',marginBottom:4}}>
                                   <span style={{fontSize:16}}>🔐</span>
                                   <div style={{flex:1}}>
-                                    <div style={{fontSize:12,fontWeight:900}}>Connexion {startT}{endT?' → '+endT:''}</div>
+                                    <div style={{fontSize:12,fontWeight:900}}>Connexion {startT}{endT?' → '+endT:(!isOpen&&!endT?' → ~'+new Date(new Date(s.created_at||'').getTime()+20*60000).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'')} </div>
                                     {dur&&<div style={{fontSize:11,color:'#005FFF',fontWeight:700}}>{dur}</div>}
+                                    {!endLog&&!isOpen&&<div style={{fontSize:10,color:'#888',fontStyle:'italic'}}>Fermée par inactivité (20min)</div>}
                                   </div>
                                   <span style={{fontSize:10,fontWeight:900,color:isOpen?'#FF6B2B':'#009D3A',background:isOpen?'#FFF3E0':'#D0F5E0',padding:'2px 6px',borderRadius:3}}>{isOpen?'En cours':'✅'}</span>
                                 </div>
