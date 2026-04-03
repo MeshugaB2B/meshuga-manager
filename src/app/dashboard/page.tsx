@@ -861,73 +861,9 @@ export default function DashboardPage() {
     {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
   ]
 
-  var DEVIS_SC={brouillon:'#888',envoye:'#005FFF',accepte:'#009D3A',refuse:'#CC0066',a_modifier:'#FF6B2B',facture:'#191923',paye:'#009D3A'}
-  var DEVIS_SL={brouillon:'Brouillon',envoye:'Envoyé',accepte:'Accepté',refuse:'Refusé',a_modifier:'À modifier',facture:'Facturé',paye:'Soldé'}
-  var renderCard = function(dv) {
-    var col=DEVIS_SC[dv.statut]||'#888'
-    return(
-      <div key={dv.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+col}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
-          <div style={{flex:1}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
-              <span style={{fontWeight:900,fontSize:14}}>{dv.numero}</span>
-              <span className="badge" style={{color:col,borderColor:col}}>{DEVIS_SL[dv.statut]||dv.statut}</span>
-              {dv.facture_numero&&<span className="badge" style={{color:'#191923',borderColor:'#191923'}}>FACT {dv.facture_numero}</span>}
-              {dv.acompte_recu&&<span style={{fontSize:9,background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:3,padding:'1px 5px',fontWeight:900}}>💰 Acompte OK</span>}
-            </div>
-            <div style={{fontWeight:900,fontSize:13}}>{dv.client_nom}</div>
-            <div style={{fontSize:11,opacity:.5}}>{dv.event_date?new Date(dv.event_date).toLocaleDateString('fr-FR'):''} {dv.event_lieu?'· '+dv.event_lieu:''} · {dv.nb_personnes} pers.</div>
-          </div>
-          <div style={{textAlign:'right'}}>
-            <div style={{fontWeight:900,fontSize:18}}>{parseFloat(dv.total_ttc||0).toLocaleString('fr-FR',{minimumFractionDigits:2})} €</div>
-            <div style={{fontSize:9,opacity:.4}}>TTC</div>
-          </div>
-        </div>
-        <div style={{display:'flex',gap:5,marginTop:10,flexWrap:'wrap'}}>
-          <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){
-            setDevisView('edit');setCurrentDevisId(dv.id);setDevisNumero(dv.numero)
-            setDevisClient({nom:dv.client_nom,contact:dv.client_contact||'',email:dv.client_email||'',phone:dv.client_phone||'',date:dv.event_date||'',lieu:dv.event_lieu||'',prospectId:dv.prospect_id})
-            setDevisNbPersonnes(dv.nb_personnes||50);setDevisFormat(dv.format||'normal')
-            setDevisItems(dv.items||[]);setDevisMiseEnPlace(parseFloat(dv.mise_en_place||0))
-            setDevisMiseEnPlacePct(parseFloat(dv.remise_mep_pct||0));setDevisRemiseTotal(parseFloat(dv.remise_total_pct||0))
-            setDevisNotes(dv.notes||'');setDevisLivraison(parseFloat(dv.livraison||0))
-            setDevisLivraisonOffert(!!dv.livraison_offert);setDevisMepOffert(!!dv.mise_en_place_offert)
-          }}>✏️ Modifier</button>
-          {dv.statut==='brouillon'&&<button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'envoye','')}}>📤 Envoyé</button>}
-          {dv.statut==='envoye'&&(
-            <span style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-              <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff',fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'accepte','')}}>✓ Accepté</button>
-              <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'refuse','')}}>✗ Refusé</button>
-              <button className="btn btn-sm" style={{background:'#FF6B2B',color:'#fff',fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'a_modifier','')}}>⚠️ À modifier</button>
-            </span>
-          )}
-          {(dv.statut==='accepte'||dv.statut==='facture')&&!dv.acompte_recu&&(
-            <button className="btn btn-sm" style={{background:'#FFEB5A',color:'#191923',fontSize:10}} onClick={function(){
-              sb().from('devis').update({acompte_recu:true,acompte_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('💰 Acompte reçu !')})
-            }}>💰 Acompte reçu</button>
-          )}
-          {dv.statut==='accepte'&&!dv.facture_numero&&(
-            <button className="btn btn-n btn-sm" style={{fontSize:10}} onClick={function(){
-              var fn='FACT-'+new Date().getFullYear()+'-'+String(devisList.filter(function(x){return x.facture_numero}).length+1).padStart(3,'0')
-              sb().from('devis').update({statut:'facture',facture_numero:fn,facture_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('🧾 Facture '+fn+' générée !')})
-            }}>🧾 Facturer</button>
-          )}
-          {dv.statut==='facture'&&dv.paiement_statut!=='paye'&&(
-            <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff',fontSize:10}} onClick={function(){
-              sb().from('devis').update({paiement_statut:'paye',statut:'paye',solde_recu:true,solde_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('✅ Soldé !')})
-            }}>✅ Soldé</button>
-          )}
-          <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,false)}}>📄 PDF</button>
-          {dv.facture_numero&&<button className="btn btn-n btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,true)}}>🧾 PDF Facture</button>}
-          <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){
-            if(window.confirm('Supprimer ce devis définitivement ?')){
-              sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Devis supprimé')})
-            }
-          }}>🗑️ Supprimer</button>
-        </div>
-      </div>
-    )
-  }
+  var devisEnCours = devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'})
+  var devisACloser = devisList.filter(function(d){return d.statut==='accepte'||d.statut==='facture'})
+  var devisArchives = devisList.filter(function(d){return d.statut==='paye'||d.statut==='refuse'||d.statut==='brouillon'})
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
@@ -1663,44 +1599,123 @@ export default function DashboardPage() {
                       <div style={{fontSize:40,marginBottom:10}}>📄</div>
                       <div style={{fontWeight:900,textTransform:'uppercase'}}>Aucun devis — crée le premier !</div>
                     </div>
-                  ):(function(){
-                    var enCours = devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'})
-                    var aCloser = devisList.filter(function(d){return d.statut==='accepte'||d.statut==='facture'})
-                    var archives = devisList.filter(function(d){return d.statut==='paye'||d.statut==='refuse'||d.statut==='brouillon'})
-                    return(
-                      <div>
-                        {enCours.length>0&&(
-                          <div style={{marginBottom:16}}>
-                            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'8px 12px',background:'#EBF3FF',borderRadius:6,border:'1.5px solid #005FFF'}}>
-                              <div className="yt" style={{fontSize:17,color:'#005FFF'}}>📤 En attente de réponse</div>
-                              <div style={{fontWeight:900,fontSize:12,color:'#005FFF',marginLeft:'auto'}}>{enCours.reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR',{minimumFractionDigits:2})} € TTC</div>
-                              <span style={{fontSize:10,background:'#005FFF',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{enCours.length}</span>
-                            </div>
-                            {enCours.map(renderCard)}
+                  ):(
+                    <div>
+                      {devisEnCours.length>0&&(
+                        <div style={{marginBottom:16}}>
+                          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'8px 12px',background:'#EBF3FF',borderRadius:6,border:'1.5px solid #005FFF'}}>
+                            <div className="yt" style={{fontSize:17,color:'#005FFF'}}>📤 En attente de réponse</div>
+                            <div style={{fontWeight:900,fontSize:12,color:'#005FFF',marginLeft:'auto'}}>{devisEnCours.reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR')} € TTC</div>
+                            <span style={{fontSize:10,background:'#005FFF',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{devisEnCours.length}</span>
                           </div>
-                        )}
-                        {aCloser.length>0&&(
-                          <div style={{marginBottom:16}}>
-                            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'8px 12px',background:'#F0FFF4',borderRadius:6,border:'1.5px solid #009D3A'}}>
-                              <div className="yt" style={{fontSize:17,color:'#009D3A'}}>🎯 À facturer / Solder</div>
-                              <div style={{fontWeight:900,fontSize:12,color:'#009D3A',marginLeft:'auto'}}>{aCloser.reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR',{minimumFractionDigits:2})} € TTC</div>
-                              <span style={{fontSize:10,background:'#009D3A',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{aCloser.length}</span>
-                            </div>
-                            {aCloser.map(renderCard)}
+                          {devisEnCours.map(function(dv){
+                            var sc2={brouillon:'#888',envoye:'#005FFF',accepte:'#009D3A',refuse:'#CC0066',a_modifier:'#FF6B2B',facture:'#191923',paye:'#009D3A'}
+                            var sl2={brouillon:'Brouillon',envoye:'Envoyé',accepte:'Accepté',refuse:'Refusé',a_modifier:'À modifier',facture:'Facturé',paye:'Soldé'}
+                            var col=sc2[dv.statut]||'#888'
+                            return(
+                              <div key={dv.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+col}}>
+                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
+                                  <div style={{flex:1}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                                      <span style={{fontWeight:900,fontSize:14}}>{dv.numero}</span>
+                                      <span className="badge" style={{color:col,borderColor:col}}>{sl2[dv.statut]||dv.statut}</span>
+                                      {dv.facture_numero&&<span className="badge" style={{color:'#191923',borderColor:'#191923'}}>FACT {dv.facture_numero}</span>}
+                                      {dv.acompte_recu&&<span style={{fontSize:9,background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:3,padding:'1px 5px',fontWeight:900}}>💰 Acompte OK</span>}
+                                    </div>
+                                    <div style={{fontWeight:900,fontSize:13}}>{dv.client_nom}</div>
+                                    <div style={{fontSize:11,opacity:.5}}>{dv.event_date?new Date(dv.event_date).toLocaleDateString('fr-FR'):''} {dv.event_lieu?'· '+dv.event_lieu:''} · {dv.nb_personnes} pers.</div>
+                                  </div>
+                                  <div style={{textAlign:'right'}}><div style={{fontWeight:900,fontSize:18}}>{parseFloat(dv.total_ttc||0).toFixed(2)} €</div><div style={{fontSize:9,opacity:.4}}>TTC</div></div>
+                                </div>
+                                <div style={{display:'flex',gap:5,marginTop:10,flexWrap:'wrap'}}>
+                                  <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){setDevisView('edit');setCurrentDevisId(dv.id);setDevisNumero(dv.numero);setDevisClient({nom:dv.client_nom,contact:dv.client_contact||'',email:dv.client_email||'',phone:dv.client_phone||'',date:dv.event_date||'',lieu:dv.event_lieu||'',prospectId:dv.prospect_id});setDevisNbPersonnes(dv.nb_personnes||50);setDevisFormat(dv.format||'normal');setDevisItems(dv.items||[]);setDevisMiseEnPlace(parseFloat(dv.mise_en_place||0));setDevisMiseEnPlacePct(parseFloat(dv.remise_mep_pct||0));setDevisRemiseTotal(parseFloat(dv.remise_total_pct||0));setDevisNotes(dv.notes||'');setDevisLivraison(parseFloat(dv.livraison||0));setDevisLivraisonOffert(!!dv.livraison_offert);setDevisMepOffert(!!dv.mise_en_place_offert)}}>✏️ Modifier</button>
+                                  {dv.statut==='brouillon'&&<button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'envoye','')}}>📤 Envoyé</button>}
+                                  {dv.statut==='envoye'&&<button className="btn btn-sm" style={{background:'#009D3A',color:'#fff',fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'accepte','')}}>✓ Accepté</button>}
+                                  {dv.statut==='envoye'&&<button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'refuse','')}}>✗ Refusé</button>}
+                                  {dv.statut==='envoye'&&<button className="btn btn-sm" style={{background:'#FF6B2B',color:'#fff',fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'a_modifier','')}}>⚠️ À modifier</button>}
+                                  <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,false)}}>📄 PDF</button>
+                                  {dv.facture_numero&&<button className="btn btn-n btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,true)}}>🧾 PDF Fact.</button>}
+                                  <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){if(window.confirm('Supprimer ce devis ?')){sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Devis supprimé')})}}}>🗑️</button>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                      {devisACloser.length>0&&(
+                        <div style={{marginBottom:16}}>
+                          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'8px 12px',background:'#F0FFF4',borderRadius:6,border:'1.5px solid #009D3A'}}>
+                            <div className="yt" style={{fontSize:17,color:'#009D3A'}}>🎯 À facturer / Solder</div>
+                            <div style={{fontWeight:900,fontSize:12,color:'#009D3A',marginLeft:'auto'}}>{devisACloser.reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR')} € TTC</div>
+                            <span style={{fontSize:10,background:'#009D3A',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{devisACloser.length}</span>
                           </div>
-                        )}
-                        {archives.length>0&&(
-                          <div style={{marginBottom:16}}>
-                            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'8px 12px',background:'#F8F8F8',borderRadius:6,border:'1.5px solid #DEDEDE'}}>
-                              <div className="yt" style={{fontSize:17,color:'#888'}}>📁 Archives</div>
-                              <span style={{fontSize:10,background:'#888',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900,marginLeft:'auto'}}>{archives.length}</span>
-                            </div>
-                            {archives.map(renderCard)}
+                          {devisACloser.map(function(dv){
+                            var sc2={brouillon:'#888',envoye:'#005FFF',accepte:'#009D3A',refuse:'#CC0066',a_modifier:'#FF6B2B',facture:'#191923',paye:'#009D3A'}
+                            var sl2={brouillon:'Brouillon',envoye:'Envoyé',accepte:'Accepté',refuse:'Refusé',a_modifier:'À modifier',facture:'Facturé',paye:'Soldé'}
+                            var col=sc2[dv.statut]||'#888'
+                            return(
+                              <div key={dv.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+col}}>
+                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
+                                  <div style={{flex:1}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                                      <span style={{fontWeight:900,fontSize:14}}>{dv.numero}</span>
+                                      <span className="badge" style={{color:col,borderColor:col}}>{sl2[dv.statut]||dv.statut}</span>
+                                      {dv.facture_numero&&<span className="badge" style={{color:'#191923',borderColor:'#191923'}}>FACT {dv.facture_numero}</span>}
+                                      {dv.acompte_recu&&<span style={{fontSize:9,background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:3,padding:'1px 5px',fontWeight:900}}>💰 Acompte OK</span>}
+                                    </div>
+                                    <div style={{fontWeight:900,fontSize:13}}>{dv.client_nom}</div>
+                                    <div style={{fontSize:11,opacity:.5}}>{dv.event_date?new Date(dv.event_date).toLocaleDateString('fr-FR'):''} {dv.event_lieu?'· '+dv.event_lieu:''} · {dv.nb_personnes} pers.</div>
+                                  </div>
+                                  <div style={{textAlign:'right'}}><div style={{fontWeight:900,fontSize:18}}>{parseFloat(dv.total_ttc||0).toFixed(2)} €</div><div style={{fontSize:9,opacity:.4}}>TTC</div></div>
+                                </div>
+                                <div style={{display:'flex',gap:5,marginTop:10,flexWrap:'wrap'}}>
+                                  <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){setDevisView('edit');setCurrentDevisId(dv.id);setDevisNumero(dv.numero);setDevisClient({nom:dv.client_nom,contact:dv.client_contact||'',email:dv.client_email||'',phone:dv.client_phone||'',date:dv.event_date||'',lieu:dv.event_lieu||'',prospectId:dv.prospect_id});setDevisNbPersonnes(dv.nb_personnes||50);setDevisFormat(dv.format||'normal');setDevisItems(dv.items||[]);setDevisMiseEnPlace(parseFloat(dv.mise_en_place||0));setDevisMiseEnPlacePct(parseFloat(dv.remise_mep_pct||0));setDevisRemiseTotal(parseFloat(dv.remise_total_pct||0));setDevisNotes(dv.notes||'');setDevisLivraison(parseFloat(dv.livraison||0));setDevisLivraisonOffert(!!dv.livraison_offert);setDevisMepOffert(!!dv.mise_en_place_offert)}}>✏️ Modifier</button>
+                                  {(dv.statut==='accepte'||dv.statut==='facture')&&!dv.acompte_recu&&<button className="btn btn-sm" style={{background:'#FFEB5A',color:'#191923',fontSize:10}} onClick={function(){sb().from('devis').update({acompte_recu:true,acompte_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('💰 Acompte reçu !')})}}>💰 Acompte reçu</button>}
+                                  {dv.statut==='accepte'&&!dv.facture_numero&&<button className="btn btn-n btn-sm" style={{fontSize:10}} onClick={function(){var fn='FACT-'+new Date().getFullYear()+'-'+String(devisList.filter(function(x){return x.facture_numero}).length+1).padStart(3,'0');sb().from('devis').update({statut:'facture',facture_numero:fn,facture_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('🧾 Facture '+fn+' générée!')})}}>🧾 Facturer</button>}
+                                  {dv.statut==='facture'&&dv.paiement_statut!=='paye'&&<button className="btn btn-sm" style={{background:'#009D3A',color:'#fff',fontSize:10}} onClick={function(){sb().from('devis').update({paiement_statut:'paye',statut:'paye',solde_recu:true,solde_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('✅ Soldé!')})}}>✅ Soldé</button>}
+                                  <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,false)}}>📄 PDF</button>
+                                  {dv.facture_numero&&<button className="btn btn-n btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,true)}}>🧾 PDF Fact.</button>}
+                                  <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){if(window.confirm('Supprimer ce devis ?')){sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Devis supprimé')})}}}>🗑️</button>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                      {devisArchives.length>0&&(
+                        <div style={{marginBottom:16}}>
+                          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'8px 12px',background:'#F8F8F8',borderRadius:6,border:'1.5px solid #DEDEDE'}}>
+                            <div className="yt" style={{fontSize:17,color:'#888'}}>📁 Archives</div>
+                            <span style={{fontSize:10,background:'#888',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900,marginLeft:'auto'}}>{devisArchives.length}</span>
                           </div>
-                        )}
-                      </div>
-                    )
-                  })()}
+                          {devisArchives.map(function(dv){
+                            var sc2={brouillon:'#888',envoye:'#005FFF',accepte:'#009D3A',refuse:'#CC0066',a_modifier:'#FF6B2B',facture:'#191923',paye:'#009D3A'}
+                            var sl2={brouillon:'Brouillon',envoye:'Envoyé',accepte:'Accepté',refuse:'Refusé',a_modifier:'À modifier',facture:'Facturé',paye:'Soldé'}
+                            var col=sc2[dv.statut]||'#888'
+                            return(
+                              <div key={dv.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+col,opacity:.7}}>
+                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
+                                  <div style={{flex:1}}>
+                                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                                      <span style={{fontWeight:900,fontSize:14}}>{dv.numero}</span>
+                                      <span className="badge" style={{color:col,borderColor:col}}>{sl2[dv.statut]||dv.statut}</span>
+                                    </div>
+                                    <div style={{fontWeight:900,fontSize:13}}>{dv.client_nom}</div>
+                                    <div style={{fontSize:11,opacity:.5}}>{dv.event_date?new Date(dv.event_date).toLocaleDateString('fr-FR'):''} · {dv.nb_personnes} pers.</div>
+                                  </div>
+                                  <div style={{textAlign:'right'}}><div style={{fontWeight:900,fontSize:16}}>{parseFloat(dv.total_ttc||0).toFixed(2)} €</div></div>
+                                </div>
+                                <div style={{display:'flex',gap:5,marginTop:8,flexWrap:'wrap'}}>
+                                  <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,false)}}>📄 PDF</button>
+                                  <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){if(window.confirm('Supprimer ?')){sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Supprimé')})}}}>🗑️</button>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               {devisView==='edit'&&(
