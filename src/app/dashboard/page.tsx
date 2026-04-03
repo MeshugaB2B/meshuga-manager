@@ -861,9 +861,6 @@ export default function DashboardPage() {
     {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
   ]
 
-  var devisEnCours = devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'})
-  var devisACloser = devisList.filter(function(d){return d.statut==='accepte'||d.statut==='facture'})
-  var devisArchives = devisList.filter(function(d){return d.statut==='paye'||d.statut==='refuse'||d.statut==='brouillon'})
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
@@ -1601,14 +1598,14 @@ export default function DashboardPage() {
                     </div>
                   ):(
                     <div>
-                      {devisEnCours.length>0&&(
+                      {devisList.filter(function(d2){return d2.statut==="envoye"||d2.statut==="a_modifier"}).length>0&&(
                         <div style={{marginBottom:16}}>
                           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'8px 12px',background:'#EBF3FF',borderRadius:6,border:'1.5px solid #005FFF'}}>
                             <div className="yt" style={{fontSize:17,color:'#005FFF'}}>📤 En attente de réponse</div>
-                            <div style={{fontWeight:900,fontSize:12,color:'#005FFF',marginLeft:'auto'}}>{devisEnCours.reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR')} € TTC</div>
-                            <span style={{fontSize:10,background:'#005FFF',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{devisEnCours.length}</span>
+                            <div style={{fontWeight:900,fontSize:12,color:'#005FFF',marginLeft:'auto'}}>{devisList.filter(function(d2){return d2.statut==="envoye"||d2.statut==="a_modifier"}).reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR')} € TTC</div>
+                            <span style={{fontSize:10,background:'#005FFF',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{devisList.filter(function(d2){return d2.statut==="envoye"||d2.statut==="a_modifier"}).length}</span>
                           </div>
-                          {devisEnCours.map(function(dv){
+                          {devisList.filter(function(d2){return d2.statut==="envoye"||d2.statut==="a_modifier"}).map(function(dv){
                             var sc2={brouillon:'#888',envoye:'#005FFF',accepte:'#009D3A',refuse:'#CC0066',a_modifier:'#FF6B2B',facture:'#191923',paye:'#009D3A'}
                             var sl2={brouillon:'Brouillon',envoye:'Envoyé',accepte:'Accepté',refuse:'Refusé',a_modifier:'À modifier',facture:'Facturé',paye:'Soldé'}
                             var col=sc2[dv.statut]||'#888'
@@ -1642,14 +1639,14 @@ export default function DashboardPage() {
                           })}
                         </div>
                       )}
-                      {devisACloser.length>0&&(
+                      {devisList.filter(function(d2){return d2.statut==="accepte"||d2.statut==="facture"}).length>0&&(
                         <div style={{marginBottom:16}}>
                           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'8px 12px',background:'#F0FFF4',borderRadius:6,border:'1.5px solid #009D3A'}}>
                             <div className="yt" style={{fontSize:17,color:'#009D3A'}}>🎯 À facturer / Solder</div>
-                            <div style={{fontWeight:900,fontSize:12,color:'#009D3A',marginLeft:'auto'}}>{devisACloser.reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR')} € TTC</div>
-                            <span style={{fontSize:10,background:'#009D3A',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{devisACloser.length}</span>
+                            <div style={{fontWeight:900,fontSize:12,color:'#009D3A',marginLeft:'auto'}}>{devisList.filter(function(d2){return d2.statut==="accepte"||d2.statut==="facture"}).reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR')} € TTC</div>
+                            <span style={{fontSize:10,background:'#009D3A',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{devisList.filter(function(d2){return d2.statut==="accepte"||d2.statut==="facture"}).length}</span>
                           </div>
-                          {devisACloser.map(function(dv){
+                          {devisList.filter(function(d2){return d2.statut==="accepte"||d2.statut==="facture"}).map(function(dv){
                             var sc2={brouillon:'#888',envoye:'#005FFF',accepte:'#009D3A',refuse:'#CC0066',a_modifier:'#FF6B2B',facture:'#191923',paye:'#009D3A'}
                             var sl2={brouillon:'Brouillon',envoye:'Envoyé',accepte:'Accepté',refuse:'Refusé',a_modifier:'À modifier',facture:'Facturé',paye:'Soldé'}
                             var col=sc2[dv.statut]||'#888'
@@ -1682,13 +1679,13 @@ export default function DashboardPage() {
                           })}
                         </div>
                       )}
-                      {devisArchives.length>0&&(
+                      {devisList.filter(function(d2){return d2.statut==="paye"||d2.statut==="refuse"||d2.statut==="brouillon"}).length>0&&(
                         <div style={{marginBottom:16}}>
                           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'8px 12px',background:'#F8F8F8',borderRadius:6,border:'1.5px solid #DEDEDE'}}>
                             <div className="yt" style={{fontSize:17,color:'#888'}}>📁 Archives</div>
-                            <span style={{fontSize:10,background:'#888',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900,marginLeft:'auto'}}>{devisArchives.length}</span>
+                            <span style={{fontSize:10,background:'#888',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900,marginLeft:'auto'}}>{devisList.filter(function(d2){return d2.statut==="paye"||d2.statut==="refuse"||d2.statut==="brouillon"}).length}</span>
                           </div>
-                          {devisArchives.map(function(dv){
+                          {devisList.filter(function(d2){return d2.statut==="paye"||d2.statut==="refuse"||d2.statut==="brouillon"}).map(function(dv){
                             var sc2={brouillon:'#888',envoye:'#005FFF',accepte:'#009D3A',refuse:'#CC0066',a_modifier:'#FF6B2B',facture:'#191923',paye:'#009D3A'}
                             var sl2={brouillon:'Brouillon',envoye:'Envoyé',accepte:'Accepté',refuse:'Refusé',a_modifier:'À modifier',facture:'Facturé',paye:'Soldé'}
                             var col=sc2[dv.statut]||'#888'
