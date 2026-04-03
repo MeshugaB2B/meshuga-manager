@@ -804,19 +804,19 @@ export default function DashboardPage() {
     var prospectInfo = 'Prospect : '+p.name+' ('+p.category+')'+( p.size?' — '+p.size+' personnes':'')+'\n'
     var relanceContext = ''
     if (isRelance) {
-      relanceContext = 'TU ECRIS UN EMAIL DE RELANCE (2ème contact). Tu as déjà contacté ce prospect. Fais référence à ton précédent email sans le répéter. Sois plus direct, rappelle la valeur, crée urgence légère. Objet : Re: ou Relance. Max 120 mots.\n'
+      relanceContext = 'TU ECRIS UN EMAIL DE RELANCE DOUX (2ème contact). Tu as déjà contacté ce prospect. Le ton doit être chaleureux, jamais insistant. Propose une des options suivantes selon le contexte : (1) demander si des questions ou des précisions sur votre offre, (2) proposer de venir déjeuner gratuitement pour découvrir, (3) proposer un appel de 10min pour adapter loffre. Réfère-toi subtilement au premier contact. Mentionne 1 lien presse parmi ceux fournis pour rappeler la crédibilité. Objet : court et engageant. Max 100 mots. Ton : humain, léger, bienveillant.\n' + 'Liens presse disponibles : '+pick3.map(function(l){return l.name+' ('+l.url+')'}).join(', ')+'\n'
     } else if (isDevisRelance) {
-      relanceContext = 'TU ECRIS UN EMAIL DE RELANCE DEVIS. Tu as envoyé un devis à ce prospect. Rappelle le devis avec douceur, demande si des questions, propose un appel rapide. Ton chaleureux mais pro. Max 120 mots.\n'
+      relanceContext = 'TU ECRIS UN EMAIL DE SUIVI DEVIS (très doux). Tu as envoyé un devis. Demande si tout est clair, si besoin précisions. Propose un appel de 5min ou une visite déjeuner offerte pour en discuter. Mentionne 1 lien presse pour rappeler la qualité. Jamais pressant. Max 90 mots.\n' + 'Liens presse : '+pick3.map(function(l){return l.name+' ('+l.url+')'}).join(', ')+'\n'
     } else {
-      relanceContext = 'TU ECRIS UN PREMIER CONTACT. Email de prospection chaleureux, personnalisé, court (150 mots max). Montre que tu connais leur univers. Propose un plateau déjeuner ou event.\n'
+      relanceContext = 'TU ECRIS UN PREMIER EMAIL DE PROSPECTION. Ton : chaleureux, humain, jamais commercial. Montre que tu connais leur univers. Propose un déjeuner découverte offert ou un plateau pour leur équipe. Court (120 mots max). Intègre naturellement 1 lien presse parmi ceux fournis.\n' + 'Liens presse : '+pick3.map(function(l){return l.name+' ('+l.url+')'}).join(', ')+'\n'
     }
-    const prompt = baseContext + prospectInfo + relanceContext + 'Presse: '+pressNames+' (liens: '+pick3.map(function(l){return l.name+': '+l.url}).join(', ')+').\nSignature: '+senderSig+'.\nRéponds UNIQUEMENT avec le corps de l\'email, sans "Objet:" en dehors de la ligne objet, en français professionnel.'
+    const prompt = baseContext + prospectInfo + relanceContext + 'Signature : '+senderSig+'. Réponds UNIQUEMENT avec le corps de l\'email en français. Commence par l\'objet sur la 1ère ligne (format : "Objet : ...") puis le corps.'
     try {
       const res = await fetch('/api/generate-email', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: prompt})})
       const data = await res.json()
       setGeneratedEmail(data.text || 'Erreur')
       if (data.text) {
-        logActivity('email_genere', 'Email IA généré pour ' + p.name, p.name, null)
+        logActivity('email_genere', 'Email IA généré pour ' + p.name + ' (par ' + (isEmy?'Emy':'Edward') + ')', p.name, null)
       }
     } catch(e) {
       setGeneratedEmail('Erreur de connexion.')
@@ -950,41 +950,41 @@ export default function DashboardPage() {
 
               <div className="g4">
                 <div className="kc" style={{background:'#FFFFFF',gridColumn:'span 2',cursor:'pointer'}} onClick={function(){nav('devis')}}>
-                  <div className="kl">Pipeline B2B actif 🎯</div>
-                  <div style={{display:'flex',gap:16,alignItems:'flex-end',marginTop:6,flexWrap:'wrap'}}>
+                  <div className="kl" style={{fontSize:11}}>Pipeline B2B 🎯</div>
+                  <div style={{display:'flex',gap:20,alignItems:'flex-end',marginTop:8,flexWrap:'wrap'}}>
                     <div>
-                      <div className="kv" style={{fontSize:22,lineHeight:1}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'}).length}</div>
-                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:10,color:'#005FFF',marginTop:2}}>devis en attente</div>
+                      <div className="kv" style={{fontSize:28,lineHeight:1}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'}).length}</div>
+                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:12,color:'#005FFF',marginTop:3}}>devis en attente</div>
                     </div>
-                    <div style={{fontWeight:900,fontSize:18,opacity:.2,paddingBottom:2}}>·</div>
+                    <div style={{fontWeight:900,fontSize:20,opacity:.2,paddingBottom:3}}>·</div>
                     <div>
-                      <div className="kv" style={{fontSize:22,lineHeight:1,color:'#CC6600'}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||d.montantHT||0)},0).toLocaleString('fr-FR',{maximumFractionDigits:0})} <span style={{fontSize:10}}>€ HT</span></div>
-                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:10,color:'#CC6600',marginTop:2}}>CA potentiel</div>
+                      <div className="kv" style={{fontSize:28,lineHeight:1,color:'#CC6600'}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||d.montantHT||0)},0).toLocaleString('fr-FR',{maximumFractionDigits:0})} <span style={{fontSize:12}}>€ HT</span></div>
+                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:12,color:'#CC6600',marginTop:3}}>CA potentiel</div>
                     </div>
-                    <div style={{fontWeight:900,fontSize:18,opacity:.2,paddingBottom:2}}>·</div>
+                    <div style={{fontWeight:900,fontSize:20,opacity:.2,paddingBottom:3}}>·</div>
                     <div>
-                      <div className="kv" style={{fontSize:22,lineHeight:1,color:'#FF82D7'}}>{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length}</div>
-                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:10,color:'#FF82D7',marginTop:2}}>prospects actifs</div>
+                      <div className="kv" style={{fontSize:28,lineHeight:1,color:'#FF82D7'}}>{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length}</div>
+                      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:12,color:'#FF82D7',marginTop:3}}>prospects actifs</div>
                     </div>
                   </div>
                   <div className="ki" style={{opacity:.05}}>🎯</div>
                 </div>
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('devis')}}>
                   <div className="kl">CA B2B signé</div>
-                  <div className="kv" style={{fontSize:20}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'#00AA44'}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).length} contrats signés</div>
+                  <div className="kv" style={{fontSize:26}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).reduce(function(s,d){return s+(d.montantHT||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:13,marginTop:4,color:'#00AA44'}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).length} contrats signés</div>
                   <div className="ki" style={{opacity:.1}}>📈</div>
                 </div>
                 <div className="kc" style={{background:'#FFF8E7',cursor:'pointer',border:'1.5px solid #FFEB5A'}} onClick={function(){nav('devis')}}>
                   <div className="kl">CA à closer 🎯</div>
                   <div className="kv" style={{fontSize:20,color:'#CC6600'}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='accepte'}).reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR',{maximumFractionDigits:0})} <span style={{fontSize:10}}>€</span></div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'#CC6600',opacity:.7}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='accepte'}).length} devis en attente</div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:13,marginTop:4,color:'#CC6600',opacity:.7}}>{devisList.filter(function(d){return d.statut==='envoye'||d.statut==='accepte'}).length} devis en attente</div>
                   <div className="ki" style={{opacity:.1}}>🎯</div>
                 </div>
                 <div className="kc" style={{background:'#FFFFFF'}} onClick={function(){nav('chasse')}}>
                   <div className="kl">Prospectés</div>
                   <div className="kv">{chasse.filter(function(p){return p.contacted}).length} <span style={{fontSize:16,fontWeight:400,opacity:.3}}>/ {chasse.length}</span></div>
-                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:11,marginTop:4,color:'rgba(25,25,35,.35)'}}>{chasse.length>0?Math.round(chasse.filter(function(p){return p.contacted}).length/chasse.length*100):0}% contactés</div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:13,marginTop:4,color:'rgba(25,25,35,.35)'}}>{chasse.length>0?Math.round(chasse.filter(function(p){return p.contacted}).length/chasse.length*100):0}% contactés</div>
                   <div className="ki" style={{opacity:.1}}>🎯</div>
                 </div>
 
@@ -1012,8 +1012,8 @@ export default function DashboardPage() {
                         <div key={t.id} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 8px',marginBottom:4,background:'#FFE5E5',borderRadius:5,border:'1px solid #CC0066'}}>
                           <input type="checkbox" onChange={function(){setTasks(function(prev){return prev.map(function(x){return x.id===t.id?Object.assign({},x,{status:'done'}):x})})}} style={{cursor:'pointer'}} />
                           <div style={{flex:1}}>
-                            <div style={{fontSize:12,fontWeight:900,color:'#CC0066'}}>⚠️ {t.title}</div>
-                            <div style={{fontSize:10,opacity:.6}}>{t.assignee} · Deadline dépassée : {t.deadline}</div>
+                            <div style={{fontSize:15,fontWeight:900,color:'#CC0066'}}>⚠️ {t.title}</div>
+                            <div style={{fontSize:12,opacity:.6}}>{t.assignee} · Deadline dépassée : {t.deadline}</div>
                           </div>
                         </div>
                       )})}
@@ -1098,16 +1098,16 @@ export default function DashboardPage() {
                         <div key={day} style={{borderRadius:6,border:'2px solid '+borderColor,overflow:'hidden',display:'flex',flexDirection:'column'}}>
                           <div style={{background:headerBg,padding:'6px 8px',borderBottom:'1px solid '+borderColor}}>
                             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                              <div className="yt" style={{fontSize:15,color:headerColor}}>{day}</div>
-                              <div style={{fontSize:9,fontWeight:900,opacity:.6,color:headerColor}}>{dd.getDate()}/{dd.getMonth()+1}</div>
+                              <div className="yt" style={{fontSize:18,color:headerColor}}>{day}</div>
+                              <div style={{fontSize:11,fontWeight:900,opacity:.7,color:headerColor}}>{dd.getDate()}/{dd.getMonth()+1}</div>
                             </div>
                           </div>
-                          <div style={{padding:'7px',flex:1,background:'#FFFFFF',minHeight:180}}>
+                          <div style={{padding:'7px',flex:1,background:'#FFFFFF',minHeight:200}}>
                             {autoTodos.map(function(todo){
                               return(
                                 <div key={todo.key} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:4}}>
                                   <input type="checkbox" checked={!!todo.done} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:todo.urgent?'#CC0066':'#FF82D7'}}/>
-                                  <span style={{fontSize:8.5,fontWeight:todo.urgent?900:500,color:todo.urgent?'#CC0066':'#333',textDecoration:todo.done?'line-through':'none',opacity:todo.done?.4:1,lineHeight:1.4}}>{todo.label}</span>
+                                  <span style={{fontSize:11,fontWeight:todo.urgent?900:500,color:todo.urgent?'#CC0066':'#333',textDecoration:todo.done?'line-through':'none',opacity:todo.done?.4:1,lineHeight:1.4}}>{todo.label}</span>
                                 </div>
                               )
                             })}
@@ -1119,7 +1119,7 @@ export default function DashboardPage() {
                                       setTasks(function(prev){return prev.map(function(x){return x.id!==t.id?x:Object.assign({},x,{status:t.status==='done'?'todo':'done'})})})
                                     }}>
                                       <input type="checkbox" checked={t.status==='done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#191923'}}/>
-                                      <span style={{fontSize:8.5,fontWeight:t.priority==='high'?900:600,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.4}}>{t.title}</span>
+                                      <span style={{fontSize:11,fontWeight:t.priority==='high'?900:600,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.4}}>{t.title}</span>
                                     </div>
                                   )
                                 })}
@@ -1131,7 +1131,7 @@ export default function DashboardPage() {
                                   return(
                                     <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:3}}>
                                       <input type="checkbox" checked={t.status==='done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#FFEB5A'}}/>
-                                      <span style={{fontSize:8.5,fontWeight:600,opacity:.6,lineHeight:1.4,textDecoration:t.status==='done'?'line-through':'none'}}>&#128081; {t.title}</span>
+                                      <span style={{fontSize:11,fontWeight:600,opacity:.6,lineHeight:1.4,textDecoration:t.status==='done'?'line-through':'none'}}>&#128081; {t.title}</span>
                                     </div>
                                   )
                                 })}
@@ -1966,6 +1966,275 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {page === 'instagram' && (
+            <div>
+              <div className="ph">
+                <div>
+                  <div className="pt">Instagram 📸</div>
+                  <div className="ps">Commentaires et messages</div>
+                </div>
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  {instaData && instaData.mock && <span style={{fontSize:10,background:'#FF6B2B',color:'#fff',padding:'2px 6px',borderRadius:3,fontWeight:900}}>DEMO</span>}
+                  <a href="https://www.instagram.com/meshuga.deli/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p">Ouvrir Instagram →</a>
+                </div>
+              </div>
+
+              {instaLoading && (
+                <div style={{textAlign:'center',padding:60,opacity:.4}}>
+                  <div style={{fontSize:36}}>📸</div>
+                  <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',marginTop:8}}>Chargement...</div>
+                </div>
+              )}
+
+              {!instaLoading && instaData && !instaData.ok && (
+                <div className="card" style={{borderLeft:'4px solid #FF6B2B',padding:'16px 20px'}}>
+                  <div style={{fontWeight:900,marginBottom:6}}>⚙️ Configuration requise</div>
+                  <div style={{fontSize:12,opacity:.7,lineHeight:1.7}}>
+                    Pour connecter Instagram :<br/>
+                    1. Crée une app Meta sur <a href="https://developers.facebook.com" target="_blank" style={{color:'#005FFF'}}>developers.facebook.com</a><br/>
+                    2. Active <strong>Instagram Graph API</strong> + permissions <code>instagram_basic</code>, <code>instagram_manage_comments</code>, <code>pages_messaging</code><br/>
+                    3. Ajoute <strong>INSTAGRAM_ACCESS_TOKEN</strong> dans tes variables Vercel<br/>
+                    4. Redéploie
+                  </div>
+                </div>
+              )}
+
+              {!instaLoading && instaData && instaData.ok && (
+                <div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
+                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
+                      <div className="kl">Abonnés</div>
+                      <div className="kv" style={{fontSize:24,color:'#FF82D7'}}>{instaData.followers ? instaData.followers.toLocaleString('fr-FR') : '--'}</div>
+                    </div>
+                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
+                      <div className="kl">Posts</div>
+                      <div className="kv" style={{fontSize:24}}>{instaData.mediaCount || '--'}</div>
+                    </div>
+                    <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
+                      <div className="kl">Messages non lus</div>
+                      <div className="kv" style={{fontSize:24,color:instaData.unreadMessages>0?'#CC0066':'#191923'}}>{instaData.unreadMessages || 0}</div>
+                    </div>
+                  </div>
+
+                  <div style={{display:'flex',gap:6,marginBottom:10}}>
+                    {['comments','messages','media'].map(function(tab){return(
+                      <button key={tab} className={'btn btn-sm'+(instaTab===tab?' btn-p':'')} onClick={function(){setInstaTab(tab)}}>
+                        {tab==='comments'?'💬 Commentaires':tab==='messages'?'✉️ Messages':'📷 Posts'}
+                      </button>
+                    )})}
+                  </div>
+
+                  {instaTab === 'comments' && (
+                    <div>
+                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Commentaires récents</div>
+                      {(instaData.comments||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun commentaire récent</div>}
+                      {(instaData.comments||[]).map(function(c,i){return(
+                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(c.replied?'#009D3A':'#FFEB5A')}}>
+                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                            <div style={{fontWeight:900,fontSize:13}}>@{c.username}</div>
+                            <div style={{fontSize:10,opacity:.4}}>{c.date}</div>
+                          </div>
+                          <div style={{fontSize:12,marginBottom:6,lineHeight:1.5}}>{c.text}</div>
+                          <div style={{fontSize:10,opacity:.5,marginBottom:c.replied?6:0}}>📸 {c.postCaption || 'Post Instagram'}</div>
+                          {c.replied
+                            ? <div style={{fontSize:11,color:'#009D3A',fontWeight:700}}>✅ Répondu</div>
+                            : <a href={'https://www.instagram.com/p/'+(c.shortcode||'')} target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{fontSize:10,marginTop:4}}>↗ Répondre sur Instagram</a>
+                          }
+                        </div>
+                      )})}
+                    </div>
+                  )}
+
+                  {instaTab === 'messages' && (
+                    <div>
+                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Messages directs</div>
+                      {(instaData.messages||[]).length === 0 && <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun message récent</div>}
+                      {(instaData.messages||[]).map(function(m,i){return(
+                        <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(m.read?'#EBEBEB':'#FF82D7')}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                            <div style={{flex:1}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                                <div style={{fontWeight:900,fontSize:13}}>@{m.username}</div>
+                                {!m.read && <span style={{fontSize:9,background:'#FF82D7',padding:'1px 5px',borderRadius:3,fontWeight:900,color:'#191923'}}>NOUVEAU</span>}
+                              </div>
+                              <div style={{fontSize:12,lineHeight:1.5,color:'#444'}}>{m.lastMessage}</div>
+                            </div>
+                            <div style={{fontSize:10,opacity:.4,flexShrink:0}}>{m.date}</div>
+                          </div>
+                          <a href="https://www.instagram.com/direct/inbox/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p" style={{fontSize:10,marginTop:8}}>↗ Répondre sur Instagram</a>
+                        </div>
+                      )})}
+                    </div>
+                  )}
+
+                  {instaTab === 'media' && (
+                    <div>
+                      <div className="yt" style={{fontSize:16,marginBottom:8}}>Posts récents</div>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+                        {(instaData.media||[]).map(function(p,i){return(
+                          <a key={i} href={p.permalink} target="_blank" rel="noopener noreferrer" style={{textDecoration:'none',color:'inherit'}}>
+                            <div className="card" style={{padding:10,cursor:'pointer'}}>
+                              {p.thumbnailUrl && <img src={p.thumbnailUrl} alt="" style={{width:'100%',aspectRatio:'1',objectFit:'cover',borderRadius:4,marginBottom:6}} />}
+                              {!p.thumbnailUrl && <div style={{width:'100%',aspectRatio:'1',background:'#FFEB5A',borderRadius:4,marginBottom:6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>📷</div>}
+                              <div style={{fontSize:11,display:'flex',justifyContent:'space-between'}}>
+                                <span>❤️ {p.likes||0}</span>
+                                <span>💬 {p.comments||0}</span>
+                              </div>
+                              <div style={{fontSize:10,opacity:.4,marginTop:3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{p.caption||''}</div>
+                            </div>
+                          </a>
+                        )})}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {page === 'journal' && !isEmy && (
+            <div>
+              <div className="ph">
+                <div><div className="pt">Journal d'Emy 📓</div><div className="ps">Activité · Sessions · Actions</div></div>
+                <div style={{display:'flex',gap:6}}>
+                  <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){
+                    var rows = activityLog.filter(function(a){
+                      var ok1 = !journalDateFrom || (a.created_at||'') >= journalDateFrom
+                      var ok2 = !journalDateTo || (a.created_at||'') <= journalDateTo+'T23:59:59'
+                      return ok1 && ok2
+                    })
+                    var csv = 'Date,Heure,Utilisateur,Type,Detail\n' + rows.map(function(a){
+                      var dt = a.created_at ? new Date(a.created_at) : new Date()
+                      return [dt.toLocaleDateString('fr-FR'), dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}), a.user_name||'', a.type||'', (a.description||'').replace(/,/g,' ')].join(',')
+                    }).join('\n')
+                    var blob = new Blob([csv],{type:'text/csv'})
+                    var url = URL.createObjectURL(blob)
+                    var el = document.createElement('a')
+                    el.href=url;el.download='journal-'+new Date().toISOString().split('T')[0]+'.csv';el.click()
+                  }}>📥 Export CSV</button>
+                </div>
+              </div>
+
+              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12}}>
+                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
+                  <div className="kl">Sessions ce mois</div>
+                  <div className="kv" style={{fontSize:24}}>{activityLog.filter(function(a){return a.type==='session_start'&&(a.created_at||'').startsWith(new Date().toISOString().slice(0,7))}).length}</div>
+                </div>
+                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
+                  <div className="kl">Actions ce mois</div>
+                  <div className="kv" style={{fontSize:24}}>{activityLog.filter(function(a){return a.type!=='session_start'&&a.type!=='session_end'&&(a.created_at||'').startsWith(new Date().toISOString().slice(0,7))}).length}</div>
+                </div>
+                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
+                  <div className="kl">Prospects contactés</div>
+                  <div className="kv" style={{fontSize:24,color:'#009D3A'}}>{activityLog.filter(function(a){return a.type==='prospect_contacte'}).length}</div>
+                </div>
+                <div className="kc" style={{background:'#fff',textAlign:'center'}}>
+                  <div className="kl">Emails IA générés</div>
+                  <div className="kv" style={{fontSize:24,color:'#FF82D7'}}>{activityLog.filter(function(a){return a.type==='email_genere'||a.type==='email_copie'}).length}</div>
+                </div>
+              </div>
+
+              <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+                <select className="inp" style={{width:'auto',padding:'5px 10px',fontSize:12}} value={journalFilter} onChange={function(e){setJournalFilter(e.target.value)}}>
+                  <option value="all">Toutes les actions</option>
+                  <option value="session_start">Sessions uniquement</option>
+                  <option value="prospect_contacte">Prospects contactés</option>
+                  <option value="email_copie">Emails copiés</option>
+                  <option value="email_genere">Emails IA</option>
+                </select>
+                <input type="date" className="inp" style={{width:145,fontSize:12,padding:'5px 8px'}} value={journalDateFrom} onChange={function(e){setJournalDateFrom(e.target.value)}} />
+                <span style={{fontSize:13,opacity:.3}}>→</span>
+                <input type="date" className="inp" style={{width:145,fontSize:12,padding:'5px 8px'}} value={journalDateTo} onChange={function(e){setJournalDateTo(e.target.value)}} />
+                {(journalDateFrom||journalDateTo)&&<button className="btn btn-sm" onClick={function(){setJournalDateFrom('');setJournalDateTo('')}}>✕</button>}
+              </div>
+
+              {/* SIDE-BY-SIDE: Emy | Edward */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                {['emy','edward'].map(function(who){
+                  var label = who==='emy'?'Emy':'Edward'
+                  var color = who==='emy'?'#FF82D7':'#005FFF'
+                  var filtered = activityLog.filter(function(a){
+                    var mUser = a.user_name&&a.user_name.toLowerCase().indexOf(who)>-1
+                    var mType = journalFilter==='all' || a.type===journalFilter
+                    var mFrom = !journalDateFrom || (a.created_at||'') >= journalDateFrom
+                    var mTo = !journalDateTo || (a.created_at||'') <= journalDateTo+'T23:59:59'
+                    return mUser && mType && mFrom && mTo
+                  })
+
+                  var byDay = {}
+                  filtered.forEach(function(a){
+                    var d = a.created_at ? a.created_at.split('T')[0] : 'inconnu'
+                    if(!byDay[d]) byDay[d] = []
+                    byDay[d].push(a)
+                  })
+
+                  return(
+                    <div key={who}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,padding:'8px 12px',background:color,borderRadius:7}}>
+                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#fff'}}>{label}</div>
+                        <div style={{fontSize:11,color:'rgba(255,255,255,.7)',marginLeft:'auto'}}>{filtered.length} actions</div>
+                      </div>
+
+                      {filtered.length===0&&<div style={{fontSize:13,opacity:.4,textAlign:'center',padding:20}}>Aucune activité</div>}
+
+                      {Object.keys(byDay).sort(function(a,b){return b.localeCompare(a)}).map(function(day){
+                        var dayLogs = byDay[day]
+                        var sessions = dayLogs.filter(function(a){return a.type==='session_start'})
+                        var ends = dayLogs.filter(function(a){return a.type==='session_end'})
+                        var actions = dayLogs.filter(function(a){return a.type!=='session_start'&&a.type!=='session_end'})
+                        var dayLabel = new Date(day+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'})
+
+                        return(
+                          <div key={day} style={{marginBottom:12}}>
+                            <div style={{fontWeight:900,fontSize:12,color:'#888',textTransform:'uppercase',letterSpacing:.5,padding:'3px 0',borderBottom:'1px solid #F0F0F0',marginBottom:6}}>{dayLabel}</div>
+
+                            {sessions.map(function(s,si){
+                              var endLog = ends[si]
+                              var startT = s.created_at ? new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : ''
+                              var endT = endLog&&endLog.created_at ? new Date(endLog.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : null
+                              var dur = endLog ? (endLog.description||'').replace('Fin de session — ','') : null
+                              var isOpen = !endLog
+                              return(
+                                <div key={si} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:'#EBF3FF',borderRadius:5,borderLeft:'3px solid #005FFF',marginBottom:4}}>
+                                  <span style={{fontSize:16}}>🔐</span>
+                                  <div style={{flex:1}}>
+                                    <div style={{fontSize:12,fontWeight:900}}>Connexion {startT}{endT?' → '+endT:''}</div>
+                                    {dur&&<div style={{fontSize:11,color:'#005FFF',fontWeight:700}}>{dur}</div>}
+                                  </div>
+                                  <span style={{fontSize:10,fontWeight:900,color:isOpen?'#FF6B2B':'#009D3A',background:isOpen?'#FFF3E0':'#D0F5E0',padding:'2px 6px',borderRadius:3}}>{isOpen?'En cours':'✅'}</span>
+                                </div>
+                              )
+                            })}
+
+                            {actions.map(function(a,ai){
+                              var tl={email_copie:'📋 Copié',prospect_contacte:'📞 Contact',email_genere:'✉️ Email IA',prospect_relance:'↩ Relance',devis_cree:'📄 Devis'}
+                              var tc={email_copie:'#FFE5F7',prospect_contacte:'#D0F5E0',email_genere:'#FFE5F7',prospect_relance:'#EBF3FF',devis_cree:'#FFEB5A'}
+                              var badge = tl[a.type]||a.type
+                              var bg = tc[a.type]||'#F0F0F0'
+                              var time = a.created_at ? new Date(a.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) : ''
+                              var detail = a.description||''
+                              var prospect = a.prospect_name||''
+                              return(
+                                <div key={ai} style={{display:'flex',alignItems:'flex-start',gap:8,padding:'6px 8px',borderBottom:'1px solid #F8F8F8',background:ai%2===0?'#FAFAFA':'#fff',borderRadius:4,marginBottom:2}}>
+                                  <span style={{fontSize:9,background:bg,color:'#191923',padding:'3px 6px',borderRadius:3,fontWeight:900,whiteSpace:'nowrap',flexShrink:0}}>{badge}</span>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:12,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{prospect||detail||a.type}</div>
+                                    {prospect&&detail&&<div style={{fontSize:10,opacity:.45,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{detail}</div>}
+                                  </div>
+                                  <span style={{fontSize:10,opacity:.4,flexShrink:0}}>{time}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
 
