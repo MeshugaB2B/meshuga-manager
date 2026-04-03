@@ -700,8 +700,19 @@ export default function DashboardPage() {
   }
   function updateDevisStatut(id,statut,note) {
     sb().from('devis').update({statut:statut}).eq('id',id).then(function(){
-      sb().from('devis_historique').insert({devis_id:id,action:statut,note:note||'',user_name:(profile&&profile.full_name)||'?'})
-      loadDevis(); toast('Statut : '+statut)
+      sb().from('devis_historique').insert({devis_id:id,action:statut,note:note||'',user_name:(profile&&profile.name)||''}).then(function(){})
+      loadDevis()
+      toast('Statut : '+statut)
+      var dv = devisList.find(function(d){return String(d.id)===String(id)})
+      if(dv && dv.prospect_id) {
+        var ts = new Date().toLocaleDateString('fr-FR')
+        var devisNote = '['+ts+'] Devis '+dv.numero+' statut : '+statut+(statut==='accepte'?' ✅ SIGNÉ':statut==='facture'?' 🧾 Facturé':statut==='paye'?' 💰 Soldé':'')
+        setProspects(function(prev){return prev.map(function(p){
+          if(String(p.id)!==String(dv.prospect_id)) return p
+          var newN = (p.notes ? p.notes+'\n' : '') + devisNote
+          return Object.assign({},p,{notes:newN})
+        })})
+      }
     })
   }
   function generateAndPrintDoc(dv, isFacture) {
@@ -828,14 +839,24 @@ export default function DashboardPage() {
     }
     const prompt = baseContext + prospectInfo + relanceContext + 'Signature : '+senderSig+'. Réponds UNIQUEMENT avec le corps de l\'email en français. Commence par l\'objet sur la 1ère ligne (format : "Objet : ...") puis le corps.'
     try {
-      const res = await fetch('/api/generate-email', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({prompt: prompt})})
+      const res = await fetch('/api/generate-email', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({prompt: prompt, type: emailType || 'first'})
+      })
+      if (!res.ok) {
+        setGeneratedEmail('Erreur serveur (' + res.status + '). Réessaie.')
+        setGeneratingEmail(false)
+        return
+      }
       const data = await res.json()
-      setGeneratedEmail(data.text || 'Erreur')
-      if (data.text) {
+      const text = data.text || data.email || data.content || ''
+      setGeneratedEmail(text || 'Réponse vide. Réessaie.')
+      if (text) {
         logActivity('email_genere', 'Email IA généré pour ' + p.name + ' (par ' + (isEmy?'Emy':'Edward') + ')', p.name, null)
       }
     } catch(e) {
-      setGeneratedEmail('Erreur de connexion.')
+      setGeneratedEmail('Erreur : ' + String(e.message || e))
     }
     setGeneratingEmail(false)
   }
@@ -958,7 +979,7 @@ export default function DashboardPage() {
             <div>
               <div className="ph">
                 <div>
-                  <div className="pt">{isEmy ? 'Bonjour Emy' : 'Bonjour Edward'}</div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:36,lineHeight:1.1}}>{isEmy ? 'Bonjour Emy' : 'Bonjour Edward'}</div>
                   <div className="ps">{new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}</div>
                 </div>
                 {isEmy && <button className="btn btn-p btn-sm" onClick={function(){openModal('cr',{})}}>+ Nouveau CR</button>}
@@ -1067,7 +1088,7 @@ export default function DashboardPage() {
                 </div>
                 <div style={{padding:'12px 14px'}}>
                   <div style={{display:'grid',gridTemplateColumns:planningView==='auj'?'1fr':planningView==='3j'?'repeat(3,1fr)':'repeat(5,1fr)',gap:6}}>
-                    {(planningView==='auj'?[['Lun','Mar','Mer','Jeu','Ven'][new Date().getDay()===0?4:new Date().getDay()-1]]:planningView==='3j'?['Lun','Mar','Mer']:['Lun','Mar','Mer','Jeu','Ven']).map(function(day,di){
+                    {(planningView==='auj'?[['Lundi','Mardi','Mercredi','Jeudi','Vendredi'][new Date().getDay()===0?4:new Date().getDay()-1]]:planningView==='3j'?['Lundi','Mardi','Mercredi']:['Lun','Mar','Mer','Jeu','Ven']).map(function(day,di){
                       var ws=new Date()
                       var dow=ws.getDay()===0?6:ws.getDay()-1
                       ws.setDate(ws.getDate()-dow+(planningWeek*7))
@@ -1121,8 +1142,8 @@ export default function DashboardPage() {
                           <div style={{padding:planningView==='auj'?'14px':'7px',flex:1,background:'#FFFFFF',minHeight:planningView==='auj'?280:200}}>
                             {autoTodos.map(function(todo){
                               return(
-                                <div key={todo.key} style={{display:'flex',alignItems:'flex-start',gap:planningView==='auj'?8:4,marginBottom:4}}>
-                                  <input type="checkbox" checked={!!todo.done} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:todo.urgent?'#CC0066':'#FF82D7'}}/>
+                                <div key={todo.key} style={{display:'flex',alignItems:'center',gap:planningView==='auj'?8:4,marginBottom:6}}>
+                                  <input type="checkbox" checked={!!todo.done} readOnly style={{width:planningView==='auj'?16:11,height:planningView==='auj'?16:11,flexShrink:0,marginTop:1,flexShrink:0,accentColor:todo.urgent?'#CC0066':'#FF82D7'}}/>
                                   <span style={{fontSize:planningView==='auj'?16:13,fontWeight:todo.urgent?900:500,color:todo.urgent?'#CC0066':'#333',textDecoration:todo.done?'line-through':'none',opacity:todo.done?.4:1,lineHeight:1.4}}>{todo.label}</span>
                                 </div>
                               )
@@ -1134,7 +1155,7 @@ export default function DashboardPage() {
                                     <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:4,cursor:'pointer'}} onClick={function(){
                                       setTasks(function(prev){return prev.map(function(x){return x.id!==t.id?x:Object.assign({},x,{status:t.status==='done'?'todo':'done'})})})
                                     }}>
-                                      <input type="checkbox" checked={t.status==='done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#191923'}}/>
+                                      <input type="checkbox" checked={t.status==='done'} readOnly style={{width:planningView==='auj'?16:11,height:planningView==='auj'?16:11,flexShrink:0,height:11,marginTop:1,flexShrink:0,accentColor:'#191923'}}/>
                                       <span style={{fontSize:planningView==='auj'?16:13,fontWeight:t.priority==='high'?900:600,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.4}}>{t.title}</span>
                                     </div>
                                   )
@@ -1145,7 +1166,7 @@ export default function DashboardPage() {
                               <div style={{borderTop:'1px dashed #EBEBEB',marginTop:4,paddingTop:4}}>
                                 {dayTasksEdward.map(function(t){
                                   return(
-                                    <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:3}}>
+                                    <div key={t.id} style={{display:'flex',alignItems:'center',gap:planningView==='auj'?8:4,marginBottom:6}}>
                                       <input type="checkbox" checked={t.status==='done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#FFEB5A'}}/>
                                       <span style={{fontSize:13,fontWeight:600,opacity:.6,lineHeight:1.4,textDecoration:t.status==='done'?'line-through':'none'}}>&#128081; {t.title}</span>
                                     </div>
@@ -1294,7 +1315,7 @@ export default function DashboardPage() {
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:10}}>
                       <div>
                         <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#191923',marginBottom:4}}>💰 Commission Emy</div>
-                        <div style={{fontSize:11,color:'rgba(25,25,35,.7)',textTransform:'uppercase',letterSpacing:1}}>{periodLabel} · 5% du CA signé</div>
+                        <div style={{fontSize:11,color:'rgba(25,25,35,.7)',textTransform:'uppercase',letterSpacing:1}}>{periodLabel} · 10% du CA HT signé</div>
                       </div>
                       <div style={{display:'flex',gap:4}}>
                         {['month','year','all'].map(function(per){return(
@@ -1400,7 +1421,37 @@ export default function DashboardPage() {
                       )})}
                     </div>
 
+                    {/* STATUT ÉDITABLE */}
+                    <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8,flexWrap:'wrap'}}>
+                      <div style={{fontSize:10,fontWeight:900,opacity:.5,textTransform:'uppercase'}}>Statut :</div>
+                      {['to_contact','contacted','nego','won','lost'].map(function(st){
+                        var stLabels={to_contact:'À contacter',contacted:'Contacté',nego:'En négo',won:'🏆 Gagné',lost:'✗ Perdu'}
+                        var stColors={to_contact:'#888',contacted:'#005FFF',nego:'#FF82D7',won:'#009D3A',lost:'#CC0066'}
+                        return(
+                          <button key={st} className="btn btn-sm" style={{fontSize:9,padding:'2px 7px',background:p.status===st?stColors[st]:'#F5F5F5',color:p.status===st?'#fff':'#555',border:'1px solid '+(p.status===st?stColors[st]:'#DDD'),fontWeight:p.status===st?900:400}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:st}):x})})}}>
+                            {stLabels[st]}
+                          </button>
+                        )
+                      })}
+                    </div>
+
                     {p.nextDate && <div style={{fontSize:13,fontWeight:600,marginBottom:6,color:isLate?'#CC0066':'#555',fontWeight:isLate?900:400}}>{isLate?'⚠️ RETARD — ':''}{p.nextAction} — {p.nextDate}</div>}
+
+                    {/* NOTES */}
+                    {p.notes&&<div style={{fontSize:12,color:'#444',background:'#FAFAFA',border:'1px solid #EEE',borderRadius:5,padding:'6px 10px',marginBottom:6,lineHeight:1.5}}>{p.notes}</div>}
+                    <div style={{display:'flex',gap:4,marginBottom:8}}>
+                      <input className="inp" placeholder="Ajouter une note..." style={{flex:1,fontSize:11,padding:'5px 8px'}} id={'note-'+p.id} defaultValue="" />
+                      <button className="btn btn-sm" style={{flexShrink:0}} onClick={function(){
+                        var el = document.getElementById('note-'+p.id)
+                        var note = el ? el.value.trim() : ''
+                        if(!note) return
+                        var ts = new Date().toLocaleDateString('fr-FR')
+                        var newNote = (p.notes ? p.notes+'\n' : '') + '['+ts+'] '+note
+                        setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{notes:newNote}):x})})
+                        if(el) el.value = ''
+                        toast('Note ajoutée ✓')
+                      }}>+ Note</button>
+                    </div>
 
                     <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
                       {p.status==='contacted' && <button className="btn btn-sm" style={{background:'#005FFF',color:'#fff',fontSize:11}} onClick={function(){
