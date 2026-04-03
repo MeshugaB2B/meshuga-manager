@@ -1319,7 +1319,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {page === 'annuaire' && (          {page === 'annuaire' && (
+          {page === 'annuaire' && (
             <div>
               <div className="ph">
                 <div><div className="pt">Annuaire</div><div className="ps">{contacts.length} contacts</div></div>
