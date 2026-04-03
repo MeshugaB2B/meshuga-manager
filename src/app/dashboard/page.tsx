@@ -861,6 +861,16 @@ export default function DashboardPage() {
     setGeneratingEmail(false)
   }
 
+  function openModal(type, data) {
+    setModal(type)
+    setForm(data || {})
+  }
+
+  function closeModal() {
+    setModal('')
+    setForm({})
+  }
+
   function saveTask() {
     if (!form.title) { toast('Titre requis !'); return }
     const t = Object.assign({}, form, {checklist: form.checklist || [], files: form.files || []})
@@ -1167,8 +1177,8 @@ export default function DashboardPage() {
                                 {dayTasksEdward.map(function(t){
                                   return(
                                     <div key={t.id} style={{display:'flex',alignItems:'center',gap:planningView==='auj'?8:4,marginBottom:6}}>
-                                      <input type="checkbox" checked={t.status==='done'} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:'#FFEB5A'}}/>
-                                      <span style={{fontSize:13,fontWeight:600,opacity:.6,lineHeight:1.4,textDecoration:t.status==='done'?'line-through':'none'}}>&#128081; {t.title}</span>
+                                      <input type="checkbox" checked={t.status==='done'} readOnly style={{width:planningView==='auj'?16:11,height:planningView==='auj'?16:11,flexShrink:0,accentColor:'#FFEB5A'}}/>
+                                      <span style={{fontSize:planningView==='auj'?16:13,fontWeight:600,lineHeight:1.4,textDecoration:t.status==='done'?'line-through':'none'}}>&#128081; {t.title}</span>
                                     </div>
                                   )
                                 })}
@@ -1454,6 +1464,15 @@ export default function DashboardPage() {
                     </div>
 
                     <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                      <button className="btn btn-y btn-sm" style={{fontSize:10}} onClick={function(){
+                        setDevisView('edit');setCurrentDevisId(null);setDevisItems([])
+                        setDevisNumero('DEV-'+new Date().getFullYear()+'-'+String(devisList.length+1).padStart(3,'0'))
+                        setDevisClient({nom:p.name,email:p.email||'',phone:p.phone||'',contact:'',date:'',lieu:'',prospectId:p.id})
+                        setDevisNbPersonnes(50);setDevisFormat('normal');setDevisMiseEnPlace(1500)
+                        setDevisMiseEnPlacePct(0);setDevisRemiseTotal(0);setDevisNotes('');setDevisLivraison(0)
+                        setDevisLivraisonOffert(false);setDevisMepOffert(false)
+                        nav('devis')
+                      }}>📄 Devis</button>
                       {p.status==='contacted' && <button className="btn btn-sm" style={{background:'#005FFF',color:'#fff',fontSize:11}} onClick={function(){
                         var rel=new Date();rel.setDate(rel.getDate()+7)
                         setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{nextDate:rel.toISOString().split('T')[0],nextAction:'2ème relance'}):x})})
@@ -2309,6 +2328,173 @@ export default function DashboardPage() {
 
         </div>
       </div>
+
+      {modal === 'task' && (
+        <div className="overlay" onClick={closeModal}>
+          <div className="modal" onClick={function(e){e.stopPropagation()}}>
+            <div className="mh"><div className="mt">{form.id?'Modifier la tâche':'Nouvelle tâche'}</div></div>
+            <div className="mb">
+              <div className="fg"><label className="lbl">Titre *</label><input className="inp" value={form.title||''} onChange={function(e){setForm(Object.assign({},form,{title:e.target.value}))}} placeholder="Ex: Appeler Agence Wagram" /></div>
+              <div className="fg"><label className="lbl">Description</label><textarea className="inp" value={form.description||''} onChange={function(e){setForm(Object.assign({},form,{description:e.target.value}))}} rows={2} /></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div className="fg"><label className="lbl">Date limite</label><input type="date" className="inp" value={form.deadline||''} onChange={function(e){setForm(Object.assign({},form,{deadline:e.target.value}))}} /></div>
+                <div className="fg"><label className="lbl">Assigné à</label>
+                  <select className="inp" value={form.assignee||'emy'} onChange={function(e){setForm(Object.assign({},form,{assignee:e.target.value}))}}>
+                    <option value="emy">Emy</option>
+                    <option value="edward">Edward</option>
+                  </select>
+                </div>
+              </div>
+              <div className="fg"><label className="lbl">Priorité</label>
+                <select className="inp" value={form.priority||'medium'} onChange={function(e){setForm(Object.assign({},form,{priority:e.target.value}))}}>
+                  <option value="high">🔴 Haute</option>
+                  <option value="medium">🟡 Moyenne</option>
+                  <option value="low">🟢 Basse</option>
+                </select>
+              </div>
+            </div>
+            <div className="mf">
+              <button className="btn" onClick={closeModal}>Annuler</button>
+              <button className="btn btn-y" onClick={saveTask}>{form.id?'Modifier':'Créer'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal === 'prospect' && (
+        <div className="overlay" onClick={closeModal}>
+          <div className="modal" onClick={function(e){e.stopPropagation()}}>
+            <div className="mh"><div className="mt">{form.id?'Modifier le prospect':'Nouveau prospect'}</div></div>
+            <div className="mb">
+              <div className="fg"><label className="lbl">Nom de l'entreprise *</label><input className="inp" value={form.name||''} onChange={function(e){setForm(Object.assign({},form,{name:e.target.value}))}} placeholder="Ex: Agence Wagram Events" /></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e){setForm(Object.assign({},form,{email:e.target.value}))}} /></div>
+                <div className="fg"><label className="lbl">Téléphone</label><input className="inp" value={form.phone||''} onChange={function(e){setForm(Object.assign({},form,{phone:e.target.value}))}} /></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div className="fg"><label className="lbl">Catégorie</label>
+                  <select className="inp" value={form.category||'Autre'} onChange={function(e){setForm(Object.assign({},form,{category:e.target.value}))}}>
+                    <option value="Startup">Startup</option>
+                    <option value="Corporate">Corporate</option>
+                    <option value="Agence">Agence</option>
+                    <option value="RH">RH</option>
+                    <option value="Luxe">Luxe</option>
+                    <option value="Autre">Autre</option>
+                  </select>
+                </div>
+                <div className="fg"><label className="lbl">Taille (personnes)</label><input type="number" className="inp" value={form.size||''} onChange={function(e){setForm(Object.assign({},form,{size:e.target.value}))}} /></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div className="fg"><label className="lbl">Statut</label>
+                  <select className="inp" value={form.status||'to_contact'} onChange={function(e){setForm(Object.assign({},form,{status:e.target.value}))}}>
+                    <option value="to_contact">À contacter</option>
+                    <option value="contacted">Contacté</option>
+                    <option value="nego">En négo</option>
+                    <option value="won">Gagné</option>
+                    <option value="lost">Perdu</option>
+                  </select>
+                </div>
+                <div className="fg"><label className="lbl">Température</label>
+                  <select className="inp" value={form.temperature||'tiede'} onChange={function(e){setForm(Object.assign({},form,{temperature:e.target.value}))}}>
+                    <option value="chaud">🔥 Chaud</option>
+                    <option value="tiede">😐 Tiède</option>
+                    <option value="froid">🧊 Froid</option>
+                  </select>
+                </div>
+              </div>
+              <div className="fg"><label className="lbl">Prochaine action</label><input className="inp" value={form.nextAction||''} onChange={function(e){setForm(Object.assign({},form,{nextAction:e.target.value}))}} placeholder="Ex: Relancer par email" /></div>
+              <div className="fg"><label className="lbl">Date de relance</label><input type="date" className="inp" value={form.nextDate||''} onChange={function(e){setForm(Object.assign({},form,{nextDate:e.target.value}))}} /></div>
+              <div className="fg"><label className="lbl">Notes</label><textarea className="inp" value={form.notes||''} onChange={function(e){setForm(Object.assign({},form,{notes:e.target.value}))}} rows={3} placeholder="Infos utiles, historique..." /></div>
+            </div>
+            <div className="mf">
+              <button className="btn" onClick={closeModal}>Annuler</button>
+              {form.id&&<button className="btn btn-red" onClick={function(){setProspects(function(prev){return prev.filter(function(x){return x.id!==form.id})});closeModal()}}>Supprimer</button>}
+              <button className="btn btn-y" onClick={saveProspect}>{form.id?'Modifier':'Créer'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal === 'email' && (
+        <div className="overlay" onClick={closeModal}>
+          <div className="modal" style={{maxWidth:640}} onClick={function(e){e.stopPropagation()}}>
+            <div className="mh">
+              <div className="mt">✉️ Email IA — {emailProspect&&emailProspect.name}</div>
+            </div>
+            <div className="mb">
+              {generatingEmail&&(
+                <div style={{textAlign:'center',padding:30,opacity:.5}}>
+                  <div style={{fontSize:28,marginBottom:8}}>✉️</div>
+                  <div style={{fontWeight:900,fontSize:12}}>Génération en cours...</div>
+                </div>
+              )}
+              {!generatingEmail&&(
+                <textarea className="inp" value={generatedEmail} onChange={function(e){setGeneratedEmail(e.target.value)}} rows={14} style={{width:'100%',fontSize:13,lineHeight:1.7,fontFamily:'Arial Narrow, Arial, sans-serif'}} />
+              )}
+            </div>
+            <div className="mf">
+              <button className="btn" onClick={closeModal}>Fermer</button>
+              {!generatingEmail&&generatedEmail&&(
+                <button className="btn btn-y" onClick={function(){
+                  navigator.clipboard.writeText(generatedEmail).then(function(){
+                    logActivity('email_copie','Email copié pour '+((emailProspect&&emailProspect.name)||''), (emailProspect&&emailProspect.name)||'',generatedEmail)
+                    toast('Email copié !')
+                  })
+                }}>📋 Copier</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal === 'contact' && (
+        <div className="overlay" onClick={closeModal}>
+          <div className="modal" onClick={function(e){e.stopPropagation()}}>
+            <div className="mh"><div className="mt">{form.id?'Modifier le contact':'Nouveau contact'}</div></div>
+            <div className="mb">
+              <div className="fg"><label className="lbl">Nom *</label><input className="inp" value={form.name||''} onChange={function(e){setForm(Object.assign({},form,{name:e.target.value}))}} /></div>
+              <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e){setForm(Object.assign({},form,{email:e.target.value}))}} /></div>
+              <div className="fg"><label className="lbl">Téléphone</label><input className="inp" value={form.phone||''} onChange={function(e){setForm(Object.assign({},form,{phone:e.target.value}))}} /></div>
+              <div className="fg"><label className="lbl">Catégorie</label>
+                <select className="inp" value={form.cat||'food'} onChange={function(e){setForm(Object.assign({},form,{cat:e.target.value}))}}>
+                  <option value="food">Fournisseur alimentaire</option>
+                  <option value="prestataire">Prestataire</option>
+                  <option value="client">Client B2B</option>
+                  <option value="presse">Presse</option>
+                  <option value="autre">Autre</option>
+                </select>
+              </div>
+              <div className="fg"><label className="lbl">Notes</label><textarea className="inp" value={form.notes||''} onChange={function(e){setForm(Object.assign({},form,{notes:e.target.value}))}} rows={2} /></div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <input type="checkbox" checked={!!form.vip} onChange={function(e){setForm(Object.assign({},form,{vip:e.target.checked}))}} />
+                <label>Contact VIP ⭐</label>
+              </div>
+            </div>
+            <div className="mf">
+              <button className="btn" onClick={closeModal}>Annuler</button>
+              <button className="btn btn-y" onClick={saveContact}>{form.id?'Modifier':'Créer'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal === 'vault' && (
+        <div className="overlay" onClick={closeModal}>
+          <div className="modal" onClick={function(e){e.stopPropagation()}}>
+            <div className="mh"><div className="mt">{form.id?'Modifier':'Nouveau secret'}</div></div>
+            <div className="mb">
+              <div className="fg"><label className="lbl">Titre *</label><input className="inp" value={form.title||''} onChange={function(e){setForm(Object.assign({},form,{title:e.target.value}))}} /></div>
+              <div className="fg"><label className="lbl">Identifiant / Login</label><input className="inp" value={form.login||''} onChange={function(e){setForm(Object.assign({},form,{login:e.target.value}))}} /></div>
+              <div className="fg"><label className="lbl">Mot de passe</label><input type="password" className="inp" value={form.password||''} onChange={function(e){setForm(Object.assign({},form,{password:e.target.value}))}} /></div>
+              <div className="fg"><label className="lbl">URL / Notes</label><textarea className="inp" value={form.notes||''} onChange={function(e){setForm(Object.assign({},form,{notes:e.target.value}))}} rows={2} /></div>
+            </div>
+            <div className="mf">
+              <button className="btn" onClick={closeModal}>Annuler</button>
+              <button className="btn btn-y" onClick={saveVault}>{form.id?'Modifier':'Ajouter'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modal === 'cr' && (
         <div className="overlay" onClick={closeModal}>
