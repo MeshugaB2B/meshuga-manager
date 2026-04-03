@@ -1121,7 +1121,7 @@ export default function DashboardPage() {
                           <div style={{padding:planningView==='auj'?'14px':'7px',flex:1,background:'#FFFFFF',minHeight:planningView==='auj'?280:200}}>
                             {autoTodos.map(function(todo){
                               return(
-                                <div key={todo.key} style={{display:'flex',alignItems:'flex-start',gap:planningView==='auj'?8:4,margi4,marginBottom:4}}>
+                                <div key={todo.key} style={{display:'flex',alignItems:'flex-start',gap:planningView==='auj'?8:4,marginBottom:4}}>
                                   <input type="checkbox" checked={!!todo.done} readOnly style={{width:11,height:11,marginTop:1,flexShrink:0,accentColor:todo.urgent?'#CC0066':'#FF82D7'}}/>
                                   <span style={{fontSize:planningView==='auj'?16:13,fontWeight:todo.urgent?900:500,color:todo.urgent?'#CC0066':'#333',textDecoration:todo.done?'line-through':'none',opacity:todo.done?.4:1,lineHeight:1.4}}>{todo.label}</span>
                                 </div>
