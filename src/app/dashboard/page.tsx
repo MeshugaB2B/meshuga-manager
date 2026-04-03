@@ -861,16 +861,6 @@ export default function DashboardPage() {
     setGeneratingEmail(false)
   }
 
-  function openModal(type, data) {
-    setModal(type)
-    setForm(data || {})
-  }
-
-  function closeModal() {
-    setModal('')
-    setForm({})
-  }
-
   function saveTask() {
     if (!form.title) { toast('Titre requis !'); return }
     const t = Object.assign({}, form, {checklist: form.checklist || [], files: form.files || []})
