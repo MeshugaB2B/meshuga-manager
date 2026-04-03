@@ -704,9 +704,34 @@ export default function DashboardPage() {
     setContactedToday(function(n) { return n + 1 })
     if (pros) {
       setTasks(function(prev) { return prev.concat([{id: 'rel-' + id + '-' + Date.now(), title: 'Relancer ' + pros.name, assignee: 'emy', priority: 'medium', status: 'todo', deadline: relDateStr, checklist: [], files: [], chasseId: id}]) })
+      var alreadyInCrm = prospects.find(function(p) { return p.name === pros.name })
+      if (!alreadyInCrm) {
+        var newProspect = {
+          id: 'crm-' + id + '-' + Date.now(),
+          name: pros.name,
+          email: pros.email || '',
+          phone: pros.phone || '',
+          size: pros.taille || '',
+          category: (pros.cat && pros.cat.charAt(0).toUpperCase() + pros.cat.slice(1)) || 'Autre',
+          status: 'contacted',
+          temperature: 'tiede',
+          nextDate: relDateStr,
+          nextAction: 'Relance J+3',
+          notes: pros.pitch || '',
+          ca: 0,
+          score: pros.score || 5,
+          files: [],
+          chasseId: id,
+          contactedDate: today,
+        }
+        setProspects(function(prev) { return prev.concat([newProspect]) })
+        toast('Contacté ! Ajouté au CRM — Relance dans 3 jours')
+      } else {
+        setProspects(function(prev) { return prev.map(function(p) { return p.name === pros.name ? Object.assign({}, p, {status: 'contacted', nextDate: relDateStr, nextAction: 'Relance J+3'}) : p }) })
+        toast('Contacté ! Pipeline CRM mis à jour')
+      }
     }
     logActivity('prospect_contacte', 'Prospect contacte : ' + (pros ? pros.name : id), pros ? pros.name : id, null)
-    toast('Contacte ! Rappel de relance dans 3 jours')
   }
 
   function relanceProspect(id) {
@@ -826,14 +851,14 @@ export default function DashboardPage() {
     {id: 'dash', label: 'Dashboard', icon: '⚡'},
     {id: 'chasse', label: 'Tableau de chasse', icon: '🎯'},
     {id: 'crm', label: 'CRM Prospects', icon: '◎'},
+    {id: 'devis', label: 'Devis', icon: '📄'},
     {id: 'annuaire', label: 'Annuaire', icon: '📒'},
     {id: 'tasks', label: 'Taches', icon: '✓'},
     {id: 'reporting', label: 'Reporting', icon: '📋'},
     {id: 'vault', label: 'Coffre-fort', icon: '🔐'},
     {id: 'gmb', label: 'Google My Biz.', icon: '⭐'},
-    {id: 'devis', label: 'Devis', icon: '📄'},
-    {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
     {id: 'instagram', label: 'Instagram', icon: '📸'},
+    {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
   ]
 
   return (
@@ -921,123 +946,18 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* ZELTY */}
-              <div className="card" style={{padding:0,overflow:'hidden',marginBottom:10}}>
-                <div style={{padding:'14px 16px',borderBottom:'1px solid #EBEBEB',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-                  <div>
-                    <div className="yt" style={{fontSize:22,lineHeight:1}}>Zelty — Caisse</div>
-                    <div style={{fontSize:9,opacity:.4,marginTop:2,textTransform:'uppercase',letterSpacing:1}}>{zeltyUpdated}</div>
-                  </div>
-                  <div style={{display:'flex',gap:4,alignItems:'center'}}>
-                    {['day','week','month','year'].map(function(p){
-                      var labels={day:'Auj.',week:'Sem.',month:'Mois',year:'Année'}
-                      return(
-                        <div key={p} onClick={function(){setZeltyPeriod(p)}} style={{padding:'4px 10px',borderRadius:4,border:'2px solid #191923',background:zeltyPeriod===p?'#FFEB5A':'transparent',fontSize:10,fontWeight:900,cursor:'pointer',textTransform:'uppercase'}}>
-                          {labels[p]}
-                        </div>
-                      )
-                    })}
-                    <div onClick={function(){setZeltyLoading(true);fetch('/api/zelty').then(function(r){return r.json()}).then(function(d){setZeltyData(d);setZeltyLoading(false)}).catch(function(){setZeltyLoading(false)})}} style={{padding:'4px 8px',borderRadius:4,border:'2px solid #191923',background:'transparent',fontSize:12,cursor:'pointer'}}>&#8635;</div>
-                  </div>
-                </div>
-                {zeltyLoading&&<div style={{padding:'20px',textAlign:'center',opacity:.3,fontSize:11,fontWeight:900}}>Chargement...</div>}
-                {!zeltyLoading&&zeltyData&&zeltyData.error&&<div style={{padding:'12px 16px',fontSize:11,opacity:.6}}>{zeltyData.error}</div>}
-                {!zeltyLoading&&zeltyData&&zeltyData.ok&&(
-                  <div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)'}}>
-                      <div style={{padding:'14px 16px',borderRight:'1px solid #EBEBEB',borderBottom:'1px solid #EBEBEB'}}>
-                        <div style={{fontSize:10,opacity:.45,textTransform:'uppercase',letterSpacing:.5,marginBottom:5,fontWeight:900}}>CA</div>
-                        <div style={{fontWeight:900,fontSize:22,lineHeight:1}}>{zeltyCA}</div>
-                      </div>
-                      <div style={{padding:'14px 16px',borderRight:'1px solid #EBEBEB',borderBottom:'1px solid #EBEBEB'}}>
-                        <div style={{fontSize:10,opacity:.45,textTransform:'uppercase',letterSpacing:.5,marginBottom:5,fontWeight:900}}>Tickets</div>
-                        <div style={{fontWeight:900,fontSize:22,lineHeight:1}}>{zeltyTickets}</div>
-                      </div>
-                      <div style={{padding:'14px 16px',borderRight:'1px solid #EBEBEB',borderBottom:'1px solid #EBEBEB'}}>
-                        <div style={{fontSize:10,opacity:.45,textTransform:'uppercase',letterSpacing:.5,marginBottom:5,fontWeight:900}}>Panier moyen</div>
-                        <div style={{fontWeight:900,fontSize:22,lineHeight:1}}>{zeltyAvg}</div>
-                      </div>
-                      <div style={{padding:'14px 16px',borderBottom:'1px solid #EBEBEB'}}>
-                        <div style={{fontSize:10,opacity:.45,textTransform:'uppercase',letterSpacing:.5,marginBottom:5,fontWeight:900}}>vs période préc.</div>
-                        <div style={{fontWeight:900,fontSize:22,lineHeight:1,color:zeltyEvolColor}}>{zeltyEvol}</div>
-                      </div>
-                    </div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr'}}>
-                      <div style={{padding:'12px 16px',borderRight:'1px solid #EBEBEB'}}>
-                        <div className="yt" style={{fontSize:16,marginBottom:8}}>Top produits</div>
-                        {zeltyData.topProducts&&zeltyData.topProducts.length>0?zeltyData.topProducts.slice(0,5).map(function(p,i){
-                          var mx=zeltyData.topProducts[0].qty||1
-                          return(
-                            <div key={p.name} style={{marginBottom:7}}>
-                              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-                                <span style={{fontSize:11,fontWeight:i===0?900:500}}>{i+1}. {p.name}</span>
-                                <span style={{fontSize:10,fontWeight:900,color:i===0?'#FF82D7':'#191923'}}>{p.qty}x</span>
-                              </div>
-                              <div style={{height:4,background:'#F0F0F0',borderRadius:2}}>
-                                <div style={{height:'100%',background:i===0?'#FF82D7':i===1?'#FFEB5A':'#DEDEDE',borderRadius:2,width:Math.round(p.qty/mx*100)+'%'}} />
-                              </div>
-                            </div>
-                          )
-                        }):<div style={{fontSize:11,opacity:.3}}>Aucune donnée</div>}
-                      </div>
-                      <div style={{padding:'12px 16px'}}>
-                        <div className="yt" style={{fontSize:16,marginBottom:8}}>Heures de pointe</div>
-                        {zeltyData.peakHours&&zeltyData.peakHours.filter(function(h){return h.count>0}).length>0?zeltyData.peakHours.filter(function(h){return h.count>0}).slice(0,7).map(function(h,i){
-                          var mx=zeltyData.peakHours.filter(function(x){return x.count>0})[0].count||1
-                          return(
-                            <div key={h.hour} style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
-                              <span style={{fontSize:10,fontWeight:900,width:26,flexShrink:0}}>{h.hour}h</span>
-                              <div style={{flex:1,height:8,background:'#F0F0F0',borderRadius:4,overflow:'hidden'}}>
-                                <div style={{height:'100%',background:i===0?'#FF82D7':i===1?'#FFEB5A':'#EBEBEB',borderRadius:4,width:Math.round(h.count/mx*100)+'%'}} />
-                              </div>
-                              <span style={{fontSize:10,fontWeight:900,width:20,textAlign:'right'}}>{h.count}</span>
-                            </div>
-                          )
-                        }):<div style={{fontSize:11,opacity:.3}}>Aucun ticket</div>}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {!zeltyLoading&&!zeltyData&&<div style={{padding:'14px 16px',fontSize:11,color:'#888'}}>Ajoute <strong>ZELTY_API_KEY</strong> dans Vercel pour activer.</div>}
-              </div>
 
-              <div className="g2">
-                <div className="card">
-                  <div className="ct">{isEmy?'Mes tâches':'Tâches équipe'}</div>
-                  {tasks.filter(function(t){return t.status!=='done'}).slice(0,4).map(function(t){
-                    return(
-                      <div key={t.id} className="row" style={{gridTemplateColumns:'4px 1fr auto',gap:10}}>
-                        <div className="pbar" style={{background:t.priority==='high'?'#FF82D7':'#FFEB5A'}}/>
-                        <div><div style={{fontSize:12,fontWeight:900}}>{t.title}</div><div style={{fontSize:10,opacity:.5}}>{t.deadline} · {t.assignee}</div></div>
-                        <span className="badge" style={{color:'#888',borderColor:'#ddd',fontSize:9}}>{t.status==='in_progress'?'En cours':'A faire'}</span>
-                      </div>
-                    )
-                  })}
-                  <button className="btn btn-y btn-sm" style={{marginTop:10}} onClick={function(){nav('tasks')}}>Voir toutes →</button>
-                </div>
-                <div className="card">
-                  <div className="ct">{isEmy?'Mon pipeline':'Prospects chauds'}</div>
-                  {prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).slice(0,4).map(function(p){
-                    return(
-                      <div key={p.id} className="row" style={{gridTemplateColumns:'1fr auto',gap:8}}>
-                        <div><div style={{fontSize:12,fontWeight:900}}>{p.name}</div><div style={{fontSize:10,opacity:.5}}>{p.nextAction}</div></div>
-                        <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>
-                      </div>
-                    )
-                  })}
-                  <button className="btn btn-y btn-sm" style={{marginTop:10}} onClick={function(){nav('crm')}}>Voir le CRM →</button>
-                </div>
-              </div>
 
               {/* PLANNING */}
               <div className="card" style={{padding:0,overflow:'hidden',marginBottom:10}}>
                 <div style={{padding:'14px 16px',borderBottom:'1px solid #EBEBEB',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-                  <div className="yt" style={{fontSize:22}}>Planning {isEmy?"de ma semaine":"d'Emy"}</div>
+                  <div className="yt" style={{fontSize:26}}>Planning {isEmy?"de ma semaine":"d'Emy"}</div>
                   <div style={{display:'flex',gap:4,alignItems:'center'}}>
                     <button className="btn btn-sm btn-y" onClick={function(){setPlanningWeek(function(w){return w-1})}}>&#8592;</button>
                     <span style={{fontSize:11,fontWeight:900,minWidth:110,textAlign:'center'}}>{planningWeek===0?'Cette semaine':planningWeek<0?'Sem. -'+Math.abs(planningWeek):'Sem. +'+planningWeek}</span>
                     <button className="btn btn-sm btn-y" onClick={function(){setPlanningWeek(function(w){return w+1})}}>&#8594;</button>
                     {planningWeek!==0&&<button className="btn btn-p btn-sm" onClick={function(){setPlanningWeek(0)}}>Auj.</button>}
+                    <button className="btn btn-p btn-sm" style={{fontWeight:900,fontSize:14}} onClick={function(){openModal('task',{assignee:'emy',priority:'medium',status:'todo',checklist:[],files:[],deadline:new Date().toISOString().split('T')[0]})}}>+ Tâche</button>
                   </div>
                 </div>
                 <div style={{padding:'12px 14px'}}>
@@ -1093,7 +1013,7 @@ export default function DashboardPage() {
                               <div style={{fontSize:9,fontWeight:900,opacity:.6,color:headerColor}}>{dd.getDate()}/{dd.getMonth()+1}</div>
                             </div>
                           </div>
-                          <div style={{padding:'7px',flex:1,background:'#FFFFFF',minHeight:140}}>
+                          <div style={{padding:'7px',flex:1,background:'#FFFFFF',minHeight:180}}>
                             {autoTodos.map(function(todo){
                               return(
                                 <div key={todo.key} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:4}}>
@@ -1247,28 +1167,52 @@ export default function DashboardPage() {
             <div>
               <div className="ph">
                 <div><div className="pt">CRM Prospects</div><div className="ps">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length} actifs · {prospects.length} total</div></div>
-                <button className="btn btn-y btn-sm" onClick={function() { openModal('prospect', {status:'to_contact',ca:0,files:[]}) }}>+ Nouveau</button>
+                <button className="btn btn-y btn-sm" onClick={function() { openModal('prospect', {status:'contacted',temperature:'tiede',ca:0,files:[]}) }}>+ Nouveau</button>
               </div>
-              {/* KPI CRM */}
-              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8,marginBottom:10}}>
-                <div className='kc' style={{background:'#FFF',gridColumn:'1/-1'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                    <div className='kl'>CA B2B signé</div>
-                    <div style={{display:'flex',gap:4}}>
-                      {['month','year','all'].map(function(per){return(
-                        <button key={per} className='btn btn-sm' style={{fontSize:9,padding:'2px 7px',background:crmPeriod===per?'#191923':'transparent',color:crmPeriod===per?'#FFEB5A':'inherit'}} onClick={function(){setCrmPeriod(per)}}>{per==='month'?'Ce mois':per==='year'?'Cette année':'Total'}</button>
-                      )})}
+
+              {/* COMMISSION EMY */}
+              {(function(){
+                var now = new Date()
+                var mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+                var yStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]
+                var filterFn = function(d) {
+                  if (crmPeriod === 'month') return d.created_at && d.created_at >= mStart && (d.statut==='paye'||d.statut==='facture'||d.statut==='accepte')
+                  if (crmPeriod === 'year') return d.created_at && d.created_at >= yStart && (d.statut==='paye'||d.statut==='facture'||d.statut==='accepte')
+                  return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'
+                }
+                var caTotal = devisList.filter(filterFn).reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0)
+                var commission = caTotal * 0.05
+                var periodLabel = crmPeriod==='month'?'Ce mois':crmPeriod==='year'?'Cette année':'Total'
+                return (
+                  <div style={{background:'linear-gradient(135deg,#191923 60%,#FF82D7)',borderRadius:10,padding:'18px 20px',marginBottom:12,border:'3px solid #191923',boxShadow:'4px 4px 0 #FF82D7'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:10}}>
+                      <div>
+                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#FFEB5A',marginBottom:4}}>💰 Commission Emy</div>
+                        <div style={{fontSize:11,color:'rgba(255,235,90,.5)',textTransform:'uppercase',letterSpacing:1}}>{periodLabel} · 5% du CA signé</div>
+                      </div>
+                      <div style={{display:'flex',gap:4}}>
+                        {['month','year','all'].map(function(per){return(
+                          <button key={per} className="btn btn-sm" style={{fontSize:9,padding:'3px 8px',background:crmPeriod===per?'#FFEB5A':'rgba(255,255,255,.1)',color:crmPeriod===per?'#191923':'#fff',border:'1.5px solid '+(crmPeriod===per?'#191923':'rgba(255,255,255,.2)')}} onClick={function(){setCrmPeriod(per)}}>{per==='month'?'Mois':per==='year'?'Année':'Total'}</button>
+                        )})}
+                      </div>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:14}}>
+                      <div style={{background:'rgba(255,255,255,.07)',borderRadius:7,padding:'12px 14px'}}>
+                        <div style={{fontSize:10,color:'rgba(255,255,255,.5)',marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>CA B2B signé</div>
+                        <div style={{fontWeight:900,fontSize:24,color:'#fff'}}>{caTotal.toLocaleString('fr-FR',{minimumFractionDigits:0})} <span style={{fontSize:12,opacity:.5}}>€ HT</span></div>
+                        <div style={{fontSize:10,color:'rgba(255,255,255,.4)',marginTop:2}}>{devisList.filter(filterFn).length} contrats</div>
+                      </div>
+                      <div style={{background:'#FFEB5A',borderRadius:7,padding:'12px 14px',border:'2px solid rgba(255,255,255,.3)'}}>
+                        <div style={{fontSize:10,color:'rgba(25,25,35,.5)',marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>🎉 Commission</div>
+                        <div style={{fontWeight:900,fontSize:24,color:'#191923'}}>{commission.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} <span style={{fontSize:12,opacity:.5}}>€</span></div>
+                        <div style={{fontSize:10,color:'rgba(25,25,35,.4)',marginTop:2}}>Bravo Emy 🚀</div>
+                      </div>
                     </div>
                   </div>
-                  <div className='kv' style={{fontSize:22,color:'#009D3A'}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:12,opacity:.4}}>€ HT</span></div>
-                  <div style={{fontFamily:'Yellowtail,cursive',fontSize:11,opacity:.5}}>{devisList.filter(function(d){return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'}).length} contrats signés</div>
-                </div>
-                <div className='kc' style={{background:'#FFF',cursor:'pointer'}} onClick={function(){setCrmFilter(function(f){return f==='nego'?'all':'nego'})}}><div className='kl'>En négo</div><div className='kv' style={{color:'#FF82D7'}}>{prospects.filter(function(p){return p.status==='nego'}).length}</div><div className='ki' style={{opacity:.08}}>🔥</div></div>
-                <div className='kc' style={{background:'#FFF'}}><div className='kl'>Devis à valider</div><div className='kv' style={{color:'#005FFF'}}>{devisList.filter(function(d){return d.statut==='envoye'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0).toLocaleString('fr-FR')} <span style={{fontSize:11,opacity:.4}}>€</span></div><div style={{fontFamily:'Yellowtail,cursive',fontSize:11,color:devisList.filter(function(d){return d.statut==='envoye'}).length>0?'#005FFF':'rgba(25,25,35,.35)'}}>{devisList.filter(function(d){return d.statut==='envoye'}).length} en attente</div></div>
-                <div className='kc' style={{background:'#FFF',cursor:'pointer'}} onClick={function(){setCrmFilter(function(f){return f==='contacted'?'all':'contacted'})}}><div className='kl'>Contactés</div><div className='kv' style={{color:'#005FFF'}}>{prospects.filter(function(p){return p.status==='contacted'}).length}</div></div>
-                <div className='kc' style={{background:'#FFF',cursor:'pointer'}} onClick={function(){setCrmFilter(function(f){return f==='won'?'all':'won'})}}><div className='kl'>Gagnés</div><div className='kv' style={{color:'#009D3A'}}>{prospects.filter(function(p){return p.status==='won'}).length}</div><div className='ki' style={{opacity:.08}}>🏆</div></div>
-                <div className='kc' style={{background:'#FFF'}}><div className='kl'>Conversion</div><div className='kv'>{prospects.length>0?Math.round(prospects.filter(function(p){return p.status==='won'}).length/prospects.length*100):0}<span style={{fontSize:14,fontWeight:400}}>%</span></div><div className='ki' style={{opacity:.08}}>📈</div></div>
-              </div>
+                )
+              })()}
+
+              {/* ACTIONS PRIORITAIRES */}
               <div style={{background:'#191923',borderRadius:7,padding:'12px 14px',marginBottom:10,color:'#fff'}}>
                 <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:1,marginBottom:8,color:'#FFEB5A'}}>💡 Actions prioritaires</div>
                 {(function(){
@@ -1276,27 +1220,52 @@ export default function DashboardPage() {
                   var late=prospects.filter(function(p){return p.nextDate&&p.nextDate<=tod&&p.status!=='won'&&p.status!=='lost'})
                   var denv=devisList.filter(function(d){return d.statut==='envoye'})
                   var neg=prospects.filter(function(p){return p.status==='nego'})
+                  var chaud=prospects.filter(function(p){return p.temperature==='chaud'&&p.status!=='won'&&p.status!=='lost'})
                   if(late.length>0)acts.push({e:'🔴',t:'URGENT — '+late.length+' relance(s) en retard : '+late.slice(0,2).map(function(p){return p.name}).join(', ')})
                   if(denv.length>0)acts.push({e:'💶',t:'Relancer '+denv.length+' devis — '+denv.reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0).toLocaleString('fr-FR')+'€ HT'})
-                  if(neg.length>0)acts.push({e:'🔥',t:neg.length+' en négo — '+neg.slice(0,2).map(function(p){return p.name}).join(', ')})
-                  if(prospects.filter(function(p){return p.status==='to_contact'}).length>20)acts.push({e:'🎯',t:prospects.filter(function(p){return p.status==='to_contact'}).length+' jamais contactés — 5 appels/jour'})
+                  if(chaud.length>0)acts.push({e:'🔥',t:chaud.length+' prospects CHAUDS à travailler : '+chaud.slice(0,2).map(function(p){return p.name}).join(', ')})
+                  if(neg.length>0)acts.push({e:'🤝',t:neg.length+' en négo — envoie le devis vite !'})
                   if(acts.length===0)acts.push({e:'✅',t:'Pipeline en bonne santé !'})
-                  return acts.map(function(a,i){return(
-                    <div key={i} style={{display:'flex',gap:8,alignItems:'flex-start',marginBottom:4,paddingBottom:4,borderBottom:i<acts.length-1?'1px solid rgba(255,255,255,.08)':'none'}}>
+                  return acts.map(function(a,idx2){return(
+                    <div key={idx2} style={{display:'flex',gap:8,alignItems:'flex-start',marginBottom:4,paddingBottom:4,borderBottom:idx2<acts.length-1?'1px solid rgba(255,255,255,.08)':'none'}}>
                       <span style={{fontSize:14,flexShrink:0}}>{a.e}</span>
                       <span style={{fontSize:12,lineHeight:1.4,opacity:.9}}>{a.t}</span>
                     </div>
                   )})
                 })()}
               </div>
-              {prospects.map(function(p) {
+
+              {/* FILTRES */}
+              <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
+                {['all','contacted','nego','chaud','froid','tiede'].map(function(f){
+                  var labels={all:'Tous',contacted:'Contactés',nego:'En négo',chaud:'🔥 Chauds',froid:'🧊 Froids',tiede:'😐 Tièdes'}
+                  var count = f==='all' ? prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length : prospects.filter(function(p){return f==='contacted'||f==='nego'?p.status===f:p.temperature===f&&p.status!=='won'&&p.status!=='lost'}).length
+                  return(
+                    <button key={f} className={'btn btn-sm'+(crmFilter===f?' btn-p':'')} onClick={function(){setCrmFilter(f)}} style={{fontSize:10}}>
+                      {labels[f]} <span style={{opacity:.5,fontSize:9}}>({count})</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* LISTE PROSPECTS ACTIFS */}
+              {prospects.filter(function(p){
+                if(p.status==='won'||p.status==='lost') return false
+                if(crmFilter==='all') return true
+                if(crmFilter==='contacted'||crmFilter==='nego') return p.status===crmFilter
+                return p.temperature===crmFilter
+              }).map(function(p) {
+                var tempColors = {chaud:'#CC0066',tiede:'#FF6B2B',froid:'#005FFF'}
+                var tempLabel = {chaud:'🔥 Chaud',tiede:'😐 Tiède',froid:'🧊 Froid'}
+                var isLate = p.nextDate && p.nextDate <= new Date().toISOString().split('T')[0]
                 return (
-                  <div key={p.id} className="card" style={{marginBottom:8}}>
+                  <div key={p.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(isLate?'#CC0066':tempColors[p.temperature]||'#EBEBEB')}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:6}}>
                       <div style={{flex:1}}>
                         <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:3}}>
                           <div style={{fontWeight:900,fontSize:14,cursor:'pointer'}} onClick={function(){openModal('prospect',Object.assign({},p))}}>{p.name}</div>
                           <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>
+                          {p.temperature && <span style={{fontSize:10,fontWeight:900,color:tempColors[p.temperature]||'#888'}}>{tempLabel[p.temperature]||''}</span>}
                         </div>
                         <div style={{fontSize:11,opacity:.5}}>{p.category} · {p.email}</div>
                       </div>
@@ -1305,41 +1274,83 @@ export default function DashboardPage() {
                         <button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={function(e){e.stopPropagation();generateEmail(Object.assign({},p,{cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category}))}}>✉️ Email</button>
                       </div>
                     </div>
-                    {p.nextDate && <div style={{fontSize:11,opacity:.6,marginBottom:4,color:p.nextDate<=new Date().toISOString().split('T')[0]?'#CC0066':'inherit'}}>{p.nextDate<=new Date().toISOString().split('T')[0]?'⚠️ ':''}{p.nextAction} — {p.nextDate}</div>}
-                    <div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:4}}>
-                      {p.status==='to_contact' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function(){
-                        var today=new Date().toISOString().split('T')[0]
-                        var rel=new Date();rel.setDate(rel.getDate()+7)
-                        setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'contacted',nextDate:rel.toISOString().split('T')[0],nextAction:'Relance J+7'}):x})})
-                        setTasks(function(prev){return prev.concat([{id:'crm-rel-'+p.id+'-'+Date.now(),title:'Relancer '+p.name,assignee:'emy',priority:'medium',status:'todo',deadline:rel.toISOString().split('T')[0],checklist:[],files:[]}])})
-                        toast('Contacté ✓ — relance dans 7 jours')
-                      }}>📞 Contacté</button>}
+
+                    {/* TEMPÉRATURE */}
+                    <div style={{display:'flex',gap:4,marginBottom:8}}>
+                      <div style={{fontSize:10,fontWeight:900,marginRight:4,opacity:.5}}>Température :</div>
+                      {['chaud','tiede','froid'].map(function(t){return(
+                        <button key={t} className="btn btn-sm" style={{fontSize:9,padding:'2px 8px',background:p.temperature===t?tempColors[t]:'transparent',color:p.temperature===t?'#fff':'inherit',border:'1.5px solid '+(tempColors[t])}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{temperature:t}):x})})}}>
+                          {tempLabel[t]}
+                        </button>
+                      )})}
+                    </div>
+
+                    {p.nextDate && <div style={{fontSize:11,marginBottom:6,color:isLate?'#CC0066':'#555',fontWeight:isLate?900:400}}>{isLate?'⚠️ RETARD — ':''}{p.nextAction} — {p.nextDate}</div>}
+
+                    <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
                       {p.status==='contacted' && <button className="btn btn-sm" style={{background:'#005FFF',color:'#fff',fontSize:10}} onClick={function(){
                         var rel=new Date();rel.setDate(rel.getDate()+7)
                         setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{nextDate:rel.toISOString().split('T')[0],nextAction:'2ème relance'}):x})})
-                        setTasks(function(prev){return prev.concat([{id:'crm-rel2-'+p.id+'-'+Date.now(),title:'2ème relance '+p.name,assignee:'emy',priority:'high',status:'todo',deadline:rel.toISOString().split('T')[0],checklist:[],files:[]}])})
                         toast('Relancé ✓')
                       }}>↩ Relancer</button>}
-                      {p.status==='contacted' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'nego'}):x})});toast('En négo !')}}>✅ Intéressé → Négo</button>}
-                      {p.status==='contacted' && <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'lost'}):x})});toast('Archivé')}}>✗ Non</button>}
+                      {p.status==='contacted' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'nego',temperature:'chaud'}):x})});toast('🔥 En négo !')}}>✅ Intéressé → Négo</button>}
+                      {p.status==='contacted' && <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'lost',temperature:'froid'}):x})});toast('Archivé')}}>✗ Perdu</button>}
+                      {p.status==='nego' && <button className="btn btn-y btn-sm" style={{fontSize:10}} onClick={function(){nav('devis')}}>📄 Créer devis</button>}
                       {p.status==='nego' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'won'}):x})});toast('🏆 Gagné !')}}>🏆 Gagné</button>}
+                      {p.status==='nego' && <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'lost'}):x})});toast('Perdu')}}>✗ Perdu</button>}
                     </div>
-                    {p.files && p.files.filter(function(f){return f&&f.trim()}).length>0 && (
-                      <div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:6}}>
-                        {p.files.filter(function(f){return f&&f.trim()}).map(function(f,i){return <span key={i} style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:3,padding:'2px 6px',fontSize:9,fontWeight:900}}>📦 {f.slice(0,25)}</span>})}
-                      </div>
-                    )}
                   </div>
                 )
               })}
+
+              {/* GAGNÉS */}
+              {prospects.filter(function(p){return p.status==='won'}).length > 0 && (
+                <div style={{marginTop:16}}>
+                  <div className="yt" style={{fontSize:16,marginBottom:8,color:'#009D3A'}}>🏆 Clients gagnés ({prospects.filter(function(p){return p.status==='won'}).length})</div>
+                  {prospects.filter(function(p){return p.status==='won'}).map(function(p){return(
+                    <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',background:'#F0FFF4',border:'1.5px solid #009D3A',borderRadius:5,marginBottom:4}}>
+                      <span style={{fontWeight:900,fontSize:13}}>{p.name}</span>
+                      <span style={{fontSize:11,color:'#009D3A',fontWeight:900}}>✅ Client</span>
+                    </div>
+                  )})}
+                </div>
+              )}
             </div>
           )}
 
-          {page === 'annuaire' && (
+          {page === 'annuaire' && (          {page === 'annuaire' && (
             <div>
               <div className="ph">
                 <div><div className="pt">Annuaire</div><div className="ps">{contacts.length} contacts</div></div>
-                <button className="btn btn-y btn-sm" onClick={function() { openModal('contact', {cat:'food',vip:false}) }}>+ Ajouter</button>
+                <div style={{display:'flex',gap:6}}>
+                  <button className="btn btn-y btn-sm" onClick={function() { openModal('contact', {cat:'food',vip:false}) }}>+ Ajouter</button>
+                  <label className="btn btn-sm" style={{cursor:'pointer',background:'#FFEB5A',border:'2px solid #191923'}}>
+                    📥 Import CSV
+                    <input type="file" accept=".csv,.vcf" style={{display:'none'}} onChange={function(e){
+                      var file = e.target.files && e.target.files[0]
+                      if (!file) return
+                      var reader = new FileReader()
+                      reader.onload = function(ev) {
+                        var text = ev.target.result
+                        var lines2 = text.split('
+').filter(function(l){return l.trim()})
+                        var imported = []
+                        lines2.slice(1).forEach(function(line) {
+                          var cols = line.split(',').map(function(c){return c.replace(/"/g,'').trim()})
+                          if (cols[0]) {
+                            imported.push({id: Date.now() + Math.random(), cat: 'prestataire', name: cols[0]||'', phone: cols[1]||'', email: cols[2]||'', notes: cols[3]||'', vip: false})
+                          }
+                        })
+                        if (imported.length > 0) {
+                          setContacts(function(prev) { return prev.concat(imported) })
+                          toast(imported.length + ' contacts importés !')
+                        }
+                      }
+                      reader.readAsText(file)
+                      e.target.value = ''
+                    }} />
+                  </label>
+                </div>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:12}}>
                 {contacts.map(function(c) {
@@ -1590,61 +1601,114 @@ export default function DashboardPage() {
                 <div>
                   {devisList.length===0?(
                     <div className="card" style={{textAlign:'center',padding:50,opacity:.4}}>
-                      <div style={{fontSize:40,marginBottom:10}}>&#128196;</div>
-                      <div style={{fontWeight:900,textTransform:'uppercase'}}>Aucun devis</div>
+                      <div style={{fontSize:40,marginBottom:10}}>📄</div>
+                      <div style={{fontWeight:900,textTransform:'uppercase'}}>Aucun devis — crée le premier !</div>
                     </div>
-                  ):devisList.map(function(dv){
+                  ):(function(){
+                    var enCours = devisList.filter(function(d){return d.statut==='envoye'||d.statut==='a_modifier'})
+                    var aCloser = devisList.filter(function(d){return d.statut==='accepte'||d.statut==='facture'})
+                    var archives = devisList.filter(function(d){return d.statut==='paye'||d.statut==='refuse'||d.statut==='brouillon'})
                     var sc={brouillon:'#888',envoye:'#005FFF',accepte:'#009D3A',refuse:'#CC0066',a_modifier:'#FF6B2B',facture:'#191923',paye:'#009D3A'}
-                    var sl={brouillon:'Brouillon',envoye:'Envoyé',accepte:'Accepté',refuse:'Refusé',a_modifier:'A modifier',facture:'Facturé',paye:'Payé'}
-                    var col=sc[dv.statut]||'#888'
-                    return(
-                      <div key={dv.id} className="card" style={{marginBottom:8}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
-                          <div style={{flex:1}}>
-                            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
-                              <span style={{fontWeight:900,fontSize:14}}>{dv.numero}</span>
-                              <span className="badge" style={{color:col,borderColor:col}}>{sl[dv.statut]||dv.statut}</span>
-                              {dv.facture_numero&&<span className="badge" style={{color:'#191923',borderColor:'#191923'}}>FACT {dv.facture_numero}</span>}
+                    var sl={brouillon:'Brouillon',envoye:'Envoyé',accepte:'Accepté',refuse:'Refusé',a_modifier:'À modifier',facture:'Facturé',paye:'Soldé'}
+                    function renderCard(dv) {
+                      var col=sc[dv.statut]||'#888'
+                      return(
+                        <div key={dv.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+col}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
+                            <div style={{flex:1}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                                <span style={{fontWeight:900,fontSize:14}}>{dv.numero}</span>
+                                <span className="badge" style={{color:col,borderColor:col}}>{sl[dv.statut]||dv.statut}</span>
+                                {dv.facture_numero&&<span className="badge" style={{color:'#191923',borderColor:'#191923'}}>FACT {dv.facture_numero}</span>}
+                                {dv.acompte_recu&&<span style={{fontSize:9,background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:3,padding:'1px 5px',fontWeight:900}}>💰 Acompte OK</span>}
+                              </div>
+                              <div style={{fontWeight:900,fontSize:13}}>{dv.client_nom}</div>
+                              <div style={{fontSize:11,opacity:.5}}>{dv.event_date?new Date(dv.event_date).toLocaleDateString('fr-FR'):''} {dv.event_lieu?'· '+dv.event_lieu:''} · {dv.nb_personnes} pers.</div>
                             </div>
-                            <div style={{fontWeight:900,fontSize:13}}>{dv.client_nom}</div>
-                            <div style={{fontSize:11,opacity:.5}}>{dv.event_date?new Date(dv.event_date).toLocaleDateString('fr-FR'):''} {dv.event_lieu?'· '+dv.event_lieu:''} · {dv.nb_personnes} pers.</div>
+                            <div style={{textAlign:'right'}}>
+                              <div style={{fontWeight:900,fontSize:18}}>{parseFloat(dv.total_ttc||0).toLocaleString('fr-FR',{minimumFractionDigits:2})} €</div>
+                              <div style={{fontSize:9,opacity:.4}}>TTC</div>
+                            </div>
                           </div>
-                          <div style={{textAlign:'right'}}><div style={{fontWeight:900,fontSize:18}}>{parseFloat(dv.total_ttc||0).toFixed(2)} EUR</div><div style={{fontSize:9,opacity:.4}}>TTC</div></div>
+                          <div style={{display:'flex',gap:5,marginTop:10,flexWrap:'wrap'}}>
+                            <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){
+                              setDevisView('edit');setCurrentDevisId(dv.id);setDevisNumero(dv.numero)
+                              setDevisClient({nom:dv.client_nom,contact:dv.client_contact||'',email:dv.client_email||'',phone:dv.client_phone||'',date:dv.event_date||'',lieu:dv.event_lieu||'',prospectId:dv.prospect_id})
+                              setDevisNbPersonnes(dv.nb_personnes||50);setDevisFormat(dv.format||'normal')
+                              setDevisItems(dv.items||[]);setDevisMiseEnPlace(parseFloat(dv.mise_en_place||0))
+                              setDevisMiseEnPlacePct(parseFloat(dv.remise_mep_pct||0));setDevisRemiseTotal(parseFloat(dv.remise_total_pct||0))
+                              setDevisNotes(dv.notes||'');setDevisLivraison(parseFloat(dv.livraison||0))
+                              setDevisLivraisonOffert(!!dv.livraison_offert);setDevisMepOffert(!!dv.mise_en_place_offert)
+                            }}>✏️ Modifier</button>
+                            {dv.statut==='brouillon'&&<button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'envoye','')}}>📤 Envoyé</button>}
+                            {dv.statut==='envoye'&&(
+                              <span style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                                <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff',fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'accepte','')}}>✓ Accepté</button>
+                                <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'refuse','')}}>✗ Refusé</button>
+                                <button className="btn btn-sm" style={{background:'#FF6B2B',color:'#fff',fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'a_modifier','')}}>⚠️ À modifier</button>
+                              </span>
+                            )}
+                            {(dv.statut==='accepte'||dv.statut==='facture')&&!dv.acompte_recu&&(
+                              <button className="btn btn-sm" style={{background:'#FFEB5A',color:'#191923',fontSize:10}} onClick={function(){
+                                sb().from('devis').update({acompte_recu:true,acompte_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('💰 Acompte reçu !')})
+                              }}>💰 Acompte reçu</button>
+                            )}
+                            {dv.statut==='accepte'&&!dv.facture_numero&&(
+                              <button className="btn btn-n btn-sm" style={{fontSize:10}} onClick={function(){
+                                var fn='FACT-'+new Date().getFullYear()+'-'+String(devisList.filter(function(x){return x.facture_numero}).length+1).padStart(3,'0')
+                                sb().from('devis').update({statut:'facture',facture_numero:fn,facture_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('🧾 Facture '+fn+' générée !')})
+                              }}>🧾 Facturer</button>
+                            )}
+                            {dv.statut==='facture'&&dv.paiement_statut!=='paye'&&(
+                              <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff',fontSize:10}} onClick={function(){
+                                sb().from('devis').update({paiement_statut:'paye',statut:'paye',solde_recu:true,solde_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('✅ Soldé !')})
+                              }}>✅ Soldé</button>
+                            )}
+                            <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,false)}}>📄 PDF</button>
+                            {dv.facture_numero&&<button className="btn btn-n btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,true)}}>🧾 PDF Facture</button>}
+                            <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){
+                              if(window.confirm('Supprimer ce devis définitivement ?')){
+                                sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Devis supprimé')})
+                              }
+                            }}>🗑️ Supprimer</button>
+                          </div>
                         </div>
-                        <div style={{display:'flex',gap:6,marginTop:10,flexWrap:'wrap'}}>
-                          <button className="btn btn-sm" onClick={function(){
-                            setDevisView('edit');setCurrentDevisId(dv.id);setDevisNumero(dv.numero)
-                            setDevisClient({nom:dv.client_nom,contact:dv.client_contact||'',email:dv.client_email||'',phone:dv.client_phone||'',date:dv.event_date||'',lieu:dv.event_lieu||'',prospectId:dv.prospect_id})
-                            setDevisNbPersonnes(dv.nb_personnes||50);setDevisFormat(dv.format||'normal')
-                            setDevisItems(dv.items||[]);setDevisMiseEnPlace(parseFloat(dv.mise_en_place||0))
-                            setDevisMiseEnPlacePct(parseFloat(dv.remise_mep_pct||0));setDevisRemiseTotal(parseFloat(dv.remise_total_pct||0))
-                            setDevisNotes(dv.notes||'');setDevisLivraison(parseFloat(dv.livraison||0))
-                            setDevisLivraisonOffert(!!dv.livraison_offert);setDevisMepOffert(!!dv.mise_en_place_offert)
-                          }}>&#9999;&#65039; Modifier</button>
-                          {dv.statut==='brouillon'&&<button className="btn btn-p btn-sm" onClick={function(){updateDevisStatut(dv.id,'envoye','')}}>Envoyé</button>}
-                          {dv.statut==='envoye'&&<span style={{display:'flex',gap:4}}>
-                            <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){updateDevisStatut(dv.id,'accepte','')}}>&#10003; Accepté</button>
-                            <button className="btn btn-red btn-sm" onClick={function(){updateDevisStatut(dv.id,'refuse','')}}>&#10005; Refusé</button>
-                            <button className="btn btn-sm" style={{background:'#FF6B2B',color:'#fff'}} onClick={function(){updateDevisStatut(dv.id,'a_modifier','')}}>A modifier</button>
-                          </span>}
-                          {dv.statut==='accepte'&&!dv.facture_numero&&<button className="btn btn-n btn-sm" onClick={function(){
-                            var fn='FACT-'+new Date().getFullYear()+'-'+String(devisList.filter(function(x){return x.facture_numero}).length+1).padStart(3,'0')
-                            sb().from('devis').update({statut:'facture',facture_numero:fn,facture_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('Facture '+fn+' générée !')})
-                          }}>&#129534; Facture</button>}
-                          {dv.statut==='facture'&&dv.paiement_statut!=='paye'&&<button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){
-                            sb().from('devis').update({paiement_statut:'paye',statut:'paye',solde_recu:true,solde_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('Payé !')})
-                          }}>&#128176; Payé</button>}
-                          <button className="btn btn-sm" onClick={function(){generateAndPrintDoc(dv,false)}}>&#128196; PDF</button>
-                          {dv.facture_numero&&<button className="btn btn-n btn-sm" onClick={function(){generateAndPrintDoc(dv,true)}}>&#129534; Facture PDF</button>}
-                          <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){
-                            if(window.confirm('Supprimer ce devis ? Cette action est irréversible.')){
-                              sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Devis supprimé')})
-                            }
-                          }}>&#128465; Supprimer</button>
-                        </div>
+                      )
+                    }
+                    return(
+                      <div>
+                        {enCours.length>0&&(
+                          <div style={{marginBottom:16}}>
+                            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'8px 12px',background:'#EBF3FF',borderRadius:6,border:'1.5px solid #005FFF'}}>
+                              <div className="yt" style={{fontSize:17,color:'#005FFF'}}>📤 En attente de réponse</div>
+                              <div style={{fontWeight:900,fontSize:12,color:'#005FFF',marginLeft:'auto'}}>{enCours.reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR',{minimumFractionDigits:2})} € TTC</div>
+                              <span style={{fontSize:10,background:'#005FFF',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{enCours.length}</span>
+                            </div>
+                            {enCours.map(renderCard)}
+                          </div>
+                        )}
+                        {aCloser.length>0&&(
+                          <div style={{marginBottom:16}}>
+                            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'8px 12px',background:'#F0FFF4',borderRadius:6,border:'1.5px solid #009D3A'}}>
+                              <div className="yt" style={{fontSize:17,color:'#009D3A'}}>🎯 À facturer / Solder</div>
+                              <div style={{fontWeight:900,fontSize:12,color:'#009D3A',marginLeft:'auto'}}>{aCloser.reduce(function(s,d){return s+(parseFloat(d.total_ttc)||0)},0).toLocaleString('fr-FR',{minimumFractionDigits:2})} € TTC</div>
+                              <span style={{fontSize:10,background:'#009D3A',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900}}>{aCloser.length}</span>
+                            </div>
+                            {aCloser.map(renderCard)}
+                          </div>
+                        )}
+                        {archives.length>0&&(
+                          <div style={{marginBottom:16}}>
+                            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'8px 12px',background:'#F8F8F8',borderRadius:6,border:'1.5px solid #DEDEDE'}}>
+                              <div className="yt" style={{fontSize:17,color:'#888'}}>📁 Archives</div>
+                              <span style={{fontSize:10,background:'#888',color:'#fff',padding:'2px 7px',borderRadius:3,fontWeight:900,marginLeft:'auto'}}>{archives.length}</span>
+                            </div>
+                            {archives.map(renderCard)}
+                          </div>
+                        )}
                       </div>
                     )
-                  })}
+                  })()}
                 </div>
               )}
               {devisView==='edit'&&(
@@ -1653,14 +1717,20 @@ export default function DashboardPage() {
                     <div className="card" style={{marginBottom:10}}>
                       <div className="ct">Client</div>
                       <div className="fg"><label className="lbl">Prospect existant</label>
-                        <select className="inp" value={devisClient.prospectId||''} onChange={function(e){
-                          var pid=e.target.value
-                          if(!pid){setDevisClient(Object.assign({},devisClient,{prospectId:null}));return}
-                          var p=prospects.filter(function(x){return String(x.id)===pid})[0]
-                          if(p)setDevisClient(Object.assign({},devisClient,{nom:p.name,email:p.email||'',phone:p.phone||'',prospectId:p.id}))
+                        <select className="inp" value={devisClient.prospectId ? String(devisClient.prospectId) : ''} onChange={function(e){
+                          var pid = e.target.value
+                          if(!pid){setDevisClient(Object.assign({},devisClient,{prospectId:null,nom:'',email:'',phone:''}));return}
+                          var allPs = prospects.concat(chasse.filter(function(c){return c.status!=='to_contact'}))
+                          var p = allPs.find(function(x){return String(x.id)===pid})
+                          if(p) setDevisClient(Object.assign({},devisClient,{nom:p.name||'',email:p.email||'',phone:p.phone||'',prospectId:p.id}))
                         }}>
                           <option value="">-- Nouveau client --</option>
-                          {prospects.map(function(p){return <option key={p.id} value={p.id}>{p.name}</option>})}
+                          <optgroup label="CRM Prospects">
+                            {prospects.map(function(p){return <option key={'crm-'+p.id} value={String(p.id)}>{p.name}</option>})}
+                          </optgroup>
+                          <optgroup label="Tableau de chasse (contactés)">
+                            {chasse.filter(function(c){return c.status!=='to_contact'}).map(function(p){return <option key={'ch-'+p.id} value={String(p.id)}>{p.name}</option>})}
+                          </optgroup>
                         </select>
                       </div>
                       <div className="fg"><label className="lbl">Entreprise *</label><input className="inp" value={devisClient.nom} onChange={function(e){setDevisClient(Object.assign({},devisClient,{nom:e.target.value}))}} /></div>
