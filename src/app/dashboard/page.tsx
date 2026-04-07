@@ -1564,19 +1564,19 @@ export default function DashboardPage() {
 
               {/* FILTRES CATÉGORIES */}
               {(function(){
-                var cats = ['all','food','prestataire','client','presse','banque','autre']
-                var catLabels = {all:'Tous',food:'Fournisseurs',prestataire:'Prestataires',client:'Clients B2B',presse:'Presse',banque:'Banque',autre:'Autre'}
-                var catColors = {food:'#009D3A',prestataire:'#005FFF',client:'#FF82D7',presse:'#FF6B2B',banque:'#191923',autre:'#888'}
+                var cats = ['all','food','prestataire','client','presse','banque','team','autre']
+                var catLabels = {all:'Tous',food:'Fournisseurs',prestataire:'Prestataires',client:'Clients B2B',presse:'Presse',banque:'Banque',team:'Team Meshuga',autre:'Autre'}
+                var catColors = {food:'#009D3A',prestataire:'#005FFF',client:'#FF82D7',presse:'#FF6B2B',banque:'#1A1A6E',team:'#FFEB5A',autre:'#888'}
                 var filtered = contacts
                   .filter(function(c){ return annCat==='all' || (c.category||c.cat)===annCat })
-                  .slice().sort(function(a,b){ return (a.full_name||a.nom||a.name||'').localeCompare(b.full_name||b.nom||b.name||'','fr') })
+                  .slice().sort(function(a,b){ return (function(){var an=a.nom||(a.full_name||'').split(' ').pop()||'';var bn=b.nom||(b.full_name||'').split(' ').pop()||'';return an.localeCompare(bn,'fr')})() })
                 return(
                   <div>
                     <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
                       {cats.map(function(cat){
                         var count = cat==='all' ? contacts.length : contacts.filter(function(c){return (c.category||c.cat)===cat}).length
                         return(
-                          <button key={cat} className={'btn btn-sm'+(annCat===cat?' btn-p':'')} style={{fontSize:10,borderColor:annCat===cat?'':'#DDD'}} onClick={function(){setAnnCat(cat)}}>
+                          <button key={cat} style={{fontSize:10,padding:'4px 10px',borderRadius:4,border:'2px solid '+(annCat===cat?catColors[cat]||'#191923':'#DDD'),background:annCat===cat?catColors[cat]||'#191923':'#fff',color:annCat===cat?(cat==='team'||cat==='banque'?'#191923':'#fff'):'#555',fontWeight:annCat===cat?900:400,cursor:'pointer'}} onClick={function(){setAnnCat(cat)}}>
                             {catLabels[cat]} <span style={{opacity:.5,fontSize:9}}>({count})</span>
                           </button>
                         )
@@ -1588,7 +1588,7 @@ export default function DashboardPage() {
                         return(
                           <div key={c.id} className="card" style={{cursor:'pointer',borderTop:'3px solid '+catColor}} onClick={function(){openModal('contact',Object.assign({},c))}}>
                             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
-                              <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',color:catColor}}>{catLabels[c.category||c.cat]||c.category||c.cat}</div>
+                              <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',padding:'2px 7px',background:catColor,color:'#fff',borderRadius:3,display:'inline-block',letterSpacing:.5}}>{catLabels[c.category||c.cat]||c.category||c.cat}</div>
                               {(c.is_vip||c.vip)&&<span style={{fontSize:10}}>⭐ VIP</span>}
                             </div>
                             <div style={{fontWeight:900,fontSize:15}}>{c.full_name || (c.nom ? (c.prenom ? c.prenom+' '+c.nom : c.nom) : c.name) || ''}</div>
@@ -2539,6 +2539,7 @@ export default function DashboardPage() {
                   <option value="client">Client B2B</option>
                   <option value="presse">Presse</option>
                   <option value="banque">Banque</option>
+                  <option value="team">Team Meshuga</option>
                   <option value="autre">Autre</option>
                 </select>
               </div>
