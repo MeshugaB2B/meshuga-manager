@@ -893,7 +893,7 @@ export default function DashboardPage() {
     var payload = {
       nom: nom, prenom: prenom,
       name: (prenom ? prenom+' '+nom : nom),
-      societe: form.societe||'', cat: form.cat||'autre',
+      societe: form.societe||'', category: form.category||form.cat||'autre',
       phone: form.phone||'', phone2: form.phone2||'',
       email: form.email||'', email2: form.email2||'',
       website: form.website||'',
@@ -1530,7 +1530,7 @@ export default function DashboardPage() {
               <div className="ph">
                 <div><div className="pt">Annuaire</div><div className="ps">{contacts.length} contacts</div></div>
                 <div style={{display:'flex',gap:6}}>
-                  <button className="btn btn-y btn-sm" onClick={function(){openModal('contact',{cat:'food',vip:false})}}>+ Contact</button>
+                  <button className="btn btn-y btn-sm" onClick={function(){openModal('contact',{category:'food',vip:false})}}>+ Contact</button>
                   <button className="btn btn-sm" style={{background:'#FFEB5A',border:'2px solid #191923'}} onClick={function(){document.getElementById('csv-imp').click()}}>📥 Import CSV</button>
                   <input id="csv-imp" type="file" accept=".csv" style={{display:'none'}} onChange={function(e){
                     var f=e.target&&e.target.files&&e.target.files[0]
@@ -1544,7 +1544,7 @@ export default function DashboardPage() {
                         return {id:Date.now()+Math.random(),cat:'prestataire',name:cols[0]||'',phone:cols[1]||'',email:cols[2]||'',notes:cols[3]||'',vip:false}
                       }).filter(function(c){return c.name})
                       if(added.length>0){
-                      var inserts = added.map(function(c){return {name:c.name,phone:c.phone||'',email:c.email||'',notes:c.notes||'',cat:'prestataire',vip:false}})
+                      var inserts = added.map(function(c){return {name:c.name,phone:c.phone||'',email:c.email||'',notes:c.notes||'',category:'prestataire',vip:false}})
                       sb().from('contacts').insert(inserts).then(function(){loadContacts();toast(added.length+' contacts importés !')})
                     }
                     }
@@ -1560,13 +1560,13 @@ export default function DashboardPage() {
                 var catLabels = {all:'Tous',food:'Fournisseurs',prestataire:'Prestataires',client:'Clients B2B',presse:'Presse',banque:'Banque',autre:'Autre'}
                 var catColors = {food:'#009D3A',prestataire:'#005FFF',client:'#FF82D7',presse:'#FF6B2B',banque:'#191923',autre:'#888'}
                 var filtered = contacts
-                  .filter(function(c){ return annCat==='all' || c.cat===annCat })
+                  .filter(function(c){ return annCat==='all' || (c.category||c.cat)===annCat })
                   .slice().sort(function(a,b){ return (a.nom||a.name||'').localeCompare(b.nom||b.name||'','fr') })
                 return(
                   <div>
                     <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
                       {cats.map(function(cat){
-                        var count = cat==='all' ? contacts.length : contacts.filter(function(c){return c.cat===cat}).length
+                        var count = cat==='all' ? contacts.length : contacts.filter(function(c){return (c.category||c.cat)===cat}).length
                         return(
                           <button key={cat} className={'btn btn-sm'+(annCat===cat?' btn-p':'')} style={{fontSize:10,borderColor:annCat===cat?'':'#DDD'}} onClick={function(){setAnnCat(cat)}}>
                             {catLabels[cat]} <span style={{opacity:.5,fontSize:9}}>({count})</span>
@@ -1576,11 +1576,11 @@ export default function DashboardPage() {
                     </div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:12}}>
                       {filtered.map(function(c){
-                        var catColor = catColors[c.cat]||'#888'
+                        var catColor = catColors[c.category||c.cat]||'#888'
                         return(
                           <div key={c.id} className="card" style={{cursor:'pointer',borderTop:'3px solid '+catColor}} onClick={function(){openModal('contact',Object.assign({},c))}}>
                             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
-                              <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',color:catColor}}>{catLabels[c.cat]||c.cat}</div>
+                              <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',color:catColor}}>{catLabels[c.category||c.cat]||c.category||c.cat}</div>
                               {c.vip&&<span style={{fontSize:10}}>⭐ VIP</span>}
                             </div>
                             <div style={{fontWeight:900,fontSize:15}}>{c.nom ? (c.prenom ? c.prenom+' '+c.nom : c.nom) : c.name}</div>
@@ -2525,7 +2525,7 @@ export default function DashboardPage() {
                 <div className="fg"><label className="lbl">Téléphone 2</label><input className="inp" value={form.phone2||''} onChange={function(e){setForm(Object.assign({},form,{phone2:e.target.value}))}} /></div>
               </div>
               <div className="fg"><label className="lbl">Catégorie</label>
-                <select className="inp" value={form.cat||'food'} onChange={function(e){setForm(Object.assign({},form,{cat:e.target.value}))}}>
+                <select className="inp" value={form.category||form.cat||'food'} onChange={function(e){setForm(Object.assign({},form,{category:e.target.value}))}}>
                   <option value="food">Fournisseur alimentaire</option>
                   <option value="prestataire">Prestataire</option>
                   <option value="client">Client B2B</option>
