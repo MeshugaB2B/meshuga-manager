@@ -538,12 +538,7 @@ export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [tasks, setTasks] = useState(INIT_TASKS)
   const [prospects, setProspects] = useState(INIT_PROSPECTS)
-  const [contacts, setContacts] = useState(function(){
-    try {
-      var saved = localStorage.getItem('meshuga_contacts')
-      return saved ? JSON.parse(saved) : INIT_CONTACTS
-    } catch(e) { return INIT_CONTACTS }
-  })
+  const [contacts, setContacts] = useState([])
   const [annCat, setAnnCat] = useState('all')
   const [vault, setVault] = useState(INIT_VAULT)
   const [reports, setReports] = useState([])
@@ -626,8 +621,9 @@ export default function DashboardPage() {
   }, [profile])
 
   useEffect(function() {
-    try { localStorage.setItem('meshuga_contacts', JSON.stringify(contacts)) } catch(e) {}
-  }, [contacts])
+    if (!profile) return
+    loadContacts()
+  }, [profile])
 
   useEffect(function() {
     if (!profile) return
@@ -698,6 +694,9 @@ export default function DashboardPage() {
 
   function loadDevis() {
     sb().from('devis').select('*').order('created_at',{ascending:false}).then(function(r){if(r.data)setDevisList(r.data)})
+  }
+  function loadContacts() {
+    sb().from('contacts').select('*').order('name',{ascending:true}).then(function(r){if(r.data)setContacts(r.data)})
   }
   function saveDevisToSupabase(payload, cb) {
     var isNew=!payload.id
@@ -889,13 +888,22 @@ export default function DashboardPage() {
 
   function saveContact() {
     if (!form.name) { toast('Nom requis !'); return }
-    var saved = Object.assign({}, form, {
-      societe: form.societe||'', phone2: form.phone2||'', email2: form.email2||''
-    })
-    if (form.id) { setContacts(function(prev){ return prev.map(function(x){ return x.id===form.id?saved:x }) }) }
-    else { setContacts(function(prev){ return prev.concat([Object.assign({},saved,{id:Date.now()})]) }) }
+    var payload = {
+      name: form.name||'', societe: form.societe||'', cat: form.cat||'autre',
+      phone: form.phone||'', phone2: form.phone2||'',
+      email: form.email||'', email2: form.email2||'',
+      notes: form.notes||'', vip: !!form.vip
+    }
+    if (form.id) {
+      sb().from('contacts').update(payload).eq('id', form.id).then(function(){
+        loadContacts(); toast('Contact modifié ✓')
+      })
+    } else {
+      sb().from('contacts').insert(payload).then(function(){
+        loadContacts(); toast('Contact créé ✓')
+      })
+    }
     closeModal()
-    toast(form.id?'Contact modifié ✓':'Contact créé ✓')
   }
 
   function saveVault() {
@@ -1525,7 +1533,10 @@ export default function DashboardPage() {
                         var cols=row.split(',').map(function(x){return x.replace(/"/g,'').trim()})
                         return {id:Date.now()+Math.random(),cat:'prestataire',name:cols[0]||'',phone:cols[1]||'',email:cols[2]||'',notes:cols[3]||'',vip:false}
                       }).filter(function(c){return c.name})
-                      if(added.length>0){setContacts(function(prev){return prev.concat(added)});toast(added.length+' contacts importés !')}
+                      if(added.length>0){
+                      var inserts = added.map(function(c){return {name:c.name,phone:c.phone||'',email:c.email||'',notes:c.notes||'',cat:'prestataire',vip:false}})
+                      sb().from('contacts').insert(inserts).then(function(){loadContacts();toast(added.length+' contacts importés !')})
+                    }
                     }
                     r.readAsText(f)
                     e.target.value=''
@@ -2516,7 +2527,7 @@ export default function DashboardPage() {
             </div>
             <div className="mf">
               <button className="btn" onClick={closeModal}>Annuler</button>
-              {form.id&&<button className="btn btn-red" onClick={function(){setContacts(function(prev){return prev.filter(function(x){return x.id!==form.id})});closeModal();toast('Contact supprimé')}}>Supprimer</button>}
+              {form.id&&<button className="btn btn-red" onClick={function(){sb().from('contacts').delete().eq('id',form.id).then(function(){loadContacts();toast('Contact supprimé')});closeModal()}}>Supprimer</button>}
               <button className="btn btn-y" onClick={saveContact}>{form.id?'Modifier':'Créer'}</button>
             </div>
           </div>
