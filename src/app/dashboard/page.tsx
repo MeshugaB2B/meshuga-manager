@@ -538,7 +538,12 @@ export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [tasks, setTasks] = useState(INIT_TASKS)
   const [prospects, setProspects] = useState(INIT_PROSPECTS)
-  const [contacts, setContacts] = useState(INIT_CONTACTS)
+  const [contacts, setContacts] = useState(function(){
+    try {
+      var saved = localStorage.getItem('meshuga_contacts')
+      return saved ? JSON.parse(saved) : INIT_CONTACTS
+    } catch(e) { return INIT_CONTACTS }
+  })
   const [vault, setVault] = useState(INIT_VAULT)
   const [reports, setReports] = useState([])
   const [toastMsg, setToastMsg] = useState('')
@@ -618,6 +623,10 @@ export default function DashboardPage() {
       if (r.error) { console.warn('[Journal] session_start insert error:', r.error.message) }
     })
   }, [profile])
+
+  useEffect(function() {
+    try { localStorage.setItem('meshuga_contacts', JSON.stringify(contacts)) } catch(e) {}
+  }, [contacts])
 
   useEffect(function() {
     if (!profile) return
@@ -879,9 +888,13 @@ export default function DashboardPage() {
 
   function saveContact() {
     if (!form.name) { toast('Nom requis !'); return }
-    if (form.id) { setContacts(function(prev) { return prev.map(function(x) { return x.id === form.id ? Object.assign({}, form) : x }) }) }
-    else { setContacts(function(prev) { return prev.concat([Object.assign({}, form, {id: Date.now()})]) }) }
+    var saved = Object.assign({}, form, {
+      societe: form.societe||'', phone2: form.phone2||'', email2: form.email2||''
+    })
+    if (form.id) { setContacts(function(prev){ return prev.map(function(x){ return x.id===form.id?saved:x }) }) }
+    else { setContacts(function(prev){ return prev.concat([Object.assign({},saved,{id:Date.now()})]) }) }
     closeModal()
+    toast(form.id?'Contact modifié ✓':'Contact créé ✓')
   }
 
   function saveVault() {
@@ -1498,7 +1511,7 @@ export default function DashboardPage() {
               <div className="ph">
                 <div><div className="pt">Annuaire</div><div className="ps">{contacts.length} contacts</div></div>
                 <div style={{display:'flex',gap:6}}>
-                  <button className="btn btn-y btn-sm" onClick={function() { openModal('contact', {cat:'food',vip:false}) }}>+ Ajouter</button>
+                  <button className="btn btn-y btn-sm" onClick={function(){openModal('contact',{cat:'food',vip:false})}}>+ Contact</button>
                   <button className="btn btn-sm" style={{background:'#FFEB5A',border:'2px solid #191923'}} onClick={function(){document.getElementById('csv-imp').click()}}>📥 Import CSV</button>
                   <input id="csv-imp" type="file" accept=".csv" style={{display:'none'}} onChange={function(e){
                     var f=e.target&&e.target.files&&e.target.files[0]
@@ -1508,8 +1521,8 @@ export default function DashboardPage() {
                       var raw=ev.target?String(ev.target.result):''
                       var rows=raw.split('\n').filter(function(l){return l.trim()})
                       var added=rows.slice(1).map(function(row){
-                        var c=row.split(',').map(function(x){return x.replace(/"/g,'').trim()})
-                        return {id:Date.now()+Math.random(),cat:'prestataire',name:c[0]||'',phone:c[1]||'',email:c[2]||'',notes:c[3]||'',vip:false}
+                        var cols=row.split(',').map(function(x){return x.replace(/"/g,'').trim()})
+                        return {id:Date.now()+Math.random(),cat:'prestataire',name:cols[0]||'',phone:cols[1]||'',email:cols[2]||'',notes:cols[3]||'',vip:false}
                       }).filter(function(c){return c.name})
                       if(added.length>0){setContacts(function(prev){return prev.concat(added)});toast(added.length+' contacts importés !')}
                     }
@@ -1518,20 +1531,51 @@ export default function DashboardPage() {
                   }} />
                 </div>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:12}}>
-                {contacts.map(function(c) {
-                  return (
-                    <div key={c.id} className="card" style={{cursor:'pointer'}} onClick={function() { openModal('contact', Object.assign({}, c)) }}>
-                      <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',padding:'2px 6px',border:'1.5px solid #191923',borderRadius:3,display:'inline-block',marginBottom:7,background:'#FFEB5A'}}>{CAT_ANN[c.cat]||c.cat}</div>
-                      {c.vip && <span style={{float:'right',fontSize:10}}>⭐ VIP</span>}
-                      <div style={{fontWeight:900,fontSize:14}}>{c.name}</div>
-                      {c.phone && c.phone !== '—' && <div style={{fontSize:11,marginTop:4}}>📞 {c.phone}</div>}
-                      {c.email && <div style={{fontSize:11,marginTop:2}}>✉️ {c.email}</div>}
-                      {c.notes && <div style={{fontSize:10,opacity:.4,marginTop:6,textTransform:'uppercase'}}>{c.notes}</div>}
+
+              {/* FILTRES CATÉGORIES */}
+              {(function(){
+                var cats = ['all','food','prestataire','client','presse','banque','autre']
+                var catLabels = {all:'Tous',food:'Fournisseurs',prestataire:'Prestataires',client:'Clients B2B',presse:'Presse',banque:'Banque',autre:'Autre'}
+                var catColors = {food:'#009D3A',prestataire:'#005FFF',client:'#FF82D7',presse:'#FF6B2B',banque:'#191923',autre:'#888'}
+                var [annCat, setAnnCat] = useState('all')
+                var filtered = contacts
+                  .filter(function(c){ return annCat==='all' || c.cat===annCat })
+                  .slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','fr') })
+                return(
+                  <div>
+                    <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+                      {cats.map(function(cat){
+                        var count = cat==='all' ? contacts.length : contacts.filter(function(c){return c.cat===cat}).length
+                        return(
+                          <button key={cat} className={'btn btn-sm'+(annCat===cat?' btn-p':'')} style={{fontSize:10,borderColor:annCat===cat?'':'#DDD'}} onClick={function(){setAnnCat(cat)}}>
+                            {catLabels[cat]} <span style={{opacity:.5,fontSize:9}}>({count})</span>
+                          </button>
+                        )
+                      })}
                     </div>
-                  )
-                })}
-              </div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:12}}>
+                      {filtered.map(function(c){
+                        var catColor = catColors[c.cat]||'#888'
+                        return(
+                          <div key={c.id} className="card" style={{cursor:'pointer',borderTop:'3px solid '+catColor}} onClick={function(){openModal('contact',Object.assign({},c))}}>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                              <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',color:catColor}}>{catLabels[c.cat]||c.cat}</div>
+                              {c.vip&&<span style={{fontSize:10}}>⭐ VIP</span>}
+                            </div>
+                            <div style={{fontWeight:900,fontSize:15}}>{c.name}</div>
+                            {c.societe&&<div style={{fontSize:12,color:'#555',marginTop:1}}>{c.societe}</div>}
+                            {c.phone&&c.phone!=='—'&&<div style={{fontSize:12,marginTop:6}}>📞 {c.phone}</div>}
+                            {c.phone2&&<div style={{fontSize:11,color:'#888'}}>📞 {c.phone2}</div>}
+                            {c.email&&<div style={{fontSize:12,marginTop:2}}>✉️ {c.email}</div>}
+                            {c.email2&&<div style={{fontSize:11,color:'#888'}}>✉️ {c.email2}</div>}
+                            {c.notes&&<div style={{fontSize:10,opacity:.5,marginTop:6,lineHeight:1.4}}>{c.notes}</div>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           )}
 
@@ -2442,15 +2486,25 @@ export default function DashboardPage() {
           <div className="modal" onClick={function(e){e.stopPropagation()}}>
             <div className="mh"><div className="mt">{form.id?'Modifier le contact':'Nouveau contact'}</div></div>
             <div className="mb">
-              <div className="fg"><label className="lbl">Nom *</label><input className="inp" value={form.name||''} onChange={function(e){setForm(Object.assign({},form,{name:e.target.value}))}} /></div>
-              <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e){setForm(Object.assign({},form,{email:e.target.value}))}} /></div>
-              <div className="fg"><label className="lbl">Téléphone</label><input className="inp" value={form.phone||''} onChange={function(e){setForm(Object.assign({},form,{phone:e.target.value}))}} /></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div className="fg"><label className="lbl">Nom *</label><input className="inp" value={form.name||''} onChange={function(e){setForm(Object.assign({},form,{name:e.target.value}))}} placeholder="Prénom Nom" /></div>
+                <div className="fg"><label className="lbl">Société</label><input className="inp" value={form.societe||''} onChange={function(e){setForm(Object.assign({},form,{societe:e.target.value}))}} placeholder="Ex: BNP Paribas" /></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div className="fg"><label className="lbl">Email principal</label><input className="inp" value={form.email||''} onChange={function(e){setForm(Object.assign({},form,{email:e.target.value}))}} /></div>
+                <div className="fg"><label className="lbl">Email 2</label><input className="inp" value={form.email2||''} onChange={function(e){setForm(Object.assign({},form,{email2:e.target.value}))}} /></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div className="fg"><label className="lbl">Téléphone principal</label><input className="inp" value={form.phone||''} onChange={function(e){setForm(Object.assign({},form,{phone:e.target.value}))}} /></div>
+                <div className="fg"><label className="lbl">Téléphone 2</label><input className="inp" value={form.phone2||''} onChange={function(e){setForm(Object.assign({},form,{phone2:e.target.value}))}} /></div>
+              </div>
               <div className="fg"><label className="lbl">Catégorie</label>
                 <select className="inp" value={form.cat||'food'} onChange={function(e){setForm(Object.assign({},form,{cat:e.target.value}))}}>
                   <option value="food">Fournisseur alimentaire</option>
                   <option value="prestataire">Prestataire</option>
                   <option value="client">Client B2B</option>
                   <option value="presse">Presse</option>
+                  <option value="banque">Banque</option>
                   <option value="autre">Autre</option>
                 </select>
               </div>
@@ -2462,11 +2516,13 @@ export default function DashboardPage() {
             </div>
             <div className="mf">
               <button className="btn" onClick={closeModal}>Annuler</button>
+              {form.id&&<button className="btn btn-red" onClick={function(){setContacts(function(prev){return prev.filter(function(x){return x.id!==form.id})});closeModal();toast('Contact supprimé')}}>Supprimer</button>}
               <button className="btn btn-y" onClick={saveContact}>{form.id?'Modifier':'Créer'}</button>
             </div>
           </div>
         </div>
       )}
+
 
       {modal === 'vault' && (
         <div className="overlay" onClick={closeModal}>
