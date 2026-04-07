@@ -900,11 +900,16 @@ export default function DashboardPage() {
       notes: form.notes||'', vip: !!form.vip
     }
     if (form.id) {
-      sb().from('contacts').update(payload).eq('id', form.id).then(function(){
+      sb().from('contacts').update(payload).eq('id', form.id).then(function(r){
+        if (r.error) { toast('Erreur: '+r.error.message); return }
         loadContacts(); toast('Contact modifié ✓')
       })
     } else {
-      sb().from('contacts').insert(payload).then(function(){
+      sb().from('contacts').insert(payload).then(function(r){
+        if (r.error) {
+          toast('Erreur: '+r.error.message)
+          return
+        }
         loadContacts(); toast('Contact créé ✓')
       })
     }
