@@ -887,11 +887,16 @@ export default function DashboardPage() {
   }
 
   function saveContact() {
-    if (!form.name) { toast('Nom requis !'); return }
+    var nom = (form.nom||'').trim()
+    var prenom = (form.prenom||'').trim()
+    if (!nom) { toast('Nom requis !'); return }
     var payload = {
-      name: form.name||'', societe: form.societe||'', cat: form.cat||'autre',
+      nom: nom, prenom: prenom,
+      name: (prenom ? prenom+' '+nom : nom),
+      societe: form.societe||'', cat: form.cat||'autre',
       phone: form.phone||'', phone2: form.phone2||'',
       email: form.email||'', email2: form.email2||'',
+      website: form.website||'',
       notes: form.notes||'', vip: !!form.vip
     }
     if (form.id) {
@@ -1551,7 +1556,7 @@ export default function DashboardPage() {
                 var catColors = {food:'#009D3A',prestataire:'#005FFF',client:'#FF82D7',presse:'#FF6B2B',banque:'#191923',autre:'#888'}
                 var filtered = contacts
                   .filter(function(c){ return annCat==='all' || c.cat===annCat })
-                  .slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','fr') })
+                  .slice().sort(function(a,b){ return (a.nom||a.name||'').localeCompare(b.nom||b.name||'','fr') })
                 return(
                   <div>
                     <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
@@ -1573,12 +1578,13 @@ export default function DashboardPage() {
                               <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',color:catColor}}>{catLabels[c.cat]||c.cat}</div>
                               {c.vip&&<span style={{fontSize:10}}>⭐ VIP</span>}
                             </div>
-                            <div style={{fontWeight:900,fontSize:15}}>{c.name}</div>
-                            {c.societe&&<div style={{fontSize:12,color:'#555',marginTop:1}}>{c.societe}</div>}
+                            <div style={{fontWeight:900,fontSize:15}}>{c.nom ? (c.prenom ? c.prenom+' '+c.nom : c.nom) : c.name}</div>
+                            {c.societe&&<div style={{fontSize:12,color:'#555',marginTop:1,fontStyle:'italic'}}>{c.societe}</div>}
                             {c.phone&&c.phone!=='—'&&<div style={{fontSize:12,marginTop:6}}>📞 {c.phone}</div>}
                             {c.phone2&&<div style={{fontSize:11,color:'#888'}}>📞 {c.phone2}</div>}
                             {c.email&&<div style={{fontSize:12,marginTop:2}}>✉️ {c.email}</div>}
                             {c.email2&&<div style={{fontSize:11,color:'#888'}}>✉️ {c.email2}</div>}
+                            {c.website&&<div style={{fontSize:11,marginTop:2}}><a href={c.website.startsWith('http')?c.website:'https://'+c.website} target="_blank" rel="noopener noreferrer" style={{color:'#005FFF',textDecoration:'none'}} onClick={function(e){e.stopPropagation()}}>🌐 {c.website.replace(/^https?:\/\//,'')}</a></div>}
                             {c.notes&&<div style={{fontSize:10,opacity:.5,marginTop:6,lineHeight:1.4}}>{c.notes}</div>}
                           </div>
                         )
@@ -2498,8 +2504,12 @@ export default function DashboardPage() {
             <div className="mh"><div className="mt">{form.id?'Modifier le contact':'Nouveau contact'}</div></div>
             <div className="mb">
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                <div className="fg"><label className="lbl">Nom *</label><input className="inp" value={form.name||''} onChange={function(e){setForm(Object.assign({},form,{name:e.target.value}))}} placeholder="Prénom Nom" /></div>
+                <div className="fg"><label className="lbl">Prénom</label><input className="inp" value={form.prenom||''} onChange={function(e){setForm(Object.assign({},form,{prenom:e.target.value}))}} placeholder="Marie" /></div>
+                <div className="fg"><label className="lbl">Nom *</label><input className="inp" value={form.nom||''} onChange={function(e){setForm(Object.assign({},form,{nom:e.target.value}))}} placeholder="Dupont" /></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                 <div className="fg"><label className="lbl">Société</label><input className="inp" value={form.societe||''} onChange={function(e){setForm(Object.assign({},form,{societe:e.target.value}))}} placeholder="Ex: BNP Paribas" /></div>
+                <div className="fg"><label className="lbl">Site web</label><input className="inp" value={form.website||''} onChange={function(e){setForm(Object.assign({},form,{website:e.target.value}))}} placeholder="https://..." /></div>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                 <div className="fg"><label className="lbl">Email principal</label><input className="inp" value={form.email||''} onChange={function(e){setForm(Object.assign({},form,{email:e.target.value}))}} /></div>
