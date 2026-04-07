@@ -544,6 +544,7 @@ export default function DashboardPage() {
       return saved ? JSON.parse(saved) : INIT_CONTACTS
     } catch(e) { return INIT_CONTACTS }
   })
+  const [annCat, setAnnCat] = useState('all')
   const [vault, setVault] = useState(INIT_VAULT)
   const [reports, setReports] = useState([])
   const [toastMsg, setToastMsg] = useState('')
@@ -1537,7 +1538,6 @@ export default function DashboardPage() {
                 var cats = ['all','food','prestataire','client','presse','banque','autre']
                 var catLabels = {all:'Tous',food:'Fournisseurs',prestataire:'Prestataires',client:'Clients B2B',presse:'Presse',banque:'Banque',autre:'Autre'}
                 var catColors = {food:'#009D3A',prestataire:'#005FFF',client:'#FF82D7',presse:'#FF6B2B',banque:'#191923',autre:'#888'}
-                var [annCat, setAnnCat] = useState('all')
                 var filtered = contacts
                   .filter(function(c){ return annCat==='all' || c.cat===annCat })
                   .slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||'','fr') })
