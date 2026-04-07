@@ -889,15 +889,23 @@ export default function DashboardPage() {
   function saveContact() {
     var nom = (form.nom||'').trim()
     var prenom = (form.prenom||'').trim()
-    if (!nom) { toast('Nom requis !'); return }
+    var fullName = (prenom ? prenom+' '+nom : nom).trim()
+    if (!fullName) { toast('Nom requis !'); return }
     var payload = {
-      nom: nom, prenom: prenom,
-      name: (prenom ? prenom+' '+nom : nom),
-      societe: form.societe||'', category: form.category||form.cat||'autre',
-      phone: form.phone||'', phone2: form.phone2||'',
-      email: form.email||'', email2: form.email2||'',
+      full_name: fullName,
+      nom: nom,
+      prenom: prenom,
+      category: form.category||form.cat||'autre',
+      company_name: form.societe||form.company_name||'',
+      societe: form.societe||'',
+      phone: form.phone||'',
+      phone2: form.phone2||'',
+      email: form.email||'',
+      email2: form.email2||'',
       website: form.website||'',
-      notes: form.notes||'', vip: !!form.vip
+      notes: form.notes||'',
+      is_vip: !!form.vip,
+      vip: !!form.vip
     }
     if (form.id) {
       sb().from('contacts').update(payload).eq('id', form.id).then(function(r){
@@ -1544,7 +1552,7 @@ export default function DashboardPage() {
                         return {id:Date.now()+Math.random(),cat:'prestataire',name:cols[0]||'',phone:cols[1]||'',email:cols[2]||'',notes:cols[3]||'',vip:false}
                       }).filter(function(c){return c.name})
                       if(added.length>0){
-                      var inserts = added.map(function(c){return {name:c.name,phone:c.phone||'',email:c.email||'',notes:c.notes||'',category:'prestataire',vip:false}})
+                      var inserts = added.map(function(c){return {full_name:c.name||'',phone:c.phone||'',email:c.email||'',notes:c.notes||'',category:'prestataire',is_vip:false}})
                       sb().from('contacts').insert(inserts).then(function(){loadContacts();toast(added.length+' contacts importés !')})
                     }
                     }
@@ -1561,7 +1569,7 @@ export default function DashboardPage() {
                 var catColors = {food:'#009D3A',prestataire:'#005FFF',client:'#FF82D7',presse:'#FF6B2B',banque:'#191923',autre:'#888'}
                 var filtered = contacts
                   .filter(function(c){ return annCat==='all' || (c.category||c.cat)===annCat })
-                  .slice().sort(function(a,b){ return (a.nom||a.name||'').localeCompare(b.nom||b.name||'','fr') })
+                  .slice().sort(function(a,b){ return (a.full_name||a.nom||a.name||'').localeCompare(b.full_name||b.nom||b.name||'','fr') })
                 return(
                   <div>
                     <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
@@ -1581,10 +1589,10 @@ export default function DashboardPage() {
                           <div key={c.id} className="card" style={{cursor:'pointer',borderTop:'3px solid '+catColor}} onClick={function(){openModal('contact',Object.assign({},c))}}>
                             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
                               <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',color:catColor}}>{catLabels[c.category||c.cat]||c.category||c.cat}</div>
-                              {c.vip&&<span style={{fontSize:10}}>⭐ VIP</span>}
+                              {(c.is_vip||c.vip)&&<span style={{fontSize:10}}>⭐ VIP</span>}
                             </div>
-                            <div style={{fontWeight:900,fontSize:15}}>{c.nom ? (c.prenom ? c.prenom+' '+c.nom : c.nom) : c.name}</div>
-                            {c.societe&&<div style={{fontSize:12,color:'#555',marginTop:1,fontStyle:'italic'}}>{c.societe}</div>}
+                            <div style={{fontWeight:900,fontSize:15}}>{c.full_name || (c.nom ? (c.prenom ? c.prenom+' '+c.nom : c.nom) : c.name) || ''}</div>
+                            {(c.company_name||c.societe)&&<div style={{fontSize:12,color:'#555',marginTop:1,fontStyle:'italic'}}>{c.company_name||c.societe}</div>}
                             {c.phone&&c.phone!=='—'&&<div style={{fontSize:12,marginTop:6}}>📞 {c.phone}</div>}
                             {c.phone2&&<div style={{fontSize:11,color:'#888'}}>📞 {c.phone2}</div>}
                             {c.email&&<div style={{fontSize:12,marginTop:2}}>✉️ {c.email}</div>}
@@ -2513,7 +2521,7 @@ export default function DashboardPage() {
                 <div className="fg"><label className="lbl">Nom *</label><input className="inp" value={form.nom||''} onChange={function(e){setForm(Object.assign({},form,{nom:e.target.value}))}} placeholder="Dupont" /></div>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                <div className="fg"><label className="lbl">Société</label><input className="inp" value={form.societe||''} onChange={function(e){setForm(Object.assign({},form,{societe:e.target.value}))}} placeholder="Ex: BNP Paribas" /></div>
+                <div className="fg"><label className="lbl">Société</label><input className="inp" value={form.company_name||form.societe||''} onChange={function(e){setForm(Object.assign({},form,{company_name:e.target.value,societe:e.target.value}))}} placeholder="Ex: BNP Paribas" /></div>
                 <div className="fg"><label className="lbl">Site web</label><input className="inp" value={form.website||''} onChange={function(e){setForm(Object.assign({},form,{website:e.target.value}))}} placeholder="https://..." /></div>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
