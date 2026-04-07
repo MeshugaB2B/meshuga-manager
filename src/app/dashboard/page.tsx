@@ -553,7 +553,7 @@ export default function DashboardPage() {
   const [journalDateFrom, setJournalDateFrom] = useState('')
   const [journalDateTo, setJournalDateTo] = useState('')
   const [planningWeek, setPlanningWeek] = useState(0)
-  const [planningView, setPlanningView] = useState('auj')
+  const [planningView, setPlanningView] = useState('3j')
   const [chasseCat, setChasseChasse] = useState('all')
   const [chasseSearch, setChasseSearch] = useState('')
   const [chasseSort, setChasseSort] = useState('score')
@@ -1184,7 +1184,7 @@ export default function DashboardPage() {
                               return(
                                 <div key={todo.key} style={{display:'flex',alignItems:'center',gap:planningView==='auj'?8:4,marginBottom:6}}>
                                   <input type="checkbox" checked={!!todo.done} readOnly style={{width:planningView==='auj'?16:11,height:planningView==='auj'?16:11,flexShrink:0,marginTop:1,flexShrink:0,accentColor:todo.urgent?'#CC0066':'#FF82D7'}}/>
-                                  <span style={{fontSize:planningView==='auj'?16:13,fontWeight:todo.urgent?900:500,color:todo.urgent?'#CC0066':'#333',textDecoration:todo.done?'line-through':'none',opacity:todo.done?.4:1,lineHeight:1.4}}>{todo.label}</span>
+                                  <span style={{fontSize:planningView==='auj'?15:12,fontWeight:todo.urgent?900:500,color:todo.urgent?'#CC0066':'#333',textDecoration:todo.done?'line-through':'none',opacity:todo.done?.4:1,lineHeight:1.4}}>{todo.label}</span>
                                 </div>
                               )
                             })}
@@ -1196,7 +1196,7 @@ export default function DashboardPage() {
                                       setTasks(function(prev){return prev.map(function(x){return x.id!==t.id?x:Object.assign({},x,{status:t.status==='done'?'todo':'done'})})})
                                     }}>
                                       <input type="checkbox" checked={t.status==='done'} readOnly style={{width:planningView==='auj'?16:11,height:planningView==='auj'?16:11,flexShrink:0,height:11,marginTop:1,flexShrink:0,accentColor:'#191923'}}/>
-                                      <span style={{fontSize:planningView==='auj'?16:13,fontWeight:t.priority==='high'?900:600,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.4}}>{t.title}</span>
+                                      <span style={{fontSize:planningView==='auj'?15:12,fontWeight:t.priority==='high'?900:600,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.4}}>{t.title}</span>
                                     </div>
                                   )
                                 })}
@@ -1208,7 +1208,7 @@ export default function DashboardPage() {
                                   return(
                                     <div key={t.id} style={{display:'flex',alignItems:'center',gap:planningView==='auj'?8:4,marginBottom:6}}>
                                       <input type="checkbox" checked={t.status==='done'} readOnly style={{width:planningView==='auj'?16:11,height:planningView==='auj'?16:11,flexShrink:0,accentColor:'#FFEB5A'}}/>
-                                      <span style={{fontSize:planningView==='auj'?16:13,fontWeight:600,lineHeight:1.4,textDecoration:t.status==='done'?'line-through':'none'}}>&#128081; {t.title}</span>
+                                      <span style={{fontSize:planningView==='auj'?15:12,fontWeight:600,lineHeight:1.4,textDecoration:t.status==='done'?'line-through':'none'}}>&#128081; {t.title}</span>
                                     </div>
                                   )
                                 })}
