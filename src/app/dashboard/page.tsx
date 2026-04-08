@@ -1564,9 +1564,9 @@ export default function DashboardPage() {
 
               {/* FILTRES CATÉGORIES */}
               {(function(){
-                var cats = ['all','food','prestataire','client','presse','banque','team','autre']
-                var catLabels = {all:'Tous',food:'Fournisseurs',prestataire:'Prestataires',client:'Clients B2B',presse:'Presse',banque:'Banque',team:'Team Meshuga',autre:'Autre'}
-                var catColors = {food:'#009D3A',prestataire:'#005FFF',client:'#FF82D7',presse:'#FF6B2B',banque:'#1A1A6E',team:'#FFEB5A',autre:'#888'}
+                var cats = ['all','food','prestataire','photographe','comptabilite','client','presse','banque','team','autre']
+                var catLabels = {all:'Tous',food:'Fournisseurs',prestataire:'Prestataires',photographe:'Photographe',comptabilite:'Comptabilité',client:'Clients B2B',presse:'Presse',banque:'Banque',team:'Team Meshuga',autre:'Autre'}
+                var catColors = {food:'#009D3A',prestataire:'#005FFF',photographe:'#7B3FBE',comptabilite:'#2D7A5A',client:'#FF82D7',presse:'#FF6B2B',banque:'#1A1A6E',team:'#FFEB5A',autre:'#888'}
                 var filtered = contacts
                   .filter(function(c){ return annCat==='all' || (c.category||c.cat)===annCat })
                   .slice().sort(function(a,b){ return (function(){var an=a.nom||(a.full_name||'').split(' ').pop()||'';var bn=b.nom||(b.full_name||'').split(' ').pop()||'';return an.localeCompare(bn,'fr')})() })
@@ -2536,6 +2536,8 @@ export default function DashboardPage() {
                 <select className="inp" value={form.category||form.cat||'food'} onChange={function(e){setForm(Object.assign({},form,{category:e.target.value}))}}>
                   <option value="food">Fournisseur alimentaire</option>
                   <option value="prestataire">Prestataire</option>
+                  <option value="photographe">↳ Photographe</option>
+                  <option value="comptabilite">↳ Comptabilité</option>
                   <option value="client">Client B2B</option>
                   <option value="presse">Presse</option>
                   <option value="banque">Banque</option>
