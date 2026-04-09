@@ -1749,17 +1749,17 @@ export default function DashboardPage() {
                     </div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2}}>
                       {cells.map(function(day,idx){
-                        if(!day) return <div key={'e'+idx} style={{minHeight:80,background:'#F8F8F8',borderRadius:4}}/>
+                        if(!day) return <div key={'e'+idx} style={{minHeight:120,background:'#F8F8F8',borderRadius:6}}/>
                         var ds=calYear+'-'+(calMonth+1<10?'0'+(calMonth+1):(calMonth+1))+'-'+(day<10?'0'+day:day)
                         var dayEvts=calEvents.filter(function(e){return e.start_date<=ds&&(e.end_date||e.start_date)>=ds})
                         var isToday=ds===today
                         var evtColors={event:'#FF82D7',rdv:'#005FFF',livraison:'#009D3A',relance:'#FF6B2B',admin:'#888',other:'#FFEB5A'}
                         return(
-                          <div key={day} style={{minHeight:80,background:isToday?'#FFF5FF':'#fff',borderRadius:4,border:isToday?'2px solid #FF82D7':'1px solid #EBEBEB',padding:'4px',cursor:'pointer'}} onClick={function(){openModal('cal_event',{assignee:'all',type:'event',start_date:ds})}}>
+                          <div key={day} style={{minHeight:120,background:isToday?'#FFF5FF':'#fff',borderRadius:6,border:isToday?'2px solid #FF82D7':'1px solid #EBEBEB',padding:'6px',cursor:'pointer'}} onClick={function(){openModal('cal_event',{assignee:'all',type:'event',start_date:ds})}}>
                             <div style={{fontWeight:isToday?900:400,fontSize:12,color:isToday?'#FF82D7':'#191923',marginBottom:2}}>{day}</div>
                             {dayEvts.slice(0,3).map(function(e,ei){return(
-                              <div key={ei} style={{fontSize:9,fontWeight:700,background:evtColors[e.type]||'#FFEB5A',color:e.type==='admin'||e.type==='other'?'#191923':'#fff',borderRadius:2,padding:'1px 4px',marginBottom:1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',cursor:'pointer'}} onClick={function(ev){ev.stopPropagation();openModal('cal_event',Object.assign({},e))}}>
-                                {e.time?e.time.slice(0,5)+' ':''}{e.title}
+                              <div key={ei} style={{fontSize:9,fontWeight:700,background:e.source==='ai_suggestion'?'#F0F4FF':evtColors[e.type]||'#FFEB5A',color:e.source==='ai_suggestion'?'#005FFF':(e.type==='admin'||e.type==='other'?'#191923':'#fff'),borderRadius:2,padding:'1px 4px',marginBottom:1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',cursor:'pointer',border:e.source==='ai_suggestion'?'1px dashed #005FFF':'none',opacity:e.source==='ai_suggestion'?0.85:1}} onClick={function(ev){ev.stopPropagation();openModal('cal_event',Object.assign({},e))}}>
+                                {e.source==='ai_suggestion'?'💡 ':''}{e.time?e.time.slice(0,5)+' ':''}{e.title}
                               </div>
                             )})}
                             {dayEvts.length>3&&<div style={{fontSize:8,opacity:.5}}>+{dayEvts.length-3}</div>}
@@ -1783,7 +1783,7 @@ export default function DashboardPage() {
                     function renderEvt(e,i){
                       var col=evtColors[e.type]||'#FFEB5A'
                       return(
-                        <div key={i} className="card" style={{marginBottom:6,borderLeft:'4px solid '+col,cursor:'pointer'}} onClick={function(){openModal('cal_event',Object.assign({},e))}}>
+                        <div key={i} className="card" style={{marginBottom:6,borderLeft:'4px solid '+(e.source==='ai_suggestion'?'#005FFF':col),cursor:'pointer',background:e.source==='ai_suggestion'?'#F8FAFF':'#fff',opacity:e.source==='ai_suggestion'?0.92:1}} onClick={function(){openModal('cal_event',Object.assign({},e))}}>
                           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
                             <div style={{flex:1}}>
                               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3}}>
@@ -1794,6 +1794,7 @@ export default function DashboardPage() {
                               {e.prospect&&<div style={{fontSize:12,color:'#555',marginTop:1}}>👤 {e.prospect}</div>}
                               {e.location&&<div style={{fontSize:11,color:'#888',marginTop:1}}>📍 {e.location}</div>}
                               {e.notes&&<div style={{fontSize:11,opacity:.5,marginTop:4}}>{e.notes}</div>}
+                            {e.contact_info&&<div style={{fontSize:10,color:'#005FFF',background:'#EFF3FF',borderRadius:4,padding:'4px 8px',marginTop:6,lineHeight:1.7}}>{e.contact_info}</div>}
                             </div>
                             <div style={{textAlign:'right',flexShrink:0}}>
                               <div style={{fontWeight:900,fontSize:13}}>{e.start_date?new Date(e.start_date+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</div>
@@ -1845,7 +1846,7 @@ export default function DashboardPage() {
                       var isToday=ds===todayStr
                       var dayNames=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']
                       return(
-                        <div key={i} style={{background:isToday?'#FFF5FF':'#fff',borderRadius:6,border:isToday?'2px solid #FF82D7':'1px solid #EBEBEB',padding:'8px',minHeight:120}}>
+                        <div key={i} style={{background:isToday?'#FFF5FF':'#fff',borderRadius:6,border:isToday?'2px solid #FF82D7':'1px solid #EBEBEB',padding:'10px',minHeight:160}}>
                           <div style={{fontWeight:900,fontSize:11,textTransform:'uppercase',color:isToday?'#FF82D7':'#888',marginBottom:4}}>{dayNames[i]}</div>
                           <div style={{fontWeight:900,fontSize:20,color:isToday?'#FF82D7':'#191923',marginBottom:6}}>{d.getDate()}</div>
                           {dayEvts.map(function(e,ei){return(
@@ -2817,6 +2818,7 @@ export default function DashboardPage() {
                 </select>
               </div>
               <div className="fg"><label className="lbl">Notes</label><textarea className="inp" rows={2} value={form.notes||''} onChange={function(e){setForm(Object.assign({},form,{notes:e.target.value}))}} /></div>
+              {form.contact_info&&<div style={{background:'#EFF3FF',border:'1px dashed #005FFF',borderRadius:6,padding:'8px 10px',fontSize:11,color:'#005FFF',lineHeight:1.7}}><strong>📋 Infos contact (suggestion IA) :</strong><br/>{form.contact_info}</div>}
             </div>
             <div className="mf">
               <button className="btn" onClick={closeModal}>Annuler</button>
