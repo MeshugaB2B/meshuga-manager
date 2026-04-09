@@ -1613,10 +1613,10 @@ export default function DashboardPage() {
                             </div>
                             <div style={{fontWeight:900,fontSize:15}}>{c.full_name || (c.nom ? (c.prenom ? c.prenom+' '+c.nom : c.nom) : c.name) || ''}</div>
                             {(c.company_name||c.societe)&&<div style={{fontSize:12,color:'#555',marginTop:1,fontStyle:'italic'}}>{c.company_name||c.societe}</div>}
-                            {c.phone&&c.phone!=='—'&&<div style={{fontSize:12,marginTop:6}}>📞 {c.phone}</div>}
-                            {c.phone2&&<div style={{fontSize:11,color:'#888'}}>📞 {c.phone2}</div>}
-                            {c.email&&<div style={{fontSize:12,marginTop:2}}>✉️ {c.email}</div>}
-                            {c.email2&&<div style={{fontSize:11,color:'#888'}}>✉️ {c.email2}</div>}
+                            {c.phone&&c.phone!=='—'&&<a href={'tel:'+c.phone.replace(/\s/g,'')} style={{display:'block',fontSize:12,marginTop:6,color:'inherit',textDecoration:'none'}} onClick={function(e){e.stopPropagation()}}>📞 {c.phone}</a>}
+                            {c.phone2&&<a href={'tel:'+c.phone2.replace(/\s/g,'')} style={{display:'block',fontSize:11,color:'#888',textDecoration:'none'}} onClick={function(e){e.stopPropagation()}}>📞 {c.phone2}</a>}
+                            {c.email&&<a href={'mailto:'+c.email} style={{display:'block',fontSize:12,marginTop:2,color:'inherit',textDecoration:'none'}} onClick={function(e){e.stopPropagation()}}>✉️ {c.email}</a>}
+                            {c.email2&&<a href={'mailto:'+c.email2} style={{display:'block',fontSize:11,color:'#888',textDecoration:'none'}} onClick={function(e){e.stopPropagation()}}>✉️ {c.email2}</a>}
                             {c.website&&<div style={{fontSize:11,marginTop:2}}><a href={c.website.startsWith('http')?c.website:'https://'+c.website} target="_blank" rel="noopener noreferrer" style={{color:'#005FFF',textDecoration:'none'}} onClick={function(e){e.stopPropagation()}}>🌐 {c.website.replace(/^https?:\/\//,'')}</a></div>}
                             {c.notes&&<div style={{fontSize:10,opacity:.5,marginTop:6,lineHeight:1.4}}>{c.notes}</div>}
                           </div>
