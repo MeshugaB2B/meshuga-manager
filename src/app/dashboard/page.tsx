@@ -589,6 +589,10 @@ export default function DashboardPage() {
   const [instaData, setInstaData] = useState(null)
   const [instaLoading, setInstaLoading] = useState(false)
   const [instaTab, setInstaTab] = useState('comments')
+  const [calEvents, setCalEvents] = useState([])
+  const [calMonth, setCalMonth] = useState(new Date().getMonth())
+  const [calYear, setCalYear] = useState(new Date().getFullYear())
+  const [calView, setCalView] = useState('month')
 
   useEffect(function() {
     async function load() {
@@ -623,6 +627,7 @@ export default function DashboardPage() {
   useEffect(function() {
     if (!profile) return
     loadContacts()
+    loadCalEvents()
   }, [profile])
 
   useEffect(function() {
@@ -694,6 +699,20 @@ export default function DashboardPage() {
 
   function loadDevis() {
     sb().from('devis').select('*').order('created_at',{ascending:false}).then(function(r){if(r.data)setDevisList(r.data)})
+  }
+  function loadCalEvents() {
+    sb().from('cal_events').select('*').order('start_date',{ascending:true}).then(function(r){if(r.data)setCalEvents(r.data)})
+  }
+  function saveCalEvent(payload, cb) {
+    if(payload.id) {
+      var id=payload.id; var p=Object.assign({},payload); delete p.id
+      sb().from('cal_events').update(p).eq('id',id).then(function(r){if(!r.error){loadCalEvents();if(cb)cb()}else toast('Erreur: '+r.error.message)})
+    } else {
+      sb().from('cal_events').insert(payload).then(function(r){if(!r.error){loadCalEvents();if(cb)cb()}else toast('Erreur: '+r.error.message)})
+    }
+  }
+  function deleteCalEvent(id) {
+    sb().from('cal_events').delete().eq('id',id).then(function(r){if(!r.error)loadCalEvents()})
   }
   function loadContacts() {
     sb().from('contacts').select('*').order('name',{ascending:true}).then(function(r){if(r.data)setContacts(r.data)})
@@ -959,6 +978,7 @@ export default function DashboardPage() {
     {id: 'crm', label: 'CRM Prospects', icon: '◎'},
     {id: 'devis', label: 'Devis', icon: '📄'},
     {id: 'annuaire', label: 'Annuaire', icon: '📒'},
+    {id: 'calendrier', label: 'Calendrier', icon: '📅'},
     {id: 'reporting', label: 'Reporting', icon: '📋'},
     {id: 'vault', label: 'Coffre-fort', icon: '🔐'},
     {id: 'gmb', label: 'Google My Biz.', icon: '⭐'},
@@ -1658,6 +1678,188 @@ export default function DashboardPage() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {page === 'calendrier' && (
+            <div>
+              <div className="ph">
+                <div><div className="pt">Calendrier 📅</div><div className="ps">{calEvents.length} événements</div></div>
+                <div style={{display:'flex',gap:6}}>
+                  <div style={{display:'flex',background:'#EBEBEB',borderRadius:5,overflow:'hidden'}}>
+                    {['month','week','list'].map(function(v){return(
+                      <button key={v} style={{padding:'5px 12px',fontSize:10,fontWeight:900,background:calView===v?'#191923':'transparent',color:calView===v?'#FFEB5A':'#191923',border:'none',cursor:'pointer'}} onClick={function(){setCalView(v)}}>{v==='month'?'Mois':v==='week'?'Semaine':'Liste'}</button>
+                    )})}
+                  </div>
+                  <button className="btn btn-y btn-sm" onClick={function(){openModal('cal_event',{assignee:'all',type:'event',start_date:new Date().toISOString().split('T')[0]})}}>+ Événement</button>
+                </div>
+              </div>
+
+              {/* STATS RAPIDES */}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:12}}>
+                {(function(){
+                  var today=new Date().toISOString().split('T')[0]
+                  var upcoming=calEvents.filter(function(e){return e.start_date>=today}).length
+                  var thisMonth=calEvents.filter(function(e){return e.start_date&&e.start_date.startsWith(new Date().toISOString().slice(0,7))}).length
+                  var totalCA=calEvents.filter(function(e){return e.amount}).reduce(function(s,e){return s+(parseFloat(e.amount)||0)},0)
+                  var rdvs=calEvents.filter(function(e){return e.type==='rdv'&&e.start_date>=today}).length
+                  return([
+                    {label:'À venir',val:upcoming,color:'#005FFF'},
+                    {label:'Ce mois',val:thisMonth,color:'#FF82D7'},
+                    {label:'RDV prospects',val:rdvs,color:'#009D3A'},
+                    {label:'CA planifié',val:totalCA.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €',color:'#CC6600'},
+                  ]).map(function(s,i){return(
+                    <div key={i} className="kc" style={{background:'#fff',textAlign:'center'}}>
+                      <div className="kl" style={{fontSize:11}}>{s.label}</div>
+                      <div className="kv" style={{fontSize:24,color:s.color}}>{s.val}</div>
+                    </div>
+                  )})
+                })()}
+              </div>
+
+              {/* NAVIGATION MOIS */}
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+                <button className="btn btn-sm btn-y" onClick={function(){
+                  var d=new Date(calYear,calMonth-1,1)
+                  setCalMonth(d.getMonth());setCalYear(d.getFullYear())
+                }}>&#8592;</button>
+                <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,flex:1,textAlign:'center'}}>
+                  {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][calMonth]} {calYear}
+                </div>
+                <button className="btn btn-sm btn-y" onClick={function(){
+                  var d=new Date(calYear,calMonth+1,1)
+                  setCalMonth(d.getMonth());setCalYear(d.getFullYear())
+                }}>&#8594;</button>
+                <button className="btn btn-sm btn-p" onClick={function(){setCalMonth(new Date().getMonth());setCalYear(new Date().getFullYear())}}>Aujourd'hui</button>
+              </div>
+
+              {calView==='month'&&(function(){
+                var firstDay=new Date(calYear,calMonth,1)
+                var lastDay=new Date(calYear,calMonth+1,0)
+                var startDow=firstDay.getDay()===0?6:firstDay.getDay()-1
+                var cells=[]
+                for(var i=0;i<startDow;i++) cells.push(null)
+                for(var d=1;d<=lastDay.getDate();d++) cells.push(d)
+                var today=new Date().toISOString().split('T')[0]
+                var days=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']
+                return(
+                  <div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>
+                      {days.map(function(d){return <div key={d} style={{textAlign:'center',fontSize:10,fontWeight:900,padding:'4px 0',opacity:.5,textTransform:'uppercase'}}>{d}</div>})}
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2}}>
+                      {cells.map(function(day,idx){
+                        if(!day) return <div key={'e'+idx} style={{minHeight:80,background:'#F8F8F8',borderRadius:4}}/>
+                        var ds=calYear+'-'+(calMonth+1<10?'0'+(calMonth+1):(calMonth+1))+'-'+(day<10?'0'+day:day)
+                        var dayEvts=calEvents.filter(function(e){return e.start_date<=ds&&(e.end_date||e.start_date)>=ds})
+                        var isToday=ds===today
+                        var evtColors={event:'#FF82D7',rdv:'#005FFF',livraison:'#009D3A',relance:'#FF6B2B',admin:'#888',other:'#FFEB5A'}
+                        return(
+                          <div key={day} style={{minHeight:80,background:isToday?'#FFF5FF':'#fff',borderRadius:4,border:isToday?'2px solid #FF82D7':'1px solid #EBEBEB',padding:'4px',cursor:'pointer'}} onClick={function(){openModal('cal_event',{assignee:'all',type:'event',start_date:ds})}}>
+                            <div style={{fontWeight:isToday?900:400,fontSize:12,color:isToday?'#FF82D7':'#191923',marginBottom:2}}>{day}</div>
+                            {dayEvts.slice(0,3).map(function(e,ei){return(
+                              <div key={ei} style={{fontSize:9,fontWeight:700,background:evtColors[e.type]||'#FFEB5A',color:e.type==='admin'||e.type==='other'?'#191923':'#fff',borderRadius:2,padding:'1px 4px',marginBottom:1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',cursor:'pointer'}} onClick={function(ev){ev.stopPropagation();openModal('cal_event',Object.assign({},e))}}>
+                                {e.time?e.time.slice(0,5)+' ':''}{e.title}
+                              </div>
+                            )})}
+                            {dayEvts.length>3&&<div style={{fontSize:8,opacity:.5}}>+{dayEvts.length-3}</div>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {calView==='list'&&(
+                <div>
+                  {(function(){
+                    var today=new Date().toISOString().split('T')[0]
+                    var sorted=calEvents.slice().sort(function(a,b){return (a.start_date||'').localeCompare(b.start_date||'')})
+                    var upcoming=sorted.filter(function(e){return (e.end_date||e.start_date)>=today})
+                    var past=sorted.filter(function(e){return (e.end_date||e.start_date)<today})
+                    var evtColors={event:'#FF82D7',rdv:'#005FFF',livraison:'#009D3A',relance:'#FF6B2B',admin:'#888',other:'#FFEB5A'}
+                    var evtLabels={event:'🎉 Event client',rdv:'🤝 RDV',livraison:'🚚 Livraison',relance:'📞 Relance',admin:'📋 Admin',other:'Autre'}
+                    function renderEvt(e,i){
+                      var col=evtColors[e.type]||'#FFEB5A'
+                      return(
+                        <div key={i} className="card" style={{marginBottom:6,borderLeft:'4px solid '+col,cursor:'pointer'}} onClick={function(){openModal('cal_event',Object.assign({},e))}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                            <div style={{flex:1}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3}}>
+                                <span style={{fontSize:9,background:col,color:e.type==='other'?'#191923':'#fff',padding:'2px 6px',borderRadius:3,fontWeight:900}}>{evtLabels[e.type]||e.type}</span>
+                                {e.assignee&&e.assignee!=='all'&&<span style={{fontSize:9,background:'#EBEBEB',padding:'2px 6px',borderRadius:3}}>{e.assignee}</span>}
+                              </div>
+                              <div style={{fontWeight:900,fontSize:14}}>{e.title}</div>
+                              {e.prospect&&<div style={{fontSize:12,color:'#555',marginTop:1}}>👤 {e.prospect}</div>}
+                              {e.location&&<div style={{fontSize:11,color:'#888',marginTop:1}}>📍 {e.location}</div>}
+                              {e.notes&&<div style={{fontSize:11,opacity:.5,marginTop:4}}>{e.notes}</div>}
+                            </div>
+                            <div style={{textAlign:'right',flexShrink:0}}>
+                              <div style={{fontWeight:900,fontSize:13}}>{e.start_date?new Date(e.start_date+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):''}</div>
+                              {e.time&&<div style={{fontSize:11,color:'#888'}}>{e.time.slice(0,5)}</div>}
+                              {e.amount&&<div style={{fontSize:12,fontWeight:900,color:'#009D3A',marginTop:2}}>{parseFloat(e.amount).toLocaleString('fr-FR')} €</div>}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return(
+                      <div>
+                        {upcoming.length>0&&(
+                          <div style={{marginBottom:16}}>
+                            <div className="yt" style={{fontSize:18,marginBottom:8,color:'#005FFF'}}>📅 À venir ({upcoming.length})</div>
+                            {upcoming.map(renderEvt)}
+                          </div>
+                        )}
+                        {past.length>0&&(
+                          <div>
+                            <div className="yt" style={{fontSize:18,marginBottom:8,opacity:.5}}>📁 Passés ({past.length})</div>
+                            {past.slice().reverse().map(renderEvt)}
+                          </div>
+                        )}
+                        {calEvents.length===0&&<div style={{textAlign:'center',padding:40,opacity:.4}}>Aucun événement — crée le premier !</div>}
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
+
+              {calView==='week'&&(function(){
+                var today=new Date()
+                var dow=today.getDay()===0?6:today.getDay()-1
+                var monday=new Date(calYear,calMonth,1)
+                var weekDays=[]
+                for(var i=0;i<7;i++){
+                  var d=new Date(monday)
+                  d.setDate(monday.getDate()+i)
+                  weekDays.push(d)
+                }
+                var todayStr=new Date().toISOString().split('T')[0]
+                var evtColors={event:'#FF82D7',rdv:'#005FFF',livraison:'#009D3A',relance:'#FF6B2B',admin:'#888',other:'#FFEB5A'}
+                return(
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4}}>
+                    {weekDays.map(function(d,i){
+                      var ds=d.toISOString().split('T')[0]
+                      var dayEvts=calEvents.filter(function(e){return e.start_date<=ds&&(e.end_date||e.start_date)>=ds})
+                      var isToday=ds===todayStr
+                      var dayNames=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']
+                      return(
+                        <div key={i} style={{background:isToday?'#FFF5FF':'#fff',borderRadius:6,border:isToday?'2px solid #FF82D7':'1px solid #EBEBEB',padding:'8px',minHeight:120}}>
+                          <div style={{fontWeight:900,fontSize:11,textTransform:'uppercase',color:isToday?'#FF82D7':'#888',marginBottom:4}}>{dayNames[i]}</div>
+                          <div style={{fontWeight:900,fontSize:20,color:isToday?'#FF82D7':'#191923',marginBottom:6}}>{d.getDate()}</div>
+                          {dayEvts.map(function(e,ei){return(
+                            <div key={ei} style={{fontSize:10,background:evtColors[e.type]||'#FFEB5A',color:e.type==='other'?'#191923':'#fff',borderRadius:3,padding:'3px 6px',marginBottom:3,cursor:'pointer',lineHeight:1.4}} onClick={function(){openModal('cal_event',Object.assign({},e))}}>
+                              {e.time?e.time.slice(0,5)+' ':''}{e.title}
+                            </div>
+                          )})}
+                          <div style={{opacity:.3,fontSize:9,cursor:'pointer',marginTop:4}} onClick={function(){openModal('cal_event',{assignee:'all',type:'event',start_date:ds})}}>+ Ajouter</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
             </div>
           )}
 
@@ -2574,6 +2776,61 @@ export default function DashboardPage() {
             <div className="mf">
               <button className="btn" onClick={closeModal}>Annuler</button>
               <button className="btn btn-y" onClick={saveVault}>{form.id?'Modifier':'Ajouter'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal === 'cal_event' && (
+        <div className="overlay" onClick={closeModal}>
+          <div className="modal" onClick={function(e){e.stopPropagation()}}>
+            <div className="mh"><div className="mt">{form.id?"Modifier l'événement":'Nouvel événement'}</div></div>
+            <div className="mb">
+              <div className="fg"><label className="lbl">Titre *</label><input className="inp" value={form.title||''} onChange={function(e){setForm(Object.assign({},form,{title:e.target.value}))}} placeholder="Ex: Event corporate Wagram" /></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div className="fg"><label className="lbl">Date début *</label><input type="date" className="inp" value={form.start_date||''} onChange={function(e){setForm(Object.assign({},form,{start_date:e.target.value}))}} /></div>
+                <div className="fg"><label className="lbl">Date fin</label><input type="date" className="inp" value={form.end_date||''} onChange={function(e){setForm(Object.assign({},form,{end_date:e.target.value}))}} /></div>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div className="fg"><label className="lbl">Heure</label><input type="time" className="inp" value={form.time||''} onChange={function(e){setForm(Object.assign({},form,{time:e.target.value}))}} /></div>
+                <div className="fg"><label className="lbl">Type</label>
+                  <select className="inp" value={form.type||'event'} onChange={function(e){setForm(Object.assign({},form,{type:e.target.value}))}}>
+                    <option value="event">🎉 Événement client</option>
+                    <option value="rdv">🤝 RDV prospect</option>
+                    <option value="livraison">🚚 Livraison / Prestation</option>
+                    <option value="relance">📞 Relance</option>
+                    <option value="admin">📋 Admin / Interne</option>
+                    <option value="other">Autre</option>
+                  </select>
+                </div>
+              </div>
+              <div className="fg"><label className="lbl">Lieu</label><input className="inp" value={form.location||''} onChange={function(e){setForm(Object.assign({},form,{location:e.target.value}))}} placeholder="Adresse ou lieu" /></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div className="fg"><label className="lbl">Client / Prospect</label><input className="inp" value={form.prospect||''} onChange={function(e){setForm(Object.assign({},form,{prospect:e.target.value}))}} placeholder="Nom de l'entreprise" /></div>
+                <div className="fg"><label className="lbl">Montant estimé €HT</label><input type="number" className="inp" value={form.amount||''} onChange={function(e){setForm(Object.assign({},form,{amount:e.target.value}))}} /></div>
+              </div>
+              <div className="fg"><label className="lbl">Assigné à</label>
+                <select className="inp" value={form.assignee||'all'} onChange={function(e){setForm(Object.assign({},form,{assignee:e.target.value}))}}>
+                  <option value="all">Edward + Emy</option>
+                  <option value="edward">Edward</option>
+                  <option value="emy">Emy</option>
+                </select>
+              </div>
+              <div className="fg"><label className="lbl">Notes</label><textarea className="inp" rows={2} value={form.notes||''} onChange={function(e){setForm(Object.assign({},form,{notes:e.target.value}))}} /></div>
+            </div>
+            <div className="mf">
+              <button className="btn" onClick={closeModal}>Annuler</button>
+              {form.id&&<button className="btn btn-red" onClick={function(){deleteCalEvent(form.id);closeModal();toast('Événement supprimé')}}>Supprimer</button>}
+              <button className="btn btn-y" onClick={function(){
+                if(!form.title||!form.start_date){toast('Titre et date requis !');return}
+                saveCalEvent({
+                  id:form.id||undefined,
+                  title:form.title,start_date:form.start_date,end_date:form.end_date||form.start_date,
+                  time:form.time||null,type:form.type||'event',location:form.location||'',
+                  prospect:form.prospect||'',amount:parseFloat(form.amount)||null,
+                  assignee:form.assignee||'all',notes:form.notes||''
+                },function(){closeModal();toast(form.id?'Événement modifié ✓':'Événement créé ✓')})
+              }}>{form.id?'Modifier':'Créer'}</button>
             </div>
           </div>
         </div>
