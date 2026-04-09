@@ -589,6 +589,8 @@ export default function DashboardPage() {
   const [instaData, setInstaData] = useState(null)
   const [instaLoading, setInstaLoading] = useState(false)
   const [instaTab, setInstaTab] = useState('comments')
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushLoading, setPushLoading] = useState(false)
   const [calEvents, setCalEvents] = useState([])
   const [calMonth, setCalMonth] = useState(new Date().getMonth())
   const [calYear, setCalYear] = useState(new Date().getFullYear())
@@ -628,6 +630,16 @@ export default function DashboardPage() {
     if (!profile) return
     loadContacts()
     loadCalEvents()
+    // Check push subscription status
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      navigator.serviceWorker.getRegistration('/sw.js').then(function(reg) {
+        if (reg) {
+          reg.pushManager.getSubscription().then(function(sub) {
+            if (sub) setPushEnabled(true)
+          })
+        }
+      })
+    }
   }, [profile])
 
   useEffect(function() {
@@ -690,6 +702,69 @@ export default function DashboardPage() {
   const today = new Date().toISOString().split('T')[0]
   const isEmy = profile && profile.role === 'emy'
   const senderSig = isEmy ? 'Emy | B2B Manager | emy@meshuga.fr | +33 6 24 67 78 66' : 'Edward | Big Boss | edward@meshuga.fr | +33 6 58 58 58 01'
+
+  const VAPID_PUBLIC_KEY = 'BIuqZmpJbHgu57aUBKlExbzzOI96jwCEWgFrZ3M14Yv9mdHmsZzGCI_D4Z_GTY6dymRXOpeznrAYrcsgvbiskPc'
+  const SUPABASE_FN_URL = 'https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-push'
+
+  function urlBase64ToUint8Array(base64String) {
+    var padding = '='.repeat((4 - base64String.length % 4) % 4)
+    var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+    var rawData = window.atob(base64)
+    var outputArray = new Uint8Array(rawData.length)
+    for (var i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i) }
+    return outputArray
+  }
+
+  async function registerPush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      toast('Push non supporté sur ce navigateur')
+      return
+    }
+    setPushLoading(true)
+    try {
+      var reg = await navigator.serviceWorker.register('/sw.js')
+      var perm = await Notification.requestPermission()
+      if (perm !== 'granted') { toast('Notifications refusées'); setPushLoading(false); return }
+      var sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      })
+      var res = await fetch('/api/push-subscribe', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          subscription: sub.toJSON(),
+          userRole: (profile && profile.role) || 'edward',
+          userName: (profile && profile.full_name) || ''
+        })
+      })
+      if (res.ok) { setPushEnabled(true); toast('🔔 Notifications activées !') }
+    } catch(e) { toast('Erreur: ' + e.message) }
+    setPushLoading(false)
+  }
+
+  async function unregisterPush() {
+    var reg = await navigator.serviceWorker.getRegistration('/sw.js')
+    if (reg) {
+      var sub = await reg.pushManager.getSubscription()
+      if (sub) {
+        await fetch('/api/push-subscribe', {method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})})
+        await sub.unsubscribe()
+      }
+    }
+    setPushEnabled(false)
+    toast('Notifications désactivées')
+  }
+
+  async function sendPushToAll(title, body, target) {
+    try {
+      await fetch(SUPABASE_FN_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({title, body, target: target || 'all'})
+      })
+    } catch(e) { console.error('Push send error:', e) }
+  }
 
   function logActivity(type, description, prospectName, emailContent) {
     const entry = {user_role: (profile && profile.role) || 'unknown', user_name: (profile && profile.full_name) || '?', type: type, description: description, prospect_name: prospectName || null, email_content: emailContent || null}
@@ -893,7 +968,14 @@ export default function DashboardPage() {
     if (!form.title) { toast('Titre requis !'); return }
     const t = Object.assign({}, form, {checklist: form.checklist || [], files: form.files || []})
     if (form.id) { setTasks(function(prev) { return prev.map(function(x) { return x.id === form.id ? t : x }) }) }
-    else { setTasks(function(prev) { return prev.concat([Object.assign({}, t, {id: Date.now(), status: 'todo'})]) }) }
+    else {
+      setTasks(function(prev) { return prev.concat([Object.assign({}, t, {id: Date.now(), status: 'todo'})]) })
+      var assigneeName = form.assignee === 'emy' ? 'Emy' : 'Edward'
+      var senderName = isEmy ? 'Emy' : 'Edward'
+      if (form.assignee !== (isEmy ? 'emy' : 'edward')) {
+        sendPushToAll('📋 Nouvelle tâche — ' + form.title, 'Assignée à ' + assigneeName + ' par ' + senderName + (form.deadline ? ' · Deadline : ' + form.deadline : ''), form.assignee)
+      }
+    }
     closeModal()
   }
 
