@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 
-const PLACE_ID = 'ChIJ4xaUA7tx5kc6qN/4P1O61Q'
 const API_KEY = process.env.GOOGLE_PLACES_API_KEY
 
 export async function GET() {
@@ -9,18 +8,60 @@ export async function GET() {
   }
 
   try {
-    const url = `https://places.googleapis.com/v1/places/${PLACE_ID}?fields=rating,userRatingCount,reviews,displayName&key=${API_KEY}&languageCode=fr`
-    const res = await fetch(url, {
-      headers: { 'X-Goog-FieldMask': 'rating,userRatingCount,reviews,displayName' }
-    })
-    const data = await res.json()
+    // Step 1: Find Place ID via text search
+    const searchRes = await fetch(
+      'https://places.googleapis.com/v1/places:searchText',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': API_KEY,
+          'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.userRatingCount',
+        },
+        body: JSON.stringify({
+          textQuery: 'Meshuga Crazy Deli 3 rue Vavin Paris',
+          languageCode: 'fr',
+        }),
+      }
+    )
 
-    if (!res.ok || data.error) {
-      console.error('GMB error:', data)
-      return NextResponse.json({ ok: false, error: data.error?.message || 'Erreur API', mock: true, ...MOCK_DATA })
+    const searchData = await searchRes.json()
+    
+    if (!searchRes.ok || !searchData.places || searchData.places.length === 0) {
+      console.error('GMB search error:', JSON.stringify(searchData))
+      return NextResponse.json({ ok: false, error: 'Lieu non trouvé: ' + JSON.stringify(searchData).slice(0,200), mock: true, ...MOCK_DATA })
     }
 
-    const reviews = (data.reviews || []).map((r: any) => ({
+    const place = searchData.places[0]
+    const placeId = place.id
+
+    // Step 2: Get reviews for this place
+    const detailRes = await fetch(
+      `https://places.googleapis.com/v1/places/${placeId}`,
+      {
+        headers: {
+          'X-Goog-Api-Key': API_KEY,
+          'X-Goog-FieldMask': 'id,displayName,rating,userRatingCount,reviews',
+        },
+      }
+    )
+
+    const detailData = await detailRes.json()
+
+    if (!detailRes.ok) {
+      console.error('GMB detail error:', JSON.stringify(detailData))
+      return NextResponse.json({
+        ok: true,
+        mock: false,
+        name: place.displayName?.text || 'Meshuga',
+        rating: place.rating || 0,
+        totalRatings: place.userRatingCount || 0,
+        reviews: [],
+        placeId,
+      })
+    }
+
+    const reviews = (detailData.reviews || []).map((r: any) => ({
       author: r.authorAttribution?.displayName || 'Anonyme',
       rating: r.rating || 5,
       text: r.text?.text || '',
@@ -31,11 +72,13 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       mock: false,
-      name: data.displayName?.text || 'Meshuga',
-      rating: data.rating || 0,
-      totalRatings: data.userRatingCount || 0,
+      name: detailData.displayName?.text || 'Meshuga',
+      rating: detailData.rating || 0,
+      totalRatings: detailData.userRatingCount || 0,
       reviews,
+      placeId,
     })
+
   } catch (e: any) {
     console.error('GMB fetch error:', e)
     return NextResponse.json({ ok: false, error: e.message, mock: true, ...MOCK_DATA })
