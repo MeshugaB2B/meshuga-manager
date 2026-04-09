@@ -715,55 +715,52 @@ export default function DashboardPage() {
     return outputArray
   }
 
-  async function registerPush() {
+  function registerPush() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      toast('Push non supporté sur ce navigateur')
-      return
+      toast('Push non supporté sur ce navigateur'); return
     }
     setPushLoading(true)
-    try {
-      var reg = await navigator.serviceWorker.register('/sw.js')
-      var perm = await Notification.requestPermission()
-      if (perm !== 'granted') { toast('Notifications refusées'); setPushLoading(false); return }
-      var sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      })
-      var res = await fetch('/api/push-subscribe', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          subscription: sub.toJSON(),
-          userRole: (profile && profile.role) || 'edward',
-          userName: (profile && profile.full_name) || ''
+    navigator.serviceWorker.register('/sw.js').then(function(reg) {
+      return Notification.requestPermission().then(function(perm) {
+        if (perm !== 'granted') { toast('Notifications refusées'); setPushLoading(false); return }
+        return reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        }).then(function(sub) {
+          return fetch('/api/push-subscribe', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              subscription: sub.toJSON(),
+              userRole: (profile && profile.role) || 'edward',
+              userName: (profile && profile.full_name) || ''
+            })
+          }).then(function(res) {
+            if (res.ok) { setPushEnabled(true); toast('🔔 Notifications activées !') }
+            setPushLoading(false)
+          })
         })
       })
-      if (res.ok) { setPushEnabled(true); toast('🔔 Notifications activées !') }
-    } catch(e) { toast('Erreur: ' + e.message) }
-    setPushLoading(false)
+    }).catch(function(e) { toast('Erreur: ' + (e.message||e)); setPushLoading(false) })
   }
 
-  async function unregisterPush() {
-    var reg = await navigator.serviceWorker.getRegistration('/sw.js')
-    if (reg) {
-      var sub = await reg.pushManager.getSubscription()
-      if (sub) {
-        await fetch('/api/push-subscribe', {method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})})
-        await sub.unsubscribe()
-      }
-    }
-    setPushEnabled(false)
-    toast('Notifications désactivées')
-  }
-
-  async function sendPushToAll(title, body, target) {
-    try {
-      await fetch(SUPABASE_FN_URL, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({title, body, target: target || 'all'})
+  function unregisterPush() {
+    navigator.serviceWorker.getRegistration('/sw.js').then(function(reg) {
+      if (!reg) { setPushEnabled(false); toast('Notifications désactivées'); return }
+      reg.pushManager.getSubscription().then(function(sub) {
+        if (!sub) { setPushEnabled(false); toast('Notifications désactivées'); return }
+        fetch('/api/push-subscribe', {method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})})
+        sub.unsubscribe().then(function() { setPushEnabled(false); toast('Notifications désactivées') })
       })
-    } catch(e) { console.error('Push send error:', e) }
+    })
+  }
+
+  function sendPushToAll(title, body, target) {
+    fetch(SUPABASE_FN_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({title: title, body: body, target: target || 'all'})
+    }).catch(function(e) { console.error('Push send error:', e) })
   }
 
   function logActivity(type, description, prospectName, emailContent) {
