@@ -1744,10 +1744,10 @@ export default function DashboardPage() {
                 var days=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']
                 return(
                   <div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,minmax(0,1fr))',gap:2,marginBottom:4}}>
                       {days.map(function(d){return <div key={d} style={{textAlign:'center',fontSize:10,fontWeight:900,padding:'4px 0',opacity:.5,textTransform:'uppercase'}}>{d}</div>})}
                     </div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2}}>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(7,minmax(0,1fr))',gap:2}}>
                       {cells.map(function(day,idx){
                         if(!day) return <div key={'e'+idx} style={{minHeight:120,background:'#F8F8F8',borderRadius:6}}/>
                         var ds=calYear+'-'+(calMonth+1<10?'0'+(calMonth+1):(calMonth+1))+'-'+(day<10?'0'+day:day)
@@ -1758,7 +1758,7 @@ export default function DashboardPage() {
                           <div key={day} style={{minHeight:120,background:isToday?'#FFF5FF':'#fff',borderRadius:6,border:isToday?'2px solid #FF82D7':'1px solid #EBEBEB',padding:'6px',cursor:'pointer'}} onClick={function(){openModal('cal_event',{assignee:'all',type:'event',start_date:ds})}}>
                             <div style={{fontWeight:isToday?900:400,fontSize:12,color:isToday?'#FF82D7':'#191923',marginBottom:2}}>{day}</div>
                             {dayEvts.slice(0,3).map(function(e,ei){return(
-                              <div key={ei} style={{fontSize:9,fontWeight:700,background:e.source==='ai_suggestion'?'#F0F4FF':evtColors[e.type]||'#FFEB5A',color:e.source==='ai_suggestion'?'#005FFF':(e.type==='admin'||e.type==='other'?'#191923':'#fff'),borderRadius:2,padding:'1px 4px',marginBottom:1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',cursor:'pointer',border:e.source==='ai_suggestion'?'1px dashed #005FFF':'none',opacity:e.source==='ai_suggestion'?0.85:1}} onClick={function(ev){ev.stopPropagation();openModal('cal_event',Object.assign({},e))}}>
+                              <div key={ei} style={{fontSize:9,fontWeight:700,background:e.source==='ai_suggestion'?'#F0F4FF':evtColors[e.type]||'#FFEB5A',color:e.source==='ai_suggestion'?'#005FFF':(e.type==='admin'||e.type==='other'?'#191923':'#fff'),borderRadius:2,padding:'1px 4px',marginBottom:1,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',cursor:'pointer',maxWidth:'100%',boxSizing:'border-box',border:e.source==='ai_suggestion'?'1px dashed #005FFF':'none',opacity:e.source==='ai_suggestion'?0.85:1}} onClick={function(ev){ev.stopPropagation();openModal('cal_event',Object.assign({},e))}}>
                                 {e.source==='ai_suggestion'?'💡 ':''}{e.time?e.time.slice(0,5)+' ':''}{e.title}
                               </div>
                             )})}
@@ -1839,7 +1839,7 @@ export default function DashboardPage() {
                 var todayStr=new Date().toISOString().split('T')[0]
                 var evtColors={event:'#FF82D7',rdv:'#005FFF',livraison:'#009D3A',relance:'#FF6B2B',admin:'#888',other:'#FFEB5A'}
                 return(
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4}}>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(7,minmax(0,1fr))',gap:4}}>
                     {weekDays.map(function(d,i){
                       var ds=d.toISOString().split('T')[0]
                       var dayEvts=calEvents.filter(function(e){return e.start_date<=ds&&(e.end_date||e.start_date)>=ds})
