@@ -1,0 +1,84 @@
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+
+export async function POST() {
+  try {
+    var today = new Date().toISOString().split('T')[0]
+    var future = new Date()
+    future.setMonth(future.getMonth() + 3)
+    var futureStr = future.toISOString().split('T')[0]
+
+    var aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'web-search-2025-03-05'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 3000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        system: 'Tu es un assistant pour Meshuga Crazy Deli (3 rue Vavin Paris 6e), un deli new-yorkais B2B specialise dans les plateaux repas et le catering corporate. Trouve les evenements professionnels a Paris qui representent des opportunites commerciales : fashion week, salons pro, trade shows, congres, events startup, events luxe/mode, foires. Reponds UNIQUEMENT avec un tableau JSON valide, sans aucun texte avant ou apres. Format exact : [{"title":"Nom evenement","start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD","notes":"Pourquoi cest une opportunite pour Meshuga Deli","location":"Lieu Paris"}]',
+        messages: [{
+          role: 'user',
+          content: 'Quels sont les evenements professionnels, salons, trade shows et grands evenements a Paris du ' + today + ' au ' + futureStr + ' ? Cherche specifiquement : Fashion Week Paris, Maison et Objet, SIAL, salons professionnels Porte de Versailles, Palais des Congres, Paris Expo, events startup Paris, events luxe et mode, congres medicaux, foires gastronomiques. Retourne 15 a 20 evenements en JSON strict.'
+        }]
+      })
+    })
+
+    var aiData = await aiRes.json()
+    var text = ''
+    if (aiData.content) {
+      for (var i = 0; i < aiData.content.length; i++) {
+        if (aiData.content[i].type === 'text') {
+          text += aiData.content[i].text
+        }
+      }
+    }
+
+    if (!text) {
+      return NextResponse.json({ ok: false, error: 'Pas de reponse IA', raw: aiData }, { status: 400 })
+    }
+
+    var clean = text.replace(/```json/g, '').replace(/```/g, '').trim()
+    var startIdx = clean.indexOf('[')
+    var endIdx = clean.lastIndexOf(']')
+    if (startIdx === -1 || endIdx === -1) {
+      return NextResponse.json({ ok: false, error: 'JSON invalide', raw: text }, { status: 400 })
+    }
+    clean = clean.slice(startIdx, endIdx + 1)
+
+    var events = JSON.parse(clean)
+
+    var supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    )
+
+    await supabase.from('cal_events').delete().eq('source', 'ai_suggestion')
+
+    var toInsert = []
+    for (var j = 0; j < events.length; j++) {
+      var ev = events[j]
+      if (!ev.title || !ev.start_date) continue
+      toInsert.push({
+        title: ev.title,
+        start_date: ev.start_date,
+        end_date: ev.end_date || ev.start_date,
+        type: 'event',
+        notes: ev.notes || '',
+        location: ev.location || 'Paris',
+        source: 'ai_suggestion',
+        assignee: 'all'
+      })
+    }
+
+    var insertRes = await supabase.from('cal_events').insert(toInsert).select()
+
+    return NextResponse.json({ ok: true, count: (insertRes.data || []).length })
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 })
+  }
+}
