@@ -591,10 +591,11 @@ export default function DashboardPage() {
   const [instaTab, setInstaTab] = useState('comments')
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
+  const [aiEventsLoading, setAiEventsLoading] = useState(false)
   const [calEvents, setCalEvents] = useState([])
   const [calMonth, setCalMonth] = useState(new Date().getMonth())
   const [calYear, setCalYear] = useState(new Date().getFullYear())
-  const [calView, setCalView] = useState('month')
+  const [calView, setCalView] = useState('list')
 
   useEffect(function() {
     async function load() {
@@ -785,6 +786,17 @@ export default function DashboardPage() {
   }
   function deleteCalEvent(id) {
     sb().from('cal_events').delete().eq('id',id).then(function(r){if(!r.error)loadCalEvents()})
+  }
+  function fetchAIEvents() {
+    setAiEventsLoading(true)
+    fetch('/api/cal-ai-events', {method:'POST'})
+      .then(function(r){return r.json()})
+      .then(function(d){
+        setAiEventsLoading(false)
+        if(d.ok){loadCalEvents();toast('✨ '+d.count+' suggestions IA ajoutées !')}
+        else toast('Erreur IA: '+(d.error||'Inconnue'))
+      })
+      .catch(function(){setAiEventsLoading(false);toast('Erreur de connexion')})
   }
   function loadContacts() {
     sb().from('contacts').select('*').order('name',{ascending:true}).then(function(r){if(r.data)setContacts(r.data)})
@@ -1770,6 +1782,7 @@ export default function DashboardPage() {
                       <button key={v} style={{padding:'5px 12px',fontSize:10,fontWeight:900,background:calView===v?'#191923':'transparent',color:calView===v?'#FFEB5A':'#191923',border:'none',cursor:'pointer'}} onClick={function(){setCalView(v)}}>{v==='month'?'Mois':v==='week'?'Semaine':'Liste'}</button>
                     )})}
                   </div>
+                  <button className="btn btn-b btn-sm" onClick={fetchAIEvents} disabled={aiEventsLoading} style={{opacity:aiEventsLoading?0.6:1}}>{aiEventsLoading?'⏳ Recherche...':'✨ Suggestions IA'}</button>
                   <button className="btn btn-y btn-sm" onClick={function(){openModal('cal_event',{assignee:'all',type:'event',start_date:new Date().toISOString().split('T')[0]})}}>+ Événement</button>
                 </div>
               </div>
