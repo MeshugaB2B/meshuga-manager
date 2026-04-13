@@ -588,6 +588,7 @@ function DashboardImpl() {
   const [scriptProspect, setScriptProspect] = useState(null)
   const [scriptContent, setScriptContent] = useState('')
   const [scriptLoading, setScriptLoading] = useState(false)
+  const [enrichLoading, setEnrichLoading] = useState(false)
   const [gmbData, setGmbData] = useState(null)
   const [gmbLoading, setGmbLoading] = useState(false)
   const [gmbFilter, setGmbFilter] = useState('all')
@@ -834,6 +835,34 @@ function DashboardImpl() {
       setScriptContent('Erreur: '+e.message)
       setScriptLoading(false)
     })
+  }
+
+  function enrichProspect() {
+    var name = form.name || ''
+    if (!name || name.length < 2) { toast('Saisis d'abord le nom de l'entreprise'); return }
+    setEnrichLoading(true)
+    fetch('/api/enrich-prospect', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name: name })
+    })
+    .then(function(r){ return r.json() })
+    .then(function(d) {
+      if (d.error) { toast('Erreur: ' + d.error); return }
+      setForm(function(prev) {
+        return Object.assign({}, prev, {
+          category: d.category || prev.category,
+          size: d.size || prev.size,
+          email: d.email || prev.email,
+          phone: d.phone || prev.phone,
+          notes: d.pitch ? (prev.notes ? prev.notes + '\n' + d.pitch : d.pitch) : prev.notes,
+          temperature: d.temperature || prev.temperature
+        })
+      })
+      toast('✨ Fiche enrichie par l'IA !')
+    })
+    .catch(function(e){ toast('Erreur: ' + e.message) })
+    .finally(function(){ setEnrichLoading(false) })
   }
 
   function sendPushToAll(title, body, target) {
@@ -3033,7 +3062,16 @@ function DashboardImpl() {
           <div className="modal" onClick={function(e){e.stopPropagation()}}>
             <div className="mh"><div className="mt">{form.id?'Modifier le prospect':'Nouveau prospect'}</div></div>
             <div className="mb">
-              <div className="fg"><label className="lbl">Nom de l'entreprise *</label><input className="inp" value={form.name||''} onChange={function(e){setForm(Object.assign({},form,{name:e.target.value}))}} placeholder="Ex: Agence Wagram Events" /></div>
+              <div className="fg">
+                <label className="lbl">Nom de l'entreprise *</label>
+                <div style={{display:'flex',gap:8}}>
+                  <input className="inp" value={form.name||''} onChange={function(e){setForm(Object.assign({},form,{name:e.target.value}))}} placeholder="Ex: Agence Wagram Events" style={{flex:1}} />
+                  <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',flexShrink:0,opacity:enrichLoading?0.5:1,fontSize:11}} disabled={enrichLoading} onClick={enrichProspect}>
+                    {enrichLoading ? '⏳' : '✨ IA'}
+                  </button>
+                </div>
+                {!form.id && <div style={{fontSize:10,color:'#888',marginTop:3}}>Tape le nom et clique ✨ IA pour pré-remplir automatiquement</div>}
+              </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                 <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e){setForm(Object.assign({},form,{email:e.target.value}))}} /></div>
                 <div className="fg"><label className="lbl">Téléphone</label><input className="inp" value={form.phone||''} onChange={function(e){setForm(Object.assign({},form,{phone:e.target.value}))}} /></div>
