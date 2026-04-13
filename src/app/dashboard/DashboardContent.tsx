@@ -1684,7 +1684,7 @@ function DashboardImpl() {
                       <div style={{background:'#FFEB5A',borderRadius:7,padding:'12px 14px',border:'2px solid rgba(255,255,255,.3)'}}>
                         <div style={{fontSize:12,color:'rgba(25,25,35,.7)',fontWeight:900,marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>🎉 Commission</div>
                         <div style={{fontWeight:900,fontSize:24,color:'#191923'}}>{commission.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} <span style={{fontSize:12,opacity:.5}}>€</span></div>
-                        <div style={{fontSize:10,color:'#333',fontWeight:700,marginTop:2}}>{progress !== null ? progress + '% de l'objectif' : 'Bravo Emy 🚀'}</div>
+                        <div style={{fontSize:10,color:'#333',fontWeight:700,marginTop:2}}>{progress !== null ? progress + "% de l'objectif" : 'Bravo Emy 🚀'}</div>
                       </div>
                     </div>
 
