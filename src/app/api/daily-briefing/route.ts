@@ -104,17 +104,61 @@ async function buildBriefing(supabase: any, role: string) {
     lines.push('📞 Relances : ' + prospects.map((p: any) => p.name).join(', '))
   }
 
-  // Devis Edward
-  if (role === 'edward' && devisAttente && devisAttente.length > 0) {
-    const totalHT = devisAttente.reduce((s: number, d: any) => s + (parseFloat(d.total_ht) || 0), 0)
-    lines.push(`📄 ${devisAttente.length} devis en attente — ${totalHT.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} € HT`)
+  // Devis Edward + tâches Emy visibles par Edward
+  if (role === 'edward') {
+    if (devisAttente && devisAttente.length > 0) {
+      const totalHT = devisAttente.reduce((s: number, d: any) => s + (parseFloat(d.total_ht) || 0), 0)
+      lines.push(`📄 ${devisAttente.length} devis en attente — ${totalHT.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} € HT`)
+    }
+    // Tâches d'Emy aujourd'hui
+    const { data: emyTasks } = await supabase
+      .from('tasks')
+      .select('title, priority')
+      .or('assignee.eq.emy,assignee.eq.all')
+      .eq('done', false)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    if (emyTasks && emyTasks.length > 0) {
+      lines.push('👩 Emy aujourd'hui : ' + emyTasks.map((t: any) => t.title).join(', '))
+    }
+    // Prospects qu'Emy doit relancer
+    const { data: emyProspects } = await supabase
+      .from('prospects')
+      .select('name, temperature')
+      .lte('next_contact_date', today)
+      .neq('status', 'won')
+      .neq('status', 'lost')
+      .limit(5)
+    if (emyProspects && emyProspects.length > 0) {
+      const chauds = emyProspects.filter((p: any) => p.temperature === 'chaud')
+      if (chauds.length > 0) lines.push('🔥 Relances urgentes Emy : ' + chauds.map((p: any) => p.name).join(', '))
+      else lines.push('📞 Relances Emy : ' + emyProspects.map((p: any) => p.name).join(', '))
+    }
+  }
+
+  // Top 3 priorités IA pour Emy
+  if (role === 'emy' && prospects && prospects.length > 0) {
+    try {
+      var top3Res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY || '', 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 150,
+          messages: [{ role: 'user', content: 'Commerciale B2B Meshuga Crazy Deli Paris. Prospects actifs : ' + JSON.stringify(prospects.slice(0,10).map(function(p: any){return {name:p.name,status:p.status,temp:p.temperature,nextDate:p.next_contact_date}})) + '. Donne les 3 prospects les plus prioritaires à contacter aujourd hui avec 1 raison courte chacun. Format: "1. NOM — raison · 2. NOM — raison · 3. NOM — raison". Sois direct.' }]
+        })
+      })
+      var top3Data = await top3Res.json()
+      var top3 = top3Data.content?.[0]?.text?.trim() || ''
+      if (top3) lines.push('🎯 Top 3 : ' + top3)
+    } catch(e) {}
   }
 
   const context = lines.join('. ')
   const conseil = await getAiConseil(role, context)
   if (conseil) lines.push('🧠 ' + conseil)
 
-  const title = `☀️ Bonjour ${prenom} — ${todayFr.charAt(0).toUpperCase() + todayFr.slice(1)}`
+  const title = `🌭 Bonjour ${prenom} — ${todayFr.charAt(0).toUpperCase() + todayFr.slice(1)}`
   const body = lines.join(' · ')
   return { title, body }
 }
