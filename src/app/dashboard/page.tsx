@@ -1,5 +1,5 @@
 'use client' // build-fix
-export const dynamic = 'force-dynamic'
+import dynamic_next from 'next/dynamic'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
@@ -532,7 +532,7 @@ const ALL_PROSPECTS = [
 
 ]
 
-export default function DashboardPage() {
+function DashboardImpl() {
   const [mounted, setMounted] = useState(false)
   const [profile, setProfile] = useState(null)
   const [page, setPage] = useState('dash')
@@ -2995,3 +2995,10 @@ export default function DashboardPage() {
     </div>
   )
 }
+
+const DashboardPage = dynamic_next(
+  function() { return Promise.resolve({ default: DashboardImpl }) },
+  { ssr: false, loading: function() { return null } }
+)
+
+export default DashboardPage
