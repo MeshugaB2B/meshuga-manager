@@ -9,7 +9,6 @@ const sb = () => createClient(
 )
 
 const G = `
-@import url('https://fonts.googleapis.com/css2?family=Yellowtail&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Arial Narrow',Arial,sans-serif;background:#FFEB5A;color:#191923;height:100vh;overflow:hidden}
 .yt{font-family:'Yellowtail',cursive}
@@ -1114,6 +1113,9 @@ export default function DashboardPage() {
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet" />
       <style dangerouslySetInnerHTML={{__html: G}} />
 
       {!profile && (
