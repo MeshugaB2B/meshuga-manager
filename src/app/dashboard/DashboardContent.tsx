@@ -584,6 +584,10 @@ function DashboardImpl() {
   const [crmFilter, setCrmFilter] = useState('all')
   const [crmPeriod, setCrmPeriod] = useState('all')
   const [crmSearch, setCrmSearch] = useState('')
+  const [crmView, setCrmView] = useState('list')
+  const [scriptProspect, setScriptProspect] = useState(null)
+  const [scriptContent, setScriptContent] = useState('')
+  const [scriptLoading, setScriptLoading] = useState(false)
   const [gmbData, setGmbData] = useState(null)
   const [gmbLoading, setGmbLoading] = useState(false)
   const [gmbFilter, setGmbFilter] = useState('all')
@@ -798,6 +802,37 @@ function DashboardImpl() {
         fetch('/api/push-subscribe', {method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})})
         sub.unsubscribe().then(function() { setPushEnabled(false); toast('Notifications désactivées') })
       })
+    })
+  }
+
+  function generateScript(p) {
+    setScriptProspect(p)
+    setScriptContent('')
+    setScriptLoading(true)
+    fetch('/api/generate-script', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        prospect: {
+          name: p.name,
+          category: p.category || p.cat || '',
+          size: p.size || p.taille || '',
+          notes: p.notes || p.pitch || '',
+          status: p.status,
+          temperature: p.temperature,
+          email: p.email,
+          arrondissement: p.arrondissement || ''
+        }
+      })
+    })
+    .then(function(r){return r.json()})
+    .then(function(d){
+      setScriptContent(d.content || d.email || d.text || 'Erreur génération')
+      setScriptLoading(false)
+    })
+    .catch(function(e){
+      setScriptContent('Erreur: '+e.message)
+      setScriptLoading(false)
     })
   }
 
@@ -1508,7 +1543,14 @@ function DashboardImpl() {
             <div>
               <div className="ph">
                 <div><div className="pt">CRM Prospects</div><div className="ps">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length} actifs · {prospects.length} total</div></div>
-                <button className="btn btn-y btn-sm" onClick={function() { openModal('prospect', {status:'contacted',temperature:'tiede',ca:0,files:[]}) }}>+ Nouveau</button>
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  <button className="btn btn-sm" style={{background:crmView==='list'?'#191923':'#F5F5F5',color:crmView==='list'?'#FFEB5A':'#555',fontSize:11}} onClick={function(){setCrmView('list')}}>☰ Liste</button>
+                  <button className="btn btn-sm" style={{background:crmView==='kanban'?'#191923':'#F5F5F5',color:crmView==='kanban'?'#FFEB5A':'#555',fontSize:11}} onClick={function(){setCrmView('kanban')}}>⬛ Kanban</button>
+                  <button className="btn btn-y btn-sm" onClick={function() { openModal('prospect', {status:'contacted',temperature:'tiede',ca:0,files:[]}) }}>+ Nouveau</button>
+                </div>
+              </div>
+              <div style={{padding:'0 0 10px'}}>
+                <input className="inp" placeholder="🔍 Rechercher un prospect..." value={crmSearch} onChange={function(e){setCrmSearch(e.target.value)}} style={{width:'100%'}} />
               </div>
 
               {/* COMMISSION EMY */}
@@ -1600,8 +1642,9 @@ function DashboardImpl() {
               </div>
 
               {/* LISTE PROSPECTS ACTIFS */}
-              {prospects.filter(function(p){
+              {crmView === 'list' && prospects.filter(function(p){
                 if(p.status==='won'||p.status==='lost') return false
+                if(crmSearch && !p.name.toLowerCase().includes(crmSearch.toLowerCase()) && !(p.category||'').toLowerCase().includes(crmSearch.toLowerCase())) return false
                 if(crmFilter==='all') return true
                 if(crmFilter==='contacted'||crmFilter==='nego') return p.status===crmFilter
                 return p.temperature===crmFilter
@@ -1623,6 +1666,7 @@ function DashboardImpl() {
                       <div style={{display:'flex',gap:4,flexShrink:0}}>
                         <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){openModal('prospect',Object.assign({},p))}}>✏️</button>
                         <button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={function(e){e.stopPropagation();generateEmail(Object.assign({},p,{cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category}),p.status==='contacted'||p.status==='nego'?'relance':'first')}}>{p.status==='contacted'||p.status==='nego'?'✉️ Relance':'✉️ Email'}</button>
+                        <button className="btn btn-sm" style={{fontSize:10,background:'#FF82D7',color:'#fff'}} onClick={function(e){e.stopPropagation();generateScript(p)}}>📞 Script</button>
                       </div>
                     </div>
 
@@ -1692,6 +1736,114 @@ function DashboardImpl() {
                   </div>
                 )
               })}
+
+              {/* VUE KANBAN */}
+              {crmView === 'kanban' && (function(){
+                var cols = [
+                  {id:'to_contact', label:'À contacter', color:'#888', icon:'📋'},
+                  {id:'contacted', label:'Contacté', color:'#005FFF', icon:'📞'},
+                  {id:'nego', label:'En négo', color:'#FF82D7', icon:'🤝'},
+                  {id:'won', label:'Gagné', color:'#009D3A', icon:'🏆'},
+                  {id:'lost', label:'Perdu', color:'#CC0066', icon:'✗'},
+                ]
+                var search = crmSearch.toLowerCase()
+                return (
+                  <div style={{overflowX:'auto',paddingBottom:12}}>
+                    <div style={{display:'flex',gap:10,minWidth:600}}>
+                      {cols.map(function(col){
+                        var colProspects = prospects.filter(function(p){
+                          var matchSearch = !search || p.name.toLowerCase().includes(search) || (p.category||'').toLowerCase().includes(search)
+                          return p.status === col.id && matchSearch
+                        })
+                        return (
+                          <div key={col.id} style={{flex:'0 0 200px',background:'#F8F8F8',borderRadius:10,padding:10,border:'1.5px solid #EEE'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10,paddingBottom:8,borderBottom:'2px solid '+col.color}}>
+                              <span style={{fontSize:14}}>{col.icon}</span>
+                              <div>
+                                <div style={{fontWeight:900,fontSize:12,color:col.color,textTransform:'uppercase',letterSpacing:.5}}>{col.label}</div>
+                                <div style={{fontSize:10,color:'#888'}}>{colProspects.length} prospect{colProspects.length!==1?'s':''}</div>
+                              </div>
+                            </div>
+                            {colProspects.map(function(p){
+                              var tempColors = {chaud:'#CC0066',tiede:'#FF6B2B',froid:'#005FFF'}
+                              var isLate = p.nextDate && p.nextDate <= new Date().toISOString().split('T')[0]
+                              return (
+                                <div key={p.id} style={{background:'#fff',borderRadius:8,padding:'10px',marginBottom:8,border:'1px solid #EEE',borderLeft:'3px solid '+(isLate?'#CC0066':tempColors[p.temperature]||col.color),cursor:'pointer'}}
+                                  onClick={function(){openModal('prospect',Object.assign({},p))}}>
+                                  <div style={{fontWeight:900,fontSize:13,marginBottom:3}}>{p.name}</div>
+                                  <div style={{fontSize:10,color:'#888',marginBottom:6}}>{p.category}</div>
+                                  {isLate && <div style={{fontSize:10,color:'#CC0066',fontWeight:900,marginBottom:4}}>⚠️ Relance en retard</div>}
+                                  {p.nextDate && !isLate && <div style={{fontSize:10,color:'#555',marginBottom:4}}>📅 {p.nextDate}</div>}
+                                  <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                                    <button className="btn btn-sm" style={{fontSize:9,padding:'2px 6px',background:'#FF82D7',color:'#fff'}} onClick={function(e){e.stopPropagation();generateScript(p)}}>📞 Script</button>
+                                    <button className="btn btn-sm" style={{fontSize:9,padding:'2px 6px'}} onClick={function(e){e.stopPropagation();generateEmail(Object.assign({},p,{cat:'crm',taille:p.size,pitch:p.notes||'',type:p.category}),'first')}}>✉️</button>
+                                  </div>
+                                  {/* Drag statut rapide */}
+                                  <div style={{display:'flex',gap:3,marginTop:6,flexWrap:'wrap'}}>
+                                    {col.id !== 'won' && col.id !== 'lost' && (
+                                      <select style={{fontSize:9,border:'1px solid #EEE',borderRadius:4,padding:'2px 4px',background:'#fafafa',color:'#555',width:'100%'}}
+                                        value={p.status}
+                                        onChange={function(e){
+                                          var newStatus = e.target.value
+                                          setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:newStatus}):x})})
+                                          if(newStatus==='won') sendPushToAll('🏆 Gagné !', p.name+' est client !', 'all')
+                                          toast('Statut mis à jour ✓')
+                                        }}>
+                                        <option value="to_contact">→ À contacter</option>
+                                        <option value="contacted">→ Contacté</option>
+                                        <option value="nego">→ En négo</option>
+                                        <option value="won">→ 🏆 Gagné</option>
+                                        <option value="lost">→ Perdu</option>
+                                      </select>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                            {colProspects.length === 0 && (
+                              <div style={{textAlign:'center',padding:'20px 10px',color:'#CCC',fontSize:11}}>Aucun prospect</div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* SCRIPT APPEL MODAL */}
+              {scriptProspect && (
+                <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:200,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={function(){setScriptProspect(null);setScriptContent('')}}>
+                  <div style={{background:'#fff',borderRadius:'16px 16px 0 0',padding:20,width:'100%',maxWidth:520,maxHeight:'80vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+                      <div>
+                        <div style={{fontFamily:'Yellowtail,cursive',fontSize:22,color:'#191923'}}>📞 Script d'appel</div>
+                        <div style={{fontSize:12,color:'#888',marginTop:2}}>{scriptProspect.name}</div>
+                      </div>
+                      <button style={{background:'none',border:'none',fontSize:22,cursor:'pointer',color:'#888'}} onClick={function(){setScriptProspect(null);setScriptContent('')}}>✕</button>
+                    </div>
+                    {scriptLoading && (
+                      <div style={{textAlign:'center',padding:40}}>
+                        <div style={{fontSize:32,marginBottom:8}}>🧠</div>
+                        <div style={{fontSize:13,color:'#888'}}>L'IA prépare ton script...</div>
+                      </div>
+                    )}
+                    {!scriptLoading && scriptContent && (
+                      <div>
+                        <div style={{background:'#FFFBEA',border:'1.5px solid #FFEB5A',borderRadius:10,padding:16,fontSize:13,lineHeight:1.7,whiteSpace:'pre-wrap',color:'#191923'}}>
+                          {scriptContent}
+                        </div>
+                        <div style={{display:'flex',gap:8,marginTop:12}}>
+                          <button className="btn btn-y" style={{flex:1,fontWeight:900}} onClick={function(){
+                            navigator.clipboard.writeText(scriptContent).then(function(){toast('Script copié ✓')})
+                          }}>📋 Copier le script</button>
+                          <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff'}} onClick={function(){generateScript(scriptProspect)}}>🔄 Regénérer</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* GAGNÉS */}
               {prospects.filter(function(p){return p.status==='won'}).length > 0 && (
