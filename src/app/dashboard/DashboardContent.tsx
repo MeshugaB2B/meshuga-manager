@@ -1,5 +1,4 @@
 'use client' // build-fix
-import dynamic_next from 'next/dynamic'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
@@ -2996,9 +2995,4 @@ function DashboardImpl() {
   )
 }
 
-const DashboardPage = dynamic_next(
-  function() { return Promise.resolve({ default: DashboardImpl }) },
-  { ssr: false, loading: function() { return null } }
-)
-
-export default DashboardPage
+export default DashboardImpl
