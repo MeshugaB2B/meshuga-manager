@@ -599,20 +599,28 @@ export default function DashboardPage() {
   const [calView, setCalView] = useState('list')
 
   useEffect(function() {
+    var timeout = setTimeout(function() { window.location.href = '/login' }, 8000)
     async function load() {
-      const res = await sb().auth.getUser()
-      const user = res.data.user
-      if (!user) return
-      const r2 = await sb().from('profiles').select('*').eq('id', user.id).single()
-      const prof = r2.data
-      if (prof && prof.role) {
-        setProfile(prof)
-      } else {
-        const role = user.email && user.email.includes('emy') ? 'emy' : 'edward'
-        setProfile({ role: role, full_name: role === 'emy' ? 'Emy' : 'Edward', email: user.email })
+      try {
+        const res = await sb().auth.getUser()
+        const user = res.data.user
+        if (!user) { clearTimeout(timeout); window.location.href = '/login'; return }
+        const r2 = await sb().from('profiles').select('*').eq('id', user.id).single()
+        const prof = r2.data
+        clearTimeout(timeout)
+        if (prof && prof.role) {
+          setProfile(prof)
+        } else {
+          const role = user.email && user.email.includes('emy') ? 'emy' : 'edward'
+          setProfile({ role: role, full_name: role === 'emy' ? 'Emy' : 'Edward', email: user.email })
+        }
+      } catch(e) {
+        clearTimeout(timeout)
+        window.location.href = '/login'
       }
     }
     load()
+    return function() { clearTimeout(timeout) }
   }, [])
 
   useEffect(function() {
