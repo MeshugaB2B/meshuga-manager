@@ -1748,15 +1748,15 @@ function DashboardImpl() {
                 ]
                 var search = crmSearch.toLowerCase()
                 return (
-                  <div style={{overflowX:'auto',paddingBottom:12}}>
-                    <div style={{display:'flex',gap:10,minWidth:600}}>
+                  <div style={{paddingBottom:12}}>
+                    <div style={{display:'flex',flexDirection:'column',gap:10}}>
                       {cols.map(function(col){
                         var colProspects = prospects.filter(function(p){
                           var matchSearch = !search || p.name.toLowerCase().includes(search) || (p.category||'').toLowerCase().includes(search)
                           return p.status === col.id && matchSearch
                         })
                         return (
-                          <div key={col.id} style={{flex:'0 0 200px',background:'#F8F8F8',borderRadius:10,padding:10,border:'1.5px solid #EEE'}}>
+                          <div key={col.id} style={{width:'100%',background:'#F8F8F8',borderRadius:10,padding:10,border:'1.5px solid #EEE'}}>
                             <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10,paddingBottom:8,borderBottom:'2px solid '+col.color}}>
                               <span style={{fontSize:14}}>{col.icon}</span>
                               <div>
@@ -1764,11 +1764,12 @@ function DashboardImpl() {
                                 <div style={{fontSize:10,color:'#888'}}>{colProspects.length} prospect{colProspects.length!==1?'s':''}</div>
                               </div>
                             </div>
+                            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
                             {colProspects.map(function(p){
                               var tempColors = {chaud:'#CC0066',tiede:'#FF6B2B',froid:'#005FFF'}
                               var isLate = p.nextDate && p.nextDate <= new Date().toISOString().split('T')[0]
                               return (
-                                <div key={p.id} style={{background:'#fff',borderRadius:8,padding:'10px',marginBottom:8,border:'1px solid #EEE',borderLeft:'3px solid '+(isLate?'#CC0066':tempColors[p.temperature]||col.color),cursor:'pointer'}}
+                                <div key={p.id} style={{background:'#fff',borderRadius:8,padding:'10px',border:'1px solid #EEE',borderLeft:'3px solid '+(isLate?'#CC0066':tempColors[p.temperature]||col.color),cursor:'pointer'}}
                                   onClick={function(){openModal('prospect',Object.assign({},p))}}>
                                   <div style={{fontWeight:900,fontSize:13,marginBottom:3}}>{p.name}</div>
                                   <div style={{fontSize:10,color:'#888',marginBottom:6}}>{p.category}</div>
@@ -1800,6 +1801,7 @@ function DashboardImpl() {
                                 </div>
                               )
                             })}
+                            </div>
                             {colProspects.length === 0 && (
                               <div style={{textAlign:'center',padding:'20px 10px',color:'#CCC',fontSize:11}}>Aucun prospect</div>
                             )}
