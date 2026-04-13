@@ -2666,11 +2666,11 @@ function DashboardImpl() {
                     style={{background:'#191923',color:'#FFEB5A',fontWeight:900,width:'100%'}}
                     onClick={function(){
                       fetch('/api/daily-briefing',{method:'POST'})
-                        .then(function(){toast('☀️ Briefing envoyé !')})
+                        .then(function(){toast('🌭 Briefing envoyé !')})
                         .catch(function(e){toast('Erreur: '+e.message)})
                     }}
                   >
-                    ☀️ Envoyer le briefing maintenant
+                    🌭 Envoyer le briefing maintenant
                   </button>
                 </div>
 
