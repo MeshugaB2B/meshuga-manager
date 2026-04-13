@@ -744,7 +744,7 @@ function DashboardImpl() {
   const isEmy = profile && profile.role === 'emy'
   const senderSig = isEmy ? 'Emy | B2B Manager | emy@meshuga.fr | +33 6 24 67 78 66' : 'Edward | Big Boss | edward@meshuga.fr | +33 6 58 58 58 01'
 
-  const VAPID_PUBLIC_KEY = 'BIuqZmpJbHgu57aUBKlExbzzOI96jwCEWgFrZ3M14Yv9mdHmsZzGCI_D4Z_GTY6dymRXOpeznrAYrcsgvbiskPc'
+  const VAPID_PUBLIC_KEY = 'BBwJb444Jzo-UcTnBZbiy6BCZOZM7W0IbsQbkK2-Tw9RijSHRu3vtbOpyIG4jQoF_BvWyL8Nq-unbiYrneRKTx4'
   const SUPABASE_FN_URL = 'https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-push'
 
   function urlBase64ToUint8Array(base64String) {
