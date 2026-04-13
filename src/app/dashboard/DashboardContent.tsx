@@ -1097,7 +1097,8 @@ function DashboardImpl() {
     } else {
       relanceContext = 'TU ECRIS UN PREMIER EMAIL DE PROSPECTION. Ton : chaleureux, humain, jamais commercial. Montre que tu connais leur univers. Propose un déjeuner découverte offert ou un plateau pour leur équipe. Court (120 mots max). Intègre naturellement 1 lien presse parmi ceux fournis.\n' + 'Liens presse : '+pick3.map(function(l){return l.name+' ('+l.url+')'}).join(', ')+'\n'
     }
-    const prompt = baseContext + prospectInfo + relanceContext + 'Signature : '+senderSig+'. Réponds UNIQUEMENT avec le corps de l\'email en français. Commence par l\'objet sur la 1ère ligne (format : "Objet : ...") puis le corps.'
+    var signatureLine = "Reponds UNIQUEMENT avec le corps de l'email en francais. Commence par l'objet sur la 1ere ligne (Objet : ...) puis le corps."
+    const prompt = baseContext + prospectInfo + relanceContext + "Signature : " + senderSig + ". " + signatureLine
     try {
       const res = await fetch('/api/generate-email', {
         method: 'POST',
@@ -1637,7 +1638,8 @@ function DashboardImpl() {
                       <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
                         {['month','year','all'].map(function(per){return(
                           <button key={per} className="btn btn-sm" style={{fontSize:9,padding:'3px 8px',background:crmPeriod===per?'#191923':'#F5F5F5',color:crmPeriod===per?'#FFEB5A':'#555',border:'1.5px solid '+(crmPeriod===per?'#191923':'#DDD')}} onClick={function(){setCrmPeriod(per)}}>{per==='month'?'Mois':per==='year'?'Année':'Total'}</button>
-                        ))}
+                        )})
+                      }
                       </div>
                     </div>
 
