@@ -55,8 +55,8 @@ export async function GET(req: Request) {
   }
 
   await Promise.all([
-    sendPush('📞 Rappel relances — Midi', emyLines.join(' · '), 'emy'),
-    sendPush('📊 Suivi terrain midi', edwardLines.join(' · '), 'edward')
+    sendPush('🥪 Relances de midi !', emyLines.join(' · '), 'emy'),
+    sendPush('📊 Terrain — suivi midi', edwardLines.join(' · '), 'edward')
   ])
 
   return NextResponse.json({ ok: true, prospects: prospects?.length })
