@@ -601,18 +601,21 @@ function DashboardImpl() {
   useEffect(function() { setMounted(true) }, [])
 
   useEffect(function() {
-    // Timeout dur 4s : si Supabase ne répond pas, on va au login
+    // Timer securite 10s
     var hardTimer = setTimeout(function() {
       window.location.href = '/login'
-    }, 4000)
+    }, 10000)
 
-    // onAuthStateChange est plus fiable que getSession sur Safari
-    var sub = sb().auth.onAuthStateChange(function(event, session) {
+    var profileSet = false
+
+    function handleSession(session) {
       clearTimeout(hardTimer)
       if (!session || !session.user) {
-        window.location.href = '/login'
+        if (!profileSet) window.location.href = '/login'
         return
       }
+      if (profileSet) return
+      profileSet = true
       var user = session.user
       sb().from('profiles').select('*').eq('id', user.id).single().then(function(r2) {
         var prof = r2.data
@@ -623,6 +626,22 @@ function DashboardImpl() {
           setProfile({ role: role, full_name: role === 'emy' ? 'Emy' : 'Edward', email: user.email })
         }
       })
+    }
+
+    // getSession en premier - fix Safari + remount React
+    sb().auth.getSession().then(function(r) {
+      if (r.data && r.data.session) {
+        handleSession(r.data.session)
+      }
+    })
+
+    // onAuthStateChange pour les changements futurs
+    var sub = sb().auth.onAuthStateChange(function(event, session) {
+      if (event === 'SIGNED_OUT') {
+        window.location.href = '/login'
+      } else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+        handleSession(session)
+      }
     })
 
     return function() {
@@ -2994,5 +3013,6 @@ function DashboardImpl() {
     </div>
   )
 }
+
 
 export default DashboardImpl
