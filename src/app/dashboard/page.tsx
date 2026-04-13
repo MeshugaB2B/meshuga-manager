@@ -591,6 +591,7 @@ export default function DashboardPage() {
   const [instaTab, setInstaTab] = useState('comments')
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
+  const [briefingLoading, setBriefingLoading] = useState(false)
   const [aiEventsLoading, setAiEventsLoading] = useState(false)
   const [calEvents, setCalEvents] = useState([])
   const [calMonth, setCalMonth] = useState(new Date().getMonth())
@@ -787,6 +788,17 @@ export default function DashboardPage() {
   }
   function deleteCalEvent(id) {
     sb().from('cal_events').delete().eq('id',id).then(function(r){if(!r.error)loadCalEvents()})
+  }
+  function sendBriefing() {
+    setBriefingLoading(true)
+    fetch('/api/daily-briefing', {method:'POST'})
+      .then(function(r){return r.json()})
+      .then(function(d){
+        setBriefingLoading(false)
+        if(d.ok) toast('☀️ Briefing envoyé à Edward & Emy !')
+        else toast('Erreur briefing')
+      })
+      .catch(function(){setBriefingLoading(false);toast('Erreur de connexion')})
   }
   function fetchAIEvents() {
     setAiEventsLoading(true)
@@ -1787,6 +1799,7 @@ export default function DashboardPage() {
                     )})}
                   </div>
                   <button className="btn btn-b btn-sm" onClick={fetchAIEvents} disabled={aiEventsLoading} style={{opacity:aiEventsLoading?0.6:1}}>{aiEventsLoading?'⏳ Recherche...':'✨ Suggestions IA'}</button>
+                  <button className="btn btn-sm" style={{background:'#FF6B2B',color:'#fff',opacity:briefingLoading?0.6:1}} onClick={sendBriefing} disabled={briefingLoading}>{briefingLoading?'⏳ Envoi...':'☀️ Envoyer briefing'}</button>
                   <button className="btn btn-y btn-sm" onClick={function(){openModal('cal_event',{assignee:'all',type:'event',start_date:new Date().toISOString().split('T')[0]})}}>+ Événement</button>
                 </div>
               </div>
