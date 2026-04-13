@@ -82,7 +82,7 @@ export async function GET(req: Request) {
   // Message Emy
   const emyLines = [`${contactsEmy} action${contactsEmy > 1 ? 's' : ''} aujourd'hui`]
   if (newDevis > 0) emyLines.push(`${newDevis} devis créé${newDevis > 1 ? 's' : ''}`)
-  if (encouragement) emyLines.push('✨ ' + encouragement)
+  if (encouragement) emyLines.push('🧠 ' + encouragement)
 
   // Message Edward
   const edwardLines = [`Emy : ${contactsEmy} actions · Toi : ${contactsEdward} actions`]
@@ -90,11 +90,11 @@ export async function GET(req: Request) {
   if (devisAttente && devisAttente.length > 0) {
     edwardLines.push(`${devisAttente.length} devis en attente — ${totalAttente.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} € HT`)
   }
-  if (encouragement) edwardLines.push('✨ ' + encouragement)
+  if (encouragement) edwardLines.push('🧠 ' + encouragement)
 
   await Promise.all([
-    sendPush('🌙 Bonne soirée Emy !', emyLines.join(' · '), 'emy'),
-    sendPush('🌙 Bilan du jour, Edward', edwardLines.join(' · '), 'edward')
+    sendPush('🥪 Bonne soirée Emy !', emyLines.join(' · '), 'emy'),
+    sendPush('🌭 Bilan du jour, Edward', edwardLines.join(' · '), 'edward')
   ])
 
   return NextResponse.json({ ok: true, context })
