@@ -592,6 +592,11 @@ function DashboardImpl() {
   const [instaTab, setInstaTab] = useState('comments')
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
+  const [notifTitle, setNotifTitle] = useState('')
+  const [notifBody, setNotifBody] = useState('')
+  const [notifTarget, setNotifTarget] = useState('all')
+  const [notifSending, setNotifSending] = useState(false)
+  const [notifSent, setNotifSent] = useState(false)
   const [briefingLoading, setBriefingLoading] = useState(false)
   const [aiEventsLoading, setAiEventsLoading] = useState(false)
   const [calEvents, setCalEvents] = useState([])
@@ -744,7 +749,7 @@ function DashboardImpl() {
   const isEmy = profile && profile.role === 'emy'
   const senderSig = isEmy ? 'Emy | B2B Manager | emy@meshuga.fr | +33 6 24 67 78 66' : 'Edward | Big Boss | edward@meshuga.fr | +33 6 58 58 58 01'
 
-  const VAPID_PUBLIC_KEY = 'BBwJb444Jzo-UcTnBZbiy6BCZOZM7W0IbsQbkK2-Tw9RijSHRu3vtbOpyIG4jQoF_BvWyL8Nq-unbiYrneRKTx4'
+  const VAPID_PUBLIC_KEY = 'BIuqZmpJbHgu57aUBKlExbzzOI96jwCEWgFrZ3M14Yv9mdHmsZzGCI_D4Z_GTY6dymRXOpeznrAYrcsgvbiskPc'
   const SUPABASE_FN_URL = 'https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-push'
 
   function urlBase64ToUint8Array(base64String) {
@@ -1126,6 +1131,7 @@ function DashboardImpl() {
     {id: 'gmb', label: 'Google My Biz.', icon: '⭐'},
     {id: 'instagram', label: 'Instagram', icon: '📸'},
     {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
+    {id: 'notifs', label: 'Notifications', icon: '🔔'},
   ]
 
   if (!mounted) return null
@@ -2596,6 +2602,95 @@ function DashboardImpl() {
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {page === 'notifs' && (
+            <div>
+              <div className="ph">
+                <div><div className="pt">Notifications 🔔</div><div className="ps">Envoyer · Gérer les abonnements</div></div>
+              </div>
+              <div style={{padding:16,display:'flex',flexDirection:'column',gap:16,maxWidth:520}}>
+
+                {/* Envoi manuel */}
+                <div style={{background:'#fff',borderRadius:12,padding:20,border:'1.5px solid #FFEB5A'}}>
+                  <div style={{fontFamily:'Yellowtail,cursive',fontSize:20,color:'#191923',marginBottom:16}}>Envoyer une notification</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                    <div>
+                      <label style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#666',display:'block',marginBottom:4}}>Titre</label>
+                      <input className="inp" value={notifTitle} onChange={function(e){setNotifTitle(e.target.value)}} placeholder="Ex: Nouvelle commande reçue !" style={{width:'100%'}} />
+                    </div>
+                    <div>
+                      <label style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#666',display:'block',marginBottom:4}}>Message</label>
+                      <textarea className="inp" value={notifBody} onChange={function(e){setNotifBody(e.target.value)}} placeholder="Votre message ici..." rows={3} style={{width:'100%',resize:'vertical'}} />
+                    </div>
+                    <div>
+                      <label style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#666',display:'block',marginBottom:4}}>Destinataire</label>
+                      <select className="inp" value={notifTarget} onChange={function(e){setNotifTarget(e.target.value)}} style={{width:'100%'}}>
+                        <option value="all">Tout le monde (Edward + Emy)</option>
+                        <option value="edward">Edward uniquement</option>
+                        <option value="emy">Emy uniquement</option>
+                      </select>
+                    </div>
+                    <button
+                      className="btn"
+                      style={{background:'#FFEB5A',color:'#191923',fontWeight:900,marginTop:4,opacity:notifSending||!notifTitle||!notifBody?0.5:1}}
+                      disabled={notifSending||!notifTitle||!notifBody}
+                      onClick={function(){
+                        setNotifSending(true)
+                        setNotifSent(false)
+                        fetch('https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-push',{
+                          method:'POST',
+                          headers:{'Content-Type':'application/json'},
+                          body:JSON.stringify({title:notifTitle,body:notifBody,target:notifTarget})
+                        }).then(function(){
+                          setNotifSent(true)
+                          setNotifTitle('')
+                          setNotifBody('')
+                          setTimeout(function(){setNotifSent(false)},3000)
+                        }).catch(function(e){toast('Erreur: '+e.message)})
+                        .finally(function(){setNotifSending(false)})
+                      }}
+                    >
+                      {notifSending ? '⏳ Envoi...' : notifSent ? '✅ Envoyée !' : '🔔 Envoyer'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Briefing du jour */}
+                <div style={{background:'#fff',borderRadius:12,padding:20,border:'1px solid #eee'}}>
+                  <div style={{fontFamily:'Yellowtail,cursive',fontSize:18,color:'#191923',marginBottom:12}}>Briefing du jour</div>
+                  <div style={{fontSize:12,color:'#666',marginBottom:12}}>Envoie à Edward et Emy leur programme du jour avec conseil IA.</div>
+                  <button
+                    className="btn"
+                    style={{background:'#191923',color:'#FFEB5A',fontWeight:900,width:'100%'}}
+                    onClick={function(){
+                      fetch('/api/daily-briefing',{method:'POST'})
+                        .then(function(){toast('☀️ Briefing envoyé !')})
+                        .catch(function(e){toast('Erreur: '+e.message)})
+                    }}
+                  >
+                    ☀️ Envoyer le briefing maintenant
+                  </button>
+                </div>
+
+                {/* Abonnement push */}
+                <div style={{background:'#fff',borderRadius:12,padding:20,border:'1px solid #eee'}}>
+                  <div style={{fontFamily:'Yellowtail,cursive',fontSize:18,color:'#191923',marginBottom:12}}>Mon abonnement</div>
+                  <button
+                    className="btn"
+                    style={{width:'100%',background:pushEnabled?'#009D3A':'#f5f5f5',color:pushEnabled?'#fff':'#191923',fontWeight:900,opacity:pushLoading?0.5:1}}
+                    disabled={pushLoading}
+                    onClick={pushEnabled?unregisterPush:registerPush}
+                  >
+                    {pushLoading?'⏳ ...':(pushEnabled?'🔔 Notifications activées — Désactiver':'🔕 Activer mes notifications')}
+                  </button>
+                  <div style={{fontSize:11,color:'#aaa',marginTop:8,textAlign:'center'}}>
+                    Notifications automatiques : 8h briefing · 12h30 relances · 18h bilan
+                  </div>
+                </div>
+
+              </div>
             </div>
           )}
 
