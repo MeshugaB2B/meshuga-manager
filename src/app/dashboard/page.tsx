@@ -1,9 +1,9 @@
 'use client'
 import dynamic from 'next/dynamic'
 
-const DashboardPage = dynamic(
+const DashboardContent = dynamic(
   () => import('./DashboardContent'),
   { ssr: false, loading: () => null }
 )
 
-export default DashboardPage
+export default DashboardContent
