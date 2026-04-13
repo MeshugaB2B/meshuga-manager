@@ -2,10 +2,11 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
-const sb = () => createClient(
+const _supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 )
+const sb = () => _supabase
 
 const G = `
 *{box-sizing:border-box;margin:0;padding:0}
