@@ -97,6 +97,8 @@ const RECIPES_DATA = [
   {id:'pink_lemonade',name:"Pink Lemonade",prixHT:3.3075,prixTTC:3.5,foodCost:0.6614508749999999,marge:2.65,foodCostPct:20.0,ingredients:[{"fournisseur": "Foodflow", "article": "Citrons jaunes", "unite": "kg", "prix_achat": 1.79, "qte": 0.055, "cout": 0.09845}, {"fournisseur": "Rouquette", "article": "Jus de citron", "unite": "L", "prix_achat": 2.34, "qte": 0.0625, "cout": 0.14625}, {"fournisseur": "Rouquette", "article": "Sucre", "unite": "kg", "prix_achat": 1.3, "qte": 0.021875, "cout": 0.028437499999999998}, {"fournisseur": "Rouquette", "article": "Grenadine", "unite": "L", "prix_achat": 5.7, "qte": 0.0009375, "cout": 0.0053437499999999995}, {"fournisseur": "Distribution Services", "article": "Bouteille", "unite": "U", "prix_achat": 0.3, "qte": 1.0, "cout": 0.3}, {"fournisseur": "China", "article": "Sticker", "unite": "U", "prix_achat": 0.07, "qte": 1.0, "cout": 0.07}]},
 ]
 
+const FC_CATALOG = [{"article": "Pain", "fournisseur": "Monarque", "unite": "U", "prix_achat": 0.58}, {"article": "saucisse SCHWART'S", "fournisseur": "Norbert", "unite": "kg", "prix_achat": 5.3}, {"article": "Oignons frits", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 6.44}, {"article": "ketchup", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 1.692}, {"article": "yellow mustard", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 4.66}, {"article": "sweet relish", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 7.04}, {"article": "cebette", "fournisseur": "Fooflow", "unite": "kg", "prix_achat": 10.0}, {"article": "cheddar", "fournisseur": "Fooflow", "unite": "kg", "prix_achat": 8.85}, {"article": "gouda", "fournisseur": "Fooflow", "unite": "kg", "prix_achat": 8.7}, {"article": "american cheese", "fournisseur": "Fooflow", "unite": "kg", "prix_achat": 7.2}, {"article": "pickles onions", "fournisseur": "maison", "unite": "kg", "prix_achat": 3.0}, {"article": "œufs(2)", "fournisseur": "Foodflow", "unite": "U", "prix_achat": 0.35}, {"article": "yuzu kosho", "fournisseur": "BienManger.com", "unite": "kg", "prix_achat": 70.0}, {"article": "échalote", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 3.0}, {"article": "sucrine", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 5.4}, {"article": "poulet", "fournisseur": "Boucherie Norbert", "unite": "kg", "prix_achat": 10.8}, {"article": "Echalote ciselée", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 3.0}, {"article": "mayonnaise maison", "fournisseur": "Maison", "unite": "kg", "prix_achat": 3.0}, {"article": "câpres", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 4.45}, {"article": "anchois", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 19.0}, {"article": "parmesan", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 16.26}, {"article": "moutarde ancienne", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 11.9}, {"article": "Thon", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 8.3}, {"article": "Sriracha", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 4.75}, {"article": "pickles  onions rouge", "fournisseur": "Maison", "unite": "kg", "prix_achat": 3.0}, {"article": "mayo  maison", "fournisseur": "Maison", "unite": "kg", "prix_achat": 3.0}, {"article": "pickles", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 8.89}, {"article": "Pastrami", "fournisseur": "boucherie norbert", "unite": "kg", "prix_achat": 22.8}, {"article": "Sauce Russe", "fournisseur": "maison", "unite": "kg", "prix_achat": 3.0}, {"article": "Saumon Fumé", "fournisseur": "Marina Sea food", "unite": "kg", "prix_achat": 30.0}, {"article": "échalotte ciselée", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 3.05}, {"article": "citron jaune", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 1.79}, {"article": "cream cheese", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 10.59}, {"article": "poivre noir", "fournisseur": "Rouqette", "unite": "kg", "prix_achat": 13.0}, {"article": "homard", "fournisseur": "Marina Sea food", "unite": "kg", "prix_achat": 102.0}, {"article": "écrevisse", "fournisseur": "Marina Sea food", "unite": "kg", "prix_achat": 37.0}, {"article": "Mayo lobster maison", "fournisseur": "Maison", "unite": "kg", "prix_achat": 2.64}, {"article": "croutons", "fournisseur": "Monarque", "unite": "U", "prix_achat": 0.69}, {"article": "sel", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 1.0}, {"article": "poivre", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 13.0}, {"article": "couverts", "fournisseur": "Distribution Service", "unite": "U", "prix_achat": 0.055}, {"article": "packaging", "fournisseur": "Distribution Service", "unite": "U", "prix_achat": 0.19}, {"article": "Nutella", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 9.56}, {"article": "Whole Earth Crunchy", "fournisseur": "Amazon", "unite": "kg", "prix_achat": 14.0}, {"article": "pomme terre Agria", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 1.07}, {"article": "Maizena", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 6.7}, {"article": "Huile", "fournisseur": "Rouquette", "unite": "l", "prix_achat": 1.9}, {"article": "Packaging sauce", "fournisseur": "Distribution Service", "unite": "U", "prix_achat": 0.03}, {"article": "chou rouge", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 1.82}, {"article": "chou blanc", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 1.05}, {"article": "carottes", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 0.91}, {"article": "yaourt grec", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 3.85}, {"article": "moutarde à l'ancienne", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 11.9}, {"article": "Citrons jaunes", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 1.79}, {"article": "Jus de citron", "fournisseur": "Rouquette", "unite": "L", "prix_achat": 2.34}, {"article": "Sucre", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 1.3}, {"article": "Grenadine", "fournisseur": "Rouquette", "unite": "L", "prix_achat": 5.7}, {"article": "Bouteille", "fournisseur": "Distribution Services", "unite": "U", "prix_achat": 0.3}, {"article": "Sticker", "fournisseur": "China", "unite": "U", "prix_achat": 0.07}]
+
 const INIT_VAULT = [{id:1,title:'Supabase',url:'https://supabase.com',user:'edward@meshuga.fr',pw:''},{id:2,title:'Vercel',url:'https://vercel.com',user:'edward@meshuga.fr',pw:''}]
 
 const ALL_PROSPECTS = [
@@ -613,6 +615,10 @@ function DashboardImpl() {
   const [fcView, setFcView] = useState('recettes')
   const [fcSelected, setFcSelected] = useState(null)
   const [fcPrices, setFcPrices] = useState({})
+  const [fcPrixTTC, setFcPrixTTC] = useState({})
+  const [fcRecipes, setFcRecipes] = useState(RECIPES_DATA)
+  const [fcEditModal, setFcEditModal] = useState(null)
+  const [fcEditForm, setFcEditForm] = useState(null)
   const [editObjectif, setEditObjectif] = useState(false)
   const [scoringLoading, setScoringLoading] = useState(false)
   const [fcSearch, setFcSearch] = useState('')
@@ -2894,10 +2900,15 @@ function DashboardImpl() {
           {page === 'foodcost' && (
             <div>
               <div className="ph">
-                <div><div className="pt">Food Cost 🥩</div><div className="ps">{RECIPES_DATA.length} recettes · Seuil alerte : {fcSeuil}%</div></div>
-                <div style={{display:'flex',gap:6}}>
+                <div><div className="pt">Food Cost 🥩</div><div className="ps">{fcRecipes.length} recettes · Seuil alerte : {fcSeuil}%</div></div>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                   <button className="btn btn-y btn-sm" style={{background:fcView==='recettes'?'#191923':'transparent',color:fcView==='recettes'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('recettes');setFcSelected(null)}}>Recettes</button>
                   <button className="btn btn-y btn-sm" style={{background:fcView==='fournisseurs'?'#191923':'transparent',color:fcView==='fournisseurs'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('fournisseurs');setFcSelected(null)}}>Fournisseurs</button>
+                  <button className="btn btn-y btn-sm" onClick={function(){
+                    setFcEditForm({id:'new_'+Date.now(),name:'',categorie:'sandwich',prixTTC:0,prixHT:0,foodCost:0,marge:0,foodCostPct:0,ingredients:[]})
+                    setFcEditModal('new')
+                    setFcSelected(null)
+                  }}>+ Nouveau</button>
                 </div>
               </div>
 
@@ -2914,10 +2925,10 @@ function DashboardImpl() {
                 <div>
                   {/* KPI SUMMARY */}
                   {(function(){
-                    var avg = RECIPES_DATA.reduce(function(s,r){return s+r.foodCostPct},0)/RECIPES_DATA.length
-                    var alerts = RECIPES_DATA.filter(function(r){return r.foodCostPct > fcSeuil})
-                    var best = RECIPES_DATA.slice().sort(function(a,b){return a.foodCostPct-b.foodCostPct})[0]
-                    var worst = RECIPES_DATA.slice().sort(function(a,b){return b.foodCostPct-a.foodCostPct})[0]
+                    var avg = fcRecipes.reduce(function(s,r){return s+r.foodCostPct},0)/fcRecipes.length
+                    var alerts = fcRecipes.filter(function(r){return r.foodCostPct > fcSeuil})
+                    var best = fcRecipes.slice().sort(function(a,b){return a.foodCostPct-b.foodCostPct})[0]
+                    var worst = fcRecipes.slice().sort(function(a,b){return b.foodCostPct-a.foodCostPct})[0]
                     return (
                       <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8,marginBottom:12}}>
                         <div style={{background:'#fff',borderRadius:10,padding:'12px 14px',border:'1.5px solid #EBEBEB'}}>
@@ -2944,19 +2955,22 @@ function DashboardImpl() {
                   })()}
 
                   {/* LISTE RECETTES */}
-                  {RECIPES_DATA.slice().sort(function(a,b){return b.foodCostPct-a.foodCostPct}).map(function(r){
+                  {fcRecipes.slice().sort(function(a,b){return b.foodCostPct-a.foodCostPct}).map(function(r){
                     var alert = r.foodCostPct > fcSeuil
                     var barColor = r.foodCostPct >= fcSeuil ? '#CC0066' : r.foodCostPct >= fcSeuil*0.8 ? '#FF6B2B' : '#009D3A'
                     return (
                       <div key={r.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(alert?'#CC0066':'#009D3A'),cursor:'pointer'}} onClick={function(){setFcSelected(r)}}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                          <div>
+                          <div style={{flex:1,cursor:'pointer'}} onClick={function(){setFcSelected(r)}}>
                             <div style={{fontWeight:900,fontSize:14}}>{r.name}</div>
                             <div style={{fontSize:11,opacity:.6}}>PV HT : {r.prixHT.toFixed(2)}€ · Marge : {r.marge.toFixed(2)}€</div>
                           </div>
-                          <div style={{textAlign:'right',flexShrink:0}}>
-                            <div style={{fontSize:20,fontWeight:900,color:barColor}}>{r.foodCostPct}%</div>
-                            <div style={{fontSize:10,opacity:.5}}>food cost</div>
+                          <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                            <div style={{textAlign:'right',cursor:'pointer'}} onClick={function(){setFcSelected(r)}}>
+                              <div style={{fontSize:20,fontWeight:900,color:barColor}}>{r.foodCostPct}%</div>
+                              <div style={{fontSize:10,opacity:.5}}>food cost</div>
+                            </div>
+                            <button className="btn btn-sm" style={{fontSize:11,flexShrink:0}} onClick={function(e){e.stopPropagation();setFcEditForm(JSON.parse(JSON.stringify(r)));setFcEditModal('edit')}}>✏️</button>
                           </div>
                         </div>
                         <div style={{background:'#F0F0F0',borderRadius:20,height:6,overflow:'hidden'}}>
@@ -2970,25 +2984,89 @@ function DashboardImpl() {
               )}
 
               {/* DETAIL RECETTE */}
-              {fcView === 'recettes' && fcSelected && (
+              {fcView === 'recettes' && fcSelected && (function(){
+                var TVA = 0.055
+                var prixTTCEdite = fcPrixTTC[fcSelected.id] || fcSelected.prixTTC
+                var prixHTEdite = prixTTCEdite / (1 + TVA)
+                var foodCostEdite = round2(fcSelected.foodCost / prixHTEdite * 100)
+                var margeEditee = prixHTEdite - fcSelected.foodCost
+                var conseilX4TTC = round2(fcSelected.foodCost * 4 * (1 + TVA))
+                var conseilX5TTC = round2(fcSelected.foodCost * 5 * (1 + TVA))
+                var conseilHTx4 = round2(fcSelected.foodCost * 4)
+                var conseilFCPct = round2(fcSelected.foodCost / (conseilX4TTC / (1+TVA)) * 100)
+                function round2(n) { return Math.round(n * 100) / 100 }
+                return (
                 <div>
                   <button className="btn btn-sm" style={{marginBottom:12}} onClick={function(){setFcSelected(null)}}>← Retour</button>
-                  <div style={{background:'#fff',borderRadius:12,padding:16,border:'1.5px solid #EBEBEB',marginBottom:12}}>
-                    <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,marginBottom:4}}>{fcSelected.name}</div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:12}}>
-                      <div style={{textAlign:'center',padding:'8px',background:'#F8F9FF',borderRadius:8}}>
-                        <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginBottom:2}}>Prix HT</div>
-                        <div style={{fontWeight:900,fontSize:18}}>{fcSelected.prixHT.toFixed(2)}€</div>
+
+                  {/* CONSEIL IA PRIX */}
+                  <div style={{background:'#FF82D7',borderRadius:12,padding:16,marginBottom:12,border:'2px solid #fff'}}>
+                    <div style={{fontFamily:"'Yellowtail',cursive",fontSize:18,color:'#191923',marginBottom:8}}>💡 Prix conseillé</div>
+                    <div style={{fontSize:12,color:'#191923',opacity:.7,marginBottom:12}}>Pour respecter le ratio x4 minimum (25% food cost) en restauration :</div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                      <div style={{background:'#FFEB5A',borderRadius:8,padding:'10px 12px',border:'none'}}>
+                        <div style={{fontSize:10,color:'#191923',fontWeight:900,textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>x4 — minimum</div>
+                        <div style={{fontSize:22,fontWeight:900,color:'#191923'}}>{conseilX4TTC}€ TTC</div>
+                        <div style={{fontSize:11,color:'#191923',opacity:.6,marginTop:2}}>{conseilHTx4.toFixed(2)}€ HT · FC {conseilFCPct}%</div>
                       </div>
-                      <div style={{textAlign:'center',padding:'8px',background:'#FFEB5A',borderRadius:8}}>
-                        <div style={{fontSize:10,opacity:.6,textTransform:'uppercase',marginBottom:2}}>Food Cost</div>
-                        <div style={{fontWeight:900,fontSize:18,color:fcSelected.foodCostPct>fcSeuil?'#CC0066':'#191923'}}>{fcSelected.foodCostPct}%</div>
-                      </div>
-                      <div style={{textAlign:'center',padding:'8px',background:'#F0FFF4',borderRadius:8}}>
-                        <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginBottom:2}}>Marge</div>
-                        <div style={{fontWeight:900,fontSize:18,color:'#009D3A'}}>{fcSelected.marge.toFixed(2)}€</div>
+                      <div style={{background:'#fff',borderRadius:8,padding:'10px 12px',border:'2px solid #fff'}}>
+                        <div style={{fontSize:10,color:'#CC0066',fontWeight:900,textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>x5 — confortable</div>
+                        <div style={{fontSize:22,fontWeight:900,color:'#CC0066'}}>{conseilX5TTC}€ TTC</div>
+                        <div style={{fontSize:11,color:'#191923',opacity:.6,marginTop:2}}>{round2(fcSelected.foodCost * 5).toFixed(2)}€ HT · FC {round2(fcSelected.foodCost/(fcSelected.foodCost*5)*100)}%</div>
                       </div>
                     </div>
+                    <div style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>Food cost actuel : {fcSelected.foodCost.toFixed(3)}€ · TVA 5,5%</div>
+                  </div>
+
+                  {/* MODIFIER PRIX DE VENTE */}
+                  <div style={{background:'#fff',borderRadius:12,padding:16,border:'1.5px solid #EBEBEB',marginBottom:12}}>
+                    <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,marginBottom:12}}>{fcSelected.name}</div>
+
+                    {/* PRIX DE VENTE EDITABLE */}
+                    <div style={{background:'#F8F9FF',borderRadius:8,padding:12,marginBottom:12,border:'1.5px solid #DDEEFF'}}>
+                      <div style={{fontSize:11,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,color:'#005FFF',marginBottom:8}}>Prix de vente</div>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:10,opacity:.5,marginBottom:3}}>Prix TTC (modifiable)</div>
+                          <div style={{display:'flex',alignItems:'center',gap:6}}>
+                            <input
+                              type="number"
+                              step="0.5"
+                              style={{width:'100%',fontSize:20,fontWeight:900,padding:'6px 10px',border:'2px solid #005FFF',borderRadius:6,color:'#191923'}}
+                              value={prixTTCEdite}
+                              onChange={function(e){
+                                var v = parseFloat(e.target.value)
+                                if (!isNaN(v) && v > 0) {
+                                  setFcPrixTTC(function(prev){ return Object.assign({},prev,{[fcSelected.id]:v}) })
+                                }
+                              }}
+                            />
+                            <span style={{fontSize:18,fontWeight:900,color:'#005FFF'}}>€</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+                        <div style={{textAlign:'center',padding:'8px',background:'#fff',borderRadius:6,border:'1px solid #EEE'}}>
+                          <div style={{fontSize:9,opacity:.5,textTransform:'uppercase',marginBottom:2}}>HT calculé</div>
+                          <div style={{fontWeight:900,fontSize:15}}>{prixHTEdite.toFixed(2)}€</div>
+                        </div>
+                        <div style={{textAlign:'center',padding:'8px',background:foodCostEdite>fcSeuil?'#FFE5E5':foodCostEdite>fcSeuil*0.8?'#FFEB5A':'#F0FFF4',borderRadius:6,border:'1px solid #EEE'}}>
+                          <div style={{fontSize:9,opacity:.6,textTransform:'uppercase',marginBottom:2}}>Food cost</div>
+                          <div style={{fontWeight:900,fontSize:15,color:foodCostEdite>fcSeuil?'#CC0066':'#009D3A'}}>{foodCostEdite}%</div>
+                        </div>
+                        <div style={{textAlign:'center',padding:'8px',background:'#F0FFF4',borderRadius:6,border:'1px solid #EEE'}}>
+                          <div style={{fontSize:9,opacity:.5,textTransform:'uppercase',marginBottom:2}}>Marge</div>
+                          <div style={{fontWeight:900,fontSize:15,color:'#009D3A'}}>{margeEditee.toFixed(2)}€</div>
+                        </div>
+                      </div>
+                      {fcPrixTTC[fcSelected.id] && fcPrixTTC[fcSelected.id] !== fcSelected.prixTTC && (
+                        <button className="btn btn-sm" style={{marginTop:8,fontSize:10,opacity:.6}} onClick={function(){
+                          setFcPrixTTC(function(prev){ var n=Object.assign({},prev); delete n[fcSelected.id]; return n })
+                        }}>↩ Remettre le prix original ({fcSelected.prixTTC}€)</button>
+                      )}
+                    </div>
+
+                    {/* INGREDIENTS */}
                     <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:.5,marginBottom:8,opacity:.5}}>Détail des ingrédients</div>
                     {(fcSelected.ingredients||[]).map(function(ing,idx){
                       var realPrice = (fcPrices[fcSelected.id+'_'+(ing.article||'')] || ing.prix_achat) || 0
@@ -2998,24 +3076,37 @@ function DashboardImpl() {
                         <div key={idx} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid #F0F0F0'}}>
                           <div style={{flex:1}}>
                             <div style={{fontSize:13,fontWeight:700}}>{ing.article}</div>
-                            <div style={{fontSize:10,opacity:.5}}>{ing.fournisseur} · {ing.qte}{ing.unite}</div>
+                            <div style={{fontSize:10,opacity:.5}}>{ing.fournisseur} · {ing.qte} {ing.unite}</div>
                           </div>
                           <div style={{textAlign:'right',flexShrink:0}}>
-                            <div style={{fontSize:13,fontWeight:900,color:diff>0.01?'#CC0066':diff<-0.01?'#009D3A':'#191923'}}>{realCout.toFixed(3)}€</div>
-                            {diff > 0.01 && <div style={{fontSize:9,color:'#CC0066'}}>+{diff.toFixed(3)}€ vs théorique</div>}
-                            {diff < -0.01 && <div style={{fontSize:9,color:'#009D3A'}}>{diff.toFixed(3)}€ vs théorique</div>}
+                            <div style={{display:'flex',alignItems:'center',gap:6}}>
+                              <input type="number" step="0.01" style={{width:65,fontSize:11,padding:'2px 5px',border:'1px solid #DDD',borderRadius:4,textAlign:'right'}}
+                                defaultValue={realPrice}
+                                onBlur={function(e){
+                                  var v = parseFloat(e.target.value)
+                                  if (!isNaN(v) && v > 0) {
+                                    setFcPrices(function(prev){ return Object.assign({},prev,{[fcSelected.id+'_'+(ing.article||'')]:v}) })
+                                  }
+                                }}
+                              />
+                              <span style={{fontSize:10,opacity:.4}}>€/{ing.unite}</span>
+                            </div>
+                            <div style={{fontSize:12,fontWeight:900,color:diff>0.01?'#CC0066':diff<-0.01?'#009D3A':'#191923',marginTop:2}}>{realCout.toFixed(3)}€</div>
+                            {diff > 0.01 && <div style={{fontSize:9,color:'#CC0066'}}>+{diff.toFixed(3)}€ vs théo.</div>}
+                            {diff < -0.01 && <div style={{fontSize:9,color:'#009D3A'}}>{diff.toFixed(3)}€ vs théo.</div>}
                           </div>
                         </div>
                       )
                     })}
                   </div>
                 </div>
-              )}
+                )
+              })()}
 
               {/* VUE FOURNISSEURS */}
               {fcView === 'fournisseurs' && (function(){
                 var fourn = {}
-                RECIPES_DATA.forEach(function(r){
+                fcRecipes.forEach(function(r){
                   r.ingredients.forEach(function(ing){
                     var f = ing.fournisseur
                     if (!fourn[f]) fourn[f] = {name:f, articles:[], totalCout:0, recettes:[]}
@@ -3052,6 +3143,205 @@ function DashboardImpl() {
               })()}
             </div>
           )}
+
+
+          {/* MODAL EDITION/CREATION RECETTE FOOD COST */}
+          {fcEditModal && fcEditForm && (function(){
+            var TVA = 0.055
+            var isNew = fcEditModal === 'new'
+            var allIngredients = FC_CATALOG
+
+            function calcFC(ings, prixTTC) {
+              var total = ings.reduce(function(s,ing){ return s + ((ing.prix_achat||0) * (ing.qte||0)) }, 0)
+              var prixHT = prixTTC > 0 ? prixTTC / (1 + TVA) : 0
+              var fc = prixHT > 0 ? Math.round(total / prixHT * 1000) / 10 : 0
+              var marge = Math.round((prixHT - total) * 100) / 100
+              return { total: Math.round(total*1000)/1000, fc: fc, marge: marge }
+            }
+
+            var calc = calcFC(fcEditForm.ingredients, fcEditForm.prixTTC || 0)
+
+            function updateIng(idx, field, val) {
+              setFcEditForm(function(prev) {
+                var ings = prev.ingredients.map(function(x,i){ return i===idx ? Object.assign({},x,{[field]:val}) : x })
+                var c = calcFC(ings, prev.prixTTC||0)
+                return Object.assign({}, prev, {ingredients:ings, foodCost:c.total, foodCostPct:c.fc, marge:c.marge})
+              })
+            }
+
+            function removeIng(idx) {
+              setFcEditForm(function(prev) {
+                var ings = prev.ingredients.filter(function(_,i){ return i!==idx })
+                var c = calcFC(ings, prev.prixTTC||0)
+                return Object.assign({}, prev, {ingredients:ings, foodCost:c.total, foodCostPct:c.fc, marge:c.marge})
+              })
+            }
+
+            function addIngFromCatalog(ing) {
+              setFcEditForm(function(prev) {
+                var newIng = {article:ing.article, fournisseur:ing.fournisseur, unite:ing.unite, prix_achat:ing.prix_achat, qte:0.1, cout:ing.prix_achat*0.1}
+                var ings = prev.ingredients.concat([newIng])
+                var c = calcFC(ings, prev.prixTTC||0)
+                return Object.assign({}, prev, {ingredients:ings, foodCost:c.total, foodCostPct:c.fc, marge:c.marge})
+              })
+            }
+
+            function addNewIng() {
+              setFcEditForm(function(prev) {
+                var newIng = {article:'', fournisseur:'', unite:'kg', prix_achat:0, qte:0, cout:0}
+                return Object.assign({}, prev, {ingredients:prev.ingredients.concat([newIng])})
+              })
+            }
+
+            function updatePrix(val) {
+              setFcEditForm(function(prev) {
+                var prixTTC = parseFloat(val) || 0
+                var prixHT = Math.round(prixTTC / (1+TVA) * 100) / 100
+                var c = calcFC(prev.ingredients, prixTTC)
+                return Object.assign({}, prev, {prixTTC:prixTTC, prixHT:prixHT, foodCost:c.total, foodCostPct:c.fc, marge:c.marge})
+              })
+            }
+
+            function saveRecipe() {
+              if (!fcEditForm.name) { toast('Nom obligatoire'); return }
+              if (!fcEditForm.prixTTC) { toast('Prix de vente obligatoire'); return }
+              var prixHT = Math.round(fcEditForm.prixTTC / (1+TVA) * 100) / 100
+              var saved = Object.assign({}, fcEditForm, {prixHT:prixHT, prixTTC:fcEditForm.prixTTC})
+              setFcRecipes(function(prev) {
+                if (isNew) return prev.concat([saved])
+                return prev.map(function(r){ return r.id===saved.id ? saved : r })
+              })
+              setFcEditModal(null)
+              setFcEditForm(null)
+              toast(isNew ? 'Recette créée !' : 'Recette modifiée !')
+            }
+
+            return (
+              <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:300,overflowY:'auto',display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'20px 0'}} onClick={function(){setFcEditModal(null);setFcEditForm(null)}}>
+                <div style={{background:'#fff',borderRadius:16,padding:20,width:'calc(100% - 32px)',maxWidth:520,margin:'0 16px'}} onClick={function(e){e.stopPropagation()}}>
+
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+                    <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923'}}>{isNew ? 'Nouvelle recette' : 'Modifier'}</div>
+                    <button style={{background:'none',border:'none',fontSize:22,cursor:'pointer',color:'#888'}} onClick={function(){setFcEditModal(null);setFcEditForm(null)}}>✕</button>
+                  </div>
+
+                  {/* NOM + CATEGORIE */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
+                    <div>
+                      <label style={{fontSize:11,fontWeight:900,textTransform:'uppercase',opacity:.5,display:'block',marginBottom:4}}>Nom *</label>
+                      <input className="inp" value={fcEditForm.name||''} onChange={function(e){setFcEditForm(function(prev){return Object.assign({},prev,{name:e.target.value})})}} placeholder="Ex: Pastrami Deluxe" />
+                    </div>
+                    <div>
+                      <label style={{fontSize:11,fontWeight:900,textTransform:'uppercase',opacity:.5,display:'block',marginBottom:4}}>Catégorie</label>
+                      <select className="inp" value={fcEditForm.categorie||'sandwich'} onChange={function(e){setFcEditForm(function(prev){return Object.assign({},prev,{categorie:e.target.value})})}}>
+                        <option value="sandwich">Sandwich</option>
+                        <option value="salade">Salade</option>
+                        <option value="boisson">Boisson</option>
+                        <option value="dessert">Dessert</option>
+                        <option value="accompagnement">Accompagnement</option>
+                        <option value="autre">Autre</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* PRIX TTC */}
+                  <div style={{marginBottom:16}}>
+                    <label style={{fontSize:11,fontWeight:900,textTransform:'uppercase',opacity:.5,display:'block',marginBottom:4}}>Prix de vente TTC *</label>
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                      <input type="number" step="0.5" className="inp" style={{fontSize:18,fontWeight:900,flex:1}} value={fcEditForm.prixTTC||''} onChange={function(e){updatePrix(e.target.value)}} placeholder="0.00" />
+                      <span style={{fontWeight:900,fontSize:16}}>€</span>
+                    </div>
+                    {(fcEditForm.prixTTC||0) > 0 && (
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>
+                        <div style={{textAlign:'center',background:'#F8F9FF',borderRadius:6,padding:6}}>
+                          <div style={{fontSize:9,opacity:.5,textTransform:'uppercase'}}>HT</div>
+                          <div style={{fontWeight:900,fontSize:14}}>{Math.round(fcEditForm.prixTTC/(1+TVA)*100)/100}€</div>
+                        </div>
+                        <div style={{textAlign:'center',background:calc.fc>fcSeuil?'#FFE5E5':'#FFEB5A',borderRadius:6,padding:6}}>
+                          <div style={{fontSize:9,opacity:.6,textTransform:'uppercase'}}>Food cost</div>
+                          <div style={{fontWeight:900,fontSize:14,color:calc.fc>fcSeuil?'#CC0066':'#191923'}}>{calc.fc}%</div>
+                        </div>
+                        <div style={{textAlign:'center',background:'#F0FFF4',borderRadius:6,padding:6}}>
+                          <div style={{fontSize:9,opacity:.5,textTransform:'uppercase'}}>Marge</div>
+                          <div style={{fontWeight:900,fontSize:14,color:'#009D3A'}}>{calc.marge}€</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* INGREDIENTS */}
+                  <div style={{marginBottom:12}}>
+                    <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:.5,marginBottom:8,opacity:.5}}>Ingrédients ({fcEditForm.ingredients.length})</div>
+
+                    {fcEditForm.ingredients.map(function(ing,idx){
+                      return (
+                        <div key={idx} style={{background:'#FAFAFA',borderRadius:8,padding:'10px',marginBottom:6,border:'1px solid #EEE'}}>
+                          <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
+                            <input className="inp" style={{flex:1,fontSize:12}} value={ing.article||''} onChange={function(e){updateIng(idx,'article',e.target.value)}} placeholder="Ingrédient" />
+                            <button style={{background:'none',border:'none',color:'#CC0066',fontSize:16,cursor:'pointer',flexShrink:0}} onClick={function(){removeIng(idx)}}>✕</button>
+                          </div>
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:4}}>
+                            <div>
+                              <div style={{fontSize:9,opacity:.4,marginBottom:2}}>Fournisseur</div>
+                              <input className="inp" style={{fontSize:10,padding:'3px 6px'}} value={ing.fournisseur||''} onChange={function(e){updateIng(idx,'fournisseur',e.target.value)}} placeholder="Fourni." />
+                            </div>
+                            <div>
+                              <div style={{fontSize:9,opacity:.4,marginBottom:2}}>Prix €/u</div>
+                              <input type="number" step="0.01" className="inp" style={{fontSize:10,padding:'3px 6px'}} value={ing.prix_achat||0} onChange={function(e){updateIng(idx,'prix_achat',parseFloat(e.target.value)||0)}} />
+                            </div>
+                            <div>
+                              <div style={{fontSize:9,opacity:.4,marginBottom:2}}>Qté</div>
+                              <input type="number" step="0.001" className="inp" style={{fontSize:10,padding:'3px 6px'}} value={ing.qte||0} onChange={function(e){updateIng(idx,'qte',parseFloat(e.target.value)||0)}} />
+                            </div>
+                            <div>
+                              <div style={{fontSize:9,opacity:.4,marginBottom:2}}>Unité</div>
+                              <select className="inp" style={{fontSize:10,padding:'3px 4px'}} value={ing.unite||'kg'} onChange={function(e){updateIng(idx,'unite',e.target.value)}}>
+                                <option>kg</option>
+                                <option>U</option>
+                                <option>L</option>
+                                <option>cl</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div style={{fontSize:10,color:'#009D3A',marginTop:4,textAlign:'right',fontWeight:700}}>= {((ing.prix_achat||0)*(ing.qte||0)).toFixed(4)}€</div>
+                        </div>
+                      )
+                    })}
+
+                    {/* AJOUTER DEPUIS LE CATALOGUE */}
+                    <div style={{marginTop:10,background:'#FFF9E5',borderRadius:8,padding:10,border:'1.5px solid #FFEB5A'}}>
+                      <div style={{fontSize:11,fontWeight:900,marginBottom:6}}>+ Ajouter un ingrédient existant</div>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:4,maxHeight:90,overflowY:'auto',marginBottom:8}}>
+                        {allIngredients.filter(function(ing){
+                          return !fcEditForm.ingredients.find(function(x){return (x.article||'').toLowerCase()===(ing.article||'').toLowerCase()})
+                        }).map(function(ing,idx){
+                          return (
+                            <button key={idx} className="btn btn-sm" style={{fontSize:9,padding:'2px 7px',background:'#fff',border:'1px solid #DDD'}} onClick={function(){addIngFromCatalog(ing)}}>
+                              + {ing.article} <span style={{opacity:.4}}>({ing.prix_achat}€/{ing.unite})</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',width:'100%'}} onClick={addNewIng}>+ Ingrédient personnalisé</button>
+                    </div>
+                  </div>
+
+                  {/* ACTIONS */}
+                  <div style={{display:'flex',gap:8,marginTop:16}}>
+                    <button className="btn" onClick={function(){setFcEditModal(null);setFcEditForm(null)}}>Annuler</button>
+                    {!isNew && <button className="btn btn-sm" style={{background:'#CC0066',color:'#fff'}} onClick={function(){
+                      setFcRecipes(function(prev){return prev.filter(function(r){return r.id!==fcEditForm.id})})
+                      setFcEditModal(null);setFcEditForm(null)
+                      toast('Recette supprimée')
+                    }}>Supprimer</button>}
+                    <button className="btn btn-y" style={{flex:1}} onClick={saveRecipe}>{isNew?'Créer':'Enregistrer'}</button>
+                  </div>
+
+                </div>
+              </div>
+            )
+          })()}
+
 
           {page === 'notifs' && (
             <div>
