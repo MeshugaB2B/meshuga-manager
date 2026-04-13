@@ -839,7 +839,7 @@ function DashboardImpl() {
 
   function enrichProspect() {
     var name = form.name || ''
-    if (!name || name.length < 2) { toast('Saisis d'abord le nom de l'entreprise'); return }
+    if (!name || name.length < 2) { toast("Saisis d'abord le nom de l'entreprise"); return }
     setEnrichLoading(true)
     fetch('/api/enrich-prospect', {
       method: 'POST',
