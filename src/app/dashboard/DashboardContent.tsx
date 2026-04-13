@@ -859,7 +859,7 @@ function DashboardImpl() {
           temperature: d.temperature || prev.temperature
         })
       })
-      toast('✨ Fiche enrichie par l'IA !')
+      toast("✨ Fiche enrichie par l'IA !")
     })
     .catch(function(e){ toast('Erreur: ' + e.message) })
     .finally(function(){ setEnrichLoading(false) })
