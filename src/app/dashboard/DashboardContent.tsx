@@ -589,6 +589,9 @@ function DashboardImpl() {
   const [scriptContent, setScriptContent] = useState('')
   const [scriptLoading, setScriptLoading] = useState(false)
   const [enrichLoading, setEnrichLoading] = useState(false)
+  const [commissionObjectif, setCommissionObjectif] = useState(2000)
+  const [editObjectif, setEditObjectif] = useState(false)
+  const [scoringLoading, setScoringLoading] = useState(false)
   const [gmbData, setGmbData] = useState(null)
   const [gmbLoading, setGmbLoading] = useState(false)
   const [gmbFilter, setGmbFilter] = useState('all')
@@ -835,6 +838,31 @@ function DashboardImpl() {
       setScriptContent('Erreur: '+e.message)
       setScriptLoading(false)
     })
+  }
+
+  function autoScore() {
+    if (prospects.length === 0) { toast('Aucun prospect à scorer'); return }
+    setScoringLoading(true)
+    var batch = prospects.filter(function(p){ return p.status !== 'won' && p.status !== 'lost' }).slice(0, 20)
+    fetch('/api/score-prospects', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ prospects: batch })
+    })
+    .then(function(r){ return r.json() })
+    .then(function(d) {
+      if (d.scores) {
+        setProspects(function(prev) {
+          return prev.map(function(p) {
+            var found = d.scores.find(function(s) { return s.id === p.id })
+            return found ? Object.assign({}, p, { score: found.score, scoreReason: found.reason }) : p
+          })
+        })
+        toast('🎯 Scoring mis à jour !')
+      }
+    })
+    .catch(function(e){ toast('Erreur scoring: ' + e.message) })
+    .finally(function(){ setScoringLoading(false) })
   }
 
   function enrichProspect() {
@@ -1582,7 +1610,7 @@ function DashboardImpl() {
                 <input className="inp" placeholder="🔍 Rechercher un prospect..." value={crmSearch} onChange={function(e){setCrmSearch(e.target.value)}} style={{width:'100%'}} />
               </div>
 
-              {/* COMMISSION EMY */}
+              {/* COMMISSION EMY + OBJECTIF + SCORING */}
               {(function(){
                 var now = new Date()
                 var mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
@@ -1596,6 +1624,9 @@ function DashboardImpl() {
                 var commission = caTotal * 0.10
                 var periodLabel = crmPeriod==='month'?'Ce mois':crmPeriod==='year'?'Cette année':'Total'
                 var pipeCA = devisList.filter(function(d){return d.statut==='envoye'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0)
+                var objectifMensuel = crmPeriod === 'month' ? commissionObjectif : crmPeriod === 'year' ? commissionObjectif * 12 : null
+                var progress = objectifMensuel ? Math.min(100, Math.round(commission / objectifMensuel * 100)) : null
+                var progressColor = progress === null ? '#FFEB5A' : progress >= 100 ? '#009D3A' : progress >= 50 ? '#FFEB5A' : '#FF82D7'
                 return (
                   <div style={{background:'#FFFFFF',borderRadius:10,padding:'18px 20px',marginBottom:12,border:'1.5px solid #EBEBEB',boxShadow:'0 2px 8px rgba(0,0,0,.06)'}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:10}}>
@@ -1603,12 +1634,47 @@ function DashboardImpl() {
                         <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#191923',marginBottom:4}}>💰 Commission Emy</div>
                         <div style={{fontSize:11,color:'rgba(25,25,35,.7)',textTransform:'uppercase',letterSpacing:1}}>{periodLabel} · 10% du CA HT signé</div>
                       </div>
-                      <div style={{display:'flex',gap:4}}>
+                      <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
                         {['month','year','all'].map(function(per){return(
                           <button key={per} className="btn btn-sm" style={{fontSize:9,padding:'3px 8px',background:crmPeriod===per?'#191923':'#F5F5F5',color:crmPeriod===per?'#FFEB5A':'#555',border:'1.5px solid '+(crmPeriod===per?'#191923':'#DDD')}} onClick={function(){setCrmPeriod(per)}}>{per==='month'?'Mois':per==='year'?'Année':'Total'}</button>
-                        )})}
+                        ))}
                       </div>
                     </div>
+
+                    {/* BARRE DE PROGRESSION OBJECTIF */}
+                    {objectifMensuel && (
+                      <div style={{marginTop:14,marginBottom:4}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                          <div style={{fontSize:11,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,color:'#555'}}>
+                            Objectif {crmPeriod==='month'?'mensuel':'annuel'} · {progress}%
+                          </div>
+                          <div style={{display:'flex',alignItems:'center',gap:6}}>
+                            {editObjectif ? (
+                              <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                                <input type="number" style={{width:70,fontSize:11,padding:'2px 6px',border:'1px solid #DDD',borderRadius:4}} defaultValue={commissionObjectif} id="obj-input" />
+                                <button className="btn btn-sm" style={{fontSize:10,background:'#191923',color:'#FFEB5A'}} onClick={function(){
+                                  var el = document.getElementById('obj-input')
+                                  var val = el ? parseInt(el.value) : commissionObjectif
+                                  if (val > 0) setCommissionObjectif(val)
+                                  setEditObjectif(false)
+                                  toast('Objectif mis à jour !')
+                                }}>OK</button>
+                              </div>
+                            ) : (
+                              <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){setEditObjectif(true)}}>
+                                🎯 {commissionObjectif.toLocaleString('fr-FR')} €/mois
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{background:'#F0F0F0',borderRadius:20,height:10,overflow:'hidden'}}>
+                          <div style={{width:progress+'%',background:progressColor,height:'100%',borderRadius:20,transition:'width .5s ease'}} />
+                        </div>
+                        {progress >= 100 && <div style={{fontSize:11,color:'#009D3A',fontWeight:900,marginTop:4,textAlign:'center'}}>🏆 Objectif atteint ! Félicitations Emy !</div>}
+                        {progress >= 50 && progress < 100 && <div style={{fontSize:11,color:'#555',marginTop:4,textAlign:'center'}}>Mi-chemin — encore {(objectifMensuel - commission).toLocaleString('fr-FR',{maximumFractionDigits:0})} € à aller !</div>}
+                      </div>
+                    )}
+
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:14}}>
                       <div style={{background:'#F8F9FF',border:'1.5px solid #DDEEFF',borderRadius:7,padding:'12px 14px'}}>
                         <div style={{fontSize:12,color:'rgba(25,25,35,.7)',fontWeight:900,marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>CA B2B signé</div>
@@ -1618,9 +1684,10 @@ function DashboardImpl() {
                       <div style={{background:'#FFEB5A',borderRadius:7,padding:'12px 14px',border:'2px solid rgba(255,255,255,.3)'}}>
                         <div style={{fontSize:12,color:'rgba(25,25,35,.7)',fontWeight:900,marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>🎉 Commission</div>
                         <div style={{fontWeight:900,fontSize:24,color:'#191923'}}>{commission.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} <span style={{fontSize:12,opacity:.5}}>€</span></div>
-                        <div style={{fontSize:10,color:'#333',fontWeight:700,marginTop:2}}>Bravo Emy 🚀</div>
+                        <div style={{fontSize:10,color:'#333',fontWeight:700,marginTop:2}}>{progress !== null ? progress + '% de l'objectif' : 'Bravo Emy 🚀'}</div>
                       </div>
                     </div>
+
                   {pipeCA>0&&(
                     <div style={{marginTop:10,padding:'8px 12px',background:'#EBF3FF',borderRadius:6,border:'1.5px solid #005FFF',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                       <div>
@@ -1630,6 +1697,11 @@ function DashboardImpl() {
                       <div style={{fontWeight:900,fontSize:20,color:'#005FFF'}}>{pipeCA.toLocaleString('fr-FR',{maximumFractionDigits:0})} € <span style={{fontSize:10,opacity:.5}}>HT</span></div>
                     </div>
                   )}
+
+                  {/* BOUTON SCORING */}
+                  <button className="btn btn-sm" style={{marginTop:12,width:'100%',background:'#191923',color:'#FFEB5A',fontWeight:900,opacity:scoringLoading?0.5:1}} disabled={scoringLoading} onClick={autoScore}>
+                    {scoringLoading ? '⏳ Scoring en cours...' : '🎯 Recalculer le scoring IA'}
+                  </button>
                 </div>
                 )
               })()}
@@ -1686,7 +1758,10 @@ function DashboardImpl() {
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:6}}>
                       <div style={{flex:1}}>
                         <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:3}}>
-                          <div style={{fontWeight:900,fontSize:14,cursor:'pointer'}} onClick={function(){openModal('prospect',Object.assign({},p))}}>{p.name}</div>
+                          <div style={{display:'flex',alignItems:'center',gap:6}}>
+                            <div style={{fontWeight:900,fontSize:14,cursor:'pointer'}} onClick={function(){openModal('prospect',Object.assign({},p))}}>{p.name}</div>
+                            {p.score && <div style={{background:p.score>=8?'#009D3A':p.score>=6?'#FFEB5A':'#FF82D7',color:p.score>=8?'#fff':p.score>=6?'#191923':'#fff',borderRadius:20,padding:'1px 7px',fontSize:10,fontWeight:900,flexShrink:0}} title={p.scoreReason||''}>{p.score}/10</div>}
+                          </div>
                           <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>
                           {p.temperature && <span style={{fontSize:12,fontWeight:900,color:tempColors[p.temperature]||'#888'}}>{tempLabel[p.temperature]||''}</span>}
                         </div>
