@@ -1544,8 +1544,8 @@ function DashboardImpl() {
               <div className="ph">
                 <div><div className="pt">CRM Prospects</div><div className="ps">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length} actifs · {prospects.length} total</div></div>
                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                  <button className="btn btn-sm" style={{background:crmView==='list'?'#191923':'#F5F5F5',color:crmView==='list'?'#FFEB5A':'#555',fontSize:10,padding:'4px 10px',border:'1.5px solid '+(crmView==='list'?'#191923':'#DDD')}} onClick={function(){setCrmView('list')}}>☰ Liste</button>
-                  <button className="btn btn-sm" style={{background:crmView==='kanban'?'#191923':'#F5F5F5',color:crmView==='kanban'?'#FFEB5A':'#555',fontSize:10,padding:'4px 10px',border:'1.5px solid '+(crmView==='kanban'?'#191923':'#DDD')}} onClick={function(){setCrmView('kanban')}}>⬛ Kanban</button>
+                  <button className="btn btn-y btn-sm" style={{background:crmView==='list'?'#191923':'transparent',color:crmView==='list'?'#FFEB5A':'#191923'}} onClick={function(){setCrmView('list')}}>Liste</button>
+                  <button className="btn btn-y btn-sm" style={{background:crmView==='kanban'?'#191923':'transparent',color:crmView==='kanban'?'#FFEB5A':'#191923'}} onClick={function(){setCrmView('kanban')}}>Kanban</button>
                   <button className="btn btn-y btn-sm" onClick={function() { openModal('prospect', {status:'contacted',temperature:'tiede',ca:0,files:[]}) }}>+ Nouveau</button>
                 </div>
               </div>
