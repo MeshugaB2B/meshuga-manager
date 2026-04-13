@@ -112,7 +112,7 @@ async function buildBriefing(supabase: any, role: string) {
 
   const context = lines.join('. ')
   const conseil = await getAiConseil(role, context)
-  if (conseil) lines.push('💡 ' + conseil)
+  if (conseil) lines.push('🧠 ' + conseil)
 
   const title = `☀️ Bonjour ${prenom} — ${todayFr.charAt(0).toUpperCase() + todayFr.slice(1)}`
   const body = lines.join(' · ')
