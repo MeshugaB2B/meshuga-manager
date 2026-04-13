@@ -59,14 +59,20 @@ async function buildBriefing(supabase: any, role: string) {
     .or(`assignee.eq.${role},assignee.eq.all`)
     .order('time', { ascending: true })
 
-  // Tâches du jour
+  // Tâches du jour (assigned_to = UUID du role)
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('role', role)
+    .single()
+  var profileId = profileData?.id
   const { data: tasks } = await supabase
     .from('tasks')
-    .select('*')
-    .or(`assignee.eq.${role},assignee.eq.all`)
-    .eq('done', false)
+    .select('title, priority')
+    .eq('assigned_to', profileId || '')
+    .neq('status', 'done')
     .order('created_at', { ascending: false })
-    .limit(3)
+    .limit(5)
 
   // Devis en attente
   const { data: devisAttente } = await supabase
@@ -111,11 +117,16 @@ async function buildBriefing(supabase: any, role: string) {
       lines.push(`📄 ${devisAttente.length} devis en attente — ${totalHT.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} € HT`)
     }
     // Tâches d'Emy aujourd'hui
+    const { data: emyProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'emy')
+      .single()
     const { data: emyTasks } = await supabase
       .from('tasks')
       .select('title, priority')
-      .or('assignee.eq.emy,assignee.eq.all')
-      .eq('done', false)
+      .eq('assigned_to', emyProfile?.id || '')
+      .neq('status', 'done')
       .order('created_at', { ascending: false })
       .limit(5)
     if (emyTasks && emyTasks.length > 0) {
