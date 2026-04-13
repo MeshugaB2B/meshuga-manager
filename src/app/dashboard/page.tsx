@@ -1,4 +1,5 @@
 'use client' // build-fix
+export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
@@ -1113,7 +1114,7 @@ export default function DashboardPage() {
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
-      <style>{G}</style>
+      <style dangerouslySetInnerHTML={{__html: G}} />
 
       {!profile && (
         <div style={{position:'fixed',inset:0,background:'#FFEB5A',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999,flexDirection:'column',gap:16}}>
