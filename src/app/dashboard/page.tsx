@@ -533,6 +533,7 @@ const ALL_PROSPECTS = [
 ]
 
 export default function DashboardPage() {
+  const [mounted, setMounted] = useState(false)
   const [profile, setProfile] = useState(null)
   const [page, setPage] = useState('dash')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -598,29 +599,39 @@ export default function DashboardPage() {
   const [calYear, setCalYear] = useState(new Date().getFullYear())
   const [calView, setCalView] = useState('list')
 
+  useEffect(function() { setMounted(true) }, [])
+
   useEffect(function() {
-    async function load() {
-      try {
-        // getSession lit le localStorage directement, sans appel réseau
-        const { data: { session } } = await sb().auth.getSession()
-        if (!session || !session.user) {
-          window.location.replace('/login')
-          return
-        }
-        const user = session.user
-        const r2 = await sb().from('profiles').select('*').eq('id', user.id).single()
-        const prof = r2.data
+    // Timeout dur 4s : si Supabase ne répond pas, on va au login
+    var hardTimer = setTimeout(function() {
+      window.location.href = '/login'
+    }, 4000)
+
+    // onAuthStateChange est plus fiable que getSession sur Safari
+    var sub = sb().auth.onAuthStateChange(function(event, session) {
+      clearTimeout(hardTimer)
+      if (!session || !session.user) {
+        window.location.href = '/login'
+        return
+      }
+      var user = session.user
+      sb().from('profiles').select('*').eq('id', user.id).single().then(function(r2) {
+        var prof = r2.data
         if (prof && prof.role) {
           setProfile(prof)
         } else {
-          const role = user.email && user.email.includes('emy') ? 'emy' : 'edward'
+          var role = user.email && user.email.includes('emy') ? 'emy' : 'edward'
           setProfile({ role: role, full_name: role === 'emy' ? 'Emy' : 'Edward', email: user.email })
         }
-      } catch(e) {
-        window.location.replace('/login')
+      })
+    })
+
+    return function() {
+      clearTimeout(hardTimer)
+      if (sub && sub.data && sub.data.subscription) {
+        sub.data.subscription.unsubscribe()
       }
     }
-    load()
   }, [])
 
   useEffect(function() {
@@ -1098,6 +1109,7 @@ export default function DashboardPage() {
     {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
   ]
 
+  if (!mounted) return null
 
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden'}}>
