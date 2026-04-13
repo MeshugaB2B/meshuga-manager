@@ -619,6 +619,7 @@ export default function DashboardPage() {
     setZeltyLoading(true)
     fetch('/api/zelty').then(function(r){return r.json()}).then(function(d){setZeltyData(d);setZeltyLoading(false)}).catch(function(){setZeltyLoading(false)})
     sb().from('devis').select('*').order('created_at',{ascending:false}).then(function(r){if(r.data)setDevisList(r.data)})
+    fetch('/api/gmb').then(function(r){return r.json()}).then(function(d){setGmbData(d)}).catch(function(){})
     sb().from('activity_log').select('*').order('created_at', {ascending: false}).limit(200).then(function(r) {
       if (r.data) setActivityLog(r.data)
     })
@@ -1117,6 +1118,9 @@ export default function DashboardPage() {
           <div style={{padding:'10px 12px 14px',borderTop:'3px solid #191923'}}>
             <div style={{fontWeight:900,fontSize:11,textTransform:'uppercase',marginBottom:4}}>{profile && (profile.full_name || (profile.email && profile.email.split('@')[0]))}</div>
             <div className="yt" style={{fontSize:11,opacity:.4,marginBottom:8}}>{isEmy ? 'B2B Manager' : 'The Big Boss'}</div>
+            <button className="btn btn-sm" style={{width:'100%',justifyContent:'center',marginBottom:6,background:pushEnabled?'#009D3A':'#FFFFFF',color:pushEnabled?'#fff':'#191923',opacity:pushLoading?0.6:1}} onClick={pushEnabled?unregisterPush:registerPush} disabled={pushLoading}>
+              {pushLoading?'⏳ ...':(pushEnabled?'🔔 Notifs ON':'🔕 Activer notifs')}
+            </button>
             <button className="btn btn-sm" style={{width:'100%',justifyContent:'center',opacity:.6}} onClick={function() { sb().auth.signOut().then(function() { window.location.href = '/login' }) }}>
               ↩ Déconnexion
             </button>
@@ -1430,7 +1434,7 @@ export default function DashboardPage() {
                           <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function() { reponseProspect(p.id,'lost') }}>✗ Non</button>
                         </div>
                       )}
-                      {p.status === 'nego' && <button className="btn btn-g btn-sm" onClick={function() { setChasse(function(prev) { return prev.map(function(x) { return x.id===p.id ? Object.assign({},x,{status:'won'}) : x }) }); toast('🎉 Gagné!') }}>🏆 Gagné!</button>}
+                      {p.status === 'nego' && <button className="btn btn-g btn-sm" onClick={function() { setChasse(function(prev) { return prev.map(function(x) { return x.id===p.id ? Object.assign({},x,{status:'won'}) : x }) }); sendPushToAll('🏆 Prospect gagné !', p.name + ' rejoint la liste clients !', 'all'); toast('🎉 Gagné!') }}>🏆 Gagné!</button>}
                       {p.status === 'won' && <span style={{fontSize:9,fontWeight:900,padding:'3px 8px',background:'#009D3A',color:'#fff',borderRadius:3}}>🏆 Client</span>}
                     </div>
                     {p.lastAction && <div style={{fontSize:9,opacity:.45,marginTop:4,fontStyle:'italic'}}>{'→ '+p.lastAction+(p.relanceDate?' · relance '+p.relanceDate:'')}</div>}
@@ -1622,7 +1626,7 @@ export default function DashboardPage() {
                       {p.status==='contacted' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'nego',temperature:'chaud'}):x})});toast('🔥 En négo !')}}>✅ Intéressé → Négo</button>}
                       {p.status==='contacted' && <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'lost',temperature:'froid'}):x})});toast('Archivé')}}>✗ Perdu</button>}
                       {p.status==='nego' && <button className="btn btn-y btn-sm" style={{fontSize:10}} onClick={function(){nav('devis')}}>📄 Créer devis</button>}
-                      {p.status==='nego' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'won'}):x})});toast('🏆 Gagné !')}}>🏆 Gagné</button>}
+                      {p.status==='nego' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'won'}):x})});sendPushToAll('🏆 Prospect gagné !', p.name + ' est maintenant client !', 'all');toast('🏆 Gagné !')}}>🏆 Gagné</button>}
                       {p.status==='nego' && <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'lost'}):x})});toast('Perdu')}}>✗ Perdu</button>}
                     </div>
                   </div>
@@ -2398,7 +2402,7 @@ export default function DashboardPage() {
                               if(devisItems.length===0){toast('Sélectionnez au moins un sandwich !');return}
                               var payload={numero:devisNumero,statut:'brouillon',prospect_id:devisClient.prospectId?String(devisClient.prospectId):null,client_nom:devisClient.nom,client_contact:devisClient.contact,client_email:devisClient.email,client_phone:devisClient.phone||'',event_date:devisClient.date||null,event_lieu:devisClient.lieu,nb_personnes:devisNbPersonnes,format:devisFormat,items:devisItems,mise_en_place:devisMiseEnPlace,mise_en_place_offert:devisMepOffert,livraison:devisLivraison,livraison_offert:devisLivraisonOffert,remise_mep_pct:devisMiseEnPlaceRemise,remise_total_pct:devisRemiseTotal,remise_montant:remiseMontant,total_ht:totalHT,tva:tva,total_ttc:totalTTC,notes:devisNotes,date_validite:new Date(Date.now()+30*24*60*60*1000).toISOString().split('T')[0]}
                               if(currentDevisId)payload.id=currentDevisId
-                              saveDevisToSupabase(payload,function(saved){toast('Devis sauvegardé !');setCurrentDevisId(saved.id)})
+                              saveDevisToSupabase(payload,function(saved){sendPushToAll('📄 Devis sauvegardé', 'Devis ' + (payload.numero||'') + ' pour ' + (payload.client_nom||'') + ' — ' + ((payload.total_ttc||0)).toLocaleString('fr-FR') + ' € TTC', 'edward');toast('Devis sauvegardé !');setCurrentDevisId(saved.id)})
                             }}>&#128190; Sauvegarder</button>
                             <button className="btn btn-p" style={{flex:1,justifyContent:'center',fontSize:11}} onClick={function(){
                               if(!devisClient.nom){toast('Nom du client requis !');return}
