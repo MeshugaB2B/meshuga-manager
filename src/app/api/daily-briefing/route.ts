@@ -119,9 +119,9 @@ async function buildBriefing(supabase: any, role: string) {
       .order('created_at', { ascending: false })
       .limit(5)
     if (emyTasks && emyTasks.length > 0) {
-      lines.push('👩 Emy aujourd'hui : ' + emyTasks.map((t: any) => t.title).join(', '))
+      lines.push("👩 Emy aujourd'hui : " + emyTasks.map((t: any) => t.title).join(', '))
     }
-    // Prospects qu'Emy doit relancer
+    // Prospects qu Emy doit relancer
     const { data: emyProspects } = await supabase
       .from('prospects')
       .select('name, temperature')
