@@ -641,6 +641,14 @@ function DashboardImpl() {
   })
   const [fcRecipes, setFcRecipes] = useState(function(){
     try {
+      var FC_VERSION = 'v4_evian_perrier'
+      var storedVersion = localStorage.getItem('meshuga_fc_version')
+      if (storedVersion !== FC_VERSION) {
+        localStorage.removeItem('meshuga_fc_recipes')
+        localStorage.removeItem('meshuga_fc_prix_ttc')
+        localStorage.setItem('meshuga_fc_version', FC_VERSION)
+        return RECIPES_DATA
+      }
       var saved = localStorage.getItem('meshuga_fc_recipes')
       if (saved) return JSON.parse(saved)
     } catch(e) {}
