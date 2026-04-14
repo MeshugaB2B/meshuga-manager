@@ -1168,7 +1168,7 @@ function DashboardImpl() {
       if (res.data) {
         setMessages(function(prev){ return prev.concat(res.data) })
         setMsgText('')
-        fetch('/api/send-message-push', {
+        fetch('https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-message-push', {
           method: 'POST',
           headers: {'Content-Type':'application/json'},
           body: JSON.stringify(msg)
