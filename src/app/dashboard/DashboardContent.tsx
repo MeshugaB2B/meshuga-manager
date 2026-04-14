@@ -3365,7 +3365,7 @@ function DashboardImpl() {
                         <div key={idx} style={{background:'#FAFAFA',borderRadius:8,padding:'10px',marginBottom:6,border:'1px solid #EEE'}}>
                           <div style={{display:'flex',gap:6,alignItems:'center',marginBottom:6}}>
                             <input className="inp" style={{flex:1,fontSize:12}} value={ing.article||''} onChange={function(e){updateIng(idx,'article',e.target.value)}} placeholder="Ingrédient" />
-                            <button style={{background:'none',border:'none',color:'#CC0066',fontSize:16,cursor:'pointer',flexShrink:0}} onClick={function(){removeIng(idx)}}>✕</button>
+                            <button style={{background:'#FFE5E5',border:'none',color:'#CC0066',fontSize:14,fontWeight:900,cursor:'pointer',flexShrink:0,borderRadius:6,padding:'4px 10px',minWidth:36}} onClick={function(){removeIng(idx)}}>🗑️</button>
                           </div>
                           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:4}}>
                             <div>
