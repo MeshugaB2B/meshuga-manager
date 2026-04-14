@@ -634,8 +634,20 @@ function DashboardImpl() {
   const [fcView, setFcView] = useState('recettes')
   const [fcSelected, setFcSelected] = useState(null)
   const [fcPrices, setFcPrices] = useState({})
-  const [fcPrixTTC, setFcPrixTTC] = useState({})
-  const [fcRecipes, setFcRecipes] = useState(RECIPES_DATA)
+  const [fcPrixTTC, setFcPrixTTC] = useState(function(){
+    try {
+      var saved = localStorage.getItem('meshuga_fc_prix_ttc')
+      if (saved) return JSON.parse(saved)
+    } catch(e) {}
+    return {}
+  })
+  const [fcRecipes, setFcRecipes] = useState(function(){
+    try {
+      var saved = localStorage.getItem('meshuga_fc_recipes')
+      if (saved) return JSON.parse(saved)
+    } catch(e) {}
+    return RECIPES_DATA
+  })
   const [fcCatFilter, setFcCatFilter] = useState('tous')
   const [fcEditModal, setFcEditModal] = useState(null)
   const [fcEditForm, setFcEditForm] = useState(null)
@@ -3103,11 +3115,28 @@ function DashboardImpl() {
                           <div style={{fontWeight:900,fontSize:15,color:'#009D3A'}}>{margeEditee.toFixed(2)}€</div>
                         </div>
                       </div>
-                      {fcPrixTTC[fcSelected.id] && fcPrixTTC[fcSelected.id] !== fcSelected.prixTTC && (
-                        <button className="btn btn-sm" style={{marginTop:8,fontSize:10,opacity:.6}} onClick={function(){
+                      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
+                        <button className="btn btn-y btn-sm" style={{flex:1,fontWeight:900}} onClick={function(){
+                          var TVA2 = 0.055
+                          var newPrixTTC = fcPrixTTC[fcSelected.id] || fcSelected.prixTTC
+                          var newPrixHT = Math.round(newPrixTTC / (1+TVA2) * 100) / 100
+                          var newFC = fcSelected.foodCost > 0 ? Math.round(fcSelected.foodCost / newPrixHT * 1000) / 10 : 0
+                          var newMarge = Math.round((newPrixHT - fcSelected.foodCost) * 100) / 100
+                          var updated = fcRecipes.map(function(r){
+                            return r.id === fcSelected.id ? Object.assign({},r,{prixTTC:newPrixTTC,prixHT:newPrixHT,foodCostPct:newFC,marge:newMarge}) : r
+                          })
+                          setFcRecipes(updated)
+                          try { localStorage.setItem('meshuga_fc_recipes', JSON.stringify(updated)) } catch(e) {}
+                          setFcSelected(Object.assign({},fcSelected,{prixTTC:newPrixTTC,prixHT:newPrixHT,foodCostPct:newFC,marge:newMarge}))
                           setFcPrixTTC(function(prev){ var n=Object.assign({},prev); delete n[fcSelected.id]; return n })
-                        }}>↩ Remettre le prix original ({fcSelected.prixTTC}€)</button>
-                      )}
+                          toast('💾 Prix enregistré !')
+                        }}>💾 Enregistrer ce prix</button>
+                        {fcPrixTTC[fcSelected.id] && fcPrixTTC[fcSelected.id] !== fcSelected.prixTTC && (
+                          <button className="btn btn-sm" style={{fontSize:10,opacity:.6}} onClick={function(){
+                            setFcPrixTTC(function(prev){ var n=Object.assign({},prev); delete n[fcSelected.id]; return n })
+                          }}>↩ Original ({fcSelected.prixTTC}€)</button>
+                        )}
+                      </div>
                     </div>
 
                     {/* INGREDIENTS */}
@@ -3246,14 +3275,23 @@ function DashboardImpl() {
               })
             }
 
+            function saveRecipesToStorage(updated) {
+              try { localStorage.setItem('meshuga_fc_recipes', JSON.stringify(updated)) } catch(e) {}
+            }
+
+            function savePrixToStorage(updated) {
+              try { localStorage.setItem('meshuga_fc_prix_ttc', JSON.stringify(updated)) } catch(e) {}
+            }
+
             function saveRecipe() {
               if (!fcEditForm.name) { toast('Nom obligatoire'); return }
               if (!fcEditForm.prixTTC) { toast('Prix de vente obligatoire'); return }
               var prixHT = Math.round(fcEditForm.prixTTC / (1+TVA) * 100) / 100
               var saved = Object.assign({}, fcEditForm, {prixHT:prixHT, prixTTC:fcEditForm.prixTTC})
               setFcRecipes(function(prev) {
-                if (isNew) return prev.concat([saved])
-                return prev.map(function(r){ return r.id===saved.id ? saved : r })
+                var updated = isNew ? prev.concat([saved]) : prev.map(function(r){ return r.id===saved.id ? saved : r })
+                saveRecipesToStorage(updated)
+                return updated
               })
               setFcEditModal(null)
               setFcEditForm(null)
@@ -3375,7 +3413,11 @@ function DashboardImpl() {
                   <div style={{display:'flex',gap:8,marginTop:16}}>
                     <button className="btn" onClick={function(){setFcEditModal(null);setFcEditForm(null)}}>Annuler</button>
                     {!isNew && <button className="btn btn-sm" style={{background:'#CC0066',color:'#fff'}} onClick={function(){
-                      setFcRecipes(function(prev){return prev.filter(function(r){return r.id!==fcEditForm.id})})
+                      setFcRecipes(function(prev){
+                        var updated = prev.filter(function(r){return r.id!==fcEditForm.id})
+                        try { localStorage.setItem('meshuga_fc_recipes', JSON.stringify(updated)) } catch(e) {}
+                        return updated
+                      })
                       setFcEditModal(null);setFcEditForm(null)
                       toast('Recette supprimée')
                     }}>Supprimer</button>}
