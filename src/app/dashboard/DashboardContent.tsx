@@ -673,6 +673,8 @@ function DashboardImpl() {
   const [instaTab, setInstaTab] = useState('comments')
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
+  const [pushTestStatus, setPushTestStatus] = useState(null)
+  const [pushTestLoading, setPushTestLoading] = useState(false)
   const [notifTitle, setNotifTitle] = useState('')
   const [notifBody, setNotifBody] = useState('')
   const [notifTarget, setNotifTarget] = useState('all')
@@ -3803,14 +3805,61 @@ function DashboardImpl() {
                 {/* Abonnement push */}
                 <div style={{background:'#fff',borderRadius:12,padding:20,border:'1px solid #eee'}}>
                   <div style={{fontFamily:'Yellowtail,cursive',fontSize:18,color:'#191923',marginBottom:12}}>Mon abonnement</div>
+
                   <button
                     className="btn"
-                    style={{width:'100%',background:pushEnabled?'#009D3A':'#f5f5f5',color:pushEnabled?'#fff':'#191923',fontWeight:900,opacity:pushLoading?0.5:1}}
+                    style={{width:'100%',background:pushEnabled?'#009D3A':'#f5f5f5',color:pushEnabled?'#fff':'#191923',fontWeight:900,opacity:pushLoading?0.5:1,marginBottom:8}}
                     disabled={pushLoading}
                     onClick={pushEnabled?unregisterPush:registerPush}
                   >
                     {pushLoading?'⏳ ...':(pushEnabled?'🔔 Notifications activées — Désactiver':'🔕 Activer mes notifications')}
                   </button>
+
+                  {pushEnabled && (
+                    <button
+                      className="btn btn-sm"
+                      style={{width:'100%',background:'#F0F0FF',color:'#005FFF',fontWeight:900,opacity:pushTestLoading?0.5:1}}
+                      disabled={pushTestLoading}
+                      onClick={function(){
+                        setPushTestLoading(true)
+                        setPushTestStatus(null)
+                        var role = isEmy ? 'emy' : 'edward'
+                        fetch('https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-push',{
+                          method:'POST',
+                          headers:{'Content-Type':'application/json'},
+                          body:JSON.stringify({
+                            title:'🔔 Test de connexion',
+                            body:'Ta connexion fonctionne ! (' + new Date().toLocaleTimeString('fr-FR') + ')',
+                            target: role
+                          })
+                        })
+                        .then(function(r){return r.json()})
+                        .then(function(data){
+                          if (data.sent > 0) {
+                            setPushTestStatus('ok')
+                          } else {
+                            setPushTestStatus('fail')
+                          }
+                        })
+                        .catch(function(){setPushTestStatus('fail')})
+                        .finally(function(){setPushTestLoading(false)})
+                      }}
+                    >
+                      {pushTestLoading ? '⏳ Test en cours...' : '🧪 Tester ma connexion'}
+                    </button>
+                  )}
+
+                  {pushTestStatus === 'ok' && (
+                    <div style={{marginTop:8,background:'#F0FFF4',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#009D3A',fontWeight:700,textAlign:'center'}}>
+                      ✅ Connexion OK — tu devrais recevoir une notif dans quelques secondes
+                    </div>
+                  )}
+                  {pushTestStatus === 'fail' && (
+                    <div style={{marginTop:8,background:'#FFF5F5',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#CC0066',fontWeight:700}}>
+                      ❌ Connexion invalide — clique sur "Désactiver" puis "Activer" pour te ré-abonner
+                    </div>
+                  )}
+
                   <div style={{fontSize:11,color:'#aaa',marginTop:8,textAlign:'center'}}>
                     Notifications automatiques : 8h briefing · 12h30 relances · 18h bilan
                   </div>
