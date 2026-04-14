@@ -3854,9 +3854,15 @@ function DashboardImpl() {
                       ✅ Connexion OK — tu devrais recevoir une notif dans quelques secondes
                     </div>
                   )}
-                  {pushTestStatus === 'fail' && (
+                  {pushTestStatus && pushTestStatus !== 'ok' && pushTestStatus !== 'nosub' && (
+                    <div style={{marginTop:8,background:'#FFF5F5',borderRadius:8,padding:'8px 12px'}}>
+                      <div style={{fontSize:12,color:'#CC0066',fontWeight:700,marginBottom:4}}>❌ Envoi échoué</div>
+                      <div style={{fontSize:10,color:'#555',wordBreak:'break-all',fontFamily:'monospace'}}>{pushTestStatus.replace('fail:','')}</div>
+                    </div>
+                  )}
+                  {pushTestStatus === 'nosub' && (
                     <div style={{marginTop:8,background:'#FFF5F5',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#CC0066',fontWeight:700}}>
-                      ❌ Connexion invalide — clique sur "Désactiver" puis "Activer" pour te ré-abonner
+                      ❌ Aucun abonnement trouvé — clique sur "Activer mes notifications"
                     </div>
                   )}
 
