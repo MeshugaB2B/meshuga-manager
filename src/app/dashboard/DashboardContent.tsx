@@ -109,9 +109,6 @@ const RECIPES_DATA = [
   {id:"coca_cola",name:"Coca Cola",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:0.64,marge:2.6775,foodCostPct:19.3,coeffReel:5.18,ingredients:[{"fournisseur": "Rouquette", "article": "Coca Cola", "unite": "U", "prix_achat": 0.64, "qte": 1, "cout": 0.64}]},
   {id:"coca_cola_zero",name:"Coca Cola Zero",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:0.67,marge:2.6475,foodCostPct:20.2,coeffReel:4.95,ingredients:[{"fournisseur": "Rouquette", "article": "Coca Cola Zero", "unite": "U", "prix_achat": 0.67, "qte": 1, "cout": 0.67}]},
   {id:"lipton_ice_tea",name:"Lipton Ice Tea",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:0.68,marge:2.6375,foodCostPct:20.5,coeffReel:4.88,ingredients:[{"fournisseur": "Rouquette", "article": "Lipton Ice Tea", "unite": "U", "prix_achat": 0.68, "qte": 1, "cout": 0.68}]},
-  {id:"budweiser",name:"Budweiser",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:1.44,marge:1.8775,foodCostPct:43.4,coeffReel:2.3,ingredients:[{"fournisseur": "Rouquette", "article": "Budweiser", "unite": "U", "prix_achat": 1.44, "qte": 1, "cout": 1.44}]},
-  {id:"tensa\u00ef_citron",name:"Tensa\u00ef Citron",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:1.4,marge:1.9175,foodCostPct:42.2,coeffReel:2.37,ingredients:[{"fournisseur": "AlterFood", "article": "Tensaï Citron", "unite": "U", "prix_achat": 1.4, "qte": 1, "cout": 1.4}]},
-  {id:"tensa\u00ef_myrtille",name:"Tensa\u00ef Myrtille",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:1.4,marge:1.9175,foodCostPct:42.2,coeffReel:2.37,ingredients:[{"fournisseur": "AlterFood", "article": "Tensaï Myrtille", "unite": "U", "prix_achat": 1.4, "qte": 1, "cout": 1.4}]},
   {id:"evian",name:"Evian",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:0.678,marge:2.6395,foodCostPct:20.4,coeffReel:4.89,ingredients:[{"fournisseur":"Episaveurs","article":"Evian","unite":"U","prix_achat":0.678,"qte":1,"cout":0.678}]},
   {id:"perrier",name:"Perrier",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:0.631,marge:2.6865,foodCostPct:19.0,coeffReel:5.26,ingredients:[{"fournisseur":"Episaveurs","article":"Perrier","unite":"U","prix_achat":0.631,"qte":1,"cout":0.631}]},
 ]
@@ -641,7 +638,7 @@ function DashboardImpl() {
   })
   const [fcRecipes, setFcRecipes] = useState(function(){
     try {
-      var FC_VERSION = 'v4_evian_perrier'
+      var FC_VERSION = 'v5_clean_boissons'
       var storedVersion = localStorage.getItem('meshuga_fc_version')
       if (storedVersion !== FC_VERSION) {
         localStorage.removeItem('meshuga_fc_recipes')
@@ -2692,7 +2689,7 @@ function DashboardImpl() {
                                   {dv.statut==='envoye'&&<button className="btn btn-sm" style={{background:'#FF6B2B',color:'#fff',fontSize:10}} onClick={function(){updateDevisStatut(dv.id,'a_modifier','')}}>⚠️ À modifier</button>}
                                   <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,false)}}>📄 PDF</button>
                                   {dv.facture_numero&&<button className="btn btn-n btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,true)}}>🧾 PDF Fact.</button>}
-                                  <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){if(window.confirm('Supprimer ce devis ?')){sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Devis supprimé')})}}}>🗑️</button>
+                                  <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Devis supprimé')})}}>🗑️</button>
                                 </div>
                               </div>
                             )
@@ -2732,7 +2729,7 @@ function DashboardImpl() {
                                   {dv.statut==='facture'&&dv.paiement_statut!=='paye'&&<button className="btn btn-sm" style={{background:'#009D3A',color:'#fff',fontSize:10}} onClick={function(){sb().from('devis').update({paiement_statut:'paye',statut:'paye',solde_recu:true,solde_date:new Date().toISOString().split('T')[0]}).eq('id',dv.id).then(function(){loadDevis();toast('✅ Soldé!')})}}>✅ Soldé</button>}
                                   <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,false)}}>📄 PDF</button>
                                   {dv.facture_numero&&<button className="btn btn-n btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,true)}}>🧾 PDF Fact.</button>}
-                                  <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){if(window.confirm('Supprimer ce devis ?')){sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Devis supprimé')})}}}>🗑️</button>
+                                  <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Devis supprimé')})}}>🗑️</button>
                                 </div>
                               </div>
                             )
@@ -2764,7 +2761,7 @@ function DashboardImpl() {
                                 </div>
                                 <div style={{display:'flex',gap:5,marginTop:8,flexWrap:'wrap'}}>
                                   <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){generateAndPrintDoc(dv,false)}}>📄 PDF</button>
-                                  <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){if(window.confirm('Supprimer ?')){sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Supprimé')})}}}>🗑️</button>
+                                  <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){sb().from('devis').delete().eq('id',dv.id).then(function(){loadDevis();toast('Supprimé')})}}>🗑️</button>
                                 </div>
                               </div>
                             )
