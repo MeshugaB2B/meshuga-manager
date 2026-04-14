@@ -112,11 +112,9 @@ const RECIPES_DATA = [
   {id:"budweiser",name:"Budweiser",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:1.44,marge:1.8775,foodCostPct:43.4,coeffReel:2.3,ingredients:[{"fournisseur": "Rouquette", "article": "Budweiser", "unite": "U", "prix_achat": 1.44, "qte": 1, "cout": 1.44}]},
   {id:"tensa\u00ef_citron",name:"Tensa\u00ef Citron",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:1.4,marge:1.9175,foodCostPct:42.2,coeffReel:2.37,ingredients:[{"fournisseur": "AlterFood", "article": "Tensaï Citron", "unite": "U", "prix_achat": 1.4, "qte": 1, "cout": 1.4}]},
   {id:"tensa\u00ef_myrtille",name:"Tensa\u00ef Myrtille",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:1.4,marge:1.9175,foodCostPct:42.2,coeffReel:2.37,ingredients:[{"fournisseur": "AlterFood", "article": "Tensaï Myrtille", "unite": "U", "prix_achat": 1.4, "qte": 1, "cout": 1.4}]},
-  {id:"celtic_plate",name:"Celtic Plate",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:0.59,marge:2.7275,foodCostPct:17.8,coeffReel:5.62,ingredients:[{"fournisseur": "AlterFood", "article": "Celtic Plate", "unite": "U", "prix_achat": 0.59, "qte": 1, "cout": 0.59}]},
-  {id:"celtic_gazeuse",name:"Celtic Gazeuse",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:0.69,marge:2.6275,foodCostPct:20.8,coeffReel:4.81,ingredients:[{"fournisseur": "AlterFood", "article": "Celtic Gazeuse", "unite": "U", "prix_achat": 0.69, "qte": 1, "cout": 0.69}]},
+  {id:"evian",name:"Evian",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:0.678,marge:2.6395,foodCostPct:20.4,coeffReel:4.89,ingredients:[{"fournisseur":"Episaveurs","article":"Evian","unite":"U","prix_achat":0.678,"qte":1,"cout":0.678}]},
+  {id:"perrier",name:"Perrier",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:0.631,marge:2.6865,foodCostPct:19.0,coeffReel:5.26,ingredients:[{"fournisseur":"Episaveurs","article":"Perrier","unite":"U","prix_achat":0.631,"qte":1,"cout":0.631}]},
 ]
-
-const FC_CATALOG = [{"article": "Pain", "fournisseur": "Monarque", "unite": "U", "prix_achat": 0.58}, {"article": "saucisse SCHWARTS", "fournisseur": "Norbert", "unite": "kg", "prix_achat": 5.3}, {"article": "Oignons frits", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 6.44}, {"article": "ketchup", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 1.692}, {"article": "yellow mustard", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 4.66}, {"article": "sweet relish", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 7.04}, {"article": "cebette", "fournisseur": "Fooflow", "unite": "kg", "prix_achat": 10.0}, {"article": "cheddar", "fournisseur": "Fooflow", "unite": "kg", "prix_achat": 8.85}, {"article": "gouda", "fournisseur": "Fooflow", "unite": "kg", "prix_achat": 8.7}, {"article": "american cheese", "fournisseur": "Fooflow", "unite": "kg", "prix_achat": 7.2}, {"article": "pickles onions", "fournisseur": "maison", "unite": "kg", "prix_achat": 3.0}, {"article": "œufs(2)", "fournisseur": "Foodflow", "unite": "U", "prix_achat": 0.35}, {"article": "yuzu kosho", "fournisseur": "BienManger.com", "unite": "kg", "prix_achat": 70.0}, {"article": "échalote", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 3.0}, {"article": "sucrine", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 5.4}, {"article": "poulet", "fournisseur": "Boucherie Norbert", "unite": "kg", "prix_achat": 10.8}, {"article": "Echalote ciselée", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 3.0}, {"article": "mayonnaise maison", "fournisseur": "Maison", "unite": "kg", "prix_achat": 3.0}, {"article": "câpres", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 4.45}, {"article": "anchois", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 19.0}, {"article": "parmesan", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 16.26}, {"article": "moutarde ancienne", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 11.9}, {"article": "Thon", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 8.3}, {"article": "Sriracha", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 4.75}, {"article": "pickles  onions rouge", "fournisseur": "Maison", "unite": "kg", "prix_achat": 3.0}, {"article": "mayo  maison", "fournisseur": "Maison", "unite": "kg", "prix_achat": 3.0}, {"article": "pickles", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 8.89}, {"article": "Pastrami", "fournisseur": "boucherie norbert", "unite": "kg", "prix_achat": 22.8}, {"article": "Sauce Russe", "fournisseur": "maison", "unite": "kg", "prix_achat": 3.0}, {"article": "Saumon Fumé", "fournisseur": "Marina Sea food", "unite": "kg", "prix_achat": 30.0}, {"article": "échalotte ciselée", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 3.05}, {"article": "citron jaune", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 1.79}, {"article": "cream cheese", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 10.59}, {"article": "poivre noir", "fournisseur": "Rouqette", "unite": "kg", "prix_achat": 13.0}, {"article": "homard", "fournisseur": "Marina Sea food", "unite": "kg", "prix_achat": 102.0}, {"article": "écrevisse", "fournisseur": "Marina Sea food", "unite": "kg", "prix_achat": 37.0}, {"article": "Mayo lobster maison", "fournisseur": "Maison", "unite": "kg", "prix_achat": 2.64}, {"article": "croutons", "fournisseur": "Monarque", "unite": "U", "prix_achat": 0.69}, {"article": "sel", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 1.0}, {"article": "poivre", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 13.0}, {"article": "couverts", "fournisseur": "Distribution Service", "unite": "U", "prix_achat": 0.055}, {"article": "packaging", "fournisseur": "Distribution Service", "unite": "U", "prix_achat": 0.19}, {"article": "Nutella", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 9.56}, {"article": "Whole Earth Crunchy", "fournisseur": "Amazon", "unite": "kg", "prix_achat": 14.0}, {"article": "pomme terre Agria", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 1.07}, {"article": "Maizena", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 6.7}, {"article": "Huile", "fournisseur": "Rouquette", "unite": "l", "prix_achat": 1.9}, {"article": "Packaging sauce", "fournisseur": "Distribution Service", "unite": "U", "prix_achat": 0.03}, {"article": "chou rouge", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 1.82}, {"article": "chou blanc", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 1.05}, {"article": "carottes", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 0.91}, {"article": "yaourt grec", "fournisseur": "Foodflow", "unite": "kg", "prix_achat": 3.85}, {"article": "moutarde à lancienne", "fournisseur": "Rouquette", "unite": "kg", "prix_achat": 11.9}, {"article": "Pink Lemonade", "fournisseur": "Maison", "unite": "U", "prix_achat": 0.6615}, {"article": "Coca Cola", "fournisseur": "Rouquette", "unite": "U", "prix_achat": 0.64}, {"article": "Coca Cola Zero", "fournisseur": "Rouquette", "unite": "U", "prix_achat": 0.67}, {"article": "Lipton Ice Tea", "fournisseur": "Rouquette", "unite": "U", "prix_achat": 0.68}, {"article": "Budweiser", "fournisseur": "Rouquette", "unite": "U", "prix_achat": 1.44}, {"article": "Tensaï Citron", "fournisseur": "AlterFood", "unite": "U", "prix_achat": 1.4}, {"article": "Tensaï Myrtille", "fournisseur": "AlterFood", "unite": "U", "prix_achat": 1.4}, {"article": "Celtic Plate", "fournisseur": "AlterFood", "unite": "U", "prix_achat": 0.59}, {"article": "Celtic Gazeuse", "fournisseur": "AlterFood", "unite": "U", "prix_achat": 0.69}]
 
 const INIT_VAULT = [{id:1,title:'Supabase',url:'https://supabase.com',user:'edward@meshuga.fr',pw:''},{id:2,title:'Vercel',url:'https://vercel.com',user:'edward@meshuga.fr',pw:''}]
 
@@ -1404,6 +1402,81 @@ function DashboardImpl() {
               </div>
 
 
+
+              {/* FOOD COST ALERTS */}
+              {!isEmy && (function(){
+                var alerts = fcRecipes.filter(function(r){ return r.foodCostPct > fcSeuil })
+                var avgFC = Math.round(fcRecipes.reduce(function(s,r){return s+r.foodCostPct},0)/fcRecipes.length*10)/10
+                var worst = fcRecipes.slice().sort(function(a,b){return b.foodCostPct-a.foodCostPct}).slice(0,3)
+                if (alerts.length === 0 && avgFC <= fcSeuil) return null
+                return (
+                  <div className="card" style={{marginBottom:10,borderLeft:'4px solid #CC0066'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                      <div>
+                        <div className="yt" style={{fontSize:20,color:'#CC0066'}}>🥩 Alertes Food Cost</div>
+                        <div style={{fontSize:11,color:'#888',marginTop:2}}>FC moyen : {avgFC}% · Seuil : {fcSeuil}%</div>
+                      </div>
+                      <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){nav('foodcost')}}>Voir tout →</button>
+                    </div>
+                    {alerts.length > 0 && (
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontSize:11,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,color:'#CC0066',marginBottom:6}}>⚠️ Au-dessus du seuil ({alerts.length} recette{alerts.length>1?'s':''})</div>
+                        {alerts.sort(function(a,b){return b.foodCostPct-a.foodCostPct}).map(function(r){
+                          var diff = Math.round((r.foodCostPct - fcSeuil)*10)/10
+                          var coutExces = Math.round((r.foodCostPct/100 * r.prixHT - fcSeuil/100 * r.prixHT)*100)/100
+                          return (
+                            <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:'1px solid #F5F5F5',cursor:'pointer'}} onClick={function(){nav('foodcost')}}>
+                              <div>
+                                <div style={{fontWeight:900,fontSize:13}}>{r.name}</div>
+                                <div style={{fontSize:10,color:'#888'}}>{r.categorie} · Marge HT : {r.marge.toFixed(2)}€</div>
+                              </div>
+                              <div style={{textAlign:'right',flexShrink:0}}>
+                                <div style={{fontWeight:900,fontSize:15,color:'#CC0066'}}>{r.foodCostPct}%</div>
+                                <div style={{fontSize:9,color:'#CC0066'}}>+{diff}% vs seuil · -{coutExces}€/portion</div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {(function(){
+                      // Find ingredients with highest food cost impact
+                      var ingImpact = []
+                      fcRecipes.filter(function(r){return r.foodCostPct > fcSeuil}).forEach(function(r){
+                        r.ingredients.forEach(function(ing){
+                          var pct = r.prixHT > 0 ? Math.round(ing.cout / r.prixHT * 1000)/10 : 0
+                          if (pct >= 10) {
+                            var existing = ingImpact.find(function(x){return x.article===ing.article})
+                            if (!existing) ingImpact.push({article:ing.article, fournisseur:ing.fournisseur, prixActuel:ing.prix_achat, unite:ing.unite, pct:pct, recette:r.name})
+                          }
+                        })
+                      })
+                      ingImpact.sort(function(a,b){return b.pct-a.pct})
+                      if (ingImpact.length === 0) return null
+                      return (
+                        <div>
+                          <div style={{fontSize:11,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,color:'#555',marginBottom:6}}>📍 Ingrédients qui pèsent le plus</div>
+                          {ingImpact.slice(0,4).map(function(ing,idx){
+                            var prixCible = Math.round(ing.prixActuel * 0.85 * 100)/100
+                            return (
+                              <div key={idx} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 0',borderBottom:'1px solid #F5F5F5'}}>
+                                <div>
+                                  <div style={{fontWeight:700,fontSize:12}}>{ing.article}</div>
+                                  <div style={{fontSize:10,color:'#888'}}>{ing.fournisseur} · {ing.prixActuel}€/{ing.unite}</div>
+                                </div>
+                                <div style={{textAlign:'right',flexShrink:0}}>
+                                  <div style={{fontWeight:900,fontSize:12,color:'#CC0066'}}>{ing.pct}% du PV</div>
+                                  <div style={{fontSize:9,color:'#888'}}>Objectif : {prixCible}€/{ing.unite}</div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )
+              })()}
 
               {/* TACHES DU JOUR */}
               <div className="card" style={{marginBottom:10,borderLeft:'4px solid #FF82D7'}}>
@@ -3003,7 +3076,7 @@ function DashboardImpl() {
                     return fcCatFilter==='tous' || (r.categorie||'classique')===fcCatFilter
                   }).sort(function(a,b){return b.foodCostPct-a.foodCostPct}).map(function(r){
                     var alert = r.foodCostPct > fcSeuil
-                    var barColor = r.foodCostPct >= fcSeuil ? '#CC0066' : r.foodCostPct >= fcSeuil*0.8 ? '#FF6B2B' : '#009D3A'
+                    var barColor = r.foodCostPct > fcSeuil ? '#CC0066' : '#009D3A'
                     return (
                       <div key={r.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(alert?'#CC0066':'#009D3A'),cursor:'pointer'}} onClick={function(){setFcSelected(r)}}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
@@ -3110,7 +3183,7 @@ function DashboardImpl() {
                           <div style={{fontSize:9,opacity:.5,textTransform:'uppercase',marginBottom:2}}>HT calculé</div>
                           <div style={{fontWeight:900,fontSize:15}}>{prixHTEdite.toFixed(2)}€</div>
                         </div>
-                        <div style={{textAlign:'center',padding:'8px',background:foodCostEdite>fcSeuil?'#FFE5E5':foodCostEdite>fcSeuil*0.8?'#FFEB5A':'#F0FFF4',borderRadius:6,border:'1px solid #EEE'}}>
+                        <div style={{textAlign:'center',padding:'8px',background:foodCostEdite>fcSeuil?'#FFE5E5':'#F0FFF4',borderRadius:6,border:'1px solid #EEE'}}>
                           <div style={{fontSize:9,opacity:.6,textTransform:'uppercase',marginBottom:2}}>Food cost</div>
                           <div style={{fontWeight:900,fontSize:15,color:foodCostEdite>fcSeuil?'#CC0066':'#009D3A'}}>{foodCostEdite}%</div>
                         </div>
