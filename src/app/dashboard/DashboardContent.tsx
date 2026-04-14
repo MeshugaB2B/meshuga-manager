@@ -638,7 +638,7 @@ function DashboardImpl() {
   })
   const [fcRecipes, setFcRecipes] = useState(function(){
     try {
-      var FC_VERSION = 'v5_clean_boissons'
+      var FC_VERSION = 'v6_modal_fix'
       var storedVersion = localStorage.getItem('meshuga_fc_version')
       if (storedVersion !== FC_VERSION) {
         localStorage.removeItem('meshuga_fc_recipes')
@@ -1599,7 +1599,7 @@ function DashboardImpl() {
                   var lateTasks=tasks.filter(function(t){return t.deadline&&t.deadline<today&&t.status!=='done'})
                   var upcoming=tasks.filter(function(t){var d=new Date(t.deadline||'9999');var n=new Date();n.setDate(n.getDate()+7);return t.deadline>today&&d<=n&&t.status!=='done'}).slice(0,3)
                   if(todayTasks.length===0&&lateTasks.length===0){
-                    return <div style={{fontSize:15,opacity:.5,padding:'10px 0'}}>✅ Aucune tâche urgente aujourd'hui !</div>
+                    return <div style={{fontSize:15,opacity:.5,padding:'10px 0'}}>✅ Aucune tâche urgente aujourd&apos;hui !</div>
                   }
                   return(
                     <div>
@@ -2175,7 +2175,7 @@ function DashboardImpl() {
                   <div style={{background:'#fff',borderRadius:'16px 16px 0 0',padding:20,width:'100%',maxWidth:520,maxHeight:'80vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
                       <div>
-                        <div style={{fontFamily:'Yellowtail,cursive',fontSize:22,color:'#191923'}}>📞 Script d'appel</div>
+                        <div style={{fontFamily:'Yellowtail,cursive',fontSize:22,color:'#191923'}}>📞 Script d&apos;appel</div>
                         <div style={{fontSize:12,color:'#888',marginTop:2}}>{scriptProspect.name}</div>
                       </div>
                       <button style={{background:'none',border:'none',fontSize:22,cursor:'pointer',color:'#888'}} onClick={function(){setScriptProspect(null);setScriptContent('')}}>✕</button>
@@ -2183,7 +2183,7 @@ function DashboardImpl() {
                     {scriptLoading && (
                       <div style={{textAlign:'center',padding:40}}>
                         <div style={{fontSize:32,marginBottom:8}}>🧠</div>
-                        <div style={{fontSize:13,color:'#888'}}>L'IA prépare ton script...</div>
+                        <div style={{fontSize:13,color:'#888'}}>L&apos;IA prépare ton script...</div>
                       </div>
                     )}
                     {!scriptLoading && scriptContent && (
@@ -2397,7 +2397,7 @@ function DashboardImpl() {
                   var d=new Date(calYear,calMonth+1,1)
                   setCalMonth(d.getMonth());setCalYear(d.getFullYear())
                 }}>&#8594;</button>
-                <button className="btn btn-sm btn-p" onClick={function(){setCalMonth(new Date().getMonth());setCalYear(new Date().getFullYear())}}>Aujourd'hui</button>
+                <button className="btn btn-sm btn-p" onClick={function(){setCalMonth(new Date().getMonth());setCalYear(new Date().getFullYear())}}>Aujourd&apos;hui</button>
               </div>
 
               {calView==='month'&&(function(){
@@ -2540,14 +2540,14 @@ function DashboardImpl() {
               {!isEmy && (
                 <div className="card-y" style={{marginBottom:12}}>
                   <div className="ct">📝 Formulaire CR Emy</div>
-                  <div style={{fontSize:12,opacity:.7,marginBottom:8}}>Ce qu'Emy remplit chaque semaine :</div>
+                  <div style={{fontSize:12,opacity:.7,marginBottom:8}}>Ce qu&apos;Emy remplit chaque semaine :</div>
                   <div style={{fontSize:11,opacity:.6,lineHeight:1.8}}>Semaine du · Prospects contactés · RDV effectués · Commandes · Victoires · Challenges · Priorités S+1 · Note pour Edward</div>
                 </div>
               )}
               {reports.length === 0 && (
                 <div className="card" style={{textAlign:'center',padding:40}}>
                   <div style={{fontSize:40,marginBottom:10}}>📋</div>
-                  <div style={{fontWeight:900,textTransform:'uppercase'}}>Aucun CR pour l'instant</div>
+                  <div style={{fontWeight:900,textTransform:'uppercase'}}>Aucun CR pour l&apos;instant</div>
                   {isEmy && <button className="btn btn-y" style={{marginTop:14}} onClick={function() { openModal('cr', {}) }}>Creer le premier CR</button>}
                 </div>
               )}
@@ -2566,8 +2566,8 @@ function DashboardImpl() {
                     {r.wins && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>✅ Victoires</div><div style={{fontSize:12}}>{r.wins}</div></div>}
                     {r.challenges && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>⚡ Challenges</div><div style={{fontSize:12}}>{r.challenges}</div></div>}
                     {r.next && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>🎯 Priorites S+1</div><div style={{fontSize:12}}>{r.next}</div></div>}
-                    {r.notes && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>💬 Note d'Emy</div><div style={{fontSize:12}}>{r.notes}</div></div>}
-                    {r.feedback && <div style={{background:'#FF82D7',border:'2px solid #191923',borderRadius:5,padding:10}}><div className="yt" style={{fontSize:14,marginBottom:4}}>Retour d'Edward</div><div style={{fontSize:12}}>{r.feedback}</div></div>}
+                    {r.notes && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>💬 Note d&apos;Emy</div><div style={{fontSize:12}}>{r.notes}</div></div>}
+                    {r.feedback && <div style={{background:'#FF82D7',border:'2px solid #191923',borderRadius:5,padding:10}}><div className="yt" style={{fontSize:14,marginBottom:4}}>Retour d&apos;Edward</div><div style={{fontSize:12}}>{r.feedback}</div></div>}
                     {!isEmy && !r.feedback && (
                       <div style={{marginTop:10}}>
                         <div className="lbl">Ton retour a Emy</div>
@@ -3556,14 +3556,18 @@ function DashboardImpl() {
                     if (!fcEditForm.prixTTC) { toast('Prix de vente obligatoire'); return }
                     var prixHT2 = Math.round(fcEditForm.prixTTC / (1+0.055) * 100) / 100
                     var saved2 = Object.assign({}, fcEditForm, {prixHT:prixHT2})
+                    var isCreating = fcEditModal === 'new'
                     setFcRecipes(function(prev) {
-                      var updated = fcEditModal === 'new' ? prev.concat([saved2]) : prev.map(function(r){ return r.id===saved2.id ? saved2 : r })
+                      var updated = isCreating ? prev.concat([saved2]) : prev.map(function(r){ return r.id===saved2.id ? saved2 : r })
                       try { localStorage.setItem('meshuga_fc_recipes', JSON.stringify(updated)) } catch(e) {}
                       return updated
                     })
+                    if (fcSelected && fcSelected.id === fcEditForm.id) {
+                      setFcSelected(saved2)
+                    }
                     setFcEditModal(null)
                     setFcEditForm(null)
-                    toast(fcEditModal === 'new' ? 'Recette créée !' : 'Recette modifiée !')
+                    toast(isCreating ? 'Recette créée !' : 'Recette modifiée !')
                   }}>{fcEditModal === 'new' ? 'Créer' : 'Enregistrer'}</button>
                 </div>
 
@@ -3584,7 +3588,7 @@ function DashboardImpl() {
                 {/* UPLOAD */}
                 {!fcInvoiceResult && !fcInvoiceLoading && (
                   <div>
-                    <div style={{fontSize:13,color:'#555',marginBottom:16}}>Upload le PDF d'une facture fournisseur — Claude extrait les prix automatiquement.</div>
+                    <div style={{fontSize:13,color:'#555',marginBottom:16}}>Upload le PDF d&apos;une facture fournisseur — Claude extrait les prix automatiquement.</div>
                     <label style={{display:'block',background:'#F8F9FF',border:'2px dashed #DDEEFF',borderRadius:10,padding:'30px 20px',textAlign:'center',cursor:'pointer'}}>
                       <div style={{fontSize:32,marginBottom:8}}>📂</div>
                       <div style={{fontWeight:900,fontSize:14,color:'#005FFF'}}>Choisir un PDF de facture</div>
