@@ -1448,14 +1448,11 @@ function DashboardImpl() {
                         {alerts.sort(function(a,b){return b.foodCostPct-a.foodCostPct}).map(function(r){
                           var diff = Math.round((r.foodCostPct - fcSeuil)*10)/10
                           return (
-                            <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 0',borderBottom:'1px solid #F5F5F5',cursor:'pointer'}} onClick={function(){nav('foodcost')}}>
-                              <div>
-                                <div style={{fontWeight:900,fontSize:12}}>{r.name}</div>
-                                <div style={{fontSize:10,color:'#888'}}>Marge HT : {r.marge.toFixed(2)}€</div>
-                              </div>
-                              <div style={{textAlign:'right',flexShrink:0}}>
-                                <div style={{fontWeight:900,fontSize:14,color:'#CC0066'}}>{r.foodCostPct}%</div>
-                                <div style={{fontSize:9,color:'#CC0066'}}>+{diff}% vs seuil</div>
+                            <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'3px 6px',background:'#FFF5F5',borderRadius:5,marginBottom:3,cursor:'pointer'}} onClick={function(){nav('foodcost')}}>
+                              <div style={{fontSize:11,fontWeight:700}}>{r.name}</div>
+                              <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0}}>
+                                <span style={{fontSize:10,color:'#888'}}>{r.marge.toFixed(2)}€ marge</span>
+                                <span style={{fontWeight:900,fontSize:12,color:'#CC0066'}}>{r.foodCostPct}% (+{diff}%)</span>
                               </div>
                             </div>
                           )
@@ -1503,18 +1500,19 @@ function DashboardImpl() {
                             var ecartPct = analysis ? analysis.ecart_pct : -15
                             var isEleve = analysis ? analysis.statut === 'eleve' : false
                             return (
-                              <div key={idx} style={{background:isEleve?'#FFF5F5':'#FAFAFA',borderRadius:6,padding:'8px 10px',marginBottom:4,border:'1px solid '+(isEleve?'#FFCCCC':'#EEE')}}>
-                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                                  <div style={{flex:1}}>
-                                    <div style={{fontWeight:700,fontSize:12}}>{ing.article}</div>
-                                    <div style={{fontSize:10,color:'#888'}}>{ing.fournisseur}</div>
-                                    {analysis && analysis.conseil && <div style={{fontSize:10,color:'#005FFF',marginTop:3,fontStyle:'italic'}}>{analysis.conseil}</div>}
+                              <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:6,alignItems:'center',padding:'4px 6px',background:isEleve?'#FFF5F5':'#FAFAFA',borderRadius:5,marginBottom:3,border:'1px solid '+(isEleve?'#FFCCCC':'#EEE')}}>
+                                <div>
+                                  <div style={{display:'flex',gap:6,alignItems:'baseline'}}>
+                                    <span style={{fontWeight:700,fontSize:12}}>{ing.article}</span>
+                                    <span style={{fontSize:10,color:'#888'}}>{ing.fournisseur}</span>
+                                    {isEleve && <span style={{fontSize:9,color:'#CC0066',fontWeight:900}}>⬆️</span>}
                                   </div>
-                                  <div style={{textAlign:'right',flexShrink:0,marginLeft:8}}>
-                                    <div style={{fontSize:11,color:'#888'}}>{ing.prixActuel}€/{ing.unite}</div>
-                                    <div style={{fontWeight:900,fontSize:13,color:'#009D3A'}}>→ {prixCible}€/{ing.unite}</div>
-                                    <div style={{fontSize:9,color:isEleve?'#CC0066':'#888'}}>{isEleve?'⬆️ Prix élevé':''} {ecartPct}%</div>
-                                  </div>
+                                  {analysis && analysis.conseil && <div style={{fontSize:10,color:'#005FFF',fontStyle:'italic'}}>{analysis.conseil}</div>}
+                                  {analysis && analysis.source && <div style={{fontSize:9,color:'#888'}}>Source : {analysis.source}</div>}
+                                </div>
+                                <div style={{textAlign:'right',whiteSpace:'nowrap'}}>
+                                  <div style={{fontSize:10,color:'#888',textDecoration:'line-through'}}>{ing.prixActuel}€/{ing.unite}</div>
+                                  <div style={{fontWeight:900,fontSize:12,color:'#009D3A'}}>→ {prixCible}€/{ing.unite}</div>
                                 </div>
                               </div>
                             )
@@ -3061,8 +3059,9 @@ function DashboardImpl() {
                 <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                   <button className="btn btn-y btn-sm" style={{background:fcView==='recettes'?'#191923':'transparent',color:fcView==='recettes'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('recettes');setFcSelected(null)}}>Recettes</button>
                   <button className="btn btn-y btn-sm" style={{background:fcView==='fournisseurs'?'#191923':'transparent',color:fcView==='fournisseurs'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('fournisseurs');setFcSelected(null)}}>Fournisseurs</button>
+                  <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Facture</button>
                   <button className="btn btn-y btn-sm" onClick={function(){
-                    setFcEditForm({id:'new_'+Date.now(),name:'',categorie:'sandwich',prixTTC:0,prixHT:0,foodCost:0,marge:0,foodCostPct:0,ingredients:[]})
+                    setFcEditForm({id:'new_'+Date.now(),name:'',categorie:'classique',prixTTC:0,prixHT:0,foodCost:0,marge:0,foodCostPct:0,ingredients:[]})
                     setFcEditModal('new')
                     setFcSelected(null)
                   }}>+ Nouveau</button>
@@ -3130,7 +3129,7 @@ function DashboardImpl() {
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
                           <div style={{flex:1,cursor:'pointer'}} onClick={function(){setFcSelected(r)}}>
                             <div style={{fontWeight:900,fontSize:14}}>{r.name}</div>
-                            <div style={{fontSize:11,opacity:.6}}>PV HT : {r.prixHT.toFixed(2)}€ · Marge HT : {r.marge.toFixed(2)}€</div>
+                            <div style={{fontSize:11,opacity:.6}}>{[...new Set(r.ingredients.map(function(i){return i.fournisseur}))].slice(0,2).join(', ')} · PV HT : {r.prixHT.toFixed(2)}€ · Marge HT : {r.marge.toFixed(2)}€</div>
                           </div>
                           <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
                             <div style={{textAlign:'right',cursor:'pointer'}} onClick={function(){setFcSelected(r)}}>
