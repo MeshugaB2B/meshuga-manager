@@ -170,7 +170,7 @@ async function buildBriefing(supabase: any, role: string) {
   if (conseil) lines.push('🧠 ' + conseil)
 
   const title = `🌭 Bonjour ${prenom} — ${todayFr.charAt(0).toUpperCase() + todayFr.slice(1)}`
-  const body = lines.join(' · ')
+  const body = lines.join('\n')
   return { title, body }
 }
 
