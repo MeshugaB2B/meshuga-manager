@@ -572,7 +572,7 @@ function DashboardImpl() {
   const [profile, setProfile] = useState(null)
   const [page, setPage] = useState('dash')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [tasks, setTasks] = useState(INIT_TASKS)
+  const [tasks, setTasks] = useState([])
   const [prospects, setProspects] = useState(INIT_PROSPECTS)
   const [contacts, setContacts] = useState([])
   const [annCat, setAnnCat] = useState('all')
@@ -982,6 +982,27 @@ function DashboardImpl() {
     setActivityLog(function(prev) { return [{id: Date.now(), created_at: new Date().toISOString(), user_role: entry.user_role, user_name: entry.user_name, type: type, description: description, prospect_name: prospectName || null, email_content: emailContent || null}].concat(prev.slice(0, 199)) })
   }
 
+  function loadTasks() {
+    sb().from('tasks').select('*').order('created_at', {ascending: false}).then(function(res) {
+      if (res.data) {
+        setTasks(res.data.map(function(t) {
+          return {
+            id: t.id,
+            title: t.title,
+            assignee: t.assignee || 'edward',
+            deadline: t.deadline || '',
+            status: t.status || 'todo',
+            priority: t.priority || 'medium',
+            description: t.description || '',
+            checklist: t.checklist || [],
+            files: [],
+            chasseId: null
+          }
+        }))
+      }
+    })
+  }
+
   function loadDevis() {
     sb().from('devis').select('*').order('created_at',{ascending:false}).then(function(r){if(r.data)setDevisList(r.data)})
   }
@@ -1037,6 +1058,7 @@ function DashboardImpl() {
     sb().from('devis').update({statut:statut}).eq('id',id).then(function(){
       sb().from('devis_historique').insert({devis_id:id,action:statut,note:note||'',user_name:(profile&&profile.name)||''}).then(function(){})
       loadDevis()
+    loadTasks()
       toast('Statut : '+statut)
       var dv = devisList.find(function(d){return String(d.id)===String(id)})
       if(dv && dv.prospect_id) {
@@ -1082,7 +1104,7 @@ function DashboardImpl() {
     setChasse(function(prev) { return prev.map(function(x) { return x.id === id ? Object.assign({}, x, {status: 'contacted', contacted: true, contactedDate: today, lastAction: 'Contact le ' + today, relanceDate: relDateStr, relanceStatut: 'en_attente'}) : x }) })
     setContactedToday(function(n) { return n + 1 })
     if (pros) {
-      setTasks(function(prev) { return prev.concat([{id: 'rel-' + id + '-' + Date.now(), title: 'Relancer ' + pros.name, assignee: 'emy', priority: 'medium', status: 'todo', deadline: relDateStr, checklist: [], files: [], chasseId: id}]) })
+      sb().from('tasks').insert({title:'Relancer '+pros.name,assignee:'emy',priority:'medium',status:'todo',deadline:relDateStr}).then(function(){loadTasks()})
       var alreadyInCrm = prospects.find(function(p) { return p.name === pros.name })
       if (!alreadyInCrm) {
         var newProspect = {
@@ -1119,7 +1141,7 @@ function DashboardImpl() {
     var next = new Date(); next.setDate(next.getDate() + 7)
     var nextStr = next.toISOString().split('T')[0]
     setChasse(function(prev) { return prev.map(function(x) { return x.id === id ? Object.assign({}, x, {lastAction: 'Relance le ' + today, relanceDate: nextStr, relanceStatut: 'relance'}) : x }) })
-    setTasks(function(prev) { return prev.filter(function(t) { return t.chasseId !== id }).concat([{id: 'rel2-' + id + '-' + Date.now(), title: 'Suivi ' + (pros ? pros.name : id) + ' - en attente reponse', assignee: 'emy', priority: 'high', status: 'todo', deadline: nextStr, checklist: [], files: [], chasseId: id}]) })
+    sb().from('tasks').insert({title:'Suivi '+(pros?pros.name:id)+' - en attente reponse',assignee:'emy',priority:'high',status:'todo',deadline:nextStr}).then(function(){loadTasks()})
     logActivity('prospect_relance', 'Relance : ' + (pros ? pros.name : id), pros ? pros.name : id, null)
     toast('Relance! Suivi dans 7 jours')
   }
@@ -1130,13 +1152,13 @@ function DashboardImpl() {
     var newSt = rep === 'interesse' ? 'nego' : rep === 'lost' ? 'lost' : 'contacted'
     var action = rep === 'interesse' ? 'Interesse !' : rep === 'lost' ? 'Pas interesse' : 'A rappeler'
     setChasse(function(prev) { return prev.map(function(x) { return x.id === id ? Object.assign({}, x, {status: newSt, lastAction: action + ' - ' + today, relanceStatut: rep}) : x }) })
-    setTasks(function(prev) { return prev.filter(function(t) { return t.chasseId !== id }) })
+    
     if (rep === 'interesse' && pros) {
-      setTasks(function(prev) { return prev.concat([{id: 'nego-' + id + '-' + Date.now(), title: 'NEGO - Envoyer devis a ' + pros.name, assignee: 'emy', priority: 'high', status: 'todo', deadline: today, checklist: ['Preparer devis', 'Envoyer via module Devis', 'Fixer RDV'], files: [], chasseId: id}]) })
+      sb().from('tasks').insert({title:'NEGO - Envoyer devis a '+pros.name,assignee:'emy',priority:'high',status:'todo',deadline:today,checklist:['Preparer devis','Envoyer via module Devis','Fixer RDV']}).then(function(){loadTasks()})
       toast('Super ! En nego - devis a preparer !')
     } else if (rep === 'rappeler' && pros) {
       var next2 = new Date(); next2.setDate(next2.getDate() + 14)
-      setTasks(function(prev) { return prev.concat([{id: 'rap-' + id + '-' + Date.now(), title: 'Rappeler ' + pros.name + ' dans 2 semaines', assignee: 'emy', priority: 'medium', status: 'todo', deadline: next2.toISOString().split('T')[0], checklist: [], files: [], chasseId: id}]) })
+      sb().from('tasks').insert({title:'Rappeler '+pros.name+' dans 2 semaines',assignee:'emy',priority:'medium',status:'todo',deadline:next2.toISOString().split('T')[0]}).then(function(){loadTasks()})
       toast('Rappel dans 2 semaines')
     } else if (rep === 'lost') {
       toast('OK, prospect archive.')
@@ -1199,15 +1221,19 @@ function DashboardImpl() {
 
   function saveTask() {
     if (!form.title) { toast('Titre requis !'); return }
-    const t = Object.assign({}, form, {checklist: form.checklist || [], files: form.files || []})
-    if (form.id) { setTasks(function(prev) { return prev.map(function(x) { return x.id === form.id ? t : x }) }) }
-    else {
-      setTasks(function(prev) { return prev.concat([Object.assign({}, t, {id: Date.now(), status: 'todo'})]) })
-      var assigneeName = form.assignee === 'emy' ? 'Emy' : 'Edward'
-      var senderName = isEmy ? 'Emy' : 'Edward'
-      if (form.assignee !== (isEmy ? 'emy' : 'edward')) {
-        sendPushToAll('📋 Nouvelle tâche — ' + form.title, 'Assignée à ' + assigneeName + ' par ' + senderName + (form.deadline ? ' · Deadline : ' + form.deadline : ''), form.assignee)
-      }
+    var payload = {title:form.title, assignee:form.assignee||'emy', deadline:form.deadline||null, priority:form.priority||'medium', status:form.status||'todo', description:form.description||'', checklist:form.checklist||[]}
+    if (form.id) {
+      sb().from('tasks').update(payload).eq('id', form.id).then(function(){loadTasks(); toast('Tâche mise à jour')})
+    } else {
+      sb().from('tasks').insert(payload).then(function(){
+        loadTasks()
+        var assigneeName = form.assignee === 'emy' ? 'Emy' : 'Edward'
+        var senderName = isEmy ? 'Emy' : 'Edward'
+        if (form.assignee !== (isEmy ? 'emy' : 'edward')) {
+          sendPushToAll('📋 Nouvelle tâche — ' + form.title, 'Assignée à ' + assigneeName + ' par ' + senderName + (form.deadline ? '\nDeadline : ' + form.deadline : ''), form.assignee)
+        }
+        toast('Tâche créée !')
+      })
     }
     closeModal()
   }
@@ -1559,7 +1585,7 @@ function DashboardImpl() {
                     <div>
                       {lateTasks.slice(0,3).map(function(t){return(
                         <div key={t.id} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 8px',marginBottom:4,background:'#FFE5E5',borderRadius:5,border:'1px solid #CC0066'}}>
-                          <input type="checkbox" onChange={function(){setTasks(function(prev){return prev.map(function(x){return x.id===t.id?Object.assign({},x,{status:'done'}):x})})}} style={{cursor:'pointer'}} />
+                          <input type="checkbox" onChange={function(){ sb().from('tasks').update({status:'done'}).eq('id',t.id).then(function(){loadTasks()}) }} style={{cursor:'pointer'}} />
                           <div style={{flex:1}}>
                             <div style={{fontSize:14,fontWeight:900,color:'#CC0066'}}>⚠️ {t.title}</div>
                             <div style={{fontSize:14,opacity:.7}}>{t.assignee} · Deadline dépassée : {t.deadline}</div>
@@ -1568,7 +1594,7 @@ function DashboardImpl() {
                       )})}
                       {todayTasks.map(function(t){return(
                         <div key={t.id} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 8px',marginBottom:4,background:'#FFF8E7',borderRadius:5,border:'1px solid #FFEB5A'}}>
-                          <input type="checkbox" onChange={function(){setTasks(function(prev){return prev.map(function(x){return x.id===t.id?Object.assign({},x,{status:'done'}):x})})}} style={{cursor:'pointer'}} />
+                          <input type="checkbox" onChange={function(){ sb().from('tasks').update({status:'done'}).eq('id',t.id).then(function(){loadTasks()}) }} style={{cursor:'pointer'}} />
                           <div style={{flex:1}}>
                             <div style={{fontSize:12,fontWeight:900}}>{t.title}</div>
                             <div style={{fontSize:10,opacity:.6}}>{t.assignee} · Priorité : {t.priority}</div>
@@ -1665,7 +1691,7 @@ function DashboardImpl() {
                                 {dayTasksEmy.map(function(t){
                                   return(
                                     <div key={t.id} style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:4,cursor:'pointer'}} onClick={function(){
-                                      setTasks(function(prev){return prev.map(function(x){return x.id!==t.id?x:Object.assign({},x,{status:t.status==='done'?'todo':'done'})})})
+                                      sb().from('tasks').update({status:t.status==='done'?'todo':'done'}).eq('id',t.id).then(function(){loadTasks()})
                                     }}>
                                       <input type="checkbox" checked={t.status==='done'} readOnly style={{width:planningView==='auj'?16:11,height:planningView==='auj'?16:11,flexShrink:0,height:11,marginTop:1,flexShrink:0,accentColor:'#191923'}}/>
                                       <span style={{fontSize:planningView==='auj'?15:12,fontWeight:t.priority==='high'?900:600,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.4}}>{t.title}</span>
@@ -2269,10 +2295,10 @@ function DashboardImpl() {
                             <span className="badge" style={{color:t.status==='done'?'#009D3A':'#888',borderColor:t.status==='done'?'#009D3A':'#ccc'}}>{TASK_S[t.status]}</span>
                             <button className="btn btn-y btn-sm" onClick={function() {
                               var o = ['todo','in_progress','done']
-                              setTasks(function(prev) { return prev.map(function(x) { return x.id !== t.id ? x : Object.assign({}, x, {status: o[Math.min(o.indexOf(x.status)+1,2)]}) }) })
+                              sb().from('tasks').update({status: o[Math.min(o.indexOf(t.status)+1,2)]}).eq('id',t.id).then(function(){loadTasks()})
                             }}>→</button>
                             <button className="btn btn-sm" onClick={function() { openModal('task', Object.assign({}, t)) }}>✏️</button>
-                            <button className="btn btn-sm btn-red" onClick={function() { setTasks(function(prev) { return prev.filter(function(x) { return x.id !== t.id }) }) }}>✕</button>
+                            <button className="btn btn-sm btn-red" onClick={function() { sb().from('tasks').delete().eq('id', t.id).then(function(){loadTasks()}) }}>✕</button>
                           </div>
                         </div>
                         {t.checklist && t.checklist.filter(function(c) { return c }).length > 0 && (
@@ -2284,7 +2310,7 @@ function DashboardImpl() {
                                     onChange={function(e) {
                                       var nl = t.checklist.slice()
                                       nl[ci] = e.target.checked ? '✓ '+item.replace('✓ ','') : item.replace('✓ ','')
-                                      setTasks(function(prev) { return prev.map(function(x) { return x.id===t.id ? Object.assign({},x,{checklist:nl}) : x }) })
+                                      var nl = t.checklist.map(function(c,ci){return ci===cIdx?Object.assign({},c,{done:!c.done}):c}); sb().from('tasks').update({checklist:nl}).eq('id',t.id).then(function(){loadTasks()})
                                     }} />
                                   <span style={{fontSize:11,textDecoration:item.indexOf('✓ ')===0?'line-through':'none',opacity:item.indexOf('✓ ')===0?.4:1}}>{item.replace('✓ ','')}</span>
                                 </div>
