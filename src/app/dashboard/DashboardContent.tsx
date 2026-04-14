@@ -3225,7 +3225,10 @@ function DashboardImpl() {
                 var conseilFCPct = Math.round((fcSelected.foodCost / (conseilX4TTC / (1+TVA) * 100) / 100) * 100)
                 return (
                 <div>
-                  <button className="btn btn-sm" style={{marginBottom:12}} onClick={function(){setFcSelected(null)}}>← Retour</button>
+                  <div style={{display:'flex',gap:8,marginBottom:12}}>
+                    <button className="btn btn-sm" onClick={function(){setFcSelected(null)}}>← Retour</button>
+                    <button className="btn btn-y btn-sm" style={{fontWeight:900}} onClick={function(){setFcEditForm(JSON.parse(JSON.stringify(fcSelected)));setFcEditModal('edit')}}>✏️ Modifier cette recette</button>
+                  </div>
 
                   {/* CONSEIL IA PRIX */}
                   <div style={{background:'#FF82D7',borderRadius:12,padding:16,marginBottom:12,border:'2px solid #fff'}}>
