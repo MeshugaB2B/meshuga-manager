@@ -9,7 +9,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'PDF manquant' }, { status: 400 })
     }
 
-    // Call Claude to extract invoice lines from PDF
     var res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -19,39 +18,43 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
+        max_tokens: 2000,
         messages: [{
           role: 'user',
           content: [
             {
               type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/pdf',
-                data: pdfBase64
-              }
+              source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 }
             },
             {
               type: 'text',
-              text: `Extrais toutes les lignes de cette facture fournisseur pour un restaurant. 
-Retourne UNIQUEMENT un JSON valide (sans markdown) avec ce format exact :
+              text: `Tu es un assistant pour un restaurant. Extrais toutes les lignes de produits alimentaires de cette facture fournisseur (ignore les produits d'entretien, emballages, gants, sacs poubelle, etc.).
+
+IMPORTANT pour le prix unitaire :
+- Ramène TOUJOURS le prix à l'unité de base (par kg, par L, ou par unité individuelle)
+- Si c'est vendu en bidon de 5kg à 8.25€ → prix_unitaire_ht = 8.25/5 = 1.65, unite = "kg"
+- Si c'est vendu en poche de 650g à 4€ → prix_unitaire_ht = 4/0.65 = 6.15, unite = "kg"
+- Si c'est vendu en pot de 4.08kg à 34€ → prix_unitaire_ht = 34/4.08 = 8.33, unite = "kg"
+- Si c'est une bouteille/canette unitaire → prix_unitaire_ht = prix brut, unite = "U"
+- Si c'est au litre → prix_unitaire_ht = prix/nb litres, unite = "L"
+
+Retourne UNIQUEMENT un JSON valide (sans markdown) :
 {
   "fournisseur": "Nom du fournisseur",
   "date": "JJ/MM/AAAA",
   "total_ht": 0.00,
   "lignes": [
     {
-      "article": "Nom simplifié de l'article",
-      "article_original": "Description complète sur la facture",
+      "article": "nom simplifié (ex: ketchup, oignons frits, thon, sweet relish, coca cola, evian)",
+      "article_original": "description complète sur la facture",
       "quantite": 1.0,
       "unite": "kg ou U ou L",
-      "prix_unitaire_ht": 0.00
+      "prix_unitaire_ht": 0.00,
+      "prix_brut_facture": 0.00,
+      "conditionnement": "ex: BID 5kg, PCH 650g, BTE 33cl"
     }
   ]
-}
-Pour l'unité : utilise "kg" pour les poids, "U" pour les unités/pièces/boîtes, "L" pour les litres.
-Pour le prix unitaire : c'est le prix par kg ou par unité de conditionnement HT.
-Simplifie le nom de l'article au maximum (ex: "Cheddar Tranché 1KG" → "cheddar", "Sucrine Cœur Bqt" → "sucrine").`
+}`
             }
           ]
         }]
@@ -61,7 +64,6 @@ Simplifie le nom de l'article au maximum (ex: "Cheddar Tranché 1KG" → "chedda
     var data = await res.json()
     var text = data.content?.[0]?.text?.trim() || ''
     text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-
     var parsed = JSON.parse(text)
     return NextResponse.json(parsed)
   } catch (e: any) {
