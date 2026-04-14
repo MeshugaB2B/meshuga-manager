@@ -3824,24 +3824,24 @@ function DashboardImpl() {
                         setPushTestLoading(true)
                         setPushTestStatus(null)
                         var role = isEmy ? 'emy' : 'edward'
-                        fetch('https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-push',{
+                        fetch('/api/test-push',{
                           method:'POST',
                           headers:{'Content-Type':'application/json'},
-                          body:JSON.stringify({
-                            title:'🔔 Test de connexion',
-                            body:'Ta connexion fonctionne ! (' + new Date().toLocaleTimeString('fr-FR') + ')',
-                            target: role
-                          })
+                          body:JSON.stringify({target: role})
                         })
                         .then(function(r){return r.json()})
                         .then(function(data){
+                          if (data.error) { setPushTestStatus('fail:server: '+data.error); return }
                           if (data.sent > 0) {
                             setPushTestStatus('ok')
+                          } else if (!data.total) {
+                            setPushTestStatus('nosub')
                           } else {
-                            setPushTestStatus('fail')
+                            var errDetail = data.errors && data.errors.length > 0 ? data.errors[0] : 'http='+data.httpStatus+' sent=0/'+data.total+(data.raw?' | '+String(data.raw).substring(0,120):'')
+                            setPushTestStatus('fail:'+errDetail)
                           }
                         })
-                        .catch(function(){setPushTestStatus('fail')})
+                        .catch(function(e){setPushTestStatus('fail:fetch error: '+(e&&e.message||String(e)))})
                         .finally(function(){setPushTestLoading(false)})
                       }}
                     >
