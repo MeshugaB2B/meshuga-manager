@@ -3452,7 +3452,7 @@ function DashboardImpl() {
                     <label style={{display:'block',background:'#F8F9FF',border:'2px dashed #DDEEFF',borderRadius:10,padding:'30px 20px',textAlign:'center',cursor:'pointer'}}>
                       <div style={{fontSize:32,marginBottom:8}}>📂</div>
                       <div style={{fontWeight:900,fontSize:14,color:'#005FFF'}}>Choisir un PDF de facture</div>
-                      <div style={{fontSize:11,color:'#888',marginTop:4}}>La Crémerie, HPS, Foodflow, Marina Sea Food...</div>
+                      <div style={{fontSize:11,color:'#888',marginTop:4}}>La Crémerie, HPS, Foodflow, Marina, Episaveurs...</div>
                       <input type="file" accept=".pdf" style={{display:'none'}} onChange={function(e){
                         var file = e.target && e.target.files && e.target.files[0]
                         if (!file) return
@@ -3543,6 +3543,7 @@ function DashboardImpl() {
                               <div style={{fontSize:13,fontWeight:700}}>{m.ligne.article_original}</div>
                               <div style={{fontSize:10,color:'#888'}}>
                                 {m.ligne.prix_unitaire_ht}€/{m.ligne.unite}
+                                {m.ligne.conditionnement && <span style={{marginLeft:4,opacity:.5}}>({m.ligne.conditionnement})</span>}
                                 {m.matched && <span style={{marginLeft:8,color:'#005FFF'}}>→ {m.matched.article}</span>}
                                 {!m.matched && <span style={{marginLeft:8,color:'#CC0066'}}>⚠️ Pas de correspondance</span>}
                               </div>
