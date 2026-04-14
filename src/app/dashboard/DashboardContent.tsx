@@ -771,6 +771,26 @@ function DashboardImpl() {
     }
   }, [profile])
 
+  // Auto-refresh tasks + planning toutes les 30s + au retour sur l'app
+  useEffect(function() {
+    if (!profile) return
+    var interval = setInterval(function() {
+      loadTasks()
+      loadCalEvents()
+    }, 30000)
+    function onVisible() {
+      if (document.visibilityState === 'visible') {
+        loadTasks()
+        loadCalEvents()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return function() {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [profile])
+
   useEffect(function() {
     if (!profile) return
     var startTime = Date.now()
