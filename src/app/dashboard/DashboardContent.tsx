@@ -649,6 +649,9 @@ function DashboardImpl() {
   const [fcCatFilter, setFcCatFilter] = useState('tous')
   const [fcEditModal, setFcEditModal] = useState(null)
   const [fcInvoiceModal, setFcInvoiceModal] = useState(false)
+  const [fcAlertCat, setFcAlertCat] = useState('tous')
+  const [fcPriceAnalysis, setFcPriceAnalysis] = useState(null)
+  const [fcPriceLoading, setFcPriceLoading] = useState(false)
   const [fcInvoiceLoading, setFcInvoiceLoading] = useState(false)
   const [fcInvoiceResult, setFcInvoiceResult] = useState(null)
   const [fcInvoiceMatches, setFcInvoiceMatches] = useState([])
@@ -1404,48 +1407,65 @@ function DashboardImpl() {
 
 
               {/* FOOD COST ALERTS */}
-              {!isEmy && (function(){
-                var alerts = fcRecipes.filter(function(r){ return r.foodCostPct > fcSeuil })
-                var avgFC = Math.round(fcRecipes.reduce(function(s,r){return s+r.foodCostPct},0)/fcRecipes.length*10)/10
-                var worst = fcRecipes.slice().sort(function(a,b){return b.foodCostPct-a.foodCostPct}).slice(0,3)
-                if (alerts.length === 0 && avgFC <= fcSeuil) return null
+              {(function(){
+                var cats = [{id:'tous',label:'Tous'},{id:'classique',label:'🥪 Classiques'},{id:'mini',label:'🥨 Mini'},{id:'salade',label:'🥗 Salades'},{id:'accompagnement',label:'🍟 Accomp.'},{id:'boisson',label:'🥤 Boissons'}]
+                var filteredRecipes = fcAlertCat==='tous' ? fcRecipes : fcRecipes.filter(function(r){return (r.categorie||'classique')===fcAlertCat})
+                var alerts = filteredRecipes.filter(function(r){ return r.foodCostPct > fcSeuil })
+                var avgFC = Math.round(filteredRecipes.reduce(function(s,r){return s+r.foodCostPct},0)/(filteredRecipes.length||1)*10)/10
+                if (fcRecipes.filter(function(r){return r.foodCostPct > fcSeuil}).length === 0) return null
                 return (
                   <div className="card" style={{marginBottom:10,borderLeft:'4px solid #CC0066'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
                       <div>
-                        <div className="yt" style={{fontSize:20,color:'#CC0066'}}>🥩 Alertes Food Cost</div>
-                        <div style={{fontSize:11,color:'#888',marginTop:2}}>FC moyen : {avgFC}% · Seuil : {fcSeuil}%</div>
+                        <div className="yt" style={{fontSize:18,color:'#CC0066'}}>🥩 Alertes Food Cost</div>
+                        <div style={{fontSize:10,color:'#888',marginTop:1}}>FC moyen : {avgFC}% · Seuil : {fcSeuil}%</div>
                       </div>
-                      <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){nav('foodcost')}}>Voir tout →</button>
+                      <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){nav('foodcost')}}>Voir →</button>
                     </div>
+
+                    {/* ONGLETS CATEGORIES */}
+                    <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:10}}>
+                      {cats.map(function(cat){
+                        var catRecipes = cat.id==='tous' ? fcRecipes : fcRecipes.filter(function(r){return (r.categorie||'classique')===cat.id})
+                        var catAlerts = catRecipes.filter(function(r){return r.foodCostPct > fcSeuil}).length
+                        if (catAlerts === 0 && cat.id !== 'tous') return null
+                        return (
+                          <button key={cat.id} className="btn btn-sm" style={{fontSize:9,padding:'2px 7px',background:fcAlertCat===cat.id?'#CC0066':'#F5F5F5',color:fcAlertCat===cat.id?'#fff':'#555',border:'1.5px solid '+(fcAlertCat===cat.id?'#CC0066':'#DDD')}} onClick={function(){setFcAlertCat(cat.id)}}>
+                            {cat.label} {catAlerts > 0 && <span style={{fontWeight:900}}>({catAlerts})</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* RECETTES EN ALERTE */}
                     {alerts.length > 0 && (
                       <div style={{marginBottom:10}}>
-                        <div style={{fontSize:11,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,color:'#CC0066',marginBottom:6}}>⚠️ Au-dessus du seuil ({alerts.length} recette{alerts.length>1?'s':''})</div>
                         {alerts.sort(function(a,b){return b.foodCostPct-a.foodCostPct}).map(function(r){
                           var diff = Math.round((r.foodCostPct - fcSeuil)*10)/10
-                          var coutExces = Math.round((r.foodCostPct/100 * r.prixHT - fcSeuil/100 * r.prixHT)*100)/100
                           return (
-                            <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:'1px solid #F5F5F5',cursor:'pointer'}} onClick={function(){nav('foodcost')}}>
+                            <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 0',borderBottom:'1px solid #F5F5F5',cursor:'pointer'}} onClick={function(){nav('foodcost')}}>
                               <div>
-                                <div style={{fontWeight:900,fontSize:13}}>{r.name}</div>
-                                <div style={{fontSize:10,color:'#888'}}>{r.categorie} · Marge HT : {r.marge.toFixed(2)}€</div>
+                                <div style={{fontWeight:900,fontSize:12}}>{r.name}</div>
+                                <div style={{fontSize:10,color:'#888'}}>Marge HT : {r.marge.toFixed(2)}€</div>
                               </div>
                               <div style={{textAlign:'right',flexShrink:0}}>
-                                <div style={{fontWeight:900,fontSize:15,color:'#CC0066'}}>{r.foodCostPct}%</div>
-                                <div style={{fontSize:9,color:'#CC0066'}}>+{diff}% vs seuil · -{coutExces}€/portion</div>
+                                <div style={{fontWeight:900,fontSize:14,color:'#CC0066'}}>{r.foodCostPct}%</div>
+                                <div style={{fontSize:9,color:'#CC0066'}}>+{diff}% vs seuil</div>
                               </div>
                             </div>
                           )
                         })}
                       </div>
                     )}
+                    {alerts.length === 0 && <div style={{fontSize:12,color:'#009D3A',padding:'6px 0'}}>✅ Tout est OK dans cette catégorie</div>}
+
+                    {/* ANALYSE PRIX MARCHE */}
                     {(function(){
-                      // Find ingredients with highest food cost impact
                       var ingImpact = []
-                      fcRecipes.filter(function(r){return r.foodCostPct > fcSeuil}).forEach(function(r){
+                      alerts.forEach(function(r){
                         r.ingredients.forEach(function(ing){
                           var pct = r.prixHT > 0 ? Math.round(ing.cout / r.prixHT * 1000)/10 : 0
-                          if (pct >= 10) {
+                          if (pct >= 8) {
                             var existing = ingImpact.find(function(x){return x.article===ing.article})
                             if (!existing) ingImpact.push({article:ing.article, fournisseur:ing.fournisseur, prixActuel:ing.prix_achat, unite:ing.unite, pct:pct, recette:r.name})
                           }
@@ -1455,18 +1475,41 @@ function DashboardImpl() {
                       if (ingImpact.length === 0) return null
                       return (
                         <div>
-                          <div style={{fontSize:11,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,color:'#555',marginBottom:6}}>📍 Ingrédients qui pèsent le plus</div>
-                          {ingImpact.slice(0,4).map(function(ing,idx){
-                            var prixCible = Math.round(ing.prixActuel * 0.85 * 100)/100
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                            <div style={{fontSize:11,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,color:'#555'}}>📍 Matières à renégocier</div>
+                            <button className="btn btn-sm" style={{fontSize:9,background:fcPriceAnalysis?'#009D3A':'#FF82D7',color:'#fff',opacity:fcPriceLoading?0.5:1}} disabled={fcPriceLoading} onClick={function(){
+                              if (fcPriceAnalysis) { setFcPriceAnalysis(null); return }
+                              setFcPriceLoading(true)
+                              fetch('/api/analyze-food-costs', {
+                                method: 'POST',
+                                headers: {'Content-Type':'application/json'},
+                                body: JSON.stringify({ingredients: ingImpact})
+                              })
+                              .then(function(r){return r.json()})
+                              .then(function(d){setFcPriceAnalysis(d.analyses||[]);setFcPriceLoading(false)})
+                              .catch(function(e){toast('Erreur: '+e.message);setFcPriceLoading(false)})
+                            }}>
+                              {fcPriceLoading ? '⏳' : fcPriceAnalysis ? '✅ Masquer' : '🔍 Analyser les prix du marché'}
+                            </button>
+                          </div>
+                          {ingImpact.slice(0,6).map(function(ing,idx){
+                            var analysis = fcPriceAnalysis && fcPriceAnalysis.find(function(a){return a.article.toLowerCase()===ing.article.toLowerCase()})
+                            var prixCible = analysis ? analysis.prix_cible : Math.round(ing.prixActuel * 0.85 * 100)/100
+                            var ecartPct = analysis ? analysis.ecart_pct : -15
+                            var isEleve = analysis ? analysis.statut === 'eleve' : false
                             return (
-                              <div key={idx} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'5px 0',borderBottom:'1px solid #F5F5F5'}}>
-                                <div>
-                                  <div style={{fontWeight:700,fontSize:12}}>{ing.article}</div>
-                                  <div style={{fontSize:10,color:'#888'}}>{ing.fournisseur} · {ing.prixActuel}€/{ing.unite}</div>
-                                </div>
-                                <div style={{textAlign:'right',flexShrink:0}}>
-                                  <div style={{fontWeight:900,fontSize:12,color:'#CC0066'}}>{ing.pct}% du PV</div>
-                                  <div style={{fontSize:9,color:'#888'}}>Objectif : {prixCible}€/{ing.unite}</div>
+                              <div key={idx} style={{background:isEleve?'#FFF5F5':'#FAFAFA',borderRadius:6,padding:'8px 10px',marginBottom:4,border:'1px solid '+(isEleve?'#FFCCCC':'#EEE')}}>
+                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                                  <div style={{flex:1}}>
+                                    <div style={{fontWeight:700,fontSize:12}}>{ing.article}</div>
+                                    <div style={{fontSize:10,color:'#888'}}>{ing.fournisseur}</div>
+                                    {analysis && analysis.conseil && <div style={{fontSize:10,color:'#005FFF',marginTop:3,fontStyle:'italic'}}>{analysis.conseil}</div>}
+                                  </div>
+                                  <div style={{textAlign:'right',flexShrink:0,marginLeft:8}}>
+                                    <div style={{fontSize:11,color:'#888'}}>{ing.prixActuel}€/{ing.unite}</div>
+                                    <div style={{fontWeight:900,fontSize:13,color:'#009D3A'}}>→ {prixCible}€/{ing.unite}</div>
+                                    <div style={{fontSize:9,color:isEleve?'#CC0066':'#888'}}>{isEleve?'⬆️ Prix élevé':''} {ecartPct}%</div>
+                                  </div>
                                 </div>
                               </div>
                             )
@@ -1478,7 +1521,7 @@ function DashboardImpl() {
                 )
               })()}
 
-              {/* TACHES DU JOUR */}
+                            {/* TACHES DU JOUR */}
               <div className="card" style={{marginBottom:10,borderLeft:'4px solid #FF82D7'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
                   <div className="yt" style={{fontSize:22}}>📋 Tâches</div>
