@@ -688,6 +688,10 @@ function DashboardImpl() {
   const [enrichLoading, setEnrichLoading] = useState(false)
   const [commissionObjectif, setCommissionObjectif] = useState(2000)
   const [fcSeuil, setFcSeuil] = useState(25)
+  const [messages, setMessages] = useState([])
+  const [msgText, setMsgText] = useState('')
+  const [msgSending, setMsgSending] = useState(false)
+  const [msgUnread, setMsgUnread] = useState(0)
   const [fcView, setFcView] = useState('recettes')
   const [fcSelected, setFcSelected] = useState(null)
   const [fcPrices, setFcPrices] = useState({})
@@ -819,6 +823,7 @@ function DashboardImpl() {
   useEffect(function() {
     if (!profile) return
     loadContacts()
+    loadMessages()
     loadCalEvents()
     // Check push subscription status
     if ('serviceWorker' in navigator && 'PushManager' in window) {
@@ -903,6 +908,19 @@ function DashboardImpl() {
       setInstaLoading(false)
     })
   }, [page])
+
+  useEffect(function(){
+    if(page === 'messagerie'){
+      loadMessages()
+      var el = document.getElementById('msg-list')
+      if(el) el.scrollTop = el.scrollHeight
+    }
+  }, [page])
+
+  useEffect(function(){
+    var el = document.getElementById('msg-list')
+    if(el) el.scrollTop = el.scrollHeight
+  }, [messages])
 
   const toast = function(msg) { setToastMsg(msg); setTimeout(function() { setToastMsg('') }, 2800) }
   const openModal = function(id, data) { setForm(data || {}); setModal(id) }
@@ -1123,7 +1141,44 @@ function DashboardImpl() {
       })
       .catch(function(){setAiEventsLoading(false);toast('Erreur de connexion')})
   }
-  function loadContacts() {
+  function loadMessages() {
+    sb().from('messages').select('*').order('created_at',{ascending:true}).limit(100)
+      .then(function(res){
+        if(res.data){
+          setMessages(res.data)
+          var myRole = profile && profile.role ? (profile.role === 'admin' ? 'edward' : 'emy') : 'edward'
+          var unread = res.data.filter(function(m){ return m.sender !== myRole && !m.read_at }).length
+          setMsgUnread(unread)
+          if(unread > 0){
+            res.data.filter(function(m){ return m.sender !== myRole && !m.read_at })
+              .forEach(function(m){
+                sb().from('messages').update({read_at: new Date().toISOString()}).eq('id', m.id).then(function(){})
+              })
+          }
+        }
+      })
+  }
+
+  function sendMessage(text) {
+    if (!text || !text.trim()) return
+    var myRole = profile && profile.role ? (profile.role === 'admin' ? 'edward' : 'emy') : 'edward'
+    var msg = {sender: myRole, content: text.trim()}
+    setMsgSending(true)
+    sb().from('messages').insert([msg]).select().then(function(res){
+      if (res.data) {
+        setMessages(function(prev){ return prev.concat(res.data) })
+        setMsgText('')
+        fetch('/api/send-message-push', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(msg)
+        }).catch(function(){})
+      }
+      setMsgSending(false)
+    })
+  }
+
+    function loadContacts() {
     sb().from('contacts').select('*').order('name',{ascending:true}).then(function(r){if(r.data)setContacts(r.data)})
   }
   function saveDevisToSupabase(payload, cb) {
@@ -1407,7 +1462,8 @@ function DashboardImpl() {
     {id: 'instagram', label: 'Instagram', icon: '📸'},
     {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
     {id: 'notifs', label: 'Notifications', icon: '🔔'},
-    {id: 'foodcost', label: 'Food Cost', icon: '🥩', edwardOnly: true},
+    {id: 'foodcost', label: 'Food Cost', icon: '🥩'},
+    {id: 'messagerie', label: 'Messagerie', icon: '💬'},
   ]
 
   if (!mounted) return null
@@ -3669,6 +3725,69 @@ function DashboardImpl() {
               )}
             </div>
           )}
+
+          {page === 'messagerie' && (
+            <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 120px)'}}>
+              <div className="ph">
+                <div>
+                  <div className="pt">💬 Messagerie</div>
+                  <div className="ps">Edward · Emy</div>
+                </div>
+              </div>
+
+              {/* MESSAGES LIST */}
+              <div style={{flex:1,overflowY:'auto',padding:'12px 16px',display:'flex',flexDirection:'column',gap:8}} id="msg-list">
+                {messages.length === 0 && (
+                  <div style={{textAlign:'center',opacity:.4,padding:40,fontSize:14}}>Aucun message — commencez la conversation !</div>
+                )}
+                {messages.map(function(m){
+                  var myRole = profile && profile.role === 'admin' ? 'edward' : 'emy'
+                  var isMe = m.sender === myRole
+                  return (
+                    <div key={m.id} style={{display:'flex',flexDirection:'column',alignItems:isMe?'flex-end':'flex-start'}}>
+                      <div style={{
+                        maxWidth:'80%',
+                        background:isMe?'#191923':'#F0F0F0',
+                        color:isMe?'#FFEB5A':'#191923',
+                        borderRadius:isMe?'16px 16px 4px 16px':'16px 16px 16px 4px',
+                        padding:'10px 14px',
+                        fontSize:14,
+                        lineHeight:1.4
+                      }}>{m.content}</div>
+                      <div style={{fontSize:10,opacity:.4,marginTop:2,marginLeft:4,marginRight:4}}>
+                        {m.sender === 'edward' ? 'Edward' : 'Emy'} · {new Date(m.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}
+                        {m.read_at && isMe && ' · vu ✓'}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* INPUT */}
+              <div style={{padding:'12px 16px',borderTop:'1px solid #EBEBEB',background:'#fff',display:'flex',gap:8,alignItems:'flex-end'}}>
+                <textarea
+                  className="inp"
+                  style={{flex:1,resize:'none',minHeight:44,maxHeight:120,fontSize:14,padding:'10px 12px',borderRadius:12,lineHeight:1.4}}
+                  placeholder="Écrire un message..."
+                  value={msgText}
+                  onChange={function(e){setMsgText(e.target.value)}}
+                  onKeyDown={function(e){
+                    if(e.key==='Enter' && !e.shiftKey){
+                      e.preventDefault()
+                      sendMessage(msgText)
+                    }
+                  }}
+                />
+                <button
+                  className="btn btn-y"
+                  style={{minWidth:44,minHeight:44,fontSize:18,padding:'0 14px',flexShrink:0,opacity:msgSending||!msgText.trim()?0.5:1}}
+                  onClick={function(){sendMessage(msgText)}}
+                  disabled={msgSending||!msgText.trim()}
+                >↑</button>
+              </div>
+            </div>
+          )}
+
 
 
           {/* MODAL EDITION/CREATION RECETTE FOOD COST */}
