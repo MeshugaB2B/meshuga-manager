@@ -3551,35 +3551,60 @@ function DashboardImpl() {
                   <div style={{marginBottom:12}}>
                     <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:.5,marginBottom:8,opacity:.5}}>Ingrédients ({(fcEditForm.ingredients||[]).length})</div>
                     {(fcEditForm&&fcEditForm.ingredients||[]).map(function(ing,idx){
+                      var isKg = ing.unite === 'kg' || ing.unite === 'l'
+                      var isU = ing.unite === 'U' || ing.unite === 'u' || ing.unite === 'unité'
+                      var displayQte = isKg ? Math.round((ing.qte||0)*1000) : (ing.qte||0)
+                      var displayUnit = isKg ? 'g' : (ing.unite||'U')
+                      var prixRevient = Math.round((ing.prix_achat||0)*(ing.qte||0)*100)/100
                       return (
-                        <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr 80px 70px auto',gap:6,alignItems:'center',marginBottom:8,background:'#FAFAFA',borderRadius:6,padding:'8px 10px'}}>
-                          <div style={{fontSize:12,fontWeight:700}}>{ing.article}<div style={{fontSize:10,opacity:.5}}>{ing.fournisseur}</div></div>
-                          <input type="number" step="0.01" className="inp" style={{padding:'4px 6px',fontSize:12}} value={ing.prix_achat||''} onChange={function(e){
-                            var v = parseFloat(e.target.value)||0
-                            setFcEditForm(function(prev){
-                              var ings = prev.ingredients.map(function(x,i){return i===idx?Object.assign({},x,{prix_achat:v,cout:v*(x.qte||0)}):x})
-                              var total2 = ings.reduce(function(s,x){return s+(x.prix_achat||0)*(x.qte||0)},0)
-                              var ht2 = (prev.prixTTC||0)/1.055
-                              return Object.assign({},prev,{ingredients:ings,foodCost:Math.round(total2*1000)/1000,foodCostPct:ht2>0?Math.round(total2/ht2*1000)/10:0,marge:Math.round((ht2-total2)*100)/100})
-                            })
-                          }} placeholder="€/kg" />
-                          <input type="number" step="0.001" className="inp" style={{padding:'4px 6px',fontSize:12}} value={ing.qte||''} onChange={function(e){
-                            var v = parseFloat(e.target.value)||0
-                            setFcEditForm(function(prev){
-                              var ings = prev.ingredients.map(function(x,i){return i===idx?Object.assign({},x,{qte:v,cout:(x.prix_achat||0)*v}):x})
-                              var total2 = ings.reduce(function(s,x){return s+(x.prix_achat||0)*(x.qte||0)},0)
-                              var ht2 = (prev.prixTTC||0)/1.055
-                              return Object.assign({},prev,{ingredients:ings,foodCost:Math.round(total2*1000)/1000,foodCostPct:ht2>0?Math.round(total2/ht2*1000)/10:0,marge:Math.round((ht2-total2)*100)/100})
-                            })
-                          }} placeholder="qte" />
-                          <button style={{background:'#FFE5E5',border:'none',color:'#CC0066',fontSize:14,cursor:'pointer',borderRadius:6,padding:'6px 10px'}} onClick={function(){
-                            setFcEditForm(function(prev){
-                              var ings = prev.ingredients.filter(function(_,i){return i!==idx})
-                              var total2 = ings.reduce(function(s,x){return s+(x.prix_achat||0)*(x.qte||0)},0)
-                              var ht2 = (prev.prixTTC||0)/1.055
-                              return Object.assign({},prev,{ingredients:ings,foodCost:Math.round(total2*1000)/1000,foodCostPct:ht2>0?Math.round(total2/ht2*1000)/10:0,marge:Math.round((ht2-total2)*100)/100})
-                            })
-                          }}>🗑️</button>
+                        <div key={idx} style={{marginBottom:8,background:'#FAFAFA',borderRadius:8,padding:'10px 12px',border:'1px solid #EBEBEB'}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                            <div>
+                              <div style={{fontSize:13,fontWeight:900}}>{ing.article}</div>
+                              <div style={{fontSize:10,opacity:.5}}>{ing.fournisseur} · {ing.prix_achat}€/{ing.unite}</div>
+                            </div>
+                            <div style={{display:'flex',alignItems:'center',gap:8}}>
+                              <div style={{textAlign:'right'}}>
+                                <div style={{fontSize:15,fontWeight:900,color:'#005FFF'}}>{prixRevient}€</div>
+                                <div style={{fontSize:9,opacity:.5}}>coût</div>
+                              </div>
+                              <button style={{background:'#FFE5E5',border:'none',color:'#CC0066',fontSize:14,cursor:'pointer',borderRadius:6,padding:'6px 10px',minWidth:36,minHeight:36}} onClick={function(){
+                                setFcEditForm(function(prev){
+                                  var ings = prev.ingredients.filter(function(_,i){return i!==idx})
+                                  var total2 = ings.reduce(function(s,x){return s+(x.prix_achat||0)*(x.qte||0)},0)
+                                  var ht2 = (prev.prixTTC||0)/1.055
+                                  return Object.assign({},prev,{ingredients:ings,foodCost:Math.round(total2*1000)/1000,foodCostPct:ht2>0?Math.round(total2/ht2*1000)/10:0,marge:Math.round((ht2-total2)*100)/100})
+                                })
+                              }}>🗑️</button>
+                            </div>
+                          </div>
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                            <div>
+                              <div style={{fontSize:10,opacity:.5,marginBottom:3}}>Prix (€/{ing.unite||'kg'})</div>
+                              <input type="number" step="0.01" className="inp" style={{padding:'6px 8px',fontSize:14,fontWeight:700}} value={ing.prix_achat||''} onChange={function(e){
+                                var v = parseFloat(e.target.value)||0
+                                setFcEditForm(function(prev){
+                                  var ings = prev.ingredients.map(function(x,i){return i===idx?Object.assign({},x,{prix_achat:v,cout:v*(x.qte||0)}):x})
+                                  var total2 = ings.reduce(function(s,x){return s+(x.prix_achat||0)*(x.qte||0)},0)
+                                  var ht2 = (prev.prixTTC||0)/1.055
+                                  return Object.assign({},prev,{ingredients:ings,foodCost:Math.round(total2*1000)/1000,foodCostPct:ht2>0?Math.round(total2/ht2*1000)/10:0,marge:Math.round((ht2-total2)*100)/100})
+                                })
+                              }} placeholder="0.00" />
+                            </div>
+                            <div>
+                              <div style={{fontSize:10,opacity:.5,marginBottom:3}}>Quantité ({displayUnit})</div>
+                              <input type="number" step={isKg?'1':'0.1'} className="inp" style={{padding:'6px 8px',fontSize:14,fontWeight:700}} value={displayQte||''} onChange={function(e){
+                                var raw = parseFloat(e.target.value)||0
+                                var v = isKg ? raw/1000 : raw
+                                setFcEditForm(function(prev){
+                                  var ings = prev.ingredients.map(function(x,i){return i===idx?Object.assign({},x,{qte:v,cout:(x.prix_achat||0)*v}):x})
+                                  var total2 = ings.reduce(function(s,x){return s+(x.prix_achat||0)*(x.qte||0)},0)
+                                  var ht2 = (prev.prixTTC||0)/1.055
+                                  return Object.assign({},prev,{ingredients:ings,foodCost:Math.round(total2*1000)/1000,foodCostPct:ht2>0?Math.round(total2/ht2*1000)/10:0,marge:Math.round((ht2-total2)*100)/100})
+                                })
+                              }} placeholder={isKg?'0 g':'0'} />
+                            </div>
+                          </div>
                         </div>
                       )
                     })}
