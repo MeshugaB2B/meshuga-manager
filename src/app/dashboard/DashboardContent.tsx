@@ -1418,108 +1418,118 @@ function DashboardImpl() {
                 var alerts = filteredRecipes.filter(function(r){ return r.foodCostPct > fcSeuil })
                 var avgFC = Math.round(filteredRecipes.reduce(function(s,r){return s+r.foodCostPct},0)/(filteredRecipes.length||1)*10)/10
                 if (fcRecipes.filter(function(r){return r.foodCostPct > fcSeuil}).length === 0) return null
+
+                var ingImpact = []
+                alerts.forEach(function(r){
+                  r.ingredients.forEach(function(ing){
+                    var pct = r.prixHT > 0 ? Math.round(ing.cout / r.prixHT * 1000)/10 : 0
+                    if (pct >= 8) {
+                      var existing = ingImpact.find(function(x){return x.article===ing.article})
+                      if (!existing) ingImpact.push({article:ing.article, fournisseur:ing.fournisseur, prixActuel:ing.prix_achat, unite:ing.unite, pct:pct, recette:r.name})
+                    }
+                  })
+                })
+                ingImpact.sort(function(a,b){return b.pct-a.pct})
+
                 return (
                   <div className="card" style={{marginBottom:10,borderLeft:'4px solid #CC0066'}}>
+                    {/* HEADER */}
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
                       <div>
                         <div className="yt" style={{fontSize:18,color:'#CC0066'}}>🥩 Alertes Food Cost</div>
                         <div style={{fontSize:10,color:'#888',marginTop:1}}>FC moyen : {avgFC}% · Seuil : {fcSeuil}%</div>
                       </div>
-                      <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){nav('foodcost')}}>Voir →</button>
+                      <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                        {ingImpact.length > 0 && (
+                          <button className="btn btn-sm" style={{fontSize:9,background:fcPriceAnalysis?'#009D3A':'#FF82D7',color:'#fff',opacity:fcPriceLoading?0.5:1}} disabled={fcPriceLoading} onClick={function(){
+                            if (fcPriceAnalysis) { setFcPriceAnalysis(null); return }
+                            setFcPriceLoading(true)
+                            fetch('/api/analyze-food-costs', {
+                              method: 'POST',
+                              headers: {'Content-Type':'application/json'},
+                              body: JSON.stringify({ingredients: ingImpact})
+                            })
+                            .then(function(r){return r.json()})
+                            .then(function(d){setFcPriceAnalysis(d.analyses||[]);setFcPriceLoading(false)})
+                            .catch(function(e){toast('Erreur: '+e.message);setFcPriceLoading(false)})
+                          }}>
+                            {fcPriceLoading ? '⏳' : fcPriceAnalysis ? '✅ Masquer' : '🔍 Prix marché'}
+                          </button>
+                        )}
+                        <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){nav('foodcost')}}>Voir →</button>
+                      </div>
                     </div>
 
-                    {/* ONGLETS CATEGORIES */}
-                    <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:10}}>
+                    {/* ONGLETS */}
+                    <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:8}}>
                       {cats.map(function(cat){
-                        var catRecipes = cat.id==='tous' ? fcRecipes : fcRecipes.filter(function(r){return (r.categorie||'classique')===cat.id})
-                        var catAlerts = catRecipes.filter(function(r){return r.foodCostPct > fcSeuil}).length
+                        var catAlerts = (cat.id==='tous' ? fcRecipes : fcRecipes.filter(function(r){return (r.categorie||'classique')===cat.id})).filter(function(r){return r.foodCostPct > fcSeuil}).length
                         if (catAlerts === 0 && cat.id !== 'tous') return null
                         return (
                           <button key={cat.id} className="btn btn-sm" style={{fontSize:9,padding:'2px 7px',background:fcAlertCat===cat.id?'#CC0066':'#F5F5F5',color:fcAlertCat===cat.id?'#fff':'#555',border:'1.5px solid '+(fcAlertCat===cat.id?'#CC0066':'#DDD')}} onClick={function(){setFcAlertCat(cat.id)}}>
-                            {cat.label} {catAlerts > 0 && <span style={{fontWeight:900}}>({catAlerts})</span>}
+                            {cat.label} <span style={{fontWeight:900}}>({catAlerts})</span>
                           </button>
                         )
                       })}
                     </div>
 
-                    {/* RECETTES EN ALERTE */}
-                    {alerts.length > 0 && (
-                      <div style={{marginBottom:10}}>
-                        {alerts.sort(function(a,b){return b.foodCostPct-a.foodCostPct}).map(function(r){
-                          var diff = Math.round((r.foodCostPct - fcSeuil)*10)/10
-                          return (
-                            <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'3px 6px',background:'#FFF5F5',borderRadius:5,marginBottom:3,cursor:'pointer'}} onClick={function(){nav('foodcost')}}>
-                              <div style={{fontSize:11,fontWeight:700}}>{r.name}</div>
-                              <div style={{display:'flex',gap:8,alignItems:'center',flexShrink:0}}>
-                                <span style={{fontSize:10,color:'#888'}}>{r.marge.toFixed(2)}€ marge</span>
-                                <span style={{fontWeight:900,fontSize:12,color:'#CC0066'}}>{r.foodCostPct}% (+{diff}%)</span>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                    {alerts.length === 0 && <div style={{fontSize:12,color:'#009D3A',padding:'6px 0'}}>✅ Tout est OK dans cette catégorie</div>}
+                    {/* DEUX COLONNES */}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,alignItems:'start'}}>
 
-                    {/* ANALYSE PRIX MARCHE */}
-                    {(function(){
-                      var ingImpact = []
-                      alerts.forEach(function(r){
-                        r.ingredients.forEach(function(ing){
-                          var pct = r.prixHT > 0 ? Math.round(ing.cout / r.prixHT * 1000)/10 : 0
-                          if (pct >= 8) {
-                            var existing = ingImpact.find(function(x){return x.article===ing.article})
-                            if (!existing) ingImpact.push({article:ing.article, fournisseur:ing.fournisseur, prixActuel:ing.prix_achat, unite:ing.unite, pct:pct, recette:r.name})
-                          }
-                        })
-                      })
-                      ingImpact.sort(function(a,b){return b.pct-a.pct})
-                      if (ingImpact.length === 0) return null
-                      return (
-                        <div>
-                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                            <div style={{fontSize:11,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,color:'#555'}}>📍 Matières à renégocier</div>
-                            <button className="btn btn-sm" style={{fontSize:9,background:fcPriceAnalysis?'#009D3A':'#FF82D7',color:'#fff',opacity:fcPriceLoading?0.5:1}} disabled={fcPriceLoading} onClick={function(){
-                              if (fcPriceAnalysis) { setFcPriceAnalysis(null); return }
-                              setFcPriceLoading(true)
-                              fetch('/api/analyze-food-costs', {
-                                method: 'POST',
-                                headers: {'Content-Type':'application/json'},
-                                body: JSON.stringify({ingredients: ingImpact})
-                              })
-                              .then(function(r){return r.json()})
-                              .then(function(d){setFcPriceAnalysis(d.analyses||[]);setFcPriceLoading(false)})
-                              .catch(function(e){toast('Erreur: '+e.message);setFcPriceLoading(false)})
-                            }}>
-                              {fcPriceLoading ? '⏳' : fcPriceAnalysis ? '✅ Masquer' : '🔍 Analyser les prix du marché'}
-                            </button>
-                          </div>
-                          {ingImpact.slice(0,6).map(function(ing,idx){
-                            var analysis = fcPriceAnalysis && fcPriceAnalysis.find(function(a){return a.article.toLowerCase()===ing.article.toLowerCase()})
-                            var prixCible = analysis ? analysis.prix_cible : Math.round(ing.prixActuel * 0.85 * 100)/100
-                            var ecartPct = analysis ? analysis.ecart_pct : -15
-                            var isEleve = analysis ? analysis.statut === 'eleve' : false
-                            return (
-                              <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr auto',gap:6,alignItems:'center',padding:'4px 6px',background:isEleve?'#FFF5F5':'#FAFAFA',borderRadius:5,marginBottom:3,border:'1px solid '+(isEleve?'#FFCCCC':'#EEE')}}>
-                                <div>
-                                  <div style={{display:'flex',gap:6,alignItems:'baseline'}}>
-                                    <span style={{fontWeight:700,fontSize:12}}>{ing.article}</span>
-                                    <span style={{fontSize:10,color:'#888'}}>{ing.fournisseur}</span>
-                                    {isEleve && <span style={{fontSize:9,color:'#CC0066',fontWeight:900}}>⬆️</span>}
+                      {/* COLONNE GAUCHE : recettes */}
+                      <div>
+                        {alerts.length === 0
+                          ? <div style={{fontSize:11,color:'#009D3A'}}>✅ OK</div>
+                          : alerts.sort(function(a,b){return b.foodCostPct-a.foodCostPct}).map(function(r){
+                              var diff = Math.round((r.foodCostPct - fcSeuil)*10)/10
+                              return (
+                                <div key={r.id} style={{display:'flex',alignItems:'center',gap:6,padding:'3px 0',borderBottom:'1px solid #F5F5F5',cursor:'pointer'}} onClick={function(){nav('foodcost')}}>
+                                  <div style={{flex:1,fontSize:11,fontWeight:700}}>{r.name}</div>
+                                  <div style={{flexShrink:0,textAlign:'right'}}>
+                                    <span style={{fontWeight:900,fontSize:12,color:'#CC0066'}}>{r.foodCostPct}%</span>
+                                    <span style={{fontSize:9,color:'#CC0066',marginLeft:3}}>(+{diff}%)</span>
                                   </div>
-                                  {analysis && analysis.conseil && <div style={{fontSize:10,color:'#005FFF',fontStyle:'italic'}}>{analysis.conseil}</div>}
-                                  {analysis && analysis.source && <div style={{fontSize:9,color:'#888'}}>Source : {analysis.source}</div>}
                                 </div>
-                                <div style={{textAlign:'right',whiteSpace:'nowrap'}}>
-                                  <div style={{fontSize:10,color:'#888',textDecoration:'line-through'}}>{ing.prixActuel}€/{ing.unite}</div>
-                                  <div style={{fontWeight:900,fontSize:12,color:'#009D3A'}}>→ {prixCible}€/{ing.unite}</div>
+                              )
+                            })
+                        }
+                      </div>
+
+                      {/* COLONNE DROITE : matières */}
+                      <div>
+                        {ingImpact.length === 0
+                          ? <div style={{fontSize:11,color:'#888'}}>Aucune matière à surveiller</div>
+                          : ingImpact.slice(0,6).map(function(ing,idx){
+                              var analysis = fcPriceAnalysis && fcPriceAnalysis.find(function(a){return a.article.toLowerCase()===ing.article.toLowerCase()})
+                              var isNa = analysis && analysis.statut === 'non_applicable'
+                              var isEleve = analysis && analysis.statut === 'eleve'
+                              return (
+                                <div key={idx} style={{padding:'3px 0',borderBottom:'1px solid #F5F5F5'}}>
+                                  <div style={{display:'flex',alignItems:'baseline',gap:4,flexWrap:'wrap'}}>
+                                    <span style={{fontWeight:700,fontSize:11}}>{ing.article}</span>
+                                    <span style={{fontSize:9,color:'#888'}}>{ing.fournisseur}</span>
+                                    {isEleve && <span style={{fontSize:9,color:'#CC0066'}}>⬆️</span>}
+                                  </div>
+                                  {!analysis && (
+                                    <div style={{fontSize:10,color:'#888'}}>{ing.prixActuel}€/{ing.unite}</div>
+                                  )}
+                                  {analysis && !isNa && (
+                                    <div style={{fontSize:10}}>
+                                      <span style={{color:'#888',textDecoration:'line-through'}}>{ing.prixActuel}€</span>
+                                      <span style={{color:'#009D3A',fontWeight:900,marginLeft:4}}>→ {analysis.prix_cible}€/{ing.unite}</span>
+                                      {analysis.source && <div style={{fontSize:9,color:'#005FFF'}}>{analysis.source}</div>}
+                                      {analysis.conseil && <div style={{fontSize:9,color:'#555',fontStyle:'italic'}}>{analysis.conseil}</div>}
+                                    </div>
+                                  )}
+                                  {analysis && isNa && (
+                                    <div style={{fontSize:9,color:'#888',fontStyle:'italic'}}>Viande/poisson — prix spécifique</div>
+                                  )}
                                 </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )
-                    })()}
+                              )
+                            })
+                        }
+                      </div>
+                    </div>
                   </div>
                 )
               })()}
