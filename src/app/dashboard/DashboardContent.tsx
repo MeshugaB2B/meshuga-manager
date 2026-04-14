@@ -650,6 +650,10 @@ function DashboardImpl() {
   })
   const [fcCatFilter, setFcCatFilter] = useState('tous')
   const [fcEditModal, setFcEditModal] = useState(null)
+  const [fcInvoiceModal, setFcInvoiceModal] = useState(false)
+  const [fcInvoiceLoading, setFcInvoiceLoading] = useState(false)
+  const [fcInvoiceResult, setFcInvoiceResult] = useState(null)
+  const [fcInvoiceMatches, setFcInvoiceMatches] = useState([])
   const [fcEditForm, setFcEditForm] = useState(null)
   const [editObjectif, setEditObjectif] = useState(false)
   const [scoringLoading, setScoringLoading] = useState(false)
@@ -3428,6 +3432,167 @@ function DashboardImpl() {
               </div>
             )
           })()}
+
+
+
+          {/* MODAL IMPORT FACTURE */}
+          {fcInvoiceModal && (
+            <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:300,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={function(){if(!fcInvoiceLoading){setFcInvoiceModal(false);setFcInvoiceResult(null);setFcInvoiceMatches([])}}}>
+              <div style={{background:'#fff',borderRadius:'16px 16px 0 0',padding:20,width:'100%',maxWidth:520,maxHeight:'90vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
+
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923'}}>📄 Importer une facture</div>
+                  {!fcInvoiceLoading && <button style={{background:'none',border:'none',fontSize:22,cursor:'pointer',color:'#888'}} onClick={function(){setFcInvoiceModal(false);setFcInvoiceResult(null);setFcInvoiceMatches([])}}>✕</button>}
+                </div>
+
+                {/* UPLOAD */}
+                {!fcInvoiceResult && !fcInvoiceLoading && (
+                  <div>
+                    <div style={{fontSize:13,color:'#555',marginBottom:16}}>Upload le PDF d'une facture fournisseur — Claude extrait les prix automatiquement.</div>
+                    <label style={{display:'block',background:'#F8F9FF',border:'2px dashed #DDEEFF',borderRadius:10,padding:'30px 20px',textAlign:'center',cursor:'pointer'}}>
+                      <div style={{fontSize:32,marginBottom:8}}>📂</div>
+                      <div style={{fontWeight:900,fontSize:14,color:'#005FFF'}}>Choisir un PDF de facture</div>
+                      <div style={{fontSize:11,color:'#888',marginTop:4}}>La Crémerie, HPS, Foodflow, Marina Sea Food...</div>
+                      <input type="file" accept=".pdf" style={{display:'none'}} onChange={function(e){
+                        var file = e.target && e.target.files && e.target.files[0]
+                        if (!file) return
+                        setFcInvoiceLoading(true)
+                        var reader = new FileReader()
+                        reader.onload = function(ev) {
+                          var base64 = ev.target ? String(ev.target.result).split(',')[1] : ''
+                          fetch('/api/import-invoice', {
+                            method: 'POST',
+                            headers: {'Content-Type':'application/json'},
+                            body: JSON.stringify({pdfBase64: base64, fileName: file.name})
+                          })
+                          .then(function(r){return r.json()})
+                          .then(function(data){
+                            if (data.error) { toast('Erreur: '+data.error); setFcInvoiceLoading(false); return }
+                            // Find matches with existing ingredients
+                            var matches = (data.lignes||[]).map(function(ligne) {
+                              var articleLow = (ligne.article||'').toLowerCase()
+                              // Try to match with existing ingredients in all recipes
+                              var allIngrs = []
+                              fcRecipes.forEach(function(r){
+                                r.ingredients.forEach(function(ing){
+                                  var existing = allIngrs.find(function(x){return x.article.toLowerCase()===ing.article.toLowerCase()})
+                                  if (!existing) allIngrs.push({article:ing.article, prix_actuel:ing.prix_achat, unite:ing.unite, recettes:[]})
+                                  var found2 = allIngrs.find(function(x){return x.article.toLowerCase()===ing.article.toLowerCase()})
+                                  if (found2 && !found2.recettes.includes(r.name)) found2.recettes.push(r.name)
+                                })
+                              })
+                              var matched = allIngrs.find(function(ing){
+                                var ingLow = ing.article.toLowerCase()
+                                return ingLow.includes(articleLow) || articleLow.includes(ingLow) ||
+                                  articleLow.split(' ').some(function(w){ return w.length > 3 && ingLow.includes(w) })
+                              })
+                              return {
+                                ligne: ligne,
+                                matched: matched || null,
+                                selected: matched ? true : false,
+                                articleMatch: matched ? matched.article : ''
+                              }
+                            })
+                            setFcInvoiceResult(data)
+                            setFcInvoiceMatches(matches)
+                            setFcInvoiceLoading(false)
+                          })
+                          .catch(function(e){toast('Erreur: '+e.message);setFcInvoiceLoading(false)})
+                        }
+                        reader.readAsDataURL(file)
+                      }} />
+                    </label>
+                  </div>
+                )}
+
+                {/* LOADING */}
+                {fcInvoiceLoading && (
+                  <div style={{textAlign:'center',padding:'40px 20px'}}>
+                    <div style={{fontSize:40,marginBottom:12}}>🧠</div>
+                    <div style={{fontWeight:900,fontSize:15,marginBottom:6}}>Claude lit la facture...</div>
+                    <div style={{fontSize:12,color:'#888'}}>Extraction des articles et prix en cours</div>
+                  </div>
+                )}
+
+                {/* RESULTS */}
+                {fcInvoiceResult && !fcInvoiceLoading && (
+                  <div>
+                    <div style={{background:'#F0FFF4',borderRadius:8,padding:'10px 14px',marginBottom:14,border:'1.5px solid #009D3A'}}>
+                      <div style={{fontWeight:900,fontSize:13,color:'#009D3A'}}>{fcInvoiceResult.fournisseur} · {fcInvoiceResult.date}</div>
+                      <div style={{fontSize:11,color:'#555',marginTop:2}}>{(fcInvoiceResult.lignes||[]).length} articles · Total HT : {fcInvoiceResult.total_ht}€</div>
+                    </div>
+
+                    <div style={{fontSize:11,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,opacity:.5,marginBottom:8}}>
+                      Correspondances trouvées — sélectionne les prix à mettre à jour
+                    </div>
+
+                    {fcInvoiceMatches.map(function(m, idx){
+                      var prixActuel = m.matched ? m.matched.prix_actuel : null
+                      var diff = prixActuel ? Math.round((m.ligne.prix_unitaire_ht - prixActuel) * 100) / 100 : null
+                      var hausse = diff !== null && diff > 0
+                      var baisse = diff !== null && diff < 0
+                      return (
+                        <div key={idx} style={{background:m.selected?'#F0FFF4':'#FAFAFA',borderRadius:8,padding:'10px 12px',marginBottom:6,border:'1.5px solid '+(m.selected?'#009D3A':'#EEE')}}>
+                          <div style={{display:'flex',alignItems:'center',gap:8}}>
+                            <input type="checkbox" checked={m.selected} onChange={function(){
+                              setFcInvoiceMatches(function(prev){
+                                return prev.map(function(x,i){return i===idx?Object.assign({},x,{selected:!x.selected}):x})
+                              })
+                            }} style={{width:16,height:16,flexShrink:0}} />
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:13,fontWeight:700}}>{m.ligne.article_original}</div>
+                              <div style={{fontSize:10,color:'#888'}}>
+                                {m.ligne.prix_unitaire_ht}€/{m.ligne.unite}
+                                {m.matched && <span style={{marginLeft:8,color:'#005FFF'}}>→ {m.matched.article}</span>}
+                                {!m.matched && <span style={{marginLeft:8,color:'#CC0066'}}>⚠️ Pas de correspondance</span>}
+                              </div>
+                            </div>
+                            {diff !== null && (
+                              <div style={{textAlign:'right',flexShrink:0}}>
+                                <div style={{fontSize:12,fontWeight:900,color:hausse?'#CC0066':baisse?'#009D3A':'#555'}}>
+                                  {hausse?'+':''}{diff}€
+                                </div>
+                                <div style={{fontSize:9,opacity:.5}}>vs {prixActuel}€</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    <div style={{display:'flex',gap:8,marginTop:16}}>
+                      <button className="btn" onClick={function(){setFcInvoiceResult(null);setFcInvoiceMatches([])}}>← Retour</button>
+                      <button className="btn btn-y" style={{flex:1,fontWeight:900}} onClick={function(){
+                        var updated = fcRecipes.map(function(recipe){
+                          var newIngredients = recipe.ingredients.map(function(ing){
+                            var match = fcInvoiceMatches.find(function(m){
+                              return m.selected && m.matched && m.matched.article.toLowerCase()===ing.article.toLowerCase()
+                            })
+                            if (match) return Object.assign({},ing,{prix_achat:match.ligne.prix_unitaire_ht, cout:match.ligne.prix_unitaire_ht*ing.qte})
+                            return ing
+                          })
+                          var newFoodCost = newIngredients.reduce(function(s,i){return s+(i.prix_achat*i.qte)},0)
+                          var newFC = recipe.prixHT>0?Math.round(newFoodCost/recipe.prixHT*1000)/10:0
+                          var newMarge = Math.round((recipe.prixHT-newFoodCost)*100)/100
+                          return Object.assign({},recipe,{ingredients:newIngredients,foodCost:Math.round(newFoodCost*1000)/1000,foodCostPct:newFC,marge:newMarge})
+                        })
+                        setFcRecipes(updated)
+                        try{localStorage.setItem('meshuga_fc_recipes',JSON.stringify(updated))}catch(e){}
+                        var nb = fcInvoiceMatches.filter(function(m){return m.selected&&m.matched}).length
+                        toast('✅ '+nb+' prix mis à jour !')
+                        setFcInvoiceModal(false)
+                        setFcInvoiceResult(null)
+                        setFcInvoiceMatches([])
+                      }}>
+                        ✅ Mettre à jour {fcInvoiceMatches.filter(function(m){return m.selected&&m.matched}).length} prix
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          )}
 
 
           {page === 'notifs' && (
