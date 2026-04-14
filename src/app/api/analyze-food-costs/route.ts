@@ -4,20 +4,23 @@ export async function POST(req: Request) {
   try {
     var body = await req.json()
     var { ingredients } = body
-
     if (!ingredients || ingredients.length === 0) {
       return NextResponse.json({ error: 'Aucun ingrédient' }, { status: 400 })
     }
 
-    var prompt = `Tu es un expert en achats pour la restauration à Paris. Voici des ingrédients d'un restaurant (Meshuga Crazy Deli, Paris 6e) avec leurs prix d'achat actuels. Pour chacun, donne :
-1. Le prix du marché actuel en France (grossiste/Rungis) en 2024-2025
-2. Un prix cible de négociation réaliste (-10 à -20% selon le marché)
-3. Si le prix actuel est anormalement élevé ou dans la norme
+    var prompt = `Tu es un expert en achats pour la restauration à Paris. Utilise la recherche web pour trouver les prix ACTUELS de ces ingrédients chez des grossistes français livrables à Paris (Metro, Promocash, Brake France, Sysco France, Episaveurs/Pomona, PassionFroid, TerreAzur, ou directement sur leurs sites).
+
+RÈGLES :
+- Pour les produits courants (épicerie sèche, condiments, légumes, produits laitiers, boissons, huiles) : cherche des prix réels sur le web
+- Pour les viandes et poissons (pastrami, saumon, homard, poulet, anchois) : statut = "non_applicable", ne cherche pas
+- Donne un prix_cible réaliste basé sur ce que tu trouves (pas une réduction arbitraire)
+- Dans "conseil" : nomme le fournisseur ET le prix trouvé (ex: "Metro : cheddar tranché à 7.20€/kg, Promocash : 6.85€/kg")
+- Dans "source" : le site ou fournisseur consulté
 
 Ingrédients :
 ${JSON.stringify(ingredients.map((i: any) => ({article: i.article, fournisseur: i.fournisseur, prix_actuel: i.prixActuel, unite: i.unite})))}
 
-Retourne UNIQUEMENT ce JSON (sans markdown) :
+Retourne UNIQUEMENT ce JSON valide (sans markdown) :
 {
   "analyses": [
     {
@@ -25,9 +28,10 @@ Retourne UNIQUEMENT ce JSON (sans markdown) :
       "prix_marche": 0.00,
       "prix_cible": 0.00,
       "unite": "kg ou U ou L",
-      "statut": "eleve | normal | bas",
+      "statut": "eleve | normal | bas | non_applicable",
       "ecart_pct": 0,
-      "conseil": "1 phrase courte sur comment négocier ou où trouver moins cher"
+      "source": "Metro / Promocash / Brake / etc.",
+      "conseil": "Fournisseur X à Y€/kg, Fournisseur Z à W€/kg"
     }
   ]
 }`
@@ -40,21 +44,19 @@ Retourne UNIQUEMENT ce JSON (sans markdown) :
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1500,
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{ role: 'user', content: prompt }]
       })
     })
 
     var data = await res.json()
-    // Get last text block (after potential web searches)
     var text = ''
     for (var block of (data.content || [])) {
       if (block.type === 'text') text = block.text
     }
     text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    // Extract JSON from text
     var jsonMatch = text.match(/\{[\s\S]*\}/)
     if (jsonMatch) text = jsonMatch[0]
 
