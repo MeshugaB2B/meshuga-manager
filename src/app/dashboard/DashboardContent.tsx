@@ -1419,11 +1419,14 @@ function DashboardImpl() {
                 var avgFC = Math.round(filteredRecipes.reduce(function(s,r){return s+r.foodCostPct},0)/(filteredRecipes.length||1)*10)/10
                 if (fcRecipes.filter(function(r){return r.foodCostPct > fcSeuil}).length === 0) return null
 
+                var FOURNISSEURS_EXCLUS = ['boucherie norbert','marina sea food','marina seafood','monarque']
                 var ingImpact = []
                 alerts.forEach(function(r){
                   r.ingredients.forEach(function(ing){
                     var pct = r.prixHT > 0 ? Math.round(ing.cout / r.prixHT * 1000)/10 : 0
-                    if (pct >= 8) {
+                    var fournisseurLow = (ing.fournisseur||'').toLowerCase()
+                    var exclu = FOURNISSEURS_EXCLUS.some(function(f){return fournisseurLow.includes(f)})
+                    if (pct >= 8 && !exclu) {
                       var existing = ingImpact.find(function(x){return x.article===ing.article})
                       if (!existing) ingImpact.push({article:ing.article, fournisseur:ing.fournisseur, prixActuel:ing.prix_achat, unite:ing.unite, pct:pct, recette:r.name})
                     }
@@ -1511,18 +1514,20 @@ function DashboardImpl() {
                                     {isEleve && <span style={{fontSize:9,color:'#CC0066'}}>⬆️</span>}
                                   </div>
                                   {!analysis && (
-                                    <div style={{fontSize:10,color:'#888'}}>{ing.prixActuel}€/{ing.unite}</div>
+                                    <div style={{fontSize:10,color:'#888'}}>{ing.prixActuel}€/{ing.unite} <span style={{opacity:.4}}>· en attente analyse</span></div>
                                   )}
                                   {analysis && !isNa && (
                                     <div style={{fontSize:10}}>
-                                      <span style={{color:'#888',textDecoration:'line-through'}}>{ing.prixActuel}€</span>
-                                      <span style={{color:'#009D3A',fontWeight:900,marginLeft:4}}>→ {analysis.prix_cible}€/{ing.unite}</span>
-                                      {analysis.source && <div style={{fontSize:9,color:'#005FFF'}}>{analysis.source}</div>}
-                                      {analysis.conseil && <div style={{fontSize:9,color:'#555',fontStyle:'italic'}}>{analysis.conseil}</div>}
+                                      <div style={{display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+                                        <span style={{color:'#888',textDecoration:'line-through',fontSize:9}}>{ing.prixActuel}€/{ing.unite}</span>
+                                        <span style={{color:'#009D3A',fontWeight:900}}>→ {analysis.prix_cible}€/{ing.unite}</span>
+                                        {analysis.statut==='eleve' && <span style={{fontSize:9,color:'#CC0066',fontWeight:900}}>⬆️ élevé</span>}
+                                      </div>
+                                      {analysis.conseil && <div style={{fontSize:9,color:'#191923',marginTop:2,lineHeight:1.3}}>{analysis.conseil}</div>}
                                     </div>
                                   )}
                                   {analysis && isNa && (
-                                    <div style={{fontSize:9,color:'#888',fontStyle:'italic'}}>Viande/poisson — prix spécifique</div>
+                                    <div style={{fontSize:9,color:'#888',fontStyle:'italic'}}>Prix spécifique — hors comparaison</div>
                                   )}
                                 </div>
                               )
