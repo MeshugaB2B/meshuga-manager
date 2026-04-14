@@ -2447,7 +2447,7 @@ function DashboardImpl() {
                     var past=sorted.filter(function(e){return (e.end_date||e.start_date)<today})
                     var evtColors={event:'#FF82D7',rdv:'#005FFF',livraison:'#009D3A',relance:'#FF6B2B',admin:'#888',other:'#FFEB5A'}
                     var evtLabels={event:'🎉 Event client',rdv:'🤝 RDV',livraison:'🚚 Livraison',relance:'📞 Relance',admin:'📋 Admin',other:'Autre'}
-                    function renderEvt(e,i){
+                    var renderEvt = function(e,i){
                       var col=evtColors[e.type]||'#FFEB5A'
                       return(
                         <div key={i} className="card" style={{marginBottom:6,borderLeft:'4px solid '+(e.source==='ai_suggestion'?'#005FFF':col),cursor:'pointer',background:e.source==='ai_suggestion'?'#F8FAFF':'#fff',opacity:e.source==='ai_suggestion'?0.92:1}} onClick={function(){openModal('cal_event',Object.assign({},e))}}>
@@ -3188,18 +3188,18 @@ function DashboardImpl() {
                     var alert = r.foodCostPct > fcSeuil
                     var barColor = r.foodCostPct > fcSeuil ? '#CC0066' : '#009D3A'
                     return (
-                      <div key={r.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(alert?'#CC0066':'#009D3A'),cursor:'pointer'}} onClick={function(){setFcSelected(r)}}>
+                      <div key={r.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(alert?'#CC0066':'#009D3A')}}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                          <div style={{flex:1,cursor:'pointer'}} onClick={function(){setFcSelected(r)}}>
+                          <div style={{flex:1,cursor:'pointer',minHeight:44,display:'flex',flexDirection:'column',justifyContent:'center'}} onClick={function(){setFcSelected(r)}}>
                             <div style={{fontWeight:900,fontSize:14}}>{r.name}</div>
-                            <div style={{fontSize:11,opacity:.6}}>{[...new Set(r.ingredients.map(function(i){return i.fournisseur}))].slice(0,2).join(', ')} · PV HT : {r.prixHT.toFixed(2)}€ · Marge HT : {r.marge.toFixed(2)}€</div>
+                            <div style={{fontSize:11,opacity:.6}}>{[...new Set(r.ingredients.map(function(i){return i.fournisseur}))].slice(0,2).join(', ')} · PV HT : {(r.prixHT||0).toFixed(2)}€ · Marge HT : {(r.marge||0).toFixed(2)}€</div>
                           </div>
-                          <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
-                            <div style={{textAlign:'right',cursor:'pointer'}} onClick={function(){setFcSelected(r)}}>
+                          <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0,marginLeft:8}}>
+                            <div style={{textAlign:'right',cursor:'pointer',padding:'4px 8px'}} onClick={function(){setFcSelected(r)}}>
                               <div style={{fontSize:20,fontWeight:900,color:barColor}}>{r.foodCostPct}%</div>
                               <div style={{fontSize:10,opacity:.5}}>food cost</div>
                             </div>
-                            <button className="btn btn-sm" style={{fontSize:11,flexShrink:0}} onClick={function(e){e.stopPropagation();setFcEditForm(JSON.parse(JSON.stringify(r)));setFcEditModal('edit')}}>✏️</button>
+                            <button style={{background:'#FFEB5A',border:'2px solid #191923',borderRadius:8,fontSize:16,cursor:'pointer',padding:'8px 12px',minWidth:44,minHeight:44,fontWeight:900,flexShrink:0,WebkitTapHighlightColor:'transparent'}} onClick={function(){setFcEditForm(JSON.parse(JSON.stringify(r)));setFcEditModal('edit')}}>✏️</button>
                           </div>
                         </div>
                         <div style={{background:'#F0F0F0',borderRadius:20,height:6,overflow:'hidden'}}>
@@ -3217,13 +3217,12 @@ function DashboardImpl() {
                 var TVA = 0.055
                 var prixTTCEdite = fcPrixTTC[fcSelected.id] || fcSelected.prixTTC
                 var prixHTEdite = prixTTCEdite / (1 + TVA)
-                var foodCostEdite = round2(fcSelected.foodCost / prixHTEdite * 100)
+                var foodCostEdite = Math.round((fcSelected.foodCost / prixHTEdite * 100) * 100) / 100
                 var margeEditee = prixHTEdite - fcSelected.foodCost
-                var conseilX4TTC = round2(fcSelected.foodCost * 4 * (1 + TVA))
-                var conseilX5TTC = round2(fcSelected.foodCost * 5 * (1 + TVA))
-                var conseilHTx4 = round2(fcSelected.foodCost * 4)
-                var conseilFCPct = round2(fcSelected.foodCost / (conseilX4TTC / (1+TVA)) * 100)
-                function round2(n) { return Math.round(n * 100) / 100 }
+                var conseilX4TTC = Math.round((fcSelected.foodCost * 4 * (1 + TVA) * 100) / 100)
+                var conseilX5TTC = Math.round((fcSelected.foodCost * 5 * (1 + TVA) * 100) / 100)
+                var conseilHTx4 = Math.round((fcSelected.foodCost * 4) * 100) / 100
+                var conseilFCPct = Math.round((fcSelected.foodCost / (conseilX4TTC / (1+TVA) * 100) / 100) * 100)
                 return (
                 <div>
                   <button className="btn btn-sm" style={{marginBottom:12}} onClick={function(){setFcSelected(null)}}>← Retour</button>
@@ -3241,7 +3240,7 @@ function DashboardImpl() {
                       <div style={{background:'#fff',borderRadius:8,padding:'10px 12px',border:'2px solid #fff'}}>
                         <div style={{fontSize:10,color:'#CC0066',fontWeight:900,textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>x5 — confortable</div>
                         <div style={{fontSize:22,fontWeight:900,color:'#CC0066'}}>{conseilX5TTC}€ TTC</div>
-                        <div style={{fontSize:11,color:'#191923',opacity:.6,marginTop:2}}>{round2(fcSelected.foodCost * 5).toFixed(2)}€ HT · FC {round2(fcSelected.foodCost/(fcSelected.foodCost*5)*100)}%</div>
+                        <div style={{fontSize:11,color:'#191923',opacity:.6,marginTop:2}}>{Math.round(fcSelected.foodCost * 5 * 100) / 100}€ HT · FC {Math.round(fcSelected.foodCost/(fcSelected.foodCost*5)*1000)/10}%</div>
                       </div>
                     </div>
                     <div style={{fontSize:11,color:'#191923',opacity:.5}}>Food cost actuel : {fcSelected.foodCost.toFixed(3)}€ · TVA 5,5%</div>
