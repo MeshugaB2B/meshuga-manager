@@ -1426,7 +1426,7 @@ function DashboardImpl() {
                     var pct = r.prixHT > 0 ? Math.round(ing.cout / r.prixHT * 1000)/10 : 0
                     var fournisseurLow = (ing.fournisseur||'').toLowerCase()
                     var exclu = FOURNISSEURS_EXCLUS.some(function(f){return fournisseurLow.includes(f)})
-                    if (pct >= 8 && !exclu) {
+                    if (pct >= 4 && !exclu) {
                       var existing = ingImpact.find(function(x){return x.article===ing.article})
                       if (!existing) ingImpact.push({article:ing.article, fournisseur:ing.fournisseur, prixActuel:ing.prix_achat, unite:ing.unite, pct:pct, recette:r.name})
                     }
