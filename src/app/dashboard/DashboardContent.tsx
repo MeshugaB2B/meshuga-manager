@@ -638,7 +638,7 @@ function DashboardImpl() {
   })
   const [fcRecipes, setFcRecipes] = useState(function(){
     try {
-      var FC_VERSION = 'v6_modal_fix'
+      var FC_VERSION = 'v7_spread_fix'
       var storedVersion = localStorage.getItem('meshuga_fc_version')
       if (storedVersion !== FC_VERSION) {
         localStorage.removeItem('meshuga_fc_recipes')
@@ -778,7 +778,7 @@ function DashboardImpl() {
       loadTasks()
       loadCalEvents()
     }, 30000)
-    function onVisible() {
+    var onVisible = function() {
       if (document.visibilityState === 'visible') {
         loadTasks()
         loadCalEvents()
@@ -2696,7 +2696,7 @@ function DashboardImpl() {
               <div className="ph">
                 <div><div className="pt">Devis</div><div className="ps">{devisView==='list'?devisList.length+' devis':'Editeur'}</div></div>
                 <div style={{display:'flex',gap:6}}>
-                  {devisView==='edit'&&<button className="btn btn-p btn-sm" onClick={function(){setDevisView('list')}}>&#8592; Fermer l'éditeur</button>}
+                  {devisView==='edit'&&<button className="btn btn-p btn-sm" onClick={function(){setDevisView('list')}}>&#8592; Fermer l&apos;éditeur</button>}
                   <button className="btn btn-y btn-sm" onClick={function(){
                     setDevisView('edit');setDevisItems([]);setCurrentDevisId(null)
                     setDevisClient({nom:'',contact:'',email:'',phone:'',date:'',lieu:'',prospectId:null})
@@ -3192,7 +3192,7 @@ function DashboardImpl() {
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
                           <div style={{flex:1,cursor:'pointer',minHeight:44,display:'flex',flexDirection:'column',justifyContent:'center'}} onClick={function(){setFcSelected(r)}}>
                             <div style={{fontWeight:900,fontSize:14}}>{r.name}</div>
-                            <div style={{fontSize:11,opacity:.6}}>{[...new Set(r.ingredients.map(function(i){return i.fournisseur}))].slice(0,2).join(', ')} · PV HT : {(r.prixHT||0).toFixed(2)}€ · Marge HT : {(r.marge||0).toFixed(2)}€</div>
+                            <div style={{fontSize:11,opacity:.6}}>{r.ingredients.reduce(function(acc,i){ return acc.includes(i.fournisseur)?acc:acc.concat([i.fournisseur]) },[]).slice(0,2).join(', ')} · PV HT : {(r.prixHT||0).toFixed(2)}€ · Marge HT : {(r.marge||0).toFixed(2)}€</div>
                           </div>
                           <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0,marginLeft:8}}>
                             <div style={{textAlign:'right',cursor:'pointer',padding:'4px 8px'}} onClick={function(){setFcSelected(r)}}>
@@ -3880,7 +3880,7 @@ function DashboardImpl() {
           {page === 'journal' && !isEmy && (
             <div>
               <div className="ph">
-                <div><div className="pt">Journal d'Emy 📓</div><div className="ps">Activité · Sessions · Actions</div></div>
+                <div><div className="pt">Journal d&apos;Emy 📓</div><div className="ps">Activité · Sessions · Actions</div></div>
                 <div style={{display:'flex',gap:6}}>
                   <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){
                     var rows = activityLog.filter(function(a){
@@ -4063,7 +4063,7 @@ function DashboardImpl() {
             <div className="mh"><div className="mt">{form.id?'Modifier le prospect':'Nouveau prospect'}</div></div>
             <div className="mb">
               <div className="fg">
-                <label className="lbl">Nom de l'entreprise *</label>
+                <label className="lbl">Nom de l&apos;entreprise *</label>
                 <div style={{display:'flex',gap:8}}>
                   <input className="inp" value={form.name||''} onChange={function(e){setForm(Object.assign({},form,{name:e.target.value}))}} placeholder="Ex: Agence Wagram Events" style={{flex:1}} />
                   <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',flexShrink:0,opacity:enrichLoading?0.5:1,fontSize:11}} disabled={enrichLoading} onClick={enrichProspect}>
