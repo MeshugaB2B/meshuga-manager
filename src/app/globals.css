@@ -132,4 +132,4 @@ body {
 
   /* STRIP */
   .strip { height: 4px; background: var(--noir); border-radius: 2px; margin-bottom: 24px; }
-}
+@import './mobile.css';}
