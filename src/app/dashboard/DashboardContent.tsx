@@ -113,6 +113,67 @@ const RECIPES_DATA = [
   {id:"perrier",name:"Perrier",categorie:"boisson",prixTTC:3.5,prixHT:3.3175,foodCost:0.631,marge:2.6865,foodCostPct:19.0,coeffReel:5.26,ingredients:[{"fournisseur":"Episaveurs","article":"Perrier","unite":"U","prix_achat":0.631,"qte":1,"cout":0.631}]},
 ]
 
+const FC_CATALOG = [
+  {article:"Coca Cola",fournisseur:"Rouquette",unite:"U",prix_achat:0.64},
+  {article:"Coca Cola Zero",fournisseur:"Rouquette",unite:"U",prix_achat:0.67},
+  {article:"Echalote cisel\u00e9e",fournisseur:"Foodflow",unite:"kg",prix_achat:3.0},
+  {article:"Evian",fournisseur:"Episaveurs",unite:"U",prix_achat:0.678},
+  {article:"Huile",fournisseur:"Rouquette",unite:"l",prix_achat:1.9},
+  {article:"Lipton Ice Tea",fournisseur:"Rouquette",unite:"U",prix_achat:0.68},
+  {article:"Maizena",fournisseur:"Rouquette",unite:"kg",prix_achat:6.7},
+  {article:"Mayo lobster maison",fournisseur:"Maison",unite:"kg",prix_achat:2.64},
+  {article:"Nutella",fournisseur:"Rouquette",unite:"kg",prix_achat:9.56},
+  {article:"Oignons frits",fournisseur:"Rouquette",unite:"kg",prix_achat:6.44},
+  {article:"Packaging sauce",fournisseur:"Distribution Service",unite:"U",prix_achat:0.03},
+  {article:"Pain",fournisseur:"Monarque",unite:"U",prix_achat:0.58},
+  {article:"Pastrami",fournisseur:"boucherie norbert",unite:"kg",prix_achat:22.8},
+  {article:"Perrier",fournisseur:"Episaveurs",unite:"U",prix_achat:0.631},
+  {article:"Pink Lemonade",fournisseur:"Maison",unite:"U",prix_achat:0.6615},
+  {article:"Sauce Russe",fournisseur:"maison",unite:"kg",prix_achat:3.0},
+  {article:"Saumon Fum\u00e9",fournisseur:"Marina Sea food",unite:"kg",prix_achat:30.0},
+  {article:"Sriracha",fournisseur:"Rouquette",unite:"kg",prix_achat:4.75},
+  {article:"Thon",fournisseur:"Rouquette",unite:"kg",prix_achat:8.3},
+  {article:"Whole Earth Crunchy",fournisseur:"Amazon",unite:"kg",prix_achat:14.0},
+  {article:"american cheese",fournisseur:"Fooflow",unite:"kg",prix_achat:7.2},
+  {article:"anchois",fournisseur:"Rouquette",unite:"kg",prix_achat:19.0},
+  {article:"carottes",fournisseur:"Foodflow",unite:"kg",prix_achat:0.91},
+  {article:"cebette",fournisseur:"Fooflow",unite:"kg",prix_achat:10.0},
+  {article:"cheddar",fournisseur:"Fooflow",unite:"kg",prix_achat:8.85},
+  {article:"chou blanc",fournisseur:"Foodflow",unite:"kg",prix_achat:1.05},
+  {article:"chou rouge",fournisseur:"Foodflow",unite:"kg",prix_achat:1.82},
+  {article:"citron jaune",fournisseur:"Foodflow",unite:"kg",prix_achat:1.79},
+  {article:"couverts",fournisseur:"Distribution Service",unite:"U",prix_achat:0.055},
+  {article:"cream cheese",fournisseur:"Foodflow",unite:"kg",prix_achat:10.59},
+  {article:"croutons",fournisseur:"Monarque",unite:"U",prix_achat:0.69},
+  {article:"c\u00e2pres",fournisseur:"Rouquette",unite:"kg",prix_achat:4.45},
+  {article:"gouda",fournisseur:"Fooflow",unite:"kg",prix_achat:8.7},
+  {article:"homard",fournisseur:"Marina Sea food",unite:"kg",prix_achat:102.0},
+  {article:"ketchup",fournisseur:"Rouquette",unite:"kg",prix_achat:1.692},
+  {article:"mayo  maison",fournisseur:"Maison",unite:"kg",prix_achat:3.0},
+  {article:"mayonnaise maison",fournisseur:"Maison",unite:"kg",prix_achat:3.0},
+  {article:"moutarde ancienne",fournisseur:"Rouquette",unite:"kg",prix_achat:11.9},
+  {article:"moutarde \u00e0 lancienne",fournisseur:"Rouquette",unite:"kg",prix_achat:11.9},
+  {article:"packaging",fournisseur:"Distribution Service",unite:"U",prix_achat:0.19},
+  {article:"parmesan",fournisseur:"Foodflow",unite:"kg",prix_achat:16.26},
+  {article:"pickles",fournisseur:"Rouquette",unite:"kg",prix_achat:8.89},
+  {article:"pickles  onions rouge",fournisseur:"Maison",unite:"kg",prix_achat:3.0},
+  {article:"pickles onions",fournisseur:"maison",unite:"kg",prix_achat:3.0},
+  {article:"poivre",fournisseur:"Rouquette",unite:"kg",prix_achat:13.0},
+  {article:"poivre noir",fournisseur:"Rouqette",unite:"kg",prix_achat:13.0},
+  {article:"pomme terre Agria",fournisseur:"Foodflow",unite:"kg",prix_achat:1.07},
+  {article:"poulet",fournisseur:"Boucherie Norbert",unite:"kg",prix_achat:10.8},
+  {article:"saucisse SCHWARTS",fournisseur:"Norbert",unite:"kg",prix_achat:5.3},
+  {article:"sel",fournisseur:"Rouquette",unite:"kg",prix_achat:1.0},
+  {article:"sucrine",fournisseur:"Foodflow",unite:"kg",prix_achat:5.4},
+  {article:"sweet relish",fournisseur:"Rouquette",unite:"kg",prix_achat:7.04},
+  {article:"yaourt grec",fournisseur:"Foodflow",unite:"kg",prix_achat:3.85},
+  {article:"yellow mustard",fournisseur:"Rouquette",unite:"kg",prix_achat:4.66},
+  {article:"yuzu kosho",fournisseur:"BienManger.com",unite:"kg",prix_achat:70.0},
+  {article:"\u00e9chalote",fournisseur:"Foodflow",unite:"kg",prix_achat:3.0},
+  {article:"\u00e9chalotte cisel\u00e9e",fournisseur:"Foodflow",unite:"kg",prix_achat:3.05},
+  {article:"\u00e9crevisse",fournisseur:"Marina Sea food",unite:"kg",prix_achat:37.0},
+  {article:"\u0153ufs(2)",fournisseur:"Foodflow",unite:"U",prix_achat:0.35}
+]
 const INIT_VAULT = [{id:1,title:'Supabase',url:'https://supabase.com',user:'edward@meshuga.fr',pw:''},{id:2,title:'Vercel',url:'https://vercel.com',user:'edward@meshuga.fr',pw:''}]
 
 const ALL_PROSPECTS = [
@@ -566,6 +627,7 @@ const ALL_PROSPECTS = [
   {id:'ev22',cat:'evenementiel',name:'Havas Events Paris',contact:'Direction',phone:'01 58 47 98 00',email:'contact@havasevents.com',site:'havasevents.com',taille:'80',arrondissement:'Paris 8e',valeur_event:3000,valeur_mois:0,type:'Events corporates & lancements produits',pitch:'Filiale events Havas. Budgets importants. Meshuga = option recurrente.',score:8,status:'to_contact',contacted:false,contactedDate:'',lastAction:'',relanceDate:'',linkedin:''},
 
 ]
+
 
 function DashboardImpl() {
   const [mounted, setMounted] = useState(false)
