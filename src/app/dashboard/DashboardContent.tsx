@@ -3198,7 +3198,16 @@ function DashboardImpl() {
                               <div style={{fontSize:20,fontWeight:900,color:barColor}}>{r.foodCostPct}%</div>
                               <div style={{fontSize:10,opacity:.5}}>food cost</div>
                             </div>
-                            <button style={{background:'#FFEB5A',border:'2px solid #191923',borderRadius:8,fontSize:16,cursor:'pointer',padding:'8px 12px',minWidth:44,minHeight:44,fontWeight:900,flexShrink:0,WebkitTapHighlightColor:'transparent'}} onClick={function(){setFcEditForm(JSON.parse(JSON.stringify(r)));setFcSelected(r);setFcView('edit')}}>✏️</button>
+                            <button style={{background:'#FFEB5A',border:'2px solid #191923',borderRadius:8,fontSize:16,cursor:'pointer',padding:'8px 12px',minWidth:44,minHeight:44,fontWeight:900,flexShrink:0,WebkitTapHighlightColor:'transparent'}} onClick={function(){
+  try {
+    var copy2=JSON.parse(JSON.stringify(r));
+    setFcEditForm(copy2);
+    setFcSelected(r);
+    setFcView('edit');
+  } catch(err2) {
+    toast('ERR crayon: '+String(err2).substring(0,80));
+  }
+}}>✏️</button>
                           </div>
                         </div>
                         <div style={{background:'#F0F0F0',borderRadius:20,height:6,overflow:'hidden'}}>
@@ -3226,7 +3235,17 @@ function DashboardImpl() {
                 <div>
                   <div style={{display:'flex',gap:8,marginBottom:12}}>
                     <button className="btn btn-sm" onClick={function(){setFcSelected(null)}}>← Retour</button>
-                    <button className="btn btn-y btn-sm" style={{fontWeight:900}} onClick={function(){setFcEditForm(JSON.parse(JSON.stringify(fcSelected)));setFcView('edit')}}>✏️ Modifier cette recette</button>
+                    <button className="btn btn-y btn-sm" style={{fontWeight:900}} onClick={function(){
+  try {
+    var copy=JSON.parse(JSON.stringify(fcSelected));
+    setFcEditForm(copy);
+    setFcSelected(null);
+    setFcView('edit');
+  } catch(err) {
+    toast('ERREUR: '+String(err).substring(0,100));
+    console.error('Modifier error:', err);
+  }
+}}>✏️ Modifier cette recette</button>
                   </div>
 
                   {/* CONSEIL IA PRIX */}
@@ -3408,7 +3427,7 @@ function DashboardImpl() {
                 <div style={{paddingBottom:40}}>
                   <div style={{display:'flex',gap:8,marginBottom:16,alignItems:'center'}}>
                     <button className="btn btn-sm" onClick={function(){setFcView('recettes');setFcEditForm(null)}}>← Annuler</button>
-                    <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923',flex:1}}>{!fcSelected || fcEditForm.id.toString().startsWith('new_') ? 'Nouvelle recette' : 'Modifier ' + fcEditForm.name}</div>
+                    <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923',flex:1}}>{fcEditForm && (String(fcEditForm.id||'').indexOf('new_')===0) ? 'Nouvelle recette' : 'Modifier ' + (fcEditForm?fcEditForm.name:'')}</div>
                   </div>
 
                   {/* NOM + CATEGORIE */}
@@ -3469,7 +3488,7 @@ function DashboardImpl() {
                   {/* INGREDIENTS */}
                   <div style={{marginBottom:12}}>
                     <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:.5,marginBottom:8,opacity:.5}}>Ingrédients ({(fcEditForm.ingredients||[]).length})</div>
-                    {(fcEditForm.ingredients||[]).map(function(ing,idx){
+                    {(fcEditForm&&fcEditForm.ingredients||[]).map(function(ing,idx){
                       return (
                         <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr 80px 70px auto',gap:6,alignItems:'center',marginBottom:8,background:'#FAFAFA',borderRadius:6,padding:'8px 10px'}}>
                           <div style={{fontSize:12,fontWeight:700}}>{ing.article}<div style={{fontSize:10,opacity:.5}}>{ing.fournisseur}</div></div>
@@ -3529,7 +3548,7 @@ function DashboardImpl() {
                   {/* BOUTONS ACTIONS */}
                   <div style={{display:'flex',gap:8,paddingTop:16,borderTop:'1px solid #EBEBEB'}}>
                     <button className="btn" style={{flex:1}} onClick={function(){setFcView('recettes');setFcEditForm(null)}}>Annuler</button>
-                    {fcSelected && !fcEditForm.id.toString().startsWith('new_') && (
+                    {fcSelected && fcEditForm && String(fcEditForm.id||'').indexOf('new_')!==0 && (
                       <button className="btn btn-sm" style={{background:'#CC0066',color:'#fff'}} onClick={function(){
                         setFcRecipes(function(prev){
                           var updated = prev.filter(function(r){return r.id!==fcEditForm.id})
@@ -3547,7 +3566,7 @@ function DashboardImpl() {
                       if (!fcEditForm.prixTTC) { toast('Prix de vente obligatoire'); return }
                       var ht3 = Math.round(fcEditForm.prixTTC/1.055*100)/100
                       var saved3 = Object.assign({},fcEditForm,{prixHT:ht3})
-                      var isNew3 = fcEditForm.id.toString().startsWith('new_')
+                      var isNew3 = String(fcEditForm&&fcEditForm.id||'').indexOf('new_')===0
                       setFcRecipes(function(prev){
                         var updated = isNew3 ? prev.concat([saved3]) : prev.map(function(r){return r.id===saved3.id?saved3:r})
                         try{localStorage.setItem('meshuga_fc_recipes',JSON.stringify(updated))}catch(e){}
