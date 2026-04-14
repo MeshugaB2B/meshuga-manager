@@ -89,8 +89,8 @@ export async function GET(req: Request) {
   if (encouragement) edwardLines.push('🧠 ' + encouragement)
 
   await Promise.all([
-    sendPush('🥪 Bonne soirée Emy !', emyLines.join(' · '), 'emy'),
-    sendPush('🌭 Bilan du jour, Edward', edwardLines.join(' · '), 'edward')
+    sendPush('🥪 Bonne soirée Emy !', emyLines.join('\n'), 'emy'),
+    sendPush('🌭 Bilan du jour, Edward', edwardLines.join('\n'), 'edward')
   ])
 
   return NextResponse.json({ ok: true, context })
