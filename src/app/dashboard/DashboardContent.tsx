@@ -2469,6 +2469,8 @@ function DashboardImpl() {
           {page === 'instagram' && (
             <InstaTab
               toast={toast}
+              instaData={instaData}
+              instaLoading={instaLoading}
               fcRecipes={fcRecipes}
               fcSeuil={fcSeuil}
               fcAlertCat={fcAlertCat}
