@@ -13,8 +13,8 @@ export default function InstaTab(props) {
   var setFcPriceLoading = props.setFcPriceLoading
   var messages = props.messages
 
-  var [instaData, setInstaData] = useState(null)
-  var [instaLoading, setInstaLoading] = useState(false)
+  var instaData = props.instaData || null
+  var instaLoading = props.instaLoading || false
   var [instaTab, setInstaTab] = useState('comments')
 
   return (
