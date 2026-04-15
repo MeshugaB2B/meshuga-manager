@@ -73,6 +73,7 @@ function DashboardImpl() {
   const [scriptContent, setScriptContent] = useState('')
   const [scriptLoading, setScriptLoading] = useState(false)
   const [enrichLoading, setEnrichLoading] = useState(false)
+  const [scoringLoading, setScoringLoading] = useState(false)
   const [commissionObjectif, setCommissionObjectif] = useState(2000)
   const [fcSeuil, setFcSeuil] = useState(25)
   const [messages, setMessages] = useState([])
