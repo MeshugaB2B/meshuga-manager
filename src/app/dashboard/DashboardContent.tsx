@@ -523,7 +523,7 @@ function DashboardImpl() {
       .then(function(res){
         if(res.data){
           setMessages(res.data)
-          var myRole = profile && profile.role ? ((profile.role === 'admin' || profile.role === 'edward') ? 'edward' : 'emy') : 'edward'
+          var myRole = profile && profile.email && profile.email.indexOf('emy') > -1 ? 'emy' : 'edward'
           var unread = res.data.filter(function(m){ return m.sender !== myRole && !m.read_at }).length
           setMsgUnread(unread)
           if(unread > 0){
@@ -538,7 +538,7 @@ function DashboardImpl() {
 
   function sendMessage(text) {
     if (!text || !text.trim()) return
-    var myRole = profile && profile.role ? (profile.role === 'admin' ? 'edward' : 'emy') : 'edward'
+    var myRole = profile && profile.email && profile.email.indexOf('emy') > -1 ? 'emy' : 'edward'
     var msg = {sender: myRole, content: text.trim()}
     setMsgSending(true)
     sb().from('messages').insert([msg]).select().then(function(res){
@@ -2585,7 +2585,7 @@ function DashboardImpl() {
                   <div style={{textAlign:'center',opacity:.4,padding:40,fontSize:14}}>Aucun message — commencez la conversation !</div>
                 )}
               {messages.map(function(m){
-                var myRole = profile && (profile.role === 'admin' || profile.role === 'edward') ? 'edward' : 'emy'
+                var myRole = profile && profile.email && profile.email.indexOf('emy') > -1 ? 'emy' : 'edward'
                 var isMe = m.sender === myRole
                 var isEmy = m.sender === 'emy'
                 var dt = new Date(m.created_at)
