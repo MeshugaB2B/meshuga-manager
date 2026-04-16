@@ -529,12 +529,12 @@ export default function FoodCostTab(props) {
 
             {!fcInvoiceResult && !fcInvoiceLoading && (
               <div>
-                <div style={{fontSize:13,color:'#555',marginBottom:16}}>Upload le PDF d&apos;une facture fournisseur — Claude extrait les prix automatiquement.</div>
+                <div style={{fontSize:13,color:'#555',marginBottom:16}}>Upload un PDF ou une photo de ta facture fournisseur — Claude extrait les prix automatiquement.</div>
                 <label style={{display:'block',background:'#F8F9FF',border:'2px dashed #DDEEFF',borderRadius:10,padding:'30px 20px',textAlign:'center',cursor:'pointer'}}>
                   <div style={{fontSize:32,marginBottom:8}}>📂</div>
-                  <div style={{fontWeight:900,fontSize:14,color:'#005FFF'}}>Choisir un PDF de facture</div>
+                  <div style={{fontWeight:900,fontSize:14,color:'#005FFF'}}>Choisir un PDF ou une photo</div>
                   <div style={{fontSize:11,color:'#888',marginTop:4}}>La Crémerie, HPS, Foodflow, Marina, Episaveurs...</div>
-                  <input type="file" accept=".pdf" style={{display:'none'}} onChange={function(e){
+                  <input type="file" accept=".pdf,image/*" style={{display:'none'}} onChange={function(e){
                     var file = e.target && e.target.files && e.target.files[0]
                     if (!file) return
                     setFcInvoiceLoading(true)
@@ -544,7 +544,7 @@ export default function FoodCostTab(props) {
                       fetch('/api/import-invoice', {
                         method: 'POST',
                         headers: {'Content-Type':'application/json'},
-                        body: JSON.stringify({pdfBase64: base64, fileName: file.name})
+                        body: JSON.stringify({pdfBase64: base64, fileName: file.name, mediaType: file.type})
                       })
                       .then(function(r){return r.json()})
                       .then(function(data){
