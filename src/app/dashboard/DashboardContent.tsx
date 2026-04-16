@@ -545,10 +545,10 @@ function DashboardImpl() {
       if (res.data) {
         setMessages(function(prev){ return prev.concat(res.data) })
         setMsgText('')
-        fetch('https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-message-push', {
+        fetch('https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-push', {
           method: 'POST',
           headers: {'Content-Type':'application/json'},
-          body: JSON.stringify(msg)
+          body: JSON.stringify({title: '\uD83D\uDCAC ' + (myRole === 'edward' ? 'Edward' : 'Emy'), body: text.trim().length > 80 ? text.trim().substring(0,80) + '\u2026' : text.trim(), target: myRole === 'edward' ? 'emy' : 'edward'})
         }).catch(function(){})
       }
       setMsgSending(false)
@@ -956,7 +956,9 @@ function DashboardImpl() {
               )}
 
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
-                <div className="kc" style={{background: isEmy ? '#FF82D7' : '#FFEB5A',cursor:'pointer'}} onClick={function(){nav('devis')}}>
+                <div className="kc" style={{background: isEmy ? '#FF82D7' : '#FFEB5A',
+                      border: isEmy ? 'none' : '2px solid #191923',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.12)',cursor:'pointer'}} onClick={function(){nav('devis')}}>
                   <div className="kl" style={{fontSize:16,letterSpacing:.3}}>Pipeline B2B 🎯</div>
                   <div style={{display:'flex',gap:12,alignItems:'flex-end',marginTop:6,flexWrap:'wrap'}}>
                     <div>
@@ -2569,7 +2571,7 @@ function DashboardImpl() {
           )}
 
           {page === 'messagerie' && (
-            <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 120px)',background:'#FFFFFF'}}>
+            <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 120px)'}}>
               <div className="ph">
                 <div>
                   <div className="pt">💬 Messagerie</div>
@@ -2601,7 +2603,7 @@ function DashboardImpl() {
                       lineHeight:1.4
                     }}>{m.content}</div>
                     <div style={{fontSize:10,opacity:.5,marginTop:3,marginLeft:6,marginRight:6,color:'#191923'}}>
-                      {m.sender === 'edward' ? 'Edward' : 'Emy'} · {dateStr} · {timeStr}{m.read_at && isMe && ' · lu ✓'}
+                      {m.sender === 'edward' ? 'Edward' : 'Emy'} · {dateStr} · {timeStr}{isMe && (m.read_at ? ' · ✓✓ lu' : ' · ✓ envoyé')}
                     </div>
                   </div>
                 )
