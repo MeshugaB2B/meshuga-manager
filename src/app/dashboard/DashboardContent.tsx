@@ -30,6 +30,7 @@ function DashboardImpl() {
   const [prospects, setProspects] = useState(INIT_PROSPECTS)
   const [contacts, setContacts] = useState([])
   const [annCat, setAnnCat] = useState('all')
+  const [priceAlerts, setPriceAlerts] = useState([])
   const [vault, setVault] = useState(INIT_VAULT)
   const [reports, setReports] = useState([])
   const [toastMsg, setToastMsg] = useState('')
@@ -188,6 +189,7 @@ function DashboardImpl() {
     loadMessages()
     loadCalEvents()
     // Check push subscription status
+    loadPriceAlerts()
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.getRegistration('/sw.js').then(function(reg) {
         if (reg) {
@@ -461,6 +463,18 @@ function DashboardImpl() {
           }
         }))
       }
+    })
+  }
+
+  function loadPriceAlerts() {
+    sb().from('price_history').select('*').eq('acknowledged', false).gt('change_pct', 0).order('change_pct', {ascending:false}).limit(10).then(function(res){
+      if (res.data) setPriceAlerts(res.data)
+    })
+  }
+
+  function dismissAlert(id) {
+    sb().from('price_history').update({acknowledged: true}).eq('id', id).then(function(){
+      setPriceAlerts(function(prev){ return prev.filter(function(a){ return a.id !== id }) })
     })
   }
 
@@ -905,6 +919,35 @@ function DashboardImpl() {
 
           {page === 'dash' && (
             <div>
+              {priceAlerts.length > 0 && (
+                <div style={{background:"linear-gradient(135deg,#FF3B30 0%,#CC0000 100%)",border:"3px solid #191923",borderRadius:10,padding:14,marginBottom:14,boxShadow:"4px 4px 0 #191923"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                    <span style={{fontSize:24}}>🚨</span>
+                    <div style={{fontFamily:"'Yellowtail',cursive",fontSize:26,color:"#FFEB5A",lineHeight:1}}>Alertes prix ingrédients</div>
+                    <span style={{background:"#FFEB5A",color:"#191923",padding:"2px 8px",borderRadius:4,fontSize:12,fontWeight:900,marginLeft:"auto"}}>{priceAlerts.length}</span>
+                  </div>
+                  <div style={{display:"grid",gap:6}}>
+                    {priceAlerts.map(function(a){
+                      return (
+                        <div key={a.id} style={{display:"flex",alignItems:"center",gap:10,background:"#FFFFFF",border:"2px solid #191923",borderRadius:6,padding:"8px 12px"}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:14,fontWeight:900,color:"#191923",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.ingredient_name}</div>
+                            <div style={{fontSize:11,color:"#666",fontStyle:"italic"}}>{a.supplier || "Fournisseur inconnu"} · {a.invoice_date || (a.created_at ? new Date(a.created_at).toLocaleDateString("fr-FR") : "")}</div>
+                          </div>
+                          <div style={{textAlign:"right",minWidth:130}}>
+                            <div style={{fontSize:16,fontWeight:900,color:"#CC0000"}}>+{Number(a.change_pct).toFixed(1)}%</div>
+                            <div style={{fontSize:11,color:"#191923",fontWeight:700}}>+{Number(a.change_eur_per_kg).toFixed(2)} €/kg</div>
+                          </div>
+                          <div style={{fontSize:11,color:"#191923",minWidth:85,textAlign:"right"}}>
+                            {Number(a.previous_price).toFixed(2)}€ → <strong>{Number(a.price_per_kg).toFixed(2)}€</strong>
+                          </div>
+                          <button className="btn btn-sm" onClick={function(){ dismissAlert(a.id) }} style={{background:"#191923",color:"#fff",padding:"5px 10px",fontSize:11,borderRadius:4}}>OK, vu</button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="ph">
                 <div>
                   <div style={{fontFamily:"'Yellowtail',cursive",fontSize:36,lineHeight:1.1}}>{isEmy ? 'Bonjour Emy' : 'Bonjour Edward'}</div>
