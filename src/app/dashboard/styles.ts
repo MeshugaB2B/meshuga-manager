@@ -8,8 +8,7 @@ body{font-family:'Arial Narrow',Arial,sans-serif;background:#FFEB5A;color:#19192
 .yt{font-family:'Yellowtail',cursive}
 
 /* === SHELL === */
-.shell{display:flex;height:100vh
-.shell-inner{display:flex;flex:1;overflow:hidden}
+.shell{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 
 /* === TOPBAR MOBILE === */
 .topbar{display:none;background:#FF82D7;padding:8px 14px;align-items:center;justify-content:space-between;border-bottom:2px solid #191923;flex-shrink:0}
