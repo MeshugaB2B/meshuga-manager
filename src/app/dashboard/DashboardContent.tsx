@@ -919,35 +919,6 @@ function DashboardImpl() {
 
           {page === 'dash' && (
             <div>
-              {priceAlerts.length > 0 && (
-                <div style={{background:"linear-gradient(135deg,#FF3B30 0%,#CC0000 100%)",border:"3px solid #191923",borderRadius:10,padding:14,marginBottom:14,boxShadow:"4px 4px 0 #191923"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                    <span style={{fontSize:24}}>🚨</span>
-                    <div style={{fontFamily:"'Yellowtail',cursive",fontSize:26,color:"#FFEB5A",lineHeight:1}}>Alertes prix ingrédients</div>
-                    <span style={{background:"#FFEB5A",color:"#191923",padding:"2px 8px",borderRadius:4,fontSize:12,fontWeight:900,marginLeft:"auto"}}>{priceAlerts.length}</span>
-                  </div>
-                  <div style={{display:"grid",gap:6}}>
-                    {priceAlerts.map(function(a){
-                      return (
-                        <div key={a.id} style={{display:"flex",alignItems:"center",gap:10,background:"#FFFFFF",border:"2px solid #191923",borderRadius:6,padding:"8px 12px"}}>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:14,fontWeight:900,color:"#191923",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.ingredient_name}</div>
-                            <div style={{fontSize:11,color:"#666",fontStyle:"italic"}}>{a.supplier || "Fournisseur inconnu"} · {a.invoice_date || (a.created_at ? new Date(a.created_at).toLocaleDateString("fr-FR") : "")}</div>
-                          </div>
-                          <div style={{textAlign:"right",minWidth:130}}>
-                            <div style={{fontSize:16,fontWeight:900,color:"#CC0000"}}>+{Number(a.change_pct).toFixed(1)}%</div>
-                            <div style={{fontSize:11,color:"#191923",fontWeight:700}}>+{Number(a.change_eur_per_kg).toFixed(2)} €/kg</div>
-                          </div>
-                          <div style={{fontSize:11,color:"#191923",minWidth:85,textAlign:"right"}}>
-                            {Number(a.previous_price).toFixed(2)}€ → <strong>{Number(a.price_per_kg).toFixed(2)}€</strong>
-                          </div>
-                          <button className="btn btn-sm" onClick={function(){ dismissAlert(a.id) }} style={{background:"#191923",color:"#fff",padding:"5px 10px",fontSize:11,borderRadius:4}}>OK, vu</button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
               <div className="ph">
                 <div>
                   <div style={{fontFamily:"'Yellowtail',cursive",fontSize:36,lineHeight:1.1}}>{isEmy ? 'Bonjour Emy' : 'Bonjour Edward'}</div>
@@ -955,6 +926,33 @@ function DashboardImpl() {
                 </div>
                 {isEmy && <button className="btn btn-p btn-sm" onClick={function(){openModal('cr',{})}}>+ Nouveau CR</button>}
               </div>
+              {priceAlerts.length > 0 && (
+                <div style={{background:"#FFFFFF",border:"2px solid #FF3B30",borderLeft:"6px solid #FF3B30",borderRadius:8,padding:"10px 14px",marginBottom:12,boxShadow:"2px 2px 0 #191923"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <span style={{fontSize:16}}>⚠️</span>
+                    <div style={{fontWeight:900,fontSize:13,color:"#191923",textTransform:"uppercase",letterSpacing:.5}}>Alertes augmentation de prix</div>
+                    <span style={{background:"#FF3B30",color:"#FFFFFF",padding:"1px 7px",borderRadius:10,fontSize:11,fontWeight:900,marginLeft:"auto"}}>{priceAlerts.length}</span>
+                  </div>
+                  <div style={{display:"grid",gap:4}}>
+                    {priceAlerts.map(function(a){
+                      return (
+                        <div key={a.id} style={{display:"flex",alignItems:"center",gap:10,padding:"5px 8px",borderRadius:4,background:"#FFF5F5"}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:13,fontWeight:700,color:"#191923",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.ingredient_name}</div>
+                            <div style={{fontSize:10,color:"#888"}}>{a.supplier || "Fournisseur inconnu"}</div>
+                          </div>
+                          <div style={{fontSize:11,color:"#666",minWidth:95,textAlign:"right"}}>{Number(a.previous_price).toFixed(2)}€ → <strong style={{color:"#191923"}}>{Number(a.price_per_kg).toFixed(2)}€</strong></div>
+                          <div style={{textAlign:"right",minWidth:100}}>
+                            <div style={{fontSize:14,fontWeight:900,color:"#FF3B30"}}>+{Number(a.change_pct).toFixed(1)}%</div>
+                            <div style={{fontSize:10,color:"#666",fontWeight:700}}>+{Number(a.change_eur_per_kg).toFixed(2)}€/kg</div>
+                          </div>
+                          <button onClick={function(){ dismissAlert(a.id) }} style={{background:"transparent",border:"1px solid #DDD",color:"#888",padding:"3px 8px",fontSize:10,borderRadius:3,cursor:"pointer",fontWeight:700}}>✕</button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
                 <div className="kc" style={{background:'#FFFFFF',cursor:'pointer'}} onClick={function(){nav('devis')}}>
