@@ -2664,3 +2664,4 @@ function DashboardImpl() {
     </div>
   )
 }
+export default DashboardImpl
