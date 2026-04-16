@@ -2664,7 +2664,3 @@ function DashboardImpl() {
     </div>
   )
 }
-
-
-export default DashboardImpl
-📋 COPIER DashboardContent.tsx
