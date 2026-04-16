@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 export async function POST(req: Request) {
   try {
     var body = await req.json()
-    var { pdfBase64, fileName } = body
+    var { pdfBase64, fileName, mediaType } = body
 
     if (!pdfBase64) {
       return NextResponse.json({ error: 'PDF manquant' }, { status: 400 })
@@ -23,8 +23,8 @@ export async function POST(req: Request) {
           role: 'user',
           content: [
             {
-              type: 'document',
-              source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 }
+              type: (mediaType && mediaType.startsWith('image/')) ? 'image' : 'document',
+              source: { type: 'base64', media_type: (mediaType && mediaType.startsWith('image/')) ? mediaType : 'application/pdf', data: pdfBase64 }
             },
             {
               type: 'text',
