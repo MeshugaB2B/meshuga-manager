@@ -25,6 +25,7 @@ function DashboardImpl() {
   const [profile, setProfile] = useState(null)
   const [page, setPage] = useState('dash')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [tasks, setTasks] = useState([])
   const [prospects, setProspects] = useState(INIT_PROSPECTS)
   const [contacts, setContacts] = useState([])
@@ -846,8 +847,7 @@ function DashboardImpl() {
       <div className="topbar">
         <img src={LOGO_YELLOW} alt="meshuga" className="topbar-logo" />
         <div className="topbar-right">
-          <span className="topbar-b2b">B2B</span>
-          <button className="hamburger" onClick={function() { setSidebarOpen(!sidebarOpen) }}>{"☰"}</button>
+          <span className="topbar-b2b">B2B Manager</span>
         </div>
       </div>
 
@@ -2620,10 +2620,45 @@ function DashboardImpl() {
         <div className={page === "dash" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("dash") }}><span className="bb-ico">{"📊"}</span><span className="bb-lbl">Accueil</span></div>
         <div className={page === "crm" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("crm") }}><span className="bb-ico">{"🎯"}</span><span className="bb-lbl">CRM</span></div>
         <div className={page === "devis" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("devis") }}><span className="bb-ico">{"📋"}</span><span className="bb-lbl">Devis</span></div>
-        <div className="bb-center" onClick={function(){ setSidebarOpen(true) }}><img src={STAMP_PINK} alt="menu" /></div>
+        <div className="bb-menu" onClick={function(){ setMenuOpen(true) }}>
+          <div className="bb-menu-circle"><img src={STAMP_PINK} alt="menu" /></div>
+          <span className="bb-menu-lbl">Menu</span>
+        </div>
         <div className={page === "foodcost" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("foodcost") }}><span className="bb-ico">{"🥩"}</span><span className="bb-lbl">Food</span></div>
         <div className={page === "messagerie" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("messagerie") }}><span className="bb-ico">{"💬"}</span><span className="bb-lbl">Messages</span></div>
         <div className={page === "tasks" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("tasks") }}><span className="bb-ico">{"✅"}</span><span className="bb-lbl">Tasks</span></div>
+      </div>
+      <div className={menuOpen ? "mms-overlay open" : "mms-overlay"} onClick={function(){ setMenuOpen(false) }}></div>
+      <div className={menuOpen ? "mms-sheet open" : "mms-sheet"}>
+        <div className="mms-handle" onClick={function(){ setMenuOpen(false) }}></div>
+        <div className="mms-header">
+          <div className="mms-title">Menu</div>
+          <div className="mms-subtitle">Navigation</div>
+        </div>
+        <div className="mms-sec">Quotidien</div>
+        <div className="mms-grid">
+          <div className={page === "dash" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("dash"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📊"}</div><div className="mms-tile-lbl">Dashboard</div></div>
+          <div className={page === "crm" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("crm"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🎯"}</div><div className="mms-tile-lbl">CRM</div></div>
+          <div className={page === "devis" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("devis"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📋"}</div><div className="mms-tile-lbl">Devis</div></div>
+          <div className={page === "messagerie" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("messagerie"); setMenuOpen(false) }}><div className="mms-tile-ico">{"💬"}</div><div className="mms-tile-lbl">Messages</div></div>
+          <div className={page === "tasks" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("tasks"); setMenuOpen(false) }}><div className="mms-tile-ico">{"✅"}</div><div className="mms-tile-lbl">Taches</div></div>
+          <div className={page === "calendar" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("calendar"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📅"}</div><div className="mms-tile-lbl">Agenda</div></div>
+        </div>
+        <div className="mms-sec">Gestion</div>
+        <div className="mms-grid">
+          <div className={page === "foodcost" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("foodcost"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🥩"}</div><div className="mms-tile-lbl">Food Cost</div></div>
+          <div className={page === "annuaire" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("annuaire"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📇"}</div><div className="mms-tile-lbl">Annuaire</div></div>
+          <div className={page === "chasse" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("chasse"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔍"}</div><div className="mms-tile-lbl">Chasse</div></div>
+          <div className={page === "reporting" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("reporting"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📊"}</div><div className="mms-tile-lbl">Reporting</div></div>
+          <div className={page === "vault" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("vault"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔐"}</div><div className="mms-tile-lbl">Coffre</div></div>
+        </div>
+        <div className="mms-sec">Outils</div>
+        <div className="mms-grid">
+          <div className={page === "insta" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("insta"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📸"}</div><div className="mms-tile-lbl">Instagram</div></div>
+          <div className={page === "gmb" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("gmb"); setMenuOpen(false) }}><div className="mms-tile-ico">{"⭐"}</div><div className="mms-tile-lbl">Google Biz</div></div>
+          <div className={page === "notifs" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("notifs"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔔"}</div><div className="mms-tile-lbl">Notifs</div></div>
+          <div className={page === "journal" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("journal"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📓"}</div><div className="mms-tile-lbl">Journal</div></div>
+        </div>
       </div>
       <div className={toastMsg ? 'toast show' : 'toast'}>{toastMsg}</div>
     </div>
