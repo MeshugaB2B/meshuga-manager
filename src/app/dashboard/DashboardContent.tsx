@@ -42,6 +42,7 @@ function DashboardImpl() {
   const [journalUser, setJournalUser] = useState('all')
   const [planningWeek, setPlanningWeek] = useState(0)
   const [planningView, setPlanningView] = useState('3j')
+  const [taskStatusFilter, setTaskStatusFilter] = useState('all')
   const [chasseCat, setChasseChasse] = useState('all')
   const [chasseSearch, setChasseSearch] = useState('')
   const [chasseSort, setChasseSort] = useState('score')
@@ -1177,6 +1178,11 @@ function DashboardImpl() {
                       )})}
                     </div>
                     <button className="btn btn-sm btn-y" onClick={function(){setPlanningWeek(function(w){return w-1})}}>&#8592;</button>
+                    <div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:4}}>
+                      {[{v:'all',l:'Toutes'},{v:'todo',l:'À faire'},{v:'progress',l:'En cours'},{v:'done',l:'Terminées'}].map(function(o){return(
+                        <button key={o.v} onClick={function(){setTaskStatusFilter(o.v)}} style={{padding:'4px 10px',fontSize:10,fontWeight:900,background:taskStatusFilter===o.v?'#FF82D7':'transparent',color:taskStatusFilter===o.v?'#FFFFFF':'#191923',border:'1px solid #191923',borderRadius:4,cursor:'pointer'}}>{o.l}</button>
+                      )})}
+                    </div>
                     <span style={{fontSize:11,fontWeight:900,minWidth:100,textAlign:'center'}}>{planningWeek===0?'Cette semaine':planningWeek<0?'Sem. -'+Math.abs(planningWeek):'Sem. +'+planningWeek}</span>
                     <button className="btn btn-sm btn-y" onClick={function(){setPlanningWeek(function(w){return w+1})}}>&#8594;</button>
                     {planningWeek!==0&&<button className="btn btn-p btn-sm" onClick={function(){setPlanningWeek(0)}}>Auj.</button>}
@@ -1197,8 +1203,8 @@ function DashboardImpl() {
                       var isFriday=di===4
                       var isMonday=di===0
                       var isWednesday=di===2
-                      var dayTasksEmy=tasks.filter(function(t){return t.deadline===ds&&t.assignee==='emy'})
-                      var dayTasksEdward=tasks.filter(function(t){return t.deadline===ds&&t.assignee==='edward'})
+                      var dayTasksEmy=tasks.filter(function(t){if(taskStatusFilter==='todo'&&t.status==='done')return false;if(taskStatusFilter==='progress'&&t.status!=='in_progress')return false;if(taskStatusFilter==='done'&&t.status!=='done')return false;return t.deadline===ds&&t.assignee==='emy'})
+                      var dayTasksEdward=tasks.filter(function(t){if(taskStatusFilter==='todo'&&t.status==='done')return false;if(taskStatusFilter==='progress'&&t.status!=='in_progress')return false;if(taskStatusFilter==='done'&&t.status!=='done')return false;return t.deadline===ds&&t.assignee==='edward'})
                       var dayRelances=prospects.filter(function(p){return p.nextDate===ds&&p.status!=='won'&&p.status!=='lost'})
                       var hasLate=isPast&&dayTasksEmy.some(function(t){return t.status!=='done'})
                       var allDone=dayTasksEmy.length>0&&dayTasksEmy.every(function(t){return t.status==='done'})
@@ -1254,6 +1260,7 @@ function DashboardImpl() {
                                     }}>
                                       <input type="checkbox" checked={t.status==='done'} readOnly style={{width:planningView==='auj'?16:11,height:planningView==='auj'?16:11,flexShrink:0,height:11,marginTop:1,flexShrink:0,accentColor:'#191923'}}/>
                                       <span style={{fontSize:planningView==='auj'?15:12,fontWeight:t.priority==='high'?900:600,textDecoration:t.status==='done'?'line-through':'none',opacity:t.status==='done'?.4:1,color:t.priority==='high'?'#CC0066':'#191923',lineHeight:1.4}}>{t.title}</span>
+                                      {t.status==='done' && <button onClick={function(e){e.stopPropagation();sb().from('tasks').delete().eq('id',t.id).then(function(){loadTasks()})}} style={{background:'transparent',border:'1px solid #DDD',color:'#888',padding:'1px 6px',fontSize:10,borderRadius:3,cursor:'pointer',marginLeft:4}}>✕</button>}
                                     </div>
                                   )
                                 })}
@@ -1266,6 +1273,7 @@ function DashboardImpl() {
                                     <div key={t.id} style={{display:'flex',alignItems:'center',gap:planningView==='auj'?8:4,marginBottom:6}}>
                                       <input type="checkbox" checked={t.status==='done'} readOnly style={{width:planningView==='auj'?16:11,height:planningView==='auj'?16:11,flexShrink:0,accentColor:'#FFEB5A'}}/>
                                       <span style={{fontSize:planningView==='auj'?15:12,fontWeight:600,lineHeight:1.4,textDecoration:t.status==='done'?'line-through':'none'}}>&#128081; {t.title}</span>
+                                      {t.status==='done' && <button onClick={function(e){e.stopPropagation();sb().from('tasks').delete().eq('id',t.id).then(function(){loadTasks()})}} style={{background:'transparent',border:'1px solid #DDD',color:'#888',padding:'1px 6px',fontSize:10,borderRadius:3,cursor:'pointer',marginLeft:4}}>✕</button>}
                                     </div>
                                   )
                                 })}
