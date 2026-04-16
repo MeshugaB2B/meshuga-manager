@@ -863,7 +863,24 @@ function DashboardImpl() {
               </div>
             </div>
           <nav className="sb-nav">
-            {NAV.filter(function(n) { return !n.edwardOnly || !isEmy }).map(function(n) {
+            <div className="sb-sec">Quotidien</div>
+            {NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['dash','crm','devis','messagerie','calendrier'].indexOf(n.id) > -1 }).map(function(n) {
+              return (
+                <div key={n.id} className={page === n.id ? 'ni active' : 'ni'} onClick={function() { nav(n.id) }}>
+                  <span style={{fontSize:14}}>{n.icon}</span>{n.label}
+                </div>
+              )
+            })}
+            <div className="sb-sec">Gestion</div>
+            {NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['chasse','foodcost','annuaire','reporting','vault'].indexOf(n.id) > -1 }).map(function(n) {
+              return (
+                <div key={n.id} className={page === n.id ? 'ni active' : 'ni'} onClick={function() { nav(n.id) }}>
+                  <span style={{fontSize:14}}>{n.icon}</span>{n.label}
+                </div>
+              )
+            })}
+            <div className="sb-sec">Outils</div>
+            {NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['instagram','gmb','notifs','journal'].indexOf(n.id) > -1 }).map(function(n) {
               return (
                 <div key={n.id} className={page === n.id ? 'ni active' : 'ni'} onClick={function() { nav(n.id) }}>
                   <span style={{fontSize:14}}>{n.icon}</span>{n.label}
@@ -2642,7 +2659,7 @@ function DashboardImpl() {
           <div className={page === "devis" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("devis"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📋"}</div><div className="mms-tile-lbl">Devis</div></div>
           <div className={page === "messagerie" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("messagerie"); setMenuOpen(false) }}><div className="mms-tile-ico">{"💬"}</div><div className="mms-tile-lbl">Messages</div></div>
           <div className={page === "tasks" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("tasks"); setMenuOpen(false) }}><div className="mms-tile-ico">{"✅"}</div><div className="mms-tile-lbl">Taches</div></div>
-          <div className={page === "calendar" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("calendar"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📅"}</div><div className="mms-tile-lbl">Agenda</div></div>
+          <div className={page === "calendrier" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("calendrier"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📅"}</div><div className="mms-tile-lbl">Agenda</div></div>
         </div>
         <div className="mms-sec">Gestion</div>
         <div className="mms-grid">
@@ -2654,7 +2671,7 @@ function DashboardImpl() {
         </div>
         <div className="mms-sec">Outils</div>
         <div className="mms-grid">
-          <div className={page === "insta" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("insta"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📸"}</div><div className="mms-tile-lbl">Instagram</div></div>
+          <div className={page === "instagram" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("instagram"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📸"}</div><div className="mms-tile-lbl">Instagram</div></div>
           <div className={page === "gmb" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("gmb"); setMenuOpen(false) }}><div className="mms-tile-ico">{"⭐"}</div><div className="mms-tile-lbl">Google Biz</div></div>
           <div className={page === "notifs" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("notifs"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔔"}</div><div className="mms-tile-lbl">Notifs</div></div>
           <div className={page === "journal" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("journal"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📓"}</div><div className="mms-tile-lbl">Journal</div></div>
