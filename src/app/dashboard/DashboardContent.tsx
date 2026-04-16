@@ -523,7 +523,7 @@ function DashboardImpl() {
       .then(function(res){
         if(res.data){
           setMessages(res.data)
-          var myRole = profile && profile.role ? (profile.role === 'admin' ? 'edward' : 'emy') : 'edward'
+          var myRole = profile && profile.role ? ((profile.role === 'admin' || profile.role === 'edward') ? 'edward' : 'emy') : 'edward'
           var unread = res.data.filter(function(m){ return m.sender !== myRole && !m.read_at }).length
           setMsgUnread(unread)
           if(unread > 0){
@@ -956,7 +956,7 @@ function DashboardImpl() {
               )}
 
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
-                <div className="kc" style={{background:'#FFFFFF',cursor:'pointer'}} onClick={function(){nav('devis')}}>
+                <div className="kc" style={{background: isEmy ? '#FF82D7' : '#FFEB5A',cursor:'pointer'}} onClick={function(){nav('devis')}}>
                   <div className="kl" style={{fontSize:16,letterSpacing:.3}}>Pipeline B2B 🎯</div>
                   <div style={{display:'flex',gap:12,alignItems:'flex-end',marginTop:6,flexWrap:'wrap'}}>
                     <div>
@@ -2569,7 +2569,7 @@ function DashboardImpl() {
           )}
 
           {page === 'messagerie' && (
-            <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 120px)'}}>
+            <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 120px)',background:'#FFFFFF'}}>
               <div className="ph">
                 <div>
                   <div className="pt">💬 Messagerie</div>
@@ -2583,7 +2583,7 @@ function DashboardImpl() {
                   <div style={{textAlign:'center',opacity:.4,padding:40,fontSize:14}}>Aucun message — commencez la conversation !</div>
                 )}
               {messages.map(function(m){
-                var myRole = profile && profile.role === 'admin' ? 'edward' : 'emy'
+                var myRole = profile && (profile.role === 'admin' || profile.role === 'edward') ? 'edward' : 'emy'
                 var isMe = m.sender === myRole
                 var isEmy = m.sender === 'emy'
                 var dt = new Date(m.created_at)
@@ -2595,7 +2595,6 @@ function DashboardImpl() {
                       maxWidth:'80%',
                       background:'#FFFFFF',
                       color:'#191923',
-                      border: '2px solid ' + (isEmy?'#FF82D7':'#191923'),
                       borderRadius:isMe?'16px 16px 4px 16px':'16px 16px 16px 4px',
                       padding:'10px 14px',
                       fontSize:14,
