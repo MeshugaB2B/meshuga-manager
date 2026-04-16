@@ -2582,27 +2582,31 @@ function DashboardImpl() {
                 {messages.length === 0 && (
                   <div style={{textAlign:'center',opacity:.4,padding:40,fontSize:14}}>Aucun message — commencez la conversation !</div>
                 )}
-                {messages.map(function(m){
-                  var myRole = profile && profile.role === 'admin' ? 'edward' : 'emy'
-                  var isMe = m.sender === myRole
-                  return (
-                    <div key={m.id} style={{display:'flex',flexDirection:'column',alignItems:isMe?'flex-end':'flex-start'}}>
-                      <div style={{
-                        maxWidth:'80%',
-                        background:isMe?'#191923':'#F0F0F0',
-                        color:isMe?'#FFEB5A':'#191923',
-                        borderRadius:isMe?'16px 16px 4px 16px':'16px 16px 16px 4px',
-                        padding:'10px 14px',
-                        fontSize:14,
-                        lineHeight:1.4
-                      }}>{m.content}</div>
-                      <div style={{fontSize:10,opacity:.4,marginTop:2,marginLeft:4,marginRight:4}}>
-                        {m.sender === 'edward' ? 'Edward' : 'Emy'} · {new Date(m.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}
-                        {m.read_at && isMe && ' · vu ✓'}
-                      </div>
+              {messages.map(function(m){
+                var myRole = profile && profile.role === 'admin' ? 'edward' : 'emy'
+                var isMe = m.sender === myRole
+                var isEmy = m.sender === 'emy'
+                var dt = new Date(m.created_at)
+                var dateStr = dt.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'})
+                var timeStr = dt.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})
+                return (
+                  <div key={m.id} style={{display:'flex',flexDirection:'column',alignItems:isMe?'flex-end':'flex-start'}}>
+                    <div style={{
+                      maxWidth:'80%',
+                      background:'#FFFFFF',
+                      color:'#191923',
+                      border: '2px solid ' + (isEmy?'#FF82D7':'#191923'),
+                      borderRadius:isMe?'16px 16px 4px 16px':'16px 16px 16px 4px',
+                      padding:'10px 14px',
+                      fontSize:14,
+                      lineHeight:1.4
+                    }}>{m.content}</div>
+                    <div style={{fontSize:10,opacity:.5,marginTop:3,marginLeft:6,marginRight:6,color:'#191923'}}>
+                      {m.sender === 'edward' ? 'Edward' : 'Emy'} · {dateStr} · {timeStr}{m.read_at && isMe && ' · lu ✓'}
                     </div>
-                  )
-                })}
+                  </div>
+                )
+              })}
               </div>
 
               {/* INPUT */}
