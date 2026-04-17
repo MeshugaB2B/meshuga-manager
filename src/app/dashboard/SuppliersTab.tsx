@@ -13,29 +13,29 @@ function sb() {
 export default function SuppliersTab() {
   var [suppliers, setSuppliers] = useState([])
   var [products, setProducts] = useState([])
+  var [articles, setArticles] = useState([])
   var [prices, setPrices] = useState([])
   var [catFilter, setCatFilter] = useState('all')
-  var [selectedSupplier, setSelectedSupplier] = useState(null)
   var [selectedProduct, setSelectedProduct] = useState(null)
   var [loading, setLoading] = useState(true)
   var [uploading, setUploading] = useState(false)
   var [uploadResult, setUploadResult] = useState(null)
   var [classifying, setClassifying] = useState(null)
 
-  useEffect(function() {
-    loadData()
-  }, [])
+  useEffect(function() { loadData() }, [])
 
   function loadData() {
     setLoading(true)
     Promise.all([
       sb().from('suppliers').select('*').order('name'),
       sb().from('products').select('*').order('name'),
+      sb().from('articles').select('*').order('name'),
       sb().from('product_prices').select('*').order('invoice_date', {ascending: true})
     ]).then(function(results) {
       if (results[0].data) setSuppliers(results[0].data)
       if (results[1].data) setProducts(results[1].data)
-      if (results[2].data) setPrices(results[2].data)
+      if (results[2].data) setArticles(results[2].data)
+      if (results[3].data) setPrices(results[3].data)
       setLoading(false)
     })
   }
@@ -59,10 +59,7 @@ export default function SuppliersTab() {
         setUploading(false)
         if (data.matched && data.matched.length > 0) loadData()
       })
-      .catch(function(err) {
-        setUploading(false)
-        alert('Erreur: ' + err.message)
-      })
+      .catch(function(err) { setUploading(false); alert('Erreur: ' + err.message) })
     }
     reader.readAsDataURL(file)
     e.target.value = ''
@@ -70,33 +67,44 @@ export default function SuppliersTab() {
 
   function classifyProduct(item, supplierId, category) {
     setClassifying(item.article)
-    sb().from('products').insert({
-      supplier_id: supplierId,
-      name: item.article,
-      unit: item.unite || 'kg',
-      current_price: item.prix_unitaire_ht || 0,
-      category: category || item.categorie || 'ingredient'
-    }).select().then(function(res) {
-      if (res.data && res.data[0]) {
-        sb().from('product_prices').insert({
-          product_id: res.data[0].id,
-          price: item.prix_unitaire_ht,
-          invoice_date: uploadResult ? uploadResult.date : new Date().toISOString().split('T')[0],
-          invoice_filename: null
-        }).then(function() {
-          setClassifying(null)
-          setUploadResult(function(prev) {
-            if (!prev) return prev
-            var newUnmatched = prev.unmatched.filter(function(u) { return u.article !== item.article })
-            var newMatched = prev.matched.concat([{article: item.article, matched_to: item.article, score: 100, old_price: 0, new_price: item.prix_unitaire_ht, change_pct: 0}])
-            return {fournisseur: prev.fournisseur, date: prev.date, total_ht: prev.total_ht, matched: newMatched, unmatched: newUnmatched, lignes: prev.lignes}
+    var articleName = item.article
+    sb().from('articles').upsert({name: articleName, unit: item.unite || 'kg', category: category || 'ingredient'}, {onConflict: 'name'}).select().then(function(artRes) {
+      var articleId = artRes.data && artRes.data[0] ? artRes.data[0].id : null
+      sb().from('products').insert({
+        supplier_id: supplierId,
+        name: articleName,
+        unit: item.unite || 'kg',
+        current_price: item.prix_unitaire_ht || 0,
+        category: category || item.categorie || 'ingredient',
+        article_id: articleId,
+        is_active: true
+      }).select().then(function(res) {
+        if (res.data && res.data[0] && uploadResult) {
+          sb().from('product_prices').insert({
+            product_id: res.data[0].id,
+            price: item.prix_unitaire_ht,
+            invoice_date: uploadResult.date || new Date().toISOString().split('T')[0]
+          }).then(function() {
+            setClassifying(null)
+            setUploadResult(function(prev) {
+              if (!prev) return prev
+              return {fournisseur: prev.fournisseur, date: prev.date, total_ht: prev.total_ht, supplier_id: prev.supplier_id,
+                matched: prev.matched.concat([{article: item.article, matched_to: item.article, score: 100, old_price: 0, new_price: item.prix_unitaire_ht, change_pct: 0}]),
+                unmatched: prev.unmatched.filter(function(u) { return u.article !== item.article }),
+                lignes: prev.lignes}
+            })
+            loadData()
           })
-          loadData()
-        })
-      } else {
-        setClassifying(null)
-        alert('Erreur insertion')
-      }
+        } else { setClassifying(null) }
+      })
+    })
+  }
+
+  function toggleActive(productId, articleId) {
+    sb().from('products').update({is_active: false}).eq('article_id', articleId).then(function() {
+      sb().from('products').update({is_active: true}).eq('id', productId).then(function() {
+        loadData()
+      })
     })
   }
 
@@ -115,47 +123,76 @@ export default function SuppliersTab() {
     return found
   }
 
-  function getProductPrices(productId) {
-    return prices.filter(function(p) { return p.product_id === productId })
-  }
-
-  function renderPriceChart(priceHistory, unit) {
-    if (!priceHistory || priceHistory.length < 2) return null
-    var vals = priceHistory.map(function(p) { return p.price })
-    var minV = Math.min.apply(null, vals) * 0.95
-    var maxV = Math.max.apply(null, vals) * 1.05
-    var range = maxV - minV || 1
-    var w = 280
-    var h = 120
-    var pad = 30
-    var chartW = w - pad * 2
-    var chartH = h - pad * 2
-    var points = priceHistory.map(function(p, i) {
-      var x = pad + (i / (priceHistory.length - 1)) * chartW
-      var y = pad + chartH - ((p.price - minV) / range) * chartH
-      return x + ',' + y
+  function renderPriceChart(productIds, allPrices, supplierMap) {
+    var seriesMap = {}
+    productIds.forEach(function(pid) {
+      var pp = allPrices.filter(function(p) { return p.product_id === pid })
+      if (pp.length > 0) seriesMap[pid] = pp
     })
-    var areaPoints = points.join(' ') + ' ' + (pad + chartW) + ',' + (pad + chartH) + ' ' + pad + ',' + (pad + chartH)
-    var labels = priceHistory.map(function(p, i) {
-      var x = pad + (i / (priceHistory.length - 1)) * chartW
-      var d = new Date(p.invoice_date)
-      var label = d.toLocaleDateString('fr-FR', {month: 'short', year: '2-digit'})
-      return {x: x, label: label, price: p.price}
+    var allDates = []
+    Object.values(seriesMap).forEach(function(pp) {
+      pp.forEach(function(p) { if (allDates.indexOf(p.invoice_date) === -1) allDates.push(p.invoice_date) })
+    })
+    allDates.sort()
+    if (allDates.length < 2) return null
+    var allVals = []
+    Object.values(seriesMap).forEach(function(pp) { pp.forEach(function(p) { allVals.push(p.price) }) })
+    var minV = Math.min.apply(null, allVals) * 0.92
+    var maxV = Math.max.apply(null, allVals) * 1.08
+    var range = maxV - minV || 1
+    var w = 320, h = 150, pad = 35
+    var chartW = w - pad * 2, chartH = h - pad * 2
+    var colors = ['#FF82D7', '#FFEB5A', '#191923', '#009D3A', '#005FFF']
+    var ci = 0
+    var svgParts = []
+    var legends = []
+    Object.keys(seriesMap).forEach(function(pid) {
+      var pp = seriesMap[pid]
+      var color = colors[ci % colors.length]
+      var supName = supplierMap[pid] || '?'
+      legends.push({color: color, name: supName})
+      var pts = pp.map(function(p) {
+        var di = allDates.indexOf(p.invoice_date)
+        var x = pad + (di / (allDates.length - 1)) * chartW
+        var y = pad + chartH - ((p.price - minV) / range) * chartH
+        return {x: x, y: y, price: p.price}
+      })
+      svgParts.push({points: pts, color: color})
+      ci++
+    })
+    var dateLabels = allDates.map(function(d, i) {
+      var x = pad + (i / (allDates.length - 1)) * chartW
+      var dt = new Date(d)
+      return {x: x, label: dt.toLocaleDateString('fr-FR', {month: 'short', year: '2-digit'})}
     })
     return (
-      <svg viewBox={"0 0 " + w + " " + h} style={{width:'100%',maxWidth:300,height:'auto'}}>
-        <polygon points={areaPoints} fill="#FF82D7" opacity="0.15" />
-        <polyline points={points.join(' ')} fill="none" stroke="#FF82D7" strokeWidth="2.5" />
-        {labels.map(function(l, i) {
-          return (
-            <g key={i}>
-              <circle cx={l.x} cy={pad + chartH - ((l.price - minV) / range) * chartH} r="4" fill="#FFEB5A" stroke="#191923" strokeWidth="2" />
-              <text x={l.x} y={h - 4} textAnchor="middle" style={{fontSize:8,fill:'#888',fontFamily:'Arial Narrow'}}>{l.label}</text>
-              <text x={l.x} y={pad + chartH - ((l.price - minV) / range) * chartH - 8} textAnchor="middle" style={{fontSize:8,fontWeight:900,fill:'#191923',fontFamily:'Arial Narrow'}}>{l.price.toFixed(2)}</text>
+      <div>
+        <div style={{display:'flex',gap:12,marginBottom:8,flexWrap:'wrap'}}>
+          {legends.map(function(l, i) {
+            return <span key={i} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}>
+              <span style={{width:10,height:10,borderRadius:2,background:l.color,border:'1px solid #191923'}}></span>
+              <span style={{fontWeight:700}}>{l.name}</span>
+            </span>
+          })}
+        </div>
+        <svg viewBox={"0 0 " + w + " " + h} style={{width:'100%',maxWidth:340,height:'auto'}}>
+          {svgParts.map(function(s, si) {
+            var polyStr = s.points.map(function(p) { return p.x + ',' + p.y }).join(' ')
+            return <g key={si}>
+              <polyline points={polyStr} fill="none" stroke={s.color} strokeWidth="2.5" />
+              {s.points.map(function(p, pi) {
+                return <g key={pi}>
+                  <circle cx={p.x} cy={p.y} r="4" fill={s.color} stroke="#191923" strokeWidth="1.5" />
+                  <text x={p.x} y={p.y - 8} textAnchor="middle" style={{fontSize:7,fontWeight:900,fill:'#191923',fontFamily:'Arial Narrow'}}>{Number(p.price).toFixed(2)}</text>
+                </g>
+              })}
             </g>
-          )
-        })}
-      </svg>
+          })}
+          {dateLabels.map(function(d, i) {
+            return <text key={i} x={d.x} y={h - 4} textAnchor="middle" style={{fontSize:7,fill:'#888',fontFamily:'Arial Narrow'}}>{d.label}</text>
+          })}
+        </svg>
+      </div>
     )
   }
 
@@ -167,41 +204,71 @@ export default function SuppliersTab() {
   if (selectedProduct) {
     var prod = selectedProduct
     var sup = suppliers.find(function(s) { return s.id === prod.supplier_id })
-    var priceHist = getProductPrices(prod.id)
+    var articleId = prod.article_id
+    var siblingProducts = articleId ? products.filter(function(p) { return p.article_id === articleId }) : [prod]
     var recipes = getRecipesForProduct(prod.name)
-    var lastPrice = priceHist.length > 0 ? priceHist[priceHist.length - 1].price : prod.current_price
-    var firstPrice = priceHist.length > 0 ? priceHist[0].price : prod.current_price
-    var totalPct = firstPrice > 0 ? ((lastPrice - firstPrice) / firstPrice * 100).toFixed(1) : '0'
+    var activeProduct = siblingProducts.find(function(p) { return p.is_active }) || prod
+    var supplierMapForChart = {}
+    siblingProducts.forEach(function(sp) {
+      var s = suppliers.find(function(ss) { return ss.id === sp.supplier_id })
+      supplierMapForChart[sp.id] = s ? s.name : '?'
+    })
+    var allProductIds = siblingProducts.map(function(sp) { return sp.id })
+    var allPricesForArticle = prices.filter(function(p) { return allProductIds.indexOf(p.product_id) > -1 })
+
     return (
       <div>
-        <div onClick={function(){setSelectedProduct(null)}} style={{cursor:'pointer',fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginBottom:12}}>← Retour {sup ? sup.name : ''}</div>
+        <div onClick={function(){setSelectedProduct(null)}} style={{cursor:'pointer',fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginBottom:12}}>← Retour</div>
         <div style={{background:'#fff',border:'2px solid #FF82D7',borderRadius:12,padding:20}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:12}}>
             <div>
               <div style={{fontFamily:'Yellowtail',fontSize:24,color:'#191923'}}>{prod.name}</div>
-              <div style={{fontSize:12,color:'#FF82D7',fontWeight:700,marginTop:2}}>{sup ? sup.name : ''}</div>
+              <div style={{fontSize:12,color:'#888',marginTop:2}}>{prod.category === 'ingredient' ? 'Ingrédient recette' : prod.category === 'packaging' ? 'Packaging' : 'Consommable'}</div>
             </div>
             <div style={{textAlign:'right'}}>
-              <div style={{fontSize:28,fontWeight:900,color:'#191923'}}>{Number(prod.current_price).toFixed(2)} €<span style={{fontSize:14,color:'#888',fontWeight:400}}>/{prod.unit}</span></div>
-              {priceHist.length > 1 && <div style={{fontSize:12,fontWeight:900,color:totalPct > 0 ? '#CC0066' : '#009D3A'}}>{totalPct > 0 ? '+' : ''}{totalPct}%</div>}
+              <div style={{fontSize:28,fontWeight:900,color:'#191923'}}>{Number(activeProduct.current_price).toFixed(2)} €<span style={{fontSize:14,color:'#888',fontWeight:400}}>/{prod.unit}</span></div>
+              <div style={{fontSize:11,color:'#FF82D7',fontWeight:700}}>prix actif</div>
             </div>
           </div>
+
+          <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Fournisseurs</div>
+          {siblingProducts.map(function(sp) {
+            var spSup = suppliers.find(function(ss) { return ss.id === sp.supplier_id })
+            var diff = activeProduct.id !== sp.id && Number(activeProduct.current_price) > 0 ? ((Number(sp.current_price) - Number(activeProduct.current_price)) / Number(activeProduct.current_price) * 100).toFixed(1) : null
+            return (
+              <div key={sp.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',borderRadius:8,marginBottom:4,background:sp.is_active ? '#FFF9D0' : 'transparent',border:sp.is_active ? '2px solid #FFEB5A' : '1px solid #EEE'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  {sp.is_active && <span style={{fontSize:14}}>★</span>}
+                  <span style={{fontWeight:900,fontSize:14}}>{spSup ? spSup.name : '?'}</span>
+                  {sp.is_active && <span style={{fontSize:10,fontWeight:900,color:'#8A6D00',background:'#FFEB5A',padding:'2px 8px',borderRadius:10}}>ACTIF</span>}
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                  <span style={{fontWeight:900,fontSize:14}}>{Number(sp.current_price).toFixed(2)} €/{sp.unit}</span>
+                  {diff !== null && <span style={{fontSize:11,fontWeight:900,color:diff > 0 ? '#CC0066' : '#009D3A'}}>{diff > 0 ? '+' : ''}{diff}%</span>}
+                  {!sp.is_active && <button onClick={function(){toggleActive(sp.id, articleId)}} style={{padding:'3px 10px',fontSize:10,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>ACTIVER</button>}
+                </div>
+              </div>
+            )
+          })}
+          {siblingProducts.length === 1 && <div style={{fontSize:12,color:'#888',marginTop:4}}>Un seul fournisseur pour cet article. Uploadez une facture d'un autre fournisseur pour comparer.</div>}
+
           <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Utilisé dans</div>
           {recipes.length > 0 ? recipes.map(function(r) {
             return <span key={r} style={{display:'inline-block',padding:'5px 12px',borderRadius:20,fontSize:11,fontWeight:900,margin:3,background:'#FFEB5A',color:'#191923',border:'2px solid #191923',textTransform:'uppercase'}}>{r}</span>
           }) : <span style={{fontSize:13,color:'#888',fontWeight:700}}>Hors recettes</span>}
+
           <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Évolution du prix</div>
-          {priceHist.length >= 2 ? renderPriceChart(priceHist, prod.unit) : <div style={{fontSize:13,color:'#888'}}>Pas encore d'historique</div>}
+          {allPricesForArticle.length >= 2 ? renderPriceChart(allProductIds, prices, supplierMapForChart) : <div style={{fontSize:13,color:'#888'}}>Pas encore d'historique — uploadez des factures pour alimenter le graph</div>}
+
           <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Historique factures</div>
-          {priceHist.length > 0 ? priceHist.slice().reverse().map(function(ph, i) {
-            var prev = i < priceHist.length - 1 ? priceHist[priceHist.length - 2 - i] : null
-            var diff = prev ? ((ph.price - prev.price) / prev.price * 100) : 0
+          {allPricesForArticle.length > 0 ? allPricesForArticle.slice().reverse().map(function(ph, i) {
+            var phSup = supplierMapForChart[ph.product_id] || '?'
             return (
-              <div key={ph.id} style={{display:'flex',justifyContent:'space-between',fontSize:13,padding:'8px 0',borderBottom:'1px solid #F5F5F5',alignItems:'center'}}>
+              <div key={ph.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'6px 0',borderBottom:'1px solid #F5F5F5',alignItems:'center'}}>
                 <span style={{fontWeight:700,minWidth:80}}>{new Date(ph.invoice_date).toLocaleDateString('fr-FR')}</span>
+                <span style={{fontSize:11,color:'#888'}}>{phSup}</span>
                 <span style={{fontWeight:900}}>{Number(ph.price).toFixed(2)} €/{prod.unit}</span>
-                {prev ? <span style={{fontWeight:900,color:diff > 0 ? '#CC0066' : diff < 0 ? '#009D3A' : '#888'}}>{diff > 0 ? '+' : ''}{diff.toFixed(1)}%</span> : <span style={{color:'#888'}}>—</span>}
-                {ph.invoice_filename && <span style={{fontSize:11,color:'#888'}}>{ph.invoice_filename}</span>}
+                {ph.invoice_filename && <span style={{fontSize:10,color:'#888'}}>{ph.invoice_filename}</span>}
               </div>
             )
           }) : <div style={{fontSize:13,color:'#888'}}>Aucune facture</div>}
@@ -229,42 +296,34 @@ export default function SuppliersTab() {
       {uploadResult && (
         <div style={{background:'#fff',border:'2px solid #FFEB5A',borderRadius:12,padding:16,marginBottom:14}}>
           <div style={{fontFamily:'Yellowtail',fontSize:18,color:'#191923',marginBottom:8}}>Résultat import — {uploadResult.fournisseur}</div>
-          <div style={{fontSize:12,color:'#888',marginBottom:10}}>{uploadResult.date} · {uploadResult.total_ht ? uploadResult.total_ht.toFixed(2) + ' € HT' : ''}</div>
-
+          <div style={{fontSize:12,color:'#888',marginBottom:10}}>{uploadResult.date} · {uploadResult.total_ht ? Number(uploadResult.total_ht).toFixed(2) + ' € HT' : ''}</div>
           {uploadResult.matched && uploadResult.matched.length > 0 && (
             <div style={{marginBottom:12}}>
-              <div style={{fontSize:12,fontWeight:900,color:'#009D3A',marginBottom:6}}>✅ {uploadResult.matched.length} produit{uploadResult.matched.length > 1 ? 's' : ''} reconnu{uploadResult.matched.length > 1 ? 's' : ''} — prix mis à jour</div>
+              <div style={{fontSize:12,fontWeight:900,color:'#009D3A',marginBottom:6}}>✅ {uploadResult.matched.length} produit{uploadResult.matched.length > 1 ? 's' : ''} — prix mis à jour</div>
               {uploadResult.matched.map(function(m, i) {
                 return (
                   <div key={i} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'4px 0',borderBottom:'1px solid #F0F0F0'}}>
                     <span style={{fontWeight:700}}>{m.article} → {m.matched_to}</span>
-                    <span style={{fontWeight:900,color:m.change_pct > 0 ? '#CC0066' : m.change_pct < 0 ? '#009D3A' : '#888'}}>{Number(m.old_price).toFixed(2)} → {Number(m.new_price).toFixed(2)} €{m.change_pct !== 0 ? ' (' + (m.change_pct > 0 ? '+' : '') + m.change_pct.toFixed(1) + '%)' : ''}</span>
+                    <span style={{fontWeight:900,color:m.change_pct > 0 ? '#CC0066' : m.change_pct < 0 ? '#009D3A' : '#888'}}>{Number(m.old_price).toFixed(2)} → {Number(m.new_price).toFixed(2)} €{m.change_pct !== 0 ? ' (' + (m.change_pct > 0 ? '+' : '') + Number(m.change_pct).toFixed(1) + '%)' : ''}</span>
                   </div>
                 )
               })}
             </div>
           )}
-
           {uploadResult.unmatched && uploadResult.unmatched.length > 0 && (
             <div>
               <div style={{fontSize:12,fontWeight:900,color:'#CC0066',marginBottom:6}}>⚠️ {uploadResult.unmatched.length} produit{uploadResult.unmatched.length > 1 ? 's' : ''} non reconnu{uploadResult.unmatched.length > 1 ? 's' : ''}</div>
               {uploadResult.unmatched.map(function(u, i) {
                 return (
                   <div key={i} style={{background:'#FFF9D0',border:'2px solid #FFEB5A',borderRadius:8,padding:10,marginBottom:8}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                      <div>
-                        <div style={{fontWeight:900,fontSize:13}}>📦 {u.article}</div>
-                        <div style={{fontSize:11,color:'#888'}}>{u.article_original} · {u.prix_unitaire_ht ? u.prix_unitaire_ht.toFixed(2) : '?'} €/{u.unite}</div>
-                      </div>
-                    </div>
+                    <div style={{fontWeight:900,fontSize:13}}>📦 {u.article}</div>
+                    <div style={{fontSize:11,color:'#888'}}>{u.article_original} · {u.prix_unitaire_ht ? Number(u.prix_unitaire_ht).toFixed(2) : '?'} €/{u.unite}</div>
                     <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap'}}>
                       {uploadResult.supplier_id && <button disabled={classifying===u.article} onClick={function(){classifyProduct(u, uploadResult.supplier_id, u.categorie)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>
                         {classifying===u.article ? '...' : '✅ Ajouter (' + (u.categorie || 'ingredient') + ')'}
                       </button>}
                       {suppliers.filter(function(s){return s.id !== uploadResult.supplier_id}).slice(0, 3).map(function(s) {
-                        return <button key={s.id} disabled={classifying===u.article} onClick={function(){classifyProduct(u, s.id, u.categorie)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #DDD',background:'#fff',cursor:'pointer'}}>
-                          {s.name}
-                        </button>
+                        return <button key={s.id} disabled={classifying===u.article} onClick={function(){classifyProduct(u, s.id, u.categorie)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #DDD',background:'#fff',cursor:'pointer'}}>{s.name}</button>
                       })}
                     </div>
                   </div>
@@ -272,10 +331,7 @@ export default function SuppliersTab() {
               })}
             </div>
           )}
-
-          {uploadResult.matched && uploadResult.matched.length > 0 && (!uploadResult.unmatched || uploadResult.unmatched.length === 0) && (
-            <button onClick={function(){setUploadResult(null)}} style={{padding:'6px 16px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#FFEB5A',color:'#191923',cursor:'pointer',marginTop:8}}>OK, FERMER</button>
-          )}
+          {(!uploadResult.unmatched || uploadResult.unmatched.length === 0) && <button onClick={function(){setUploadResult(null)}} style={{padding:'6px 16px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#FFEB5A',color:'#191923',cursor:'pointer',marginTop:8}}>OK, FERMER</button>}
         </div>
       )}
 
@@ -286,17 +342,22 @@ export default function SuppliersTab() {
           <div key={s.id} style={{background:'#fff',border:'2px solid #191923',borderRadius:12,padding:16,marginBottom:14}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingBottom:10,borderBottom:'2px solid #FFEB5A',marginBottom:8}}>
               <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <span style={{fontWeight:900,fontSize:16,textTransform:'uppercase',letterSpacing:0.5}}>{s.name}</span>
+                <span style={{fontWeight:900,fontSize:16,textTransform:'uppercase'}}>{s.name}</span>
                 <span style={{display:'inline-block',padding:'3px 10px',borderRadius:20,fontSize:10,fontWeight:900,background:catBadge.bg,color:catBadge.color,textTransform:'uppercase'}}>{catBadge.label}</span>
               </div>
               <span style={{fontFamily:'Yellowtail',fontSize:12,color:'#888'}}>{supProducts.length} produits</span>
             </div>
             {supProducts.map(function(p) {
               var recipes = getRecipesForProduct(p.name)
+              var sibCount = p.article_id ? products.filter(function(pp) { return pp.article_id === p.article_id }).length : 1
               return (
                 <div key={p.id} onClick={function(){setSelectedProduct(p)}} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 8px',borderBottom:'1px solid #F0F0F0',cursor:'pointer',borderRadius:6}} onMouseOver={function(e){e.currentTarget.style.background='#FFEB5A'}} onMouseOut={function(e){e.currentTarget.style.background='transparent'}}>
                   <div>
-                    <div style={{fontWeight:900,fontSize:14}}>{p.name}</div>
+                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                      <span style={{fontWeight:900,fontSize:14}}>{p.name}</span>
+                      {p.is_active && sibCount > 1 && <span style={{fontSize:9,fontWeight:900,color:'#8A6D00',background:'#FFEB5A',padding:'1px 6px',borderRadius:8}}>★ ACTIF</span>}
+                      {sibCount > 1 && <span style={{fontSize:9,color:'#888'}}>{sibCount} fourn.</span>}
+                    </div>
                     <div style={{marginTop:3}}>
                       {recipes.length > 0 ? recipes.slice(0, 4).map(function(r) {
                         return <span key={r} style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,margin:2,background:'#FFF3B0',color:'#8A6D00',border:'1px solid #EED980',textTransform:'uppercase'}}>{r}</span>
