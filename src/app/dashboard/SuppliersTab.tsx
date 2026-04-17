@@ -4,10 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { RECIPES_DATA } from './data'
 
 function sb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-  )
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
 }
 
 export default function SuppliersTab() {
@@ -21,6 +18,9 @@ export default function SuppliersTab() {
   var [uploading, setUploading] = useState(false)
   var [uploadResult, setUploadResult] = useState(null)
   var [classifying, setClassifying] = useState(null)
+  var [newSupName, setNewSupName] = useState('')
+  var [newSupCat, setNewSupCat] = useState('ingredient')
+  var [showNewSup, setShowNewSup] = useState(null)
 
   useEffect(function() { loadData() }, [])
 
@@ -52,46 +52,68 @@ export default function SuppliersTab() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({pdfBase64: base64, fileName: file.name, mediaType: file.type})
-      })
-      .then(function(r) { return r.json() })
-      .then(function(data) {
+      }).then(function(r) { return r.json() }).then(function(data) {
         setUploadResult(data)
         setUploading(false)
         if (data.matched && data.matched.length > 0) loadData()
-      })
-      .catch(function(err) { setUploading(false); alert('Erreur: ' + err.message) })
+      }).catch(function(err) { setUploading(false); alert('Erreur: ' + err.message) })
     }
     reader.readAsDataURL(file)
     e.target.value = ''
   }
 
+  function confirmSuggestion(item) {
+    setClassifying(item.article)
+    sb().from('product_prices').insert({
+      product_id: item.suggested_match_id, price: item.prix_unitaire_ht,
+      invoice_date: uploadResult ? uploadResult.date : new Date().toISOString().split('T')[0]
+    }).then(function() {
+      sb().from('products').update({ current_price: item.prix_unitaire_ht }).eq('id', item.suggested_match_id).then(function() {
+        setClassifying(null)
+        setUploadResult(function(prev) {
+          if (!prev) return prev
+          return Object.assign({}, prev, {
+            matched: prev.matched.concat([{article: item.article, matched_to: item.suggested_match, score: item.suggested_score, old_price: 0, new_price: item.prix_unitaire_ht, change_pct: 0}]),
+            suggestions: prev.suggestions.filter(function(s) { return s.article !== item.article })
+          })
+        })
+        loadData()
+      })
+    })
+  }
+
+  function rejectSuggestion(item) {
+    setUploadResult(function(prev) {
+      if (!prev) return prev
+      return Object.assign({}, prev, {
+        suggestions: prev.suggestions.filter(function(s) { return s.article !== item.article }),
+        unmatched: prev.unmatched.concat([{article: item.article, article_original: item.article_original, categorie: item.categorie, unite: item.unite, prix_unitaire_ht: item.prix_unitaire_ht, conditionnement: item.conditionnement}])
+      })
+    })
+  }
+
   function classifyProduct(item, supplierId, category) {
     setClassifying(item.article)
-    var articleName = item.article
-    sb().from('articles').upsert({name: articleName, unit: item.unite || 'kg', category: category || 'ingredient'}, {onConflict: 'name'}).select().then(function(artRes) {
+    sb().from('articles').upsert({name: item.article, unit: item.unite || 'kg', category: category || 'ingredient'}, {onConflict: 'name'}).select().then(function(artRes) {
       var articleId = artRes.data && artRes.data[0] ? artRes.data[0].id : null
       sb().from('products').insert({
-        supplier_id: supplierId,
-        name: articleName,
-        unit: item.unite || 'kg',
-        current_price: item.prix_unitaire_ht || 0,
-        category: category || item.categorie || 'ingredient',
-        article_id: articleId,
-        is_active: true
+        supplier_id: supplierId, name: item.article, unit: item.unite || 'kg',
+        current_price: item.prix_unitaire_ht || 0, category: category || item.categorie || 'ingredient',
+        article_id: articleId, is_active: true
       }).select().then(function(res) {
-        if (res.data && res.data[0] && uploadResult) {
+        if (res.data && res.data[0]) {
           sb().from('product_prices').insert({
-            product_id: res.data[0].id,
-            price: item.prix_unitaire_ht,
-            invoice_date: uploadResult.date || new Date().toISOString().split('T')[0]
+            product_id: res.data[0].id, price: item.prix_unitaire_ht,
+            invoice_date: uploadResult ? uploadResult.date : new Date().toISOString().split('T')[0]
           }).then(function() {
             setClassifying(null)
+            setShowNewSup(null)
             setUploadResult(function(prev) {
               if (!prev) return prev
-              return {fournisseur: prev.fournisseur, date: prev.date, total_ht: prev.total_ht, supplier_id: prev.supplier_id,
+              return Object.assign({}, prev, {
                 matched: prev.matched.concat([{article: item.article, matched_to: item.article, score: 100, old_price: 0, new_price: item.prix_unitaire_ht, change_pct: 0}]),
-                unmatched: prev.unmatched.filter(function(u) { return u.article !== item.article }),
-                lignes: prev.lignes}
+                unmatched: prev.unmatched.filter(function(u) { return u.article !== item.article })
+              })
             })
             loadData()
           })
@@ -100,11 +122,21 @@ export default function SuppliersTab() {
     })
   }
 
+  function createSupplierAndClassify(item) {
+    if (!newSupName.trim()) return
+    setClassifying(item.article)
+    sb().from('suppliers').insert({name: newSupName.trim(), category: newSupCat}).select().then(function(supRes) {
+      if (supRes.data && supRes.data[0]) {
+        classifyProduct(item, supRes.data[0].id, item.categorie)
+        setNewSupName('')
+        setNewSupCat('ingredient')
+      } else { setClassifying(null) }
+    })
+  }
+
   function toggleActive(productId, articleId) {
     sb().from('products').update({is_active: false}).eq('article_id', articleId).then(function() {
-      sb().from('products').update({is_active: true}).eq('id', productId).then(function() {
-        loadData()
-      })
+      sb().from('products').update({is_active: true}).eq('id', productId).then(function() { loadData() })
     })
   }
 
@@ -295,43 +327,107 @@ export default function SuppliersTab() {
 
       {uploadResult && (
         <div style={{background:'#fff',border:'2px solid #FFEB5A',borderRadius:12,padding:16,marginBottom:14}}>
-          <div style={{fontFamily:'Yellowtail',fontSize:18,color:'#191923',marginBottom:8}}>Résultat import — {uploadResult.fournisseur}</div>
-          <div style={{fontSize:12,color:'#888',marginBottom:10}}>{uploadResult.date} · {uploadResult.total_ht ? Number(uploadResult.total_ht).toFixed(2) + ' € HT' : ''}</div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap'}}>
+            <div>
+              <div style={{fontFamily:'Yellowtail',fontSize:18,color:'#191923'}}>Résultat import</div>
+              <div style={{fontSize:13,fontWeight:700,color:'#191923'}}>{uploadResult.fournisseur}{uploadResult.fournisseur_matched ? ' → ' + uploadResult.fournisseur_matched : ''}{!uploadResult.supplier_id && <span style={{color:'#CC0066',marginLeft:6}}>⚠️ Fournisseur non reconnu</span>}</div>
+            </div>
+            <div style={{fontSize:12,color:'#888'}}>{uploadResult.date} · {uploadResult.total_ht ? Number(uploadResult.total_ht).toFixed(2) + ' € HT' : ''}</div>
+          </div>
+
+          {!uploadResult.supplier_id && (
+            <div style={{background:'#FFE0F0',border:'2px solid #FF82D7',borderRadius:8,padding:12,marginTop:10}}>
+              <div style={{fontSize:12,fontWeight:900,color:'#993560',marginBottom:6}}>Assigner à un fournisseur existant ou créer :</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                {suppliers.map(function(s) {
+                  return <button key={s.id} onClick={function(){setUploadResult(function(prev){return Object.assign({}, prev, {supplier_id: s.id, fournisseur_matched: s.name})})}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #191923',background:'#fff',cursor:'pointer'}}>{s.name}</button>
+                })}
+                <button onClick={function(){setShowNewSup('invoice')}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #FF82D7',background:'#FF82D7',color:'#fff',cursor:'pointer'}}>+ NOUVEAU</button>
+              </div>
+              {showNewSup === 'invoice' && (
+                <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center',flexWrap:'wrap'}}>
+                  <input value={newSupName} onChange={function(e){setNewSupName(e.target.value)}} placeholder="Nom fournisseur" style={{padding:'4px 10px',fontSize:12,border:'2px solid #191923',borderRadius:8,fontWeight:700}} />
+                  <select value={newSupCat} onChange={function(e){setNewSupCat(e.target.value)}} style={{padding:'4px 8px',fontSize:11,border:'1px solid #191923',borderRadius:8}}>
+                    <option value="ingredient">Ingrédient</option>
+                    <option value="packaging">Packaging</option>
+                    <option value="consommable">Consommable</option>
+                  </select>
+                  <button onClick={function(){if(!newSupName.trim())return;sb().from('suppliers').insert({name:newSupName.trim(),category:newSupCat}).select().then(function(r){if(r.data&&r.data[0]){setUploadResult(function(prev){return Object.assign({},prev,{supplier_id:r.data[0].id,fournisseur_matched:r.data[0].name})});setShowNewSup(null);setNewSupName('');loadData()}})}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#FFEB5A',cursor:'pointer'}}>CRÉER</button>
+                </div>
+              )}
+            </div>
+          )}
+
           {uploadResult.matched && uploadResult.matched.length > 0 && (
-            <div style={{marginBottom:12}}>
+            <div style={{marginTop:10,marginBottom:12}}>
               <div style={{fontSize:12,fontWeight:900,color:'#009D3A',marginBottom:6}}>✅ {uploadResult.matched.length} produit{uploadResult.matched.length > 1 ? 's' : ''} — prix mis à jour</div>
               {uploadResult.matched.map(function(m, i) {
                 return (
                   <div key={i} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'4px 0',borderBottom:'1px solid #F0F0F0'}}>
-                    <span style={{fontWeight:700}}>{m.article} → {m.matched_to}</span>
+                    <span style={{fontWeight:700}}>{m.article}{m.matched_to !== m.article ? ' → ' + m.matched_to : ''}</span>
                     <span style={{fontWeight:900,color:m.change_pct > 0 ? '#CC0066' : m.change_pct < 0 ? '#009D3A' : '#888'}}>{Number(m.old_price).toFixed(2)} → {Number(m.new_price).toFixed(2)} €{m.change_pct !== 0 ? ' (' + (m.change_pct > 0 ? '+' : '') + Number(m.change_pct).toFixed(1) + '%)' : ''}</span>
                   </div>
                 )
               })}
             </div>
           )}
-          {uploadResult.unmatched && uploadResult.unmatched.length > 0 && (
-            <div>
-              <div style={{fontSize:12,fontWeight:900,color:'#CC0066',marginBottom:6}}>⚠️ {uploadResult.unmatched.length} produit{uploadResult.unmatched.length > 1 ? 's' : ''} non reconnu{uploadResult.unmatched.length > 1 ? 's' : ''}</div>
-              {uploadResult.unmatched.map(function(u, i) {
+
+          {uploadResult.suggestions && uploadResult.suggestions.length > 0 && (
+            <div style={{marginTop:10,marginBottom:12}}>
+              <div style={{fontSize:12,fontWeight:900,color:'#B8920A',marginBottom:6}}>🔍 {uploadResult.suggestions.length} suggestion{uploadResult.suggestions.length > 1 ? 's' : ''} — confirmez</div>
+              {uploadResult.suggestions.map(function(s, i) {
                 return (
-                  <div key={i} style={{background:'#FFF9D0',border:'2px solid #FFEB5A',borderRadius:8,padding:10,marginBottom:8}}>
-                    <div style={{fontWeight:900,fontSize:13}}>📦 {u.article}</div>
-                    <div style={{fontSize:11,color:'#888'}}>{u.article_original} · {u.prix_unitaire_ht ? Number(u.prix_unitaire_ht).toFixed(2) : '?'} €/{u.unite}</div>
-                    <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap'}}>
-                      {uploadResult.supplier_id && <button disabled={classifying===u.article} onClick={function(){classifyProduct(u, uploadResult.supplier_id, u.categorie)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>
-                        {classifying===u.article ? '...' : '✅ Ajouter (' + (u.categorie || 'ingredient') + ')'}
-                      </button>}
-                      {suppliers.filter(function(s){return s.id !== uploadResult.supplier_id}).slice(0, 3).map(function(s) {
-                        return <button key={s.id} disabled={classifying===u.article} onClick={function(){classifyProduct(u, s.id, u.categorie)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #DDD',background:'#fff',cursor:'pointer'}}>{s.name}</button>
-                      })}
+                  <div key={i} style={{background:'#FFF9D0',border:'2px solid #FFEB5A',borderRadius:8,padding:10,marginBottom:6}}>
+                    <div style={{fontSize:13,fontWeight:900}}>"{s.article}" → {s.suggested_match} ?</div>
+                    <div style={{fontSize:11,color:'#888'}}>{s.article_original} · {Number(s.prix_unitaire_ht).toFixed(2)} €/{s.unite}</div>
+                    <div style={{display:'flex',gap:6,marginTop:6}}>
+                      <button disabled={classifying===s.article} onClick={function(){confirmSuggestion(s)}} style={{padding:'4px 14px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #009D3A',background:'#fff',color:'#009D3A',cursor:'pointer'}}>{classifying===s.article ? '...' : '✅ OUI'}</button>
+                      <button onClick={function(){rejectSuggestion(s)}} style={{padding:'4px 14px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #CC0066',background:'#fff',color:'#CC0066',cursor:'pointer'}}>✗ NON</button>
                     </div>
                   </div>
                 )
               })}
             </div>
           )}
-          {(!uploadResult.unmatched || uploadResult.unmatched.length === 0) && <button onClick={function(){setUploadResult(null)}} style={{padding:'6px 16px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#FFEB5A',color:'#191923',cursor:'pointer',marginTop:8}}>OK, FERMER</button>}
+
+          {uploadResult.unmatched && uploadResult.unmatched.length > 0 && (
+            <div style={{marginTop:10}}>
+              <div style={{fontSize:12,fontWeight:900,color:'#CC0066',marginBottom:6}}>⚠️ {uploadResult.unmatched.length} non reconnu{uploadResult.unmatched.length > 1 ? 's' : ''}</div>
+              {uploadResult.unmatched.map(function(u, i) {
+                return (
+                  <div key={i} style={{background:'#FFF9D0',border:'2px solid #FFEB5A',borderRadius:8,padding:10,marginBottom:8}}>
+                    <div style={{fontWeight:900,fontSize:13}}>📦 {u.article}</div>
+                    <div style={{fontSize:11,color:'#888'}}>{u.article_original} · {u.prix_unitaire_ht ? Number(u.prix_unitaire_ht).toFixed(2) : '?'} €/{u.unite}</div>
+                    <div style={{fontSize:11,fontWeight:700,color:'#191923',marginTop:6}}>Ajouter chez :</div>
+                    <div style={{display:'flex',gap:6,marginTop:4,flexWrap:'wrap'}}>
+                      {uploadResult.supplier_id && <button disabled={classifying===u.article} onClick={function(){classifyProduct(u, uploadResult.supplier_id, u.categorie)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#FFEB5A',cursor:'pointer'}}>
+                        {classifying===u.article ? '...' : uploadResult.fournisseur_matched || 'Ce fournisseur'}
+                      </button>}
+                      {suppliers.filter(function(s){return s.id !== uploadResult.supplier_id}).map(function(s) {
+                        return <button key={s.id} disabled={classifying===u.article} onClick={function(){classifyProduct(u, s.id, u.categorie)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #DDD',background:'#fff',cursor:'pointer'}}>{s.name}</button>
+                      })}
+                      <button onClick={function(){setShowNewSup(u.article)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #FF82D7',background:'#FF82D7',color:'#fff',cursor:'pointer'}}>+ NOUVEAU</button>
+                    </div>
+                    {showNewSup === u.article && (
+                      <div style={{display:'flex',gap:6,marginTop:8,alignItems:'center',flexWrap:'wrap'}}>
+                        <input value={newSupName} onChange={function(e){setNewSupName(e.target.value)}} placeholder="Nom fournisseur" style={{padding:'4px 10px',fontSize:12,border:'2px solid #191923',borderRadius:8,fontWeight:700}} />
+                        <select value={newSupCat} onChange={function(e){setNewSupCat(e.target.value)}} style={{padding:'4px 8px',fontSize:11,border:'1px solid #191923',borderRadius:8}}>
+                          <option value="ingredient">Ingrédient</option>
+                          <option value="packaging">Packaging</option>
+                          <option value="consommable">Consommable</option>
+                        </select>
+                        <button onClick={function(){createSupplierAndClassify(u)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#FFEB5A',cursor:'pointer'}}>CRÉER</button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {uploadResult.matched && uploadResult.matched.length > 0 && (!uploadResult.unmatched || uploadResult.unmatched.length === 0) && (!uploadResult.suggestions || uploadResult.suggestions.length === 0) && (
+            <button onClick={function(){setUploadResult(null)}} style={{padding:'6px 16px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#FFEB5A',color:'#191923',cursor:'pointer',marginTop:10}}>OK, FERMER</button>
+          )}
         </div>
       )}
 
@@ -347,6 +443,7 @@ export default function SuppliersTab() {
               </div>
               <span style={{fontFamily:'Yellowtail',fontSize:12,color:'#888'}}>{supProducts.length} produits</span>
             </div>
+            {supProducts.length === 0 && <div style={{fontSize:13,color:'#888',padding:'8px 0'}}>Aucun produit — uploadez une facture pour alimenter</div>}
             {supProducts.map(function(p) {
               var recipes = getRecipesForProduct(p.name)
               var sibCount = p.article_id ? products.filter(function(pp) { return pp.article_id === p.article_id }).length : 1
@@ -362,11 +459,10 @@ export default function SuppliersTab() {
                       {recipes.length > 0 ? recipes.slice(0, 4).map(function(r) {
                         return <span key={r} style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,margin:2,background:'#FFF3B0',color:'#8A6D00',border:'1px solid #EED980',textTransform:'uppercase'}}>{r}</span>
                       }) : <span style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,background:'#E8E8E8',color:'#555',border:'1px solid #CCC',textTransform:'uppercase'}}>Hors recettes</span>}
-                      {recipes.length > 4 && <span style={{fontSize:10,color:'#888',marginLeft:4}}>+{recipes.length - 4}</span>}
                     </div>
                   </div>
                   <div style={{textAlign:'right'}}>
-                    <span style={{fontSize:16,fontWeight:900,color:'#191923'}}>{Number(p.current_price).toFixed(2)} €</span>
+                    <span style={{fontSize:16,fontWeight:900}}>{Number(p.current_price).toFixed(2)} €</span>
                     <span style={{fontSize:11,color:'#888',marginLeft:2}}>/{p.unit}</span>
                   </div>
                 </div>
