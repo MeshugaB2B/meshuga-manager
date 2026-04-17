@@ -32,6 +32,21 @@ export default function FoodCostAlertsWidget() {
     return found
   }
 
+  function getBaselinePrice(productName) {
+    var baseline = null
+    RECIPES_DATA.forEach(function(r) {
+      if (!r.ingredients) return
+      r.ingredients.forEach(function(ing) {
+        var ingName = (ing.article || '').toLowerCase()
+        var pName = productName.toLowerCase()
+        if (ingName === pName || ingName.indexOf(pName) > -1 || pName.indexOf(ingName) > -1) {
+          if (!baseline && ing.prix_achat) baseline = ing.prix_achat
+        }
+      })
+    })
+    return baseline
+  }
+
   function loadChanges() {
     Promise.all([
       sb().from('products').select('id, name, unit, current_price, supplier_id, category'),
@@ -42,14 +57,28 @@ export default function FoodCostAlertsWidget() {
       var prices = results[1].data || []
       var suppliers = results[2].data || []
       var supMap = {}
-      suppliers.filter(function(s) { return !s.archived }).forEach(function(s) { supMap[s.id] = s.name })
+      suppliers.forEach(function(s) { supMap[s.id] = s.name })
 
       var allChanges = []
       products.forEach(function(p) {
         if (!supMap[p.supplier_id]) return
         if (p.category !== 'ingredient') return
         var pp = prices.filter(function(pr) { return pr.product_id === p.id })
-        if (pp.length < 2) return
+        if (pp.length < 2) {
+          var baseline = getBaselinePrice(p.name)
+          var current = Number(p.current_price)
+          if (baseline && Math.abs((current - baseline) / baseline * 100) >= 2) {
+            var bpct = ((current - baseline) / baseline * 100)
+            var recipes2 = getRecipesForProduct(p.name)
+            allChanges.push({
+              id: p.id, name: p.name, supplier: supMap[p.supplier_id], unit: p.unit,
+              oldPrice: baseline, newPrice: current,
+              changePct: bpct, lastDate: pp.length > 0 ? pp[0].invoice_date : '', prevDate: 'ref.',
+              recipes: recipes2, allPrices: pp
+            })
+          }
+          return
+        }
         var latest = pp[0]
         var previous = pp[1]
         var changePct = previous.price > 0 ? ((latest.price - previous.price) / previous.price * 100) : 0
@@ -148,14 +177,14 @@ export default function FoodCostAlertsWidget() {
             var bg = h.changePct > 15 ? '#FFE0E0' : h.changePct > 5 ? '#FFF0E0' : '#FFF9D0'
             var borderColor = h.changePct > 15 ? '#CC0066' : h.changePct > 5 ? '#E67300' : '#B8920A'
             return (
-              <div key={i} onClick={function(){openDetail(h)}} style={{background:bg,border:'1px solid ' + borderColor,borderRadius:8,padding:'8px 10px',marginBottom:6,cursor:'pointer'}}>
+              <div key={i} onClick={function(){openDetail(h)}} style={{background:bg,border:'1px solid ' + borderColor,borderRadius:8,padding:'5px 8px',marginBottom:3,cursor:'pointer'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                   <div>
-                    <div style={{fontWeight:900,fontSize:13}}>{h.name}</div>
+                    <div style={{fontWeight:900,fontSize:11}}>{h.name}</div>
                     <div style={{fontSize:10,color:'#888'}}>{h.supplier}</div>
                   </div>
                   <div style={{textAlign:'right'}}>
-                    <div style={{fontSize:14,fontWeight:900,color:borderColor}}>+{h.changePct.toFixed(1)}%</div>
+                    <div style={{fontSize:12,fontWeight:900,color:borderColor}}>+{h.changePct.toFixed(1)}%</div>
                     <div style={{fontSize:10,color:'#888'}}>{h.oldPrice.toFixed(2)} → {h.newPrice.toFixed(2)} €/{h.unit}</div>
                   </div>
                 </div>
@@ -176,14 +205,14 @@ export default function FoodCostAlertsWidget() {
           {baisse.length === 0 && <div style={{fontSize:12,color:'#888',padding:8}}>Aucune baisse détectée</div>}
           {baisse.map(function(b, i) {
             return (
-              <div key={i} onClick={function(){openDetail(b)}} style={{background:'#E8FFE8',border:'1px solid #009D3A',borderRadius:8,padding:'8px 10px',marginBottom:6,cursor:'pointer'}}>
+              <div key={i} onClick={function(){openDetail(b)}} style={{background:'#E8FFE8',border:'1px solid #009D3A',borderRadius:8,padding:'5px 8px',marginBottom:3,cursor:'pointer'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                   <div>
-                    <div style={{fontWeight:900,fontSize:13}}>{b.name}</div>
+                    <div style={{fontWeight:900,fontSize:11}}>{b.name}</div>
                     <div style={{fontSize:10,color:'#888'}}>{b.supplier}</div>
                   </div>
                   <div style={{textAlign:'right'}}>
-                    <div style={{fontSize:14,fontWeight:900,color:'#009D3A'}}>{b.changePct.toFixed(1)}%</div>
+                    <div style={{fontSize:12,fontWeight:900,color:'#009D3A'}}>{b.changePct.toFixed(1)}%</div>
                     <div style={{fontSize:10,color:'#888'}}>{b.oldPrice.toFixed(2)} → {b.newPrice.toFixed(2)} €/{b.unit}</div>
                   </div>
                 </div>
