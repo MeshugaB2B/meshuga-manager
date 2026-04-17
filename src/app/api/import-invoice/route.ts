@@ -106,19 +106,44 @@ Retourne UNIQUEMENT un JSON valide (sans markdown) :
 
       ;(allProducts || []).forEach(function(ep) {
         var epLower = ep.name.toLowerCase()
-        if (epLower === articleLower) { bestMatch = ep; bestScore = 100 }
-        else if (bestScore < 80 && (epLower.indexOf(articleLower) > -1 || articleLower.indexOf(epLower) > -1)) { bestMatch = ep; bestScore = 80 }
-        else if (bestScore < 60) {
-          var words = articleLower.split(' ')
-          var matchWords = 0
-          words.forEach(function(w) { if (w.length > 2 && epLower.indexOf(w) > -1) matchWords++ })
-          var epWords = epLower.split(' ')
-          epWords.forEach(function(w) { if (w.length > 2 && articleLower.indexOf(w) > -1) matchWords++ })
-          var totalWords = words.length + epWords.length
-          var score = totalWords > 0 ? (matchWords / totalWords) * 100 : 0
+        if (epLower === articleLower) { bestMatch = ep; bestScore = 100; return }
+        if (epLower.indexOf(articleLower) > -1 || articleLower.indexOf(epLower) > -1) {
+          if (bestScore < 90) { bestMatch = ep; bestScore = 90 }
+          return
+        }
+        var artWords = articleLower.split(/[\s,.-]+/).filter(function(w) { return w.length > 2 })
+        var epWords = epLower.split(/[\s,.-]+/).filter(function(w) { return w.length > 2 })
+        var matchCount = 0
+        var matchedKeyword = ''
+        artWords.forEach(function(aw) {
+          epWords.forEach(function(ew) {
+            if (aw === ew || (aw.length > 4 && ew.indexOf(aw) > -1) || (ew.length > 4 && aw.indexOf(ew) > -1)) {
+              matchCount++
+              matchedKeyword = ew
+            }
+          })
+        })
+        if (matchCount > 0) {
+          var score = Math.min(30 + matchCount * 25, 85)
           if (score > bestScore) { bestMatch = ep; bestScore = score }
         }
       })
+
+      var allMatches = []
+      if (bestScore < 60) {
+        ;(allProducts || []).forEach(function(ep) {
+          var epLower = ep.name.toLowerCase()
+          var artWords = articleLower.split(/[\s,.-]+/).filter(function(w) { return w.length > 2 })
+          var epWords = epLower.split(/[\s,.-]+/).filter(function(w) { return w.length > 2 })
+          var found = false
+          artWords.forEach(function(aw) {
+            epWords.forEach(function(ew) {
+              if (aw === ew || (aw.length > 4 && ew.indexOf(aw) > -1) || (ew.length > 4 && aw.indexOf(ew) > -1)) found = true
+            })
+          })
+          if (found) allMatches.push(ep)
+        })
+      }
 
       if (bestMatch && bestScore >= 60) {
         await supabase.from('product_prices').insert({
@@ -134,12 +159,23 @@ Retourne UNIQUEMENT un JSON valide (sans markdown) :
           supplier_name: matchSup ? matchSup.name : ''
         })
       } else if (bestMatch && bestScore >= 30) {
+        var otherSuggestions = (allMatches || []).filter(function(am) { return am.id !== bestMatch.id }).slice(0, 3).map(function(am) { return {name: am.name, id: am.id} })
         suggestions.push({
           article: ligne.article, article_original: ligne.article_original,
           categorie: ligne.categorie || 'ingredient', unite: ligne.unite,
           prix_unitaire_ht: ligne.prix_unitaire_ht, conditionnement: ligne.conditionnement,
           suggested_match: bestMatch.name, suggested_match_id: bestMatch.id,
-          suggested_score: bestScore
+          suggested_score: bestScore, other_matches: otherSuggestions
+        })
+      } else if (allMatches && allMatches.length > 0) {
+        var topMatch = allMatches[0]
+        var otherSuggestions = allMatches.slice(1, 4).map(function(am) { return {name: am.name, id: am.id} })
+        suggestions.push({
+          article: ligne.article, article_original: ligne.article_original,
+          categorie: ligne.categorie || 'ingredient', unite: ligne.unite,
+          prix_unitaire_ht: ligne.prix_unitaire_ht, conditionnement: ligne.conditionnement,
+          suggested_match: topMatch.name, suggested_match_id: topMatch.id,
+          suggested_score: 25, other_matches: otherSuggestions
         })
       } else {
         unmatched.push({
