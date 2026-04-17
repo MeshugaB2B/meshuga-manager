@@ -380,9 +380,12 @@ export default function SuppliersTab() {
                   <div key={i} style={{background:'#FFF9D0',border:'2px solid #FFEB5A',borderRadius:8,padding:10,marginBottom:6}}>
                     <div style={{fontSize:13,fontWeight:900}}>"{s.article}" → {s.suggested_match} ?</div>
                     <div style={{fontSize:11,color:'#888'}}>{s.article_original} · {Number(s.prix_unitaire_ht).toFixed(2)} €/{s.unite}</div>
-                    <div style={{display:'flex',gap:6,marginTop:6}}>
-                      <button disabled={classifying===s.article} onClick={function(){confirmSuggestion(s)}} style={{padding:'4px 14px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #009D3A',background:'#fff',color:'#009D3A',cursor:'pointer'}}>{classifying===s.article ? '...' : '✅ OUI'}</button>
-                      <button onClick={function(){rejectSuggestion(s)}} style={{padding:'4px 14px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #CC0066',background:'#fff',color:'#CC0066',cursor:'pointer'}}>✗ NON</button>
+                    <div style={{display:'flex',gap:6,marginTop:6,flexWrap:'wrap',alignItems:'center'}}>
+                      <button disabled={classifying===s.article} onClick={function(){confirmSuggestion(s)}} style={{padding:'4px 14px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #009D3A',background:'#fff',color:'#009D3A',cursor:'pointer'}}>{classifying===s.article ? '...' : '✅ ' + s.suggested_match}</button>
+                      {s.other_matches && s.other_matches.map(function(om) {
+                        return <button key={om.id} disabled={classifying===s.article} onClick={function(){confirmSuggestion(Object.assign({}, s, {suggested_match: om.name, suggested_match_id: om.id}))}} style={{padding:'4px 14px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #B8920A',background:'#fff',color:'#B8920A',cursor:'pointer'}}>{'→ ' + om.name}</button>
+                      })}
+                      <button onClick={function(){rejectSuggestion(s)}} style={{padding:'4px 14px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #CC0066',background:'#fff',color:'#CC0066',cursor:'pointer'}}>✗ AUCUN</button>
                     </div>
                   </div>
                 )
