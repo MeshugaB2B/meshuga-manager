@@ -152,12 +152,29 @@ Retourne UNIQUEMENT un JSON valide (sans markdown) :
         })
         await supabase.from('products').update({ current_price: ligne.prix_unitaire_ht }).eq('id', bestMatch.id)
         var matchSup = (suppliers || []).find(function(s) { return s.id === bestMatch.supplier_id })
+        var chgPct = bestMatch.current_price > 0 ? ((ligne.prix_unitaire_ht - bestMatch.current_price) / bestMatch.current_price * 100) : 0
         matched.push({
           article: ligne.article, matched_to: bestMatch.name, score: bestScore,
           old_price: bestMatch.current_price, new_price: ligne.prix_unitaire_ht,
-          change_pct: bestMatch.current_price > 0 ? ((ligne.prix_unitaire_ht - bestMatch.current_price) / bestMatch.current_price * 100) : 0,
+          change_pct: chgPct,
           supplier_name: matchSup ? matchSup.name : ''
         })
+
+        if (chgPct > 3) {
+          var taskTitle = 'Renégocier ' + bestMatch.name + ' (+' + chgPct.toFixed(0) + '%) — ' + (matchSup ? matchSup.name : fournisseurName)
+          await supabase.from('tasks').insert({
+            title: taskTitle, status: 'todo', priority: chgPct > 10 ? 'high' : 'medium',
+            deadline: new Date().toISOString().split('T')[0]
+          })
+          await fetch('https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-push', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              title: '🔴 Hausse prix — ' + bestMatch.name,
+              body: (matchSup ? matchSup.name : fournisseurName) + ': +' + chgPct.toFixed(0) + '% (' + Number(bestMatch.current_price).toFixed(2) + ' → ' + ligne.prix_unitaire_ht.toFixed(2) + ' €)',
+              target: 'all'
+            })
+          }).catch(function(){})
+        }
       } else if (bestMatch && bestScore >= 30) {
         var otherSuggestions = (allMatches || []).filter(function(am) { return am.id !== bestMatch.id }).slice(0, 3).map(function(am) { return {name: am.name, id: am.id} })
         suggestions.push({
