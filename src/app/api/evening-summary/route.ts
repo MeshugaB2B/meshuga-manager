@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_FN_URL = 'https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-push'
 
-async function sendPush(title: string, body: string, target: string) {
+async function sendPush(title, body, target) {
   try {
     await fetch(SUPABASE_FN_URL, {
       method: 'POST',
@@ -13,85 +13,61 @@ async function sendPush(title: string, body: string, target: string) {
   } catch (e) { console.error('Push error:', e) }
 }
 
-async function getEncouragement(context: string): Promise<string> {
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 80,
-        messages: [{
-          role: 'user',
-          content: `Meshuga Crazy Deli, deli new-yorkais à Paris. Bilan du jour : ${context}. Donne une phrase d'encouragement courte et motivante pour l'équipe. Commence directement.`
-        }]
-      })
-    })
-    const data = await res.json()
-    return data.content?.[0]?.text?.trim() || ''
-  } catch (e) {
-    return ''
-  }
-}
-
-export async function GET(req: Request) {
-
-  const supabase = createClient(
+function getSupabase() {
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   )
+}
 
-  const today = new Date().toISOString().split('T')[0]
-  const startOfDay = today + 'T00:00:00.000Z'
+export async function GET() {
+  var supabase = getSupabase()
+  var today = new Date().toISOString().split('T')[0]
+  var startOfDay = today + 'T00:00:00.000Z'
 
-  // Activité du jour dans le journal
-  const { data: activityToday } = await supabase
-    .from('activity_log')
-    .select('type, user_role, description')
-    .gte('created_at', startOfDay)
-    .neq('type', 'session_start')
+  var doneRes = await supabase
+    .from('activity_log').select('description')
+    .gte('created_at', startOfDay).eq('type', 'tache_terminee')
+  var doneToday = (doneRes.data || []).map(function(a) { return a.description })
 
-  // Devis créés aujourd'hui
-  const { data: devisToday } = await supabase
-    .from('devis')
-    .select('id, client_name, total_ht, statut')
-    .gte('created_at', startOfDay)
+  var todoRes = await supabase
+    .from('tasks').select('title, priority')
+    .neq('status', 'done').order('deadline', { ascending: true }).limit(10)
+  var todos = todoRes.data || []
 
-  // Devis toujours en attente
-  const { data: devisAttente } = await supabase
-    .from('devis')
-    .select('id, total_ht')
-    .in('statut', ['envoye', 'a_modifier'])
+  var alertsRes = await supabase
+    .from('price_history').select('ingredient_name, supplier, change_pct')
+    .eq('acknowledged', false).gt('change_pct', 0).order('change_pct', { ascending: false }).limit(5)
+  var alerts = alertsRes.data || []
 
-  const contactsEmy = activityToday?.filter((a: any) => a.user_role === 'emy').length || 0
-  const contactsEdward = activityToday?.filter((a: any) => a.user_role === 'edward').length || 0
-  const newDevis = devisToday?.length || 0
-  const totalAttente = devisAttente?.reduce((s: number, d: any) => s + (parseFloat(d.total_ht) || 0), 0) || 0
+  var lines = []
 
-  const context = `${contactsEmy} actions Emy, ${contactsEdward} actions Edward, ${newDevis} devis créés, ${totalAttente.toFixed(0)}€ HT en attente`
-  const encouragement = await getEncouragement(context)
+  lines.push("Aujourd'hui :")
+  if (doneToday.length > 0) {
+    doneToday.forEach(function(d) { lines.push('- \u2705 ' + d) })
+  } else { lines.push('- Aucune tâche terminée') }
 
-  // Message Emy
-  const emyLines = [`${contactsEmy} action${contactsEmy > 1 ? 's' : ''} aujourd'hui`]
-  if (newDevis > 0) emyLines.push(`${newDevis} devis créé${newDevis > 1 ? 's' : ''}`)
-  if (encouragement) emyLines.push('🧠 ' + encouragement)
+  lines.push('')
+  lines.push('À Faire :')
+  if (todos.length > 0) {
+    todos.forEach(function(t) {
+      var prio = t.priority === 'high' ? '\uD83D\uDD34 ' : t.priority === 'medium' ? '\uD83D\uDFE1 ' : ''
+      lines.push('- ' + prio + t.title)
+    })
+  } else { lines.push('- Tout est fait ! \uD83C\uDF89') }
 
-  // Message Edward
-  const edwardLines = [`Emy : ${contactsEmy} actions · Toi : ${contactsEdward} actions`]
-  if (newDevis > 0) edwardLines.push(`${newDevis} nouveau${newDevis > 1 ? 'x' : ''} devis`)
-  if (devisAttente && devisAttente.length > 0) {
-    edwardLines.push(`${devisAttente.length} devis en attente — ${totalAttente.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} € HT`)
-  }
-  if (encouragement) edwardLines.push('🧠 ' + encouragement)
+  lines.push('')
+  lines.push('Alerte Food Cost :')
+  if (alerts.length > 0) {
+    alerts.forEach(function(a) {
+      lines.push('- ' + a.ingredient_name + ' (' + a.supplier + ') : +' + a.change_pct.toFixed(0) + '%')
+    })
+  } else { lines.push('- RAS \u2705') }
 
+  var body = lines.join('\n')
   await Promise.all([
-    sendPush('🥪 Bonne soirée Emy !', emyLines.join('\n'), 'emy'),
-    sendPush('🌭 Bilan du jour, Edward', edwardLines.join('\n'), 'edward')
+    sendPush('\uD83C\uDF1F Bilan du jour, Edward', body, 'edward'),
+    sendPush('\uD83C\uDF1F Bilan du jour, Emy', body, 'emy')
   ])
-
-  return NextResponse.json({ ok: true, context })
+  return NextResponse.json({ ok: true, body: body })
 }
