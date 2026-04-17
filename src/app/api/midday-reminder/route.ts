@@ -25,17 +25,31 @@ export async function GET() {
   var today = new Date().toISOString().split('T')[0]
   var startOfDay = today + 'T00:00:00.000Z'
 
-  var doneRes = await supabase.from('activity_log').select('id').gte('created_at', startOfDay).eq('type', 'tache_terminee')
-  var nbDone = (doneRes.data || []).length
-
   var todoRes = await supabase.from('tasks').select('id').neq('status', 'done')
   var nbTodo = (todoRes.data || []).length
 
-  var body = '\u2705 ' + nbDone + ' faite' + (nbDone > 1 ? 's' : '') + ' ce matin · \uD83D\uDCCB ' + nbTodo + ' restante' + (nbTodo > 1 ? 's' : '')
+  var emyActionsRes = await supabase.from('activity_log').select('id').gte('created_at', startOfDay).eq('user_role', 'emy')
+  var nbEmyActions = (emyActionsRes.data || []).length
+
+  var emyDoneRes = await supabase.from('activity_log').select('id').gte('created_at', startOfDay).eq('type', 'tache_terminee').eq('user_role', 'emy')
+  var nbEmyDone = (emyDoneRes.data || []).length
+
+  var allDoneRes = await supabase.from('activity_log').select('id').gte('created_at', startOfDay).eq('type', 'tache_terminee')
+  var nbAllDone = (allDoneRes.data || []).length
+
+  var edParts = []
+  edParts.push('\uD83D\uDC69 Emy: ' + nbEmyActions + ' action' + (nbEmyActions > 1 ? 's' : '') + ', ' + nbEmyDone + ' tâche' + (nbEmyDone > 1 ? 's' : '') + ' faite' + (nbEmyDone > 1 ? 's' : ''))
+  edParts.push('\uD83D\uDCCB ' + nbTodo + ' restante' + (nbTodo > 1 ? 's' : ''))
+  var edBody = edParts.join(' \u00B7 ')
+
+  var emyParts = []
+  emyParts.push('\u2705 ' + nbAllDone + ' faite' + (nbAllDone > 1 ? 's' : '') + ' ce matin')
+  emyParts.push('\uD83D\uDCCB ' + nbTodo + ' restante' + (nbTodo > 1 ? 's' : ''))
+  var emyBody = emyParts.join(' \u00B7 ')
 
   await Promise.all([
-    sendPush('\uD83E\uDD6A Rappel midi !', body, 'edward'),
-    sendPush('\uD83E\uDD6A Rappel midi !', body, 'emy')
+    sendPush('\uD83E\uDD6A Rappel midi !', edBody, 'edward'),
+    sendPush('\uD83E\uDD6A Rappel midi !', emyBody, 'emy')
   ])
-  return NextResponse.json({ ok: true, body: body })
+  return NextResponse.json({ ok: true, edward: edBody, emy: emyBody })
 }
