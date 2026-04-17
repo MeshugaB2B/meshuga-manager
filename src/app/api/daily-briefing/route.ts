@@ -20,74 +20,34 @@ function getSupabase() {
   )
 }
 
-async function buildBriefing(supabase, prenom) {
+export async function GET() {
+  var supabase = getSupabase()
   var today = new Date().toISOString().split('T')[0]
   var todayFr = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
-  var calRes = await supabase
-    .from('cal_events').select('*').eq('start_date', today)
-    .neq('source', 'ai_suggestion').order('time', { ascending: true })
-  var calEvents = calRes.data || []
+  var calRes = await supabase.from('cal_events').select('id').eq('start_date', today).neq('source', 'ai_suggestion')
+  var nbEvents = (calRes.data || []).length
 
-  var tasksRes = await supabase
-    .from('tasks').select('title, status, deadline, priority')
-    .neq('status', 'done').order('deadline', { ascending: true }).limit(10)
-  var tasks = tasksRes.data || []
+  var todoRes = await supabase.from('tasks').select('id').neq('status', 'done')
+  var nbTodo = (todoRes.data || []).length
 
-  var alertsRes = await supabase
-    .from('price_history').select('ingredient_name, supplier, change_pct, price_per_kg')
-    .eq('acknowledged', false).gt('change_pct', 0).order('change_pct', { ascending: false }).limit(5)
-  var alerts = alertsRes.data || []
+  var alertsRes = await supabase.from('price_history').select('id').eq('acknowledged', false).gt('change_pct', 0)
+  var nbAlerts = (alertsRes.data || []).length
 
-  var lines = []
+  var parts = []
+  parts.push('\uD83D\uDCC5 ' + nbEvents + ' event' + (nbEvents > 1 ? 's' : ''))
+  parts.push('\u2705 ' + nbTodo + ' tâche' + (nbTodo > 1 ? 's' : '') + ' à faire')
+  if (nbAlerts > 0) parts.push('\uD83E\uDD69 ' + nbAlerts + ' alerte' + (nbAlerts > 1 ? 's' : '') + ' FC')
+  var body = parts.join(' · ')
 
-  lines.push("Aujourd'hui :")
-  if (calEvents.length > 0) {
-    calEvents.forEach(function(e) {
-      var time = e.time ? e.time.slice(0, 5) + ' ' : ''
-      lines.push('- ' + time + e.title + (e.location ? ' @ ' + e.location : ''))
-    })
-  } else { lines.push('- Aucun événement') }
-
-  lines.push('')
-  lines.push('À Faire :')
-  if (tasks.length > 0) {
-    tasks.forEach(function(t) {
-      var prio = t.priority === 'high' ? '\uD83D\uDD34 ' : t.priority === 'medium' ? '\uD83D\uDFE1 ' : ''
-      lines.push('- ' + prio + t.title)
-    })
-  } else { lines.push('- Tout est fait ! \uD83C\uDF89') }
-
-  lines.push('')
-  lines.push('Alerte Food Cost :')
-  if (alerts.length > 0) {
-    alerts.forEach(function(a) {
-      lines.push('- ' + a.ingredient_name + ' (' + a.supplier + ') : +' + a.change_pct.toFixed(0) + '%')
-    })
-  } else { lines.push('- RAS \u2705') }
-
-  var title = '\uD83C\uDF2D Bonjour ' + prenom + ' \u2014 ' + todayFr.charAt(0).toUpperCase() + todayFr.slice(1)
-  return { title: title, body: lines.join('\n') }
-}
-
-export async function GET() {
-  var supabase = getSupabase()
-  var edward = await buildBriefing(supabase, 'Edward')
-  var emy = await buildBriefing(supabase, 'Emy')
+  var capDay = todayFr.charAt(0).toUpperCase() + todayFr.slice(1)
   await Promise.all([
-    sendPush(edward.title, edward.body, 'edward'),
-    sendPush(emy.title, emy.body, 'emy')
+    sendPush('\uD83C\uDF2D Bonjour Edward \u2014 ' + capDay, body, 'edward'),
+    sendPush('\uD83C\uDF2D Bonjour Emy \u2014 ' + capDay, body, 'emy')
   ])
-  return NextResponse.json({ ok: true, edward: edward, emy: emy })
+  return NextResponse.json({ ok: true, body: body })
 }
 
 export async function POST() {
-  var supabase = getSupabase()
-  var edward = await buildBriefing(supabase, 'Edward')
-  var emy = await buildBriefing(supabase, 'Emy')
-  await Promise.all([
-    sendPush(edward.title, edward.body, 'edward'),
-    sendPush(emy.title, emy.body, 'emy')
-  ])
-  return NextResponse.json({ ok: true, edward: edward, emy: emy })
+  return GET()
 }
