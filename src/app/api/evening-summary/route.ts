@@ -25,24 +25,36 @@ export async function GET() {
   var today = new Date().toISOString().split('T')[0]
   var startOfDay = today + 'T00:00:00.000Z'
 
-  var doneRes = await supabase.from('activity_log').select('id').gte('created_at', startOfDay).eq('type', 'tache_terminee')
-  var nbDone = (doneRes.data || []).length
-
   var todoRes = await supabase.from('tasks').select('id').neq('status', 'done')
   var nbTodo = (todoRes.data || []).length
 
   var alertsRes = await supabase.from('price_history').select('id').eq('acknowledged', false).gt('change_pct', 0)
   var nbAlerts = (alertsRes.data || []).length
 
-  var parts = []
-  parts.push('\u2705 ' + nbDone + ' faite' + (nbDone > 1 ? 's' : '') + ' aujourd\'hui')
-  parts.push('\uD83D\uDCCB ' + nbTodo + ' restante' + (nbTodo > 1 ? 's' : ''))
-  if (nbAlerts > 0) parts.push('\uD83E\uDD69 ' + nbAlerts + ' alerte' + (nbAlerts > 1 ? 's' : '') + ' FC')
-  var body = parts.join(' · ')
+  var emyActionsRes = await supabase.from('activity_log').select('id').gte('created_at', startOfDay).eq('user_role', 'emy')
+  var nbEmyActions = (emyActionsRes.data || []).length
+
+  var emyDoneRes = await supabase.from('activity_log').select('id').gte('created_at', startOfDay).eq('type', 'tache_terminee').eq('user_role', 'emy')
+  var nbEmyDone = (emyDoneRes.data || []).length
+
+  var allDoneRes = await supabase.from('activity_log').select('id').gte('created_at', startOfDay).eq('type', 'tache_terminee')
+  var nbAllDone = (allDoneRes.data || []).length
+
+  var edParts = []
+  edParts.push('\uD83D\uDC69 Emy: ' + nbEmyActions + ' action' + (nbEmyActions > 1 ? 's' : '') + ', ' + nbEmyDone + ' tâche' + (nbEmyDone > 1 ? 's' : '') + ' faite' + (nbEmyDone > 1 ? 's' : ''))
+  edParts.push('\uD83D\uDCCB ' + nbTodo + ' restante' + (nbTodo > 1 ? 's' : ''))
+  if (nbAlerts > 0) edParts.push('\uD83E\uDD69 ' + nbAlerts + ' alerte' + (nbAlerts > 1 ? 's' : '') + ' FC')
+  var edBody = edParts.join(' \u00B7 ')
+
+  var emyParts = []
+  emyParts.push('\u2705 ' + nbAllDone + ' faite' + (nbAllDone > 1 ? 's' : '') + ' aujourd\'hui')
+  emyParts.push('\uD83D\uDCCB ' + nbTodo + ' restante' + (nbTodo > 1 ? 's' : ''))
+  if (nbAlerts > 0) emyParts.push('\uD83E\uDD69 ' + nbAlerts + ' alerte' + (nbAlerts > 1 ? 's' : '') + ' FC')
+  var emyBody = emyParts.join(' \u00B7 ')
 
   await Promise.all([
-    sendPush('\uD83C\uDF1F Bilan du jour, Edward', body, 'edward'),
-    sendPush('\uD83C\uDF1F Bilan du jour, Emy', body, 'emy')
+    sendPush('\uD83C\uDF1F Bilan du jour, Edward', edBody, 'edward'),
+    sendPush('\uD83C\uDF1F Bilan du jour, Emy', emyBody, 'emy')
   ])
-  return NextResponse.json({ ok: true, body: body })
+  return NextResponse.json({ ok: true, edward: edBody, emy: emyBody })
 }
