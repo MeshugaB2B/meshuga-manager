@@ -24,6 +24,7 @@ export async function GET() {
   var supabase = getSupabase()
   var today = new Date().toISOString().split('T')[0]
   var todayFr = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  var capDay = todayFr.charAt(0).toUpperCase() + todayFr.slice(1)
 
   var calRes = await supabase.from('cal_events').select('id').eq('start_date', today).neq('source', 'ai_suggestion')
   var nbEvents = (calRes.data || []).length
@@ -34,18 +35,23 @@ export async function GET() {
   var alertsRes = await supabase.from('price_history').select('id').eq('acknowledged', false).gt('change_pct', 0)
   var nbAlerts = (alertsRes.data || []).length
 
-  var parts = []
-  parts.push('\uD83D\uDCC5 ' + nbEvents + ' event' + (nbEvents > 1 ? 's' : ''))
-  parts.push('\u2705 ' + nbTodo + ' tâche' + (nbTodo > 1 ? 's' : '') + ' à faire')
-  if (nbAlerts > 0) parts.push('\uD83E\uDD69 ' + nbAlerts + ' alerte' + (nbAlerts > 1 ? 's' : '') + ' FC')
-  var body = parts.join(' · ')
+  var edParts = []
+  edParts.push('\uD83D\uDCC5 ' + nbEvents + ' event' + (nbEvents > 1 ? 's' : ''))
+  edParts.push('\uD83D\uDC69 Emy: ' + nbTodo + ' tâche' + (nbTodo > 1 ? 's' : '') + ' à faire')
+  if (nbAlerts > 0) edParts.push('\uD83E\uDD69 ' + nbAlerts + ' alerte' + (nbAlerts > 1 ? 's' : '') + ' FC')
+  var edBody = edParts.join(' \u00B7 ')
 
-  var capDay = todayFr.charAt(0).toUpperCase() + todayFr.slice(1)
+  var emyParts = []
+  emyParts.push('\uD83D\uDCC5 ' + nbEvents + ' event' + (nbEvents > 1 ? 's' : ''))
+  emyParts.push('\u2705 ' + nbTodo + ' tâche' + (nbTodo > 1 ? 's' : '') + ' à faire')
+  if (nbAlerts > 0) emyParts.push('\uD83E\uDD69 ' + nbAlerts + ' alerte' + (nbAlerts > 1 ? 's' : '') + ' FC')
+  var emyBody = emyParts.join(' \u00B7 ')
+
   await Promise.all([
-    sendPush('\uD83C\uDF2D Bonjour Edward \u2014 ' + capDay, body, 'edward'),
-    sendPush('\uD83C\uDF2D Bonjour Emy \u2014 ' + capDay, body, 'emy')
+    sendPush('\uD83C\uDF2D Bonjour Edward \u2014 ' + capDay, edBody, 'edward'),
+    sendPush('\uD83C\uDF2D Bonjour Emy \u2014 ' + capDay, emyBody, 'emy')
   ])
-  return NextResponse.json({ ok: true, body: body })
+  return NextResponse.json({ ok: true, edward: edBody, emy: emyBody })
 }
 
 export async function POST() {
