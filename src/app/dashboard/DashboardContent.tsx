@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import FoodCostTab from './FoodCostTab'
+import SuppliersTab from './SuppliersTab'
 import NotifsTab from './NotifsTab'
 import JournalTab from './JournalTab'
 import InstaTab from './InstaTab'
@@ -840,6 +841,7 @@ function DashboardImpl() {
     {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
     {id: 'notifs', label: 'Notifications', icon: '🔔'},
     {id: 'foodcost', label: 'Food Cost', icon: '🥩'},
+    {id: 'fournisseurs', label: 'Fournisseurs', icon: '📦'},
     {id: 'messagerie', label: 'Messagerie', icon: '💬'},
   ]
 
@@ -887,7 +889,7 @@ function DashboardImpl() {
               )
             })}
             <div className="sb-sec">Gestion</div>
-            {NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['chasse','foodcost','annuaire','reporting','vault'].indexOf(n.id) > -1 }).map(function(n) {
+            {NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['chasse','foodcost','fournisseurs','annuaire','reporting','vault'].indexOf(n.id) > -1 }).map(function(n) {
               return (
                 <div key={n.id} className={page === n.id ? 'ni active' : 'ni'} onClick={function() { nav(n.id) }}>
                   <span style={{fontSize:14}}>{n.icon}</span>{n.label}
@@ -2554,6 +2556,18 @@ function DashboardImpl() {
               messages={messages}
             />
           )}
+            {page === 'fournisseurs' && (
+              <div className="mc">
+                <div className="ph">
+                  <div>
+                    <div className="pt">📦 Catalogue Fournisseurs</div>
+                    <div className="ps">Suivi des prix · Liaison recettes</div>
+                  </div>
+                </div>
+                <SuppliersTab />
+              </div>
+            )}
+
           {page === 'foodcost' && (
             <FoodCostTab
               fcRecipes={fcRecipes}
@@ -2718,6 +2732,7 @@ function DashboardImpl() {
         <div className="mms-sec">Gestion</div>
         <div className="mms-grid">
           <div className={page === "foodcost" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("foodcost"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🥩"}</div><div className="mms-tile-lbl">Food Cost</div></div>
+          <div className={page === "fournisseurs" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("fournisseurs"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📦"}</div><div className="mms-tile-lbl">Fournisseurs</div></div>
           <div className={page === "annuaire" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("annuaire"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📇"}</div><div className="mms-tile-lbl">Annuaire</div></div>
           <div className={page === "chasse" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("chasse"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔍"}</div><div className="mms-tile-lbl">Chasse</div></div>
           <div className={page === "reporting" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("reporting"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📊"}</div><div className="mms-tile-lbl">Reporting</div></div>
