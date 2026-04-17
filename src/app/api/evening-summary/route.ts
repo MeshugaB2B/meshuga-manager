@@ -25,46 +25,21 @@ export async function GET() {
   var today = new Date().toISOString().split('T')[0]
   var startOfDay = today + 'T00:00:00.000Z'
 
-  var doneRes = await supabase
-    .from('activity_log').select('description')
-    .gte('created_at', startOfDay).eq('type', 'tache_terminee')
-  var doneToday = (doneRes.data || []).map(function(a) { return a.description })
+  var doneRes = await supabase.from('activity_log').select('id').gte('created_at', startOfDay).eq('type', 'tache_terminee')
+  var nbDone = (doneRes.data || []).length
 
-  var todoRes = await supabase
-    .from('tasks').select('title, priority')
-    .neq('status', 'done').order('deadline', { ascending: true }).limit(10)
-  var todos = todoRes.data || []
+  var todoRes = await supabase.from('tasks').select('id').neq('status', 'done')
+  var nbTodo = (todoRes.data || []).length
 
-  var alertsRes = await supabase
-    .from('price_history').select('ingredient_name, supplier, change_pct')
-    .eq('acknowledged', false).gt('change_pct', 0).order('change_pct', { ascending: false }).limit(5)
-  var alerts = alertsRes.data || []
+  var alertsRes = await supabase.from('price_history').select('id').eq('acknowledged', false).gt('change_pct', 0)
+  var nbAlerts = (alertsRes.data || []).length
 
-  var lines = []
+  var parts = []
+  parts.push('\u2705 ' + nbDone + ' faite' + (nbDone > 1 ? 's' : '') + ' aujourd\'hui')
+  parts.push('\uD83D\uDCCB ' + nbTodo + ' restante' + (nbTodo > 1 ? 's' : ''))
+  if (nbAlerts > 0) parts.push('\uD83E\uDD69 ' + nbAlerts + ' alerte' + (nbAlerts > 1 ? 's' : '') + ' FC')
+  var body = parts.join(' · ')
 
-  lines.push("Aujourd'hui :")
-  if (doneToday.length > 0) {
-    doneToday.forEach(function(d) { lines.push('- \u2705 ' + d) })
-  } else { lines.push('- Aucune tâche terminée') }
-
-  lines.push('')
-  lines.push('À Faire :')
-  if (todos.length > 0) {
-    todos.forEach(function(t) {
-      var prio = t.priority === 'high' ? '\uD83D\uDD34 ' : t.priority === 'medium' ? '\uD83D\uDFE1 ' : ''
-      lines.push('- ' + prio + t.title)
-    })
-  } else { lines.push('- Tout est fait ! \uD83C\uDF89') }
-
-  lines.push('')
-  lines.push('Alerte Food Cost :')
-  if (alerts.length > 0) {
-    alerts.forEach(function(a) {
-      lines.push('- ' + a.ingredient_name + ' (' + a.supplier + ') : +' + a.change_pct.toFixed(0) + '%')
-    })
-  } else { lines.push('- RAS \u2705') }
-
-  var body = lines.join('\n')
   await Promise.all([
     sendPush('\uD83C\uDF1F Bilan du jour, Edward', body, 'edward'),
     sendPush('\uD83C\uDF1F Bilan du jour, Emy', body, 'emy')
