@@ -228,6 +228,31 @@ export default function SuppliersTab() {
     )
   }
 
+  // Orphan products: not in any recipe
+  var orphanProducts = products.filter(function(p) {
+    if (p.category !== 'ingredient') return false
+    var recipes = getRecipesForProduct(p.name)
+    return recipes.length === 0
+  })
+
+  // Price comparison: same article at multiple suppliers
+  var comparisons = []
+  articles.forEach(function(art) {
+    var artProducts = products.filter(function(p) { return p.article_id === art.id })
+    if (artProducts.length < 2) return
+    var withSupplier = artProducts.map(function(p) {
+      var sup = suppliers.find(function(s) { return s.id === p.supplier_id })
+      return { name: p.name, price: Number(p.current_price), supplier: sup ? sup.name : '?', is_active: p.is_active, unit: p.unit }
+    }).sort(function(a, b) { return a.price - b.price })
+    var cheapest = withSupplier[0].price
+    var mostExpensive = withSupplier[withSupplier.length - 1].price
+    if (cheapest > 0 && mostExpensive > 0) {
+      var savingPct = ((mostExpensive - cheapest) / mostExpensive * 100).toFixed(1)
+      comparisons.push({ article: art.name, unit: art.unit, products: withSupplier, saving: savingPct })
+    }
+  })
+  comparisons.sort(function(a, b) { return Number(b.saving) - Number(a.saving) })
+
   var filteredSuppliers = catFilter === 'all' ? suppliers : suppliers.filter(function(s) { return s.category === catFilter })
 
   if (loading) return <div style={{padding:40,textAlign:'center',opacity:0.5}}>Chargement...</div>
@@ -324,6 +349,40 @@ export default function SuppliersTab() {
           <input type="file" accept=".pdf,image/*" onChange={handleUpload} style={{display:'none'}} disabled={uploading} />
         </label>
       </div>
+
+      {comparisons.length > 0 && (
+        <div style={{background:'#fff',border:'2px solid #FF82D7',borderRadius:12,padding:16,marginBottom:14}}>
+          <div style={{fontFamily:'Yellowtail',fontSize:18,color:'#191923',marginBottom:8}}>Comparateur prix fournisseurs</div>
+          {comparisons.slice(0, 8).map(function(c, i) {
+            return (
+              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:'1px solid #F0F0F0',fontSize:13}}>
+                <span style={{fontWeight:900,minWidth:120}}>{c.article}</span>
+                <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                  {c.products.map(function(p, pi) {
+                    return <span key={pi} style={{fontSize:12,fontWeight:p.is_active?900:400,color:pi===0?'#009D3A':'#191923'}}>
+                      {p.supplier}: {p.price.toFixed(2)}€/{p.unit}{p.is_active ? ' ★' : ''}
+                    </span>
+                  })}
+                  <span style={{fontSize:11,fontWeight:900,color:'#009D3A',background:'#E8FFE8',padding:'2px 8px',borderRadius:10}}>-{c.saving}%</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {orphanProducts.length > 0 && (
+        <div style={{background:'#fff',border:'2px solid #CC0066',borderRadius:12,padding:16,marginBottom:14}}>
+          <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#CC0066',marginBottom:6}}>Produits sans recette</div>
+          <div style={{fontSize:12,color:'#888',marginBottom:8}}>Ces ingrédients ne sont liés à aucune recette — vérifiez s'ils sont encore utilisés</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {orphanProducts.map(function(op) {
+              var sup = suppliers.find(function(s) { return s.id === op.supplier_id })
+              return <span key={op.id} style={{display:'inline-block',padding:'4px 10px',borderRadius:20,fontSize:11,fontWeight:900,background:'#FFE0E0',color:'#CC0066',border:'1px solid #CC0066'}}>{op.name} ({sup ? sup.name : '?'} · {Number(op.current_price).toFixed(2)}€/{op.unit})</span>
+            })}
+          </div>
+        </div>
+      )}
 
       {uploadResult && (
         <div style={{background:'#fff',border:'2px solid #FFEB5A',borderRadius:12,padding:16,marginBottom:14}}>
