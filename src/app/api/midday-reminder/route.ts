@@ -25,31 +25,14 @@ export async function GET() {
   var today = new Date().toISOString().split('T')[0]
   var startOfDay = today + 'T00:00:00.000Z'
 
-  var doneRes = await supabase
-    .from('activity_log').select('description')
-    .gte('created_at', startOfDay).eq('type', 'tache_terminee')
-  var doneCount = (doneRes.data || []).length
+  var doneRes = await supabase.from('activity_log').select('id').gte('created_at', startOfDay).eq('type', 'tache_terminee')
+  var nbDone = (doneRes.data || []).length
 
-  var todoRes = await supabase
-    .from('tasks').select('title, priority')
-    .neq('status', 'done').order('deadline', { ascending: true }).limit(10)
-  var todos = todoRes.data || []
+  var todoRes = await supabase.from('tasks').select('id').neq('status', 'done')
+  var nbTodo = (todoRes.data || []).length
 
-  var lines = []
+  var body = '\u2705 ' + nbDone + ' faite' + (nbDone > 1 ? 's' : '') + ' ce matin · \uD83D\uDCCB ' + nbTodo + ' restante' + (nbTodo > 1 ? 's' : '')
 
-  lines.push("Aujourd'hui :")
-  lines.push('- ' + doneCount + ' tâche' + (doneCount > 1 ? 's' : '') + ' terminée' + (doneCount > 1 ? 's' : '') + ' ce matin')
-
-  lines.push('')
-  lines.push('À Faire :')
-  if (todos.length > 0) {
-    todos.forEach(function(t) {
-      var prio = t.priority === 'high' ? '\uD83D\uDD34 ' : t.priority === 'medium' ? '\uD83D\uDFE1 ' : ''
-      lines.push('- ' + prio + t.title)
-    })
-  } else { lines.push('- Tout est fait ! \uD83C\uDF89') }
-
-  var body = lines.join('\n')
   await Promise.all([
     sendPush('\uD83E\uDD6A Rappel midi !', body, 'edward'),
     sendPush('\uD83E\uDD6A Rappel midi !', body, 'emy')
