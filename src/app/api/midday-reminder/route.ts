@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_FN_URL = 'https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-push'
 
-async function sendPush(title: string, body: string, target: string) {
+async function sendPush(title, body, target) {
   try {
     await fetch(SUPABASE_FN_URL, {
       method: 'POST',
@@ -13,47 +13,46 @@ async function sendPush(title: string, body: string, target: string) {
   } catch (e) { console.error('Push error:', e) }
 }
 
-export async function GET(req: Request) {
-
-  const supabase = createClient(
+function getSupabase() {
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
   )
+}
 
-  const today = new Date().toISOString().split('T')[0]
+export async function GET() {
+  var supabase = getSupabase()
+  var today = new Date().toISOString().split('T')[0]
+  var startOfDay = today + 'T00:00:00.000Z'
 
-  // Prospects à relancer aujourd'hui
-  const { data: prospects } = await supabase
-    .from('prospects')
-    .select('name, next_contact_date, temperature')
-    .lte('next_contact_date', today)
-    .eq('status', 'actif')
-    .order('next_contact_date', { ascending: true })
-    .limit(5)
+  var doneRes = await supabase
+    .from('activity_log').select('description')
+    .gte('created_at', startOfDay).eq('type', 'tache_terminee')
+  var doneCount = (doneRes.data || []).length
 
-  const emyLines: string[] = []
-  const edwardLines: string[] = []
+  var todoRes = await supabase
+    .from('tasks').select('title, priority')
+    .neq('status', 'done').order('deadline', { ascending: true }).limit(10)
+  var todos = todoRes.data || []
 
-  if (prospects && prospects.length > 0) {
-    const urgents = prospects.filter((p: any) => p.temperature === 'hot' || p.temperature === 'warm')
-    const others = prospects.filter((p: any) => p.temperature !== 'hot' && p.temperature !== 'warm')
+  var lines = []
 
-    if (urgents.length > 0) {
-      emyLines.push('🔥 Urgents : ' + urgents.map((p: any) => p.name).join(', '))
-    }
-    if (others.length > 0) {
-      emyLines.push('📞 À appeler : ' + others.map((p: any) => p.name).join(', '))
-    }
-    edwardLines.push(`${prospects.length} prospect${prospects.length > 1 ? 's' : ''} à relancer aujourd'hui`)
-  } else {
-    emyLines.push('Toutes les relances du jour sont faites 👏')
-    return NextResponse.json({ ok: true, message: 'Pas de relances' })
-  }
+  lines.push("Aujourd'hui :")
+  lines.push('- ' + doneCount + ' tâche' + (doneCount > 1 ? 's' : '') + ' terminée' + (doneCount > 1 ? 's' : '') + ' ce matin')
 
+  lines.push('')
+  lines.push('À Faire :')
+  if (todos.length > 0) {
+    todos.forEach(function(t) {
+      var prio = t.priority === 'high' ? '\uD83D\uDD34 ' : t.priority === 'medium' ? '\uD83D\uDFE1 ' : ''
+      lines.push('- ' + prio + t.title)
+    })
+  } else { lines.push('- Tout est fait ! \uD83C\uDF89') }
+
+  var body = lines.join('\n')
   await Promise.all([
-    sendPush('🥪 Relances de midi !', emyLines.join('\n'), 'emy'),
-    sendPush('📊 Terrain — suivi midi', edwardLines.join('\n'), 'edward')
+    sendPush('\uD83E\uDD6A Rappel midi !', body, 'edward'),
+    sendPush('\uD83E\uDD6A Rappel midi !', body, 'emy')
   ])
-
-  return NextResponse.json({ ok: true, prospects: prospects?.length })
+  return NextResponse.json({ ok: true, body: body })
 }
