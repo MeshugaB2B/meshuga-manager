@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import FoodCostTab from './FoodCostTab'
 import SuppliersTab from './SuppliersTab'
+import PriceAlertsWidget from './PriceAlertsWidget'
 import NotifsTab from './NotifsTab'
 import JournalTab from './JournalTab'
 import InstaTab from './InstaTab'
@@ -1133,6 +1134,8 @@ function DashboardImpl() {
 
                             {/* TACHES DU JOUR */}
               <div className="card" style={{marginBottom:10,borderLeft:'4px solid #FF82D7'}}>
+                <PriceAlertsWidget />
+
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
                   <div className="yt" style={{fontSize:22}}>📋 Tâches</div>
                   <button className="btn btn-p btn-sm" style={{fontWeight:900}} onClick={function(){openModal('task',{assignee:isEmy?'emy':'edward',priority:'medium',status:'todo',checklist:[],files:[],deadline:new Date().toISOString().split('T')[0]})}}>+ Tâche</button>
