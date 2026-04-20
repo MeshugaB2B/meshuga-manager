@@ -40,7 +40,7 @@ export default function FoodCostTab(props) {
   var [fcEditForm, setFcEditForm] = useState(null)
 
 
-  function openIngredientPopup(ing) {
+  var openIngredientPopup = function(ing) {
     setIngPopup(ing)
     setIngHistory([])
     sb().from('products').select('id, name, current_price, unit, supplier_id').then(function(pRes) {
