@@ -442,11 +442,11 @@ export default function SuppliersTab() {
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {orphanProducts.map(function(op) {
               var sup = suppliers.find(function(s) { return s.id === op.supplier_id })
-              return <span key={op.id} onClick={function(){setOrphanAction(orphanAction === op.id ? null : op.id)}} style={{display:'inline-block',padding:'4px 10px',borderRadius:20,fontSize:11,fontWeight:900,background:orphanAction === op.id ? '#CC0066' : '#FFE0E0',color:orphanAction === op.id ? '#FFF' : '#CC0066',border:'1px solid #CC0066',cursor:'pointer'}}>{op.name} ({sup ? sup.name : '?'} · {Number(op.current_price).toFixed(2)}€/{op.unit})</span>
+              return <span key={op.id} onClick={function(){setOrphanAction(orphanAction && orphanAction.id === op.id ? null : op)}} style={{display:'inline-block',padding:'4px 10px',borderRadius:20,fontSize:11,fontWeight:900,background:orphanAction && orphanAction.id === op.id ? '#CC0066' : '#FFE0E0',color:orphanAction && orphanAction.id === op.id ? '#FFF' : '#CC0066',border:'1px solid #CC0066',cursor:'pointer'}}>{op.name} ({sup ? sup.name : '?'} · {Number(op.current_price).toFixed(2)}€/{op.unit})</span>
             })}
           </div>
           {orphanAction && (function() {
-            var op = orphanProducts.find(function(p) { return p.id === orphanAction })
+            var op = orphanAction
             if (!op) return null
             var existingLinks = recipeLinks.filter(function(rl) { return rl.product_id === op.id })
             return (
@@ -459,7 +459,7 @@ export default function SuppliersTab() {
                 <div style={{fontSize:12,fontWeight:900,color:'#191923',marginBottom:6}}>Affecter aux recettes :</div>
                 <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:8}}>
                   <button onClick={function(){assignToAllSandwiches(op.id)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #FFEB5A',background:'#FFEB5A',cursor:'pointer'}}>TOUS LES SANDWICHS</button>
-                  {assigningRecipe === op.id ? (
+                  {assigningRecipe === (op && op.id) ? (
                     <div style={{width:'100%',marginTop:6}}>
                       <div style={{fontSize:11,color:'#888',marginBottom:4}}>Choisir une recette :</div>
                       <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
@@ -470,7 +470,7 @@ export default function SuppliersTab() {
                       </div>
                     </div>
                   ) : (
-                    <button onClick={function(){setAssigningRecipe(op.id)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>CHOISIR RECETTE(S)...</button>
+                    <button onClick={function(){setAssigningRecipe(op ? op.id : null)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>CHOISIR RECETTE(S)...</button>
                   )}
                 </div>
 
