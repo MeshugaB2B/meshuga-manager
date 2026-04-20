@@ -33,6 +33,14 @@ export default function SuppliersTab() {
     {id: 'sub_pickles', name: 'Pickles oignons', categorie: 'sous-recette'},
     {id: 'sub_pink_lemonade', name: 'Pink Lemonade', categorie: 'sous-recette'},
     {id: 'sub_frites', name: 'Frites', categorie: 'sous-recette'}
+  ]).concat([
+    {id: 'sub_mayo', name: 'Mayonnaise maison (base)', categorie: 'sous-recette'},
+    {id: 'sub_mayo_lobster', name: 'Mayo lobster (estragon)', categorie: 'sous-recette'},
+    {id: 'sub_mayo_sriracha', name: 'Mayo sriracha (tuna)', categorie: 'sous-recette'},
+    {id: 'sub_sauce_russe', name: 'Sauce russe', categorie: 'sous-recette'},
+    {id: 'sub_pickles', name: 'Pickles oignons', categorie: 'sous-recette'},
+    {id: 'sub_pink_lemonade', name: 'Pink Lemonade', categorie: 'sous-recette'},
+    {id: 'sub_frites', name: 'Frites', categorie: 'sous-recette'}
   ])
 
   useEffect(function() { loadData() }, [])
