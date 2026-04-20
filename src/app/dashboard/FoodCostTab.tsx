@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { FC_CATALOG } from './data'
+import IngredientPopup from './IngredientPopup'
 
 export default function FoodCostTab(props) {
   var fcRecipes = props.fcRecipes
@@ -17,6 +18,7 @@ export default function FoodCostTab(props) {
 
   var [fcView, setFcView] = useState('recettes')
   var [fcSelected, setFcSelected] = useState(null)
+  var [ingPopup, setIngPopup] = useState(null)
   var [fcPrices, setFcPrices] = useState({})
   var [fcPrixTTC, setFcPrixTTC] = useState(function(){
     try {
@@ -270,7 +272,7 @@ export default function FoodCostTab(props) {
               return (
                 <div key={idx} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid #F0F0F0'}}>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:13,fontWeight:700}}>{ing.article}</div>
+                    <div onClick={function(){setIngPopup(ing)}} style={{fontSize:13,fontWeight:700,cursor:'pointer',textDecoration:'underline',textDecorationColor:'#FF82D7'}}>{ing.article}</div>
                     <div style={{fontSize:10,opacity:.5}}>{ing.fournisseur} · {ing.qte} {ing.unite}</div>
                   </div>
                   <div style={{textAlign:'right',flexShrink:0}}>
@@ -668,5 +670,6 @@ export default function FoodCostTab(props) {
         </div>
       )}
     </div>
+      {ingPopup && <IngredientPopup ing={ingPopup} onClose={function(){setIngPopup(null)}} />}
   )
 }
