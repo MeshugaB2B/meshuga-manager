@@ -40,24 +40,6 @@ export default function FoodCostTab(props) {
   var [fcEditForm, setFcEditForm] = useState(null)
 
 
-  var openIngredientPopup = function(ing) {
-    setIngPopup(ing)
-    setIngHistory([])
-    sb().from('products').select('id, name, current_price, unit, supplier_id').then(function(pRes) {
-      var all = pRes.data || []
-      var match = all.find(function(p) {
-        var pLow = p.name.toLowerCase()
-        var iLow = (ing.article || '').toLowerCase()
-        return pLow === iLow || pLow.indexOf(iLow) > -1 || iLow.indexOf(pLow) > -1
-      })
-      if (match) {
-        sb().from('product_prices').select('price, invoice_date, invoice_filename').eq('product_id', match.id).order('invoice_date', {ascending: true}).then(function(ppRes) {
-          setIngHistory(ppRes.data || [])
-        })
-      }
-    })
-  }
-
   return (
     <div>
       <div className="ph">
@@ -296,7 +278,7 @@ export default function FoodCostTab(props) {
               return (
                 <div key={idx} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid #F0F0F0'}}>
                   <div style={{flex:1}}>
-                    <div onClick={function(){openIngredientPopup(ing)}} style={{fontSize:13,fontWeight:700,cursor:'pointer',color:'#191923',textDecoration:'underline',textDecorationColor:'#FF82D7'}}>{ing.article}</div>
+                    <div onClick={function(){setIngPopup(ing);setIngHistory([]);sb().from('products').select('id, name, current_price, unit, supplier_id').then(function(pRes){var all=pRes.data||[];var match=all.find(function(p){var pL=p.name.toLowerCase();var iL=(ing.article||'').toLowerCase();return pL===iL||pL.indexOf(iL)>-1||iL.indexOf(pL)>-1});if(match){sb().from('product_prices').select('price, invoice_date, invoice_filename').eq('product_id',match.id).order('invoice_date',{ascending:true}).then(function(ppRes){setIngHistory(ppRes.data||[])})}})}} style={{fontSize:13,fontWeight:700,cursor:'pointer',color:'#191923',textDecoration:'underline',textDecorationColor:'#FF82D7'}}>{ing.article}</div>
                     <div style={{fontSize:10,opacity:.5}}>{ing.fournisseur} · {ing.qte} {ing.unite}</div>
                   </div>
                   <div style={{textAlign:'right',flexShrink:0}}>
