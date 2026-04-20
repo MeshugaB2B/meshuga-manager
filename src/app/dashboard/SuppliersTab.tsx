@@ -25,7 +25,15 @@ export default function SuppliersTab() {
   var [recipeLinks, setRecipeLinks] = useState([])
   var [assigningRecipe, setAssigningRecipe] = useState(null)
 
-  var allRecipes = RECIPES_DATA.map(function(r) { return {id: r.id, name: r.name, categorie: r.categorie} })
+  var allRecipes = RECIPES_DATA.map(function(r) { return {id: r.id, name: r.name, categorie: r.categorie} }).concat([
+    {id: 'sub_mayo', name: 'Mayonnaise maison (base)', categorie: 'sous-recette'},
+    {id: 'sub_mayo_lobster', name: 'Mayo lobster (estragon)', categorie: 'sous-recette'},
+    {id: 'sub_mayo_sriracha', name: 'Mayo sriracha (tuna)', categorie: 'sous-recette'},
+    {id: 'sub_sauce_russe', name: 'Sauce russe', categorie: 'sous-recette'},
+    {id: 'sub_pickles', name: 'Pickles oignons', categorie: 'sous-recette'},
+    {id: 'sub_pink_lemonade', name: 'Pink Lemonade', categorie: 'sous-recette'},
+    {id: 'sub_frites', name: 'Frites', categorie: 'sous-recette'}
+  ])
 
   useEffect(function() { loadData() }, [])
 
@@ -50,7 +58,7 @@ export default function SuppliersTab() {
   function assignToRecipe(productId, recipe) {
     sb().from('product_recipe_links').insert({
       product_id: productId, recipe_id: recipe.id, recipe_name: recipe.name
-    }).then(function() { loadData(); setAssigningRecipe(null) })
+    }).then(function() { loadData() })
   }
 
   function assignToAllSandwiches(productId) {
