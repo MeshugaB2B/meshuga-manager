@@ -694,6 +694,7 @@ export default function FoodCostTab(props) {
         </div>
       )}
     </div>
+    </div>
       {ingPopup && (
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={function(){setIngPopup(null)}}>
           <div style={{background:'#fff',borderRadius:12,border:'2px solid #FF82D7',padding:20,maxWidth:480,width:'100%',maxHeight:'80vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
@@ -784,7 +785,3 @@ export default function FoodCostTab(props) {
 
   )
 }
-
-Claude is active in this tab group
-Open chat
-Dismiss
