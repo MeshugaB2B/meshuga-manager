@@ -22,6 +22,10 @@ export default function SuppliersTab() {
   var [newSupCat, setNewSupCat] = useState('ingredient')
   var [showNewSup, setShowNewSup] = useState(null)
   var [orphanAction, setOrphanAction] = useState(null)
+  var [recipeLinks, setRecipeLinks] = useState([])
+  var [assigningRecipe, setAssigningRecipe] = useState(null)
+
+  var allRecipes = RECIPES_DATA.map(function(r) { return {id: r.id, name: r.name, categorie: r.categorie} })
 
   useEffect(function() { loadData() }, [])
 
@@ -31,14 +35,32 @@ export default function SuppliersTab() {
       sb().from('suppliers').select('*').order('name'),
       sb().from('products').select('*').order('name'),
       sb().from('articles').select('*').order('name'),
-      sb().from('product_prices').select('*').order('invoice_date', {ascending: true})
+      sb().from('product_prices').select('*').order('invoice_date', {ascending: true}),
+      sb().from('product_recipe_links').select('*')
     ]).then(function(results) {
       if (results[0].data) setSuppliers(results[0].data)
       if (results[1].data) setProducts(results[1].data)
       if (results[2].data) setArticles(results[2].data)
       if (results[3].data) setPrices(results[3].data)
+      if (results[4].data) setRecipeLinks(results[4].data)
       setLoading(false)
     })
+  }
+
+  function assignToRecipe(productId, recipe) {
+    sb().from('product_recipe_links').insert({
+      product_id: productId, recipe_id: recipe.id, recipe_name: recipe.name
+    }).then(function() { loadData(); setAssigningRecipe(null) })
+  }
+
+  function assignToAllSandwiches(productId) {
+    var sandwiches = allRecipes.filter(function(r) { return r.categorie === 'classique' || r.categorie === 'mini' })
+    var inserts = sandwiches.map(function(r) { return {product_id: productId, recipe_id: r.id, recipe_name: r.name} })
+    sb().from('product_recipe_links').insert(inserts).then(function() { loadData(); setAssigningRecipe(null) })
+  }
+
+  function removeRecipeLink(linkId) {
+    sb().from('product_recipe_links').delete().eq('id', linkId).then(function() { loadData() })
   }
 
   function handleUpload(e) {
@@ -152,7 +174,7 @@ export default function SuppliersTab() {
     sb().from('products').update({category: newCat}).eq('id', productId).then(function() { loadData(); setOrphanAction(null) })
   }
 
-  function getRecipesForProduct(productName) {
+  function getRecipesForProduct(productName, productId) {
     var found = []
     RECIPES_DATA.forEach(function(r) {
       if (!r.ingredients) return
@@ -166,6 +188,14 @@ export default function SuppliersTab() {
         }
       })
     })
+    if (productId) {
+      recipeLinks.filter(function(rl) { return rl.product_id === productId }).forEach(function(rl) {
+        if (!found.find(function(f) { return f.name === rl.recipe_name })) {
+          var rd = RECIPES_DATA.find(function(r) { return r.id === rl.recipe_id })
+          found.push({name: rl.recipe_name, foodCostPct: rd ? rd.foodCostPct || 0 : 0, linkId: rl.id})
+        }
+      })
+    }
     return found
   }
 
@@ -253,7 +283,7 @@ export default function SuppliersTab() {
     if (p.category !== 'ingredient') return false
     var sup = suppliers.find(function(s) { return s.id === p.supplier_id })
     if (sup && sup.archived) return false
-    var recipes = getRecipesForProduct(p.name)
+    var recipes = getRecipesForProduct(p.name, p.id)
     return recipes.length === 0
   })
 
@@ -282,7 +312,7 @@ export default function SuppliersTab() {
     var sup = suppliers.find(function(s) { return s.id === prod.supplier_id })
     var articleId = prod.article_id
     var siblingProducts = articleId ? products.filter(function(p) { return p.article_id === articleId }) : [prod]
-    var recipes = getRecipesForProduct(prod.name)
+    var recipes = getRecipesForProduct(prod.name, prod.id)
     var activeProduct = siblingProducts.find(function(p) { return p.is_active }) || prod
     var supplierMapForChart = {}
     siblingProducts.forEach(function(sp) {
@@ -402,20 +432,52 @@ export default function SuppliersTab() {
           {orphanAction && (function() {
             var op = orphanProducts.find(function(p) { return p.id === orphanAction })
             if (!op) return null
+            var existingLinks = recipeLinks.filter(function(rl) { return rl.product_id === op.id })
             return (
               <div style={{background:'#FFF9D0',border:'2px solid #FFEB5A',borderRadius:8,padding:12,marginTop:10}}>
-                <div style={{fontWeight:900,fontSize:13,marginBottom:8}}>{op.name}</div>
-                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
-                  <button onClick={function(){changeCategory(op.id, 'boisson')}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>🥤 Boisson revente</button>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                  <div style={{fontWeight:900,fontSize:14}}>{op.name}</div>
+                  <button onClick={function(){setOrphanAction(null)}} style={{background:'transparent',border:'none',fontSize:16,cursor:'pointer',color:'#888'}}>✕</button>
+                </div>
+
+                <div style={{fontSize:12,fontWeight:900,color:'#191923',marginBottom:6}}>Affecter aux recettes :</div>
+                <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:8}}>
+                  <button onClick={function(){assignToAllSandwiches(op.id)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #FFEB5A',background:'#FFEB5A',cursor:'pointer'}}>TOUS LES SANDWICHS</button>
+                  {assigningRecipe === op.id ? (
+                    <div style={{width:'100%',marginTop:6}}>
+                      <div style={{fontSize:11,color:'#888',marginBottom:4}}>Choisir une recette :</div>
+                      <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                        {allRecipes.map(function(r) {
+                          var alreadyLinked = existingLinks.find(function(el) { return el.recipe_id === r.id })
+                          return <button key={r.id} disabled={!!alreadyLinked} onClick={function(){assignToRecipe(op.id, r)}} style={{padding:'3px 10px',fontSize:10,fontWeight:900,borderRadius:20,border:'1px solid ' + (alreadyLinked ? '#CCC' : '#191923'),background:alreadyLinked ? '#E8E8E8' : '#fff',color:alreadyLinked ? '#888' : '#191923',cursor:alreadyLinked ? 'default' : 'pointer',textTransform:'uppercase'}}>{r.name}{alreadyLinked ? ' ✓' : ''}</button>
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={function(){setAssigningRecipe(op.id)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>CHOISIR RECETTE(S)...</button>
+                  )}
+                </div>
+
+                {existingLinks.length > 0 && (
+                  <div style={{marginBottom:8}}>
+                    <div style={{fontSize:11,color:'#009D3A',fontWeight:700,marginBottom:4}}>Déjà affecté à :</div>
+                    <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                      {existingLinks.map(function(el) {
+                        return <span key={el.id} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 10px',borderRadius:20,fontSize:10,fontWeight:900,background:'#E8FFE8',color:'#009D3A',border:'1px solid #009D3A'}}>
+                          {el.recipe_name}
+                          <span onClick={function(){removeRecipeLink(el.id)}} style={{cursor:'pointer',fontSize:12}}>✕</span>
+                        </span>
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{fontSize:12,fontWeight:900,color:'#191923',marginTop:8,marginBottom:6}}>Ou recatégoriser :</div>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  <button onClick={function(){changeCategory(op.id, 'boisson')}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>🥤 Boisson</button>
                   <button onClick={function(){changeCategory(op.id, 'consommable')}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>🧹 Consommable</button>
                   <button onClick={function(){changeCategory(op.id, 'packaging')}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>📦 Packaging</button>
                   <button onClick={function(){deleteProduct(op.id)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #CC0066',background:'#FFE0E0',color:'#CC0066',cursor:'pointer'}}>🗑 Supprimer</button>
-                </div>
-                <div style={{fontSize:11,color:'#888',marginBottom:4}}>Ou affecter au fournisseur :</div>
-                <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                  {suppliers.filter(function(s) { return !s.archived && s.id !== op.supplier_id }).map(function(s) {
-                    return <button key={s.id} onClick={function(){sb().from('products').update({supplier_id: s.id}).eq('id', op.id).then(function(){loadData();setOrphanAction(null)})}} style={{padding:'3px 10px',fontSize:10,fontWeight:900,borderRadius:20,border:'1px solid #DDD',background:'#fff',cursor:'pointer'}}>{s.name}</button>
-                  })}
                 </div>
               </div>
             )
@@ -546,7 +608,7 @@ export default function SuppliersTab() {
             </div>
             {supProducts.length === 0 && <div style={{fontSize:13,color:'#888',padding:'8px 0'}}>Aucun produit — uploadez une facture pour alimenter</div>}
             {supProducts.map(function(p) {
-              var recipes = getRecipesForProduct(p.name)
+              var recipes = getRecipesForProduct(p.name, p.id)
               var sibCount = p.article_id ? products.filter(function(pp) { return pp.article_id === p.article_id }).length : 1
               return (
                 <div key={p.id} onClick={function(){setSelectedProduct(p)}} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 8px',borderBottom:'1px solid #F0F0F0',cursor:'pointer',borderRadius:6}} onMouseOver={function(e){e.currentTarget.style.background='#FFEB5A'}} onMouseOut={function(e){e.currentTarget.style.background='transparent'}}>
