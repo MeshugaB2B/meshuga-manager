@@ -669,7 +669,7 @@ export default function FoodCostTab(props) {
           </div>
         </div>
       )}
+    {ingPopup && <IngredientPopup ing={ingPopup} onClose={function(){setIngPopup(null)}} />}
     </div>
-      {ingPopup && <IngredientPopup ing={ingPopup} onClose={function(){setIngPopup(null)}} />}
   )
 }
