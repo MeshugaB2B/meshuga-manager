@@ -21,6 +21,7 @@ export default function SuppliersTab() {
   var [newSupName, setNewSupName] = useState('')
   var [newSupCat, setNewSupCat] = useState('ingredient')
   var [showNewSup, setShowNewSup] = useState(null)
+  var [orphanAction, setOrphanAction] = useState(null)
 
   useEffect(function() { loadData() }, [])
 
@@ -140,6 +141,17 @@ export default function SuppliersTab() {
     })
   }
 
+  function deleteProduct(productId) {
+    if (!confirm('Supprimer ce produit ?')) return
+    sb().from('product_prices').delete().eq('product_id', productId).then(function() {
+      sb().from('products').delete().eq('id', productId).then(function() { loadData(); setOrphanAction(null) })
+    })
+  }
+
+  function changeCategory(productId, newCat) {
+    sb().from('products').update({category: newCat}).eq('id', productId).then(function() { loadData(); setOrphanAction(null) })
+  }
+
   function getRecipesForProduct(productName) {
     var found = []
     RECIPES_DATA.forEach(function(r) {
@@ -148,11 +160,17 @@ export default function SuppliersTab() {
         var ingName = (ing.article || '').toLowerCase()
         var pName = productName.toLowerCase()
         if (ingName === pName || ingName.indexOf(pName) > -1 || pName.indexOf(ingName) > -1) {
-          if (found.indexOf(r.name) === -1) found.push(r.name)
+          if (!found.find(function(f) { return f.name === r.name })) {
+            found.push({name: r.name, foodCostPct: r.foodCostPct || 0})
+          }
         }
       })
     })
     return found
+  }
+
+  function getProductPrices(productId) {
+    return prices.filter(function(p) { return p.product_id === productId })
   }
 
   function renderPriceChart(productIds, allPrices, supplierMap) {
@@ -168,7 +186,7 @@ export default function SuppliersTab() {
     allDates.sort()
     if (allDates.length < 2) return null
     var allVals = []
-    Object.values(seriesMap).forEach(function(pp) { pp.forEach(function(p) { allVals.push(p.price) }) })
+    Object.values(seriesMap).forEach(function(pp) { pp.forEach(function(p) { allVals.push(Number(p.price)) }) })
     var minV = Math.min.apply(null, allVals) * 0.92
     var maxV = Math.max.apply(null, allVals) * 1.08
     var range = maxV - minV || 1
@@ -186,8 +204,8 @@ export default function SuppliersTab() {
       var pts = pp.map(function(p) {
         var di = allDates.indexOf(p.invoice_date)
         var x = pad + (di / (allDates.length - 1)) * chartW
-        var y = pad + chartH - ((p.price - minV) / range) * chartH
-        return {x: x, y: y, price: p.price}
+        var y = pad + chartH - ((Number(p.price) - minV) / range) * chartH
+        return {x: x, y: y, price: Number(p.price)}
       })
       svgParts.push({points: pts, color: color})
       ci++
@@ -215,7 +233,7 @@ export default function SuppliersTab() {
               {s.points.map(function(p, pi) {
                 return <g key={pi}>
                   <circle cx={p.x} cy={p.y} r="4" fill={s.color} stroke="#191923" strokeWidth="1.5" />
-                  <text x={p.x} y={p.y - 8} textAnchor="middle" style={{fontSize:7,fontWeight:900,fill:'#191923',fontFamily:'Arial Narrow'}}>{Number(p.price).toFixed(2)}</text>
+                  <text x={p.x} y={p.y - 8} textAnchor="middle" style={{fontSize:7,fontWeight:900,fill:'#191923',fontFamily:'Arial Narrow'}}>{p.price.toFixed(2)}</text>
                 </g>
               })}
             </g>
@@ -228,14 +246,17 @@ export default function SuppliersTab() {
     )
   }
 
-  // Orphan products: not in any recipe
+  var activeSuppliers = suppliers.filter(function(s) { return !s.archived })
+  var filteredSuppliers = catFilter === 'all' ? activeSuppliers : activeSuppliers.filter(function(s) { return s.category === catFilter })
+
   var orphanProducts = products.filter(function(p) {
     if (p.category !== 'ingredient') return false
+    var sup = suppliers.find(function(s) { return s.id === p.supplier_id })
+    if (sup && sup.archived) return false
     var recipes = getRecipesForProduct(p.name)
     return recipes.length === 0
   })
 
-  // Price comparison: same article at multiple suppliers
   var comparisons = []
   articles.forEach(function(art) {
     var artProducts = products.filter(function(p) { return p.article_id === art.id })
@@ -252,8 +273,6 @@ export default function SuppliersTab() {
     }
   })
   comparisons.sort(function(a, b) { return Number(b.saving) - Number(a.saving) })
-
-  var filteredSuppliers = catFilter === 'all' ? suppliers : suppliers.filter(function(s) { return s.category === catFilter })
 
   if (loading) return <div style={{padding:40,textAlign:'center',opacity:0.5}}>Chargement...</div>
 
@@ -280,16 +299,16 @@ export default function SuppliersTab() {
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:12}}>
             <div>
               <div style={{fontFamily:'Yellowtail',fontSize:24,color:'#191923'}}>{prod.name}</div>
-              <div style={{fontSize:12,color:'#888',marginTop:2}}>{prod.category === 'ingredient' ? 'Ingrédient recette' : prod.category === 'packaging' ? 'Packaging' : 'Consommable'}</div>
+              <div style={{fontSize:12,color:'#FF82D7',fontWeight:700,marginTop:2}}>{sup ? sup.name : ''}</div>
             </div>
             <div style={{textAlign:'right'}}>
               <div style={{fontSize:28,fontWeight:900,color:'#191923'}}>{Number(activeProduct.current_price).toFixed(2)} €<span style={{fontSize:14,color:'#888',fontWeight:400}}>/{prod.unit}</span></div>
-              <div style={{fontSize:11,color:'#FF82D7',fontWeight:700}}>prix actif</div>
+              {siblingProducts.length > 1 && <div style={{fontSize:11,color:'#FF82D7',fontWeight:700}}>prix actif</div>}
             </div>
           </div>
 
-          <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Fournisseurs</div>
-          {siblingProducts.map(function(sp) {
+          {siblingProducts.length > 1 && <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Fournisseurs</div>}
+          {siblingProducts.length > 1 && siblingProducts.map(function(sp) {
             var spSup = suppliers.find(function(ss) { return ss.id === sp.supplier_id })
             var diff = activeProduct.id !== sp.id && Number(activeProduct.current_price) > 0 ? ((Number(sp.current_price) - Number(activeProduct.current_price)) / Number(activeProduct.current_price) * 100).toFixed(1) : null
             return (
@@ -307,15 +326,14 @@ export default function SuppliersTab() {
               </div>
             )
           })}
-          {siblingProducts.length === 1 && <div style={{fontSize:12,color:'#888',marginTop:4}}>Un seul fournisseur pour cet article. Uploadez une facture d'un autre fournisseur pour comparer.</div>}
 
           <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Utilisé dans</div>
           {recipes.length > 0 ? recipes.map(function(r) {
-            return <span key={r} style={{display:'inline-block',padding:'5px 12px',borderRadius:20,fontSize:11,fontWeight:900,margin:3,background:'#FFEB5A',color:'#191923',border:'2px solid #191923',textTransform:'uppercase'}}>{r}</span>
+            return <span key={r.name} style={{display:'inline-block',padding:'5px 12px',borderRadius:20,fontSize:11,fontWeight:900,margin:3,background:'#FFEB5A',color:'#191923',border:'2px solid #191923',textTransform:'uppercase'}}>{r.name}</span>
           }) : <span style={{fontSize:13,color:'#888',fontWeight:700}}>Hors recettes</span>}
 
           <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Évolution du prix</div>
-          {allPricesForArticle.length >= 2 ? renderPriceChart(allProductIds, prices, supplierMapForChart) : <div style={{fontSize:13,color:'#888'}}>Pas encore d'historique — uploadez des factures pour alimenter le graph</div>}
+          {allPricesForArticle.length >= 2 ? renderPriceChart(allProductIds, prices, supplierMapForChart) : <div style={{fontSize:13,color:'#888'}}>Pas encore d'historique</div>}
 
           <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Historique factures</div>
           {allPricesForArticle.length > 0 ? allPricesForArticle.slice().reverse().map(function(ph, i) {
@@ -340,7 +358,7 @@ export default function SuppliersTab() {
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:14}}>
         <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
           <span style={{fontFamily:'Yellowtail',fontSize:13,color:'#191923'}}>Filtrer :</span>
-          {[{v:'all',l:'TOUS'},{v:'ingredient',l:'INGRÉDIENTS'},{v:'packaging',l:'PACKAGING'},{v:'consommable',l:'CONSOMMABLES'}].map(function(c) {
+          {[{v:'all',l:'TOUS'},{v:'ingredient',l:'INGRÉDIENTS'},{v:'boisson',l:'BOISSONS'},{v:'packaging',l:'PACKAGING'},{v:'consommable',l:'CONSOMMABLES'}].map(function(c) {
             return <button key={c.v} onClick={function(){setCatFilter(c.v)}} style={{padding:'5px 14px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:catFilter===c.v?'#FFEB5A':'transparent',color:'#191923',cursor:'pointer',textTransform:'uppercase',fontFamily:'Arial Narrow, Arial, sans-serif'}}>{c.l}</button>
           })}
         </div>
@@ -374,13 +392,34 @@ export default function SuppliersTab() {
       {orphanProducts.length > 0 && (
         <div style={{background:'#fff',border:'2px solid #CC0066',borderRadius:12,padding:16,marginBottom:14}}>
           <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#CC0066',marginBottom:6}}>Produits sans recette</div>
-          <div style={{fontSize:12,color:'#888',marginBottom:8}}>Ces ingrédients ne sont liés à aucune recette — vérifiez s'ils sont encore utilisés</div>
+          <div style={{fontSize:12,color:'#888',marginBottom:8}}>Cliquez pour affecter, recatégoriser ou supprimer</div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {orphanProducts.map(function(op) {
               var sup = suppliers.find(function(s) { return s.id === op.supplier_id })
-              return <span key={op.id} style={{display:'inline-block',padding:'4px 10px',borderRadius:20,fontSize:11,fontWeight:900,background:'#FFE0E0',color:'#CC0066',border:'1px solid #CC0066'}}>{op.name} ({sup ? sup.name : '?'} · {Number(op.current_price).toFixed(2)}€/{op.unit})</span>
+              return <span key={op.id} onClick={function(){setOrphanAction(orphanAction === op.id ? null : op.id)}} style={{display:'inline-block',padding:'4px 10px',borderRadius:20,fontSize:11,fontWeight:900,background:orphanAction === op.id ? '#CC0066' : '#FFE0E0',color:orphanAction === op.id ? '#FFF' : '#CC0066',border:'1px solid #CC0066',cursor:'pointer'}}>{op.name} ({sup ? sup.name : '?'} · {Number(op.current_price).toFixed(2)}€/{op.unit})</span>
             })}
           </div>
+          {orphanAction && (function() {
+            var op = orphanProducts.find(function(p) { return p.id === orphanAction })
+            if (!op) return null
+            return (
+              <div style={{background:'#FFF9D0',border:'2px solid #FFEB5A',borderRadius:8,padding:12,marginTop:10}}>
+                <div style={{fontWeight:900,fontSize:13,marginBottom:8}}>{op.name}</div>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+                  <button onClick={function(){changeCategory(op.id, 'boisson')}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>🥤 Boisson revente</button>
+                  <button onClick={function(){changeCategory(op.id, 'consommable')}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>🧹 Consommable</button>
+                  <button onClick={function(){changeCategory(op.id, 'packaging')}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>📦 Packaging</button>
+                  <button onClick={function(){deleteProduct(op.id)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #CC0066',background:'#FFE0E0',color:'#CC0066',cursor:'pointer'}}>🗑 Supprimer</button>
+                </div>
+                <div style={{fontSize:11,color:'#888',marginBottom:4}}>Ou affecter au fournisseur :</div>
+                <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                  {suppliers.filter(function(s) { return !s.archived && s.id !== op.supplier_id }).map(function(s) {
+                    return <button key={s.id} onClick={function(){sb().from('products').update({supplier_id: s.id}).eq('id', op.id).then(function(){loadData();setOrphanAction(null)})}} style={{padding:'3px 10px',fontSize:10,fontWeight:900,borderRadius:20,border:'1px solid #DDD',background:'#fff',cursor:'pointer'}}>{s.name}</button>
+                  })}
+                </div>
+              </div>
+            )
+          })()}
         </div>
       )}
 
@@ -396,9 +435,9 @@ export default function SuppliersTab() {
 
           {!uploadResult.supplier_id && (
             <div style={{background:'#FFE0F0',border:'2px solid #FF82D7',borderRadius:8,padding:12,marginTop:10}}>
-              <div style={{fontSize:12,fontWeight:900,color:'#993560',marginBottom:6}}>Assigner à un fournisseur existant ou créer :</div>
+              <div style={{fontSize:12,fontWeight:900,color:'#993560',marginBottom:6}}>Assigner à un fournisseur :</div>
               <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                {suppliers.map(function(s) {
+                {suppliers.filter(function(s){return !s.archived}).map(function(s) {
                   return <button key={s.id} onClick={function(){setUploadResult(function(prev){return Object.assign({}, prev, {supplier_id: s.id, fournisseur_matched: s.name})})}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #191923',background:'#fff',cursor:'pointer'}}>{s.name}</button>
                 })}
                 <button onClick={function(){setShowNewSup('invoice')}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #FF82D7',background:'#FF82D7',color:'#fff',cursor:'pointer'}}>+ NOUVEAU</button>
@@ -408,6 +447,7 @@ export default function SuppliersTab() {
                   <input value={newSupName} onChange={function(e){setNewSupName(e.target.value)}} placeholder="Nom fournisseur" style={{padding:'4px 10px',fontSize:12,border:'2px solid #191923',borderRadius:8,fontWeight:700}} />
                   <select value={newSupCat} onChange={function(e){setNewSupCat(e.target.value)}} style={{padding:'4px 8px',fontSize:11,border:'1px solid #191923',borderRadius:8}}>
                     <option value="ingredient">Ingrédient</option>
+                    <option value="boisson">Boisson</option>
                     <option value="packaging">Packaging</option>
                     <option value="consommable">Consommable</option>
                   </select>
@@ -433,7 +473,7 @@ export default function SuppliersTab() {
 
           {uploadResult.suggestions && uploadResult.suggestions.length > 0 && (
             <div style={{marginTop:10,marginBottom:12}}>
-              <div style={{fontSize:12,fontWeight:900,color:'#B8920A',marginBottom:6}}>🔍 {uploadResult.suggestions.length} suggestion{uploadResult.suggestions.length > 1 ? 's' : ''} — confirmez</div>
+              <div style={{fontSize:12,fontWeight:900,color:'#B8920A',marginBottom:6}}>🔍 {uploadResult.suggestions.length} suggestion{uploadResult.suggestions.length > 1 ? 's' : ''}</div>
               {uploadResult.suggestions.map(function(s, i) {
                 return (
                   <div key={i} style={{background:'#FFF9D0',border:'2px solid #FFEB5A',borderRadius:8,padding:10,marginBottom:6}}>
@@ -465,7 +505,7 @@ export default function SuppliersTab() {
                       {uploadResult.supplier_id && <button disabled={classifying===u.article} onClick={function(){classifyProduct(u, uploadResult.supplier_id, u.categorie)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#FFEB5A',cursor:'pointer'}}>
                         {classifying===u.article ? '...' : uploadResult.fournisseur_matched || 'Ce fournisseur'}
                       </button>}
-                      {suppliers.filter(function(s){return s.id !== uploadResult.supplier_id}).map(function(s) {
+                      {suppliers.filter(function(s){return !s.archived && s.id !== uploadResult.supplier_id}).map(function(s) {
                         return <button key={s.id} disabled={classifying===u.article} onClick={function(){classifyProduct(u, s.id, u.categorie)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #DDD',background:'#fff',cursor:'pointer'}}>{s.name}</button>
                       })}
                       <button onClick={function(){setShowNewSup(u.article)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #FF82D7',background:'#FF82D7',color:'#fff',cursor:'pointer'}}>+ NOUVEAU</button>
@@ -475,6 +515,7 @@ export default function SuppliersTab() {
                         <input value={newSupName} onChange={function(e){setNewSupName(e.target.value)}} placeholder="Nom fournisseur" style={{padding:'4px 10px',fontSize:12,border:'2px solid #191923',borderRadius:8,fontWeight:700}} />
                         <select value={newSupCat} onChange={function(e){setNewSupCat(e.target.value)}} style={{padding:'4px 8px',fontSize:11,border:'1px solid #191923',borderRadius:8}}>
                           <option value="ingredient">Ingrédient</option>
+                          <option value="boisson">Boisson</option>
                           <option value="packaging">Packaging</option>
                           <option value="consommable">Consommable</option>
                         </select>
@@ -487,15 +528,13 @@ export default function SuppliersTab() {
             </div>
           )}
 
-          {uploadResult.matched && uploadResult.matched.length > 0 && (!uploadResult.unmatched || uploadResult.unmatched.length === 0) && (!uploadResult.suggestions || uploadResult.suggestions.length === 0) && (
-            <button onClick={function(){setUploadResult(null)}} style={{padding:'6px 16px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#FFEB5A',color:'#191923',cursor:'pointer',marginTop:10}}>OK, FERMER</button>
-          )}
+          {(!uploadResult.unmatched || uploadResult.unmatched.length === 0) && (!uploadResult.suggestions || uploadResult.suggestions.length === 0) && <button onClick={function(){setUploadResult(null)}} style={{padding:'6px 16px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#FFEB5A',color:'#191923',cursor:'pointer',marginTop:10}}>OK, FERMER</button>}
         </div>
       )}
 
       {filteredSuppliers.map(function(s) {
         var supProducts = products.filter(function(p) { return p.supplier_id === s.id })
-        var catBadge = s.category === 'ingredient' ? {bg:'#FFEB5A',color:'#191923',label:'Ingrédients'} : s.category === 'packaging' ? {bg:'#FF82D7',color:'#FFF',label:'Packaging'} : {bg:'#E8E8E8',color:'#555',label:'Consommable'}
+        var catBadge = s.category === 'ingredient' ? {bg:'#FFEB5A',color:'#191923',label:'Ingrédients'} : s.category === 'boisson' ? {bg:'#E0F0FF',color:'#005FFF',label:'Boissons'} : s.category === 'packaging' ? {bg:'#FF82D7',color:'#FFF',label:'Packaging'} : {bg:'#E8E8E8',color:'#555',label:'Consommable'}
         return (
           <div key={s.id} style={{background:'#fff',border:'2px solid #191923',borderRadius:12,padding:16,marginBottom:14}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingBottom:10,borderBottom:'2px solid #FFEB5A',marginBottom:8}}>
@@ -519,8 +558,8 @@ export default function SuppliersTab() {
                     </div>
                     <div style={{marginTop:3}}>
                       {recipes.length > 0 ? recipes.slice(0, 4).map(function(r) {
-                        return <span key={r} style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,margin:2,background:'#FFF3B0',color:'#8A6D00',border:'1px solid #EED980',textTransform:'uppercase'}}>{r}</span>
-                      }) : <span style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,background:'#E8E8E8',color:'#555',border:'1px solid #CCC',textTransform:'uppercase'}}>Hors recettes</span>}
+                        return <span key={r.name} style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,margin:2,background:'#FFF3B0',color:'#8A6D00',border:'1px solid #EED980',textTransform:'uppercase'}}>{r.name}</span>
+                      }) : p.category === 'boisson' ? <span style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,background:'#E0F0FF',color:'#005FFF',border:'1px solid #B0D0FF',textTransform:'uppercase'}}>Boisson revente</span> : <span style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,background:'#E8E8E8',color:'#555',border:'1px solid #CCC',textTransform:'uppercase'}}>Hors recettes</span>}
                     </div>
                   </div>
                   <div style={{textAlign:'right'}}>
