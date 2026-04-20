@@ -162,7 +162,7 @@ export default function FoodCostAlertsWidget() {
   if (loading) return null
 
   var hausse = changes.filter(function(c) { return c.changePct > 0 }).slice(0, 10)
-  var baisse = changes.filter(function(c) { return c.changePct < 0 }).slice(0, 10)
+  var baisse = changes.filter(function(c) { return c.changePct < 0 }).sort(function(a, b) { return a.changePct - b.changePct }).slice(0, 10)
 
   return (
     <div style={{background:'#fff',border:'2px solid #191923',borderRadius:12,padding:16,marginBottom:16}}>
