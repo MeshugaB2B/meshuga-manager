@@ -294,7 +294,6 @@ export default function FoodCostTab(props) {
         </div>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
           <button className="btn btn-y btn-sm" style={{background:fcView==='recettes'?'#191923':'transparent',color:fcView==='recettes'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('recettes');setFcSelectedParent(null)}}>Recettes</button>
-          <button className="btn btn-y btn-sm" style={{background:fcView==='boissons'?'#191923':'transparent',color:fcView==='boissons'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('boissons');setFcSelectedParent(null)}}>Boissons</button>
           <button className="btn btn-y btn-sm" style={{background:fcView==='fournisseurs'?'#191923':'transparent',color:fcView==='fournisseurs'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('fournisseurs');setFcSelectedParent(null)}}>Fournisseurs</button>
           <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Facture</button>
         </div>
@@ -379,6 +378,7 @@ export default function FoodCostTab(props) {
                   <div style={{flex:1,minHeight:44,display:'flex',flexDirection:'column',justifyContent:'center'}}>
                     <div style={{fontWeight:900,fontSize:14,display:'flex',alignItems:'center',gap:6}}>
                       {parent.name}
+                      {parent.category === 'boisson' && <span style={{fontSize:9,background:'#F0F0F0',color:'#555',padding:'2px 6px',borderRadius:4,fontWeight:900}}>🏡 MAISON</span>}
                       {hasVariants && <span style={{fontSize:9,background:'#FF82D7',color:'#fff',padding:'2px 6px',borderRadius:4,fontWeight:900}}>STD + MINI</span>}
                     </div>
                     <div style={{fontSize:11,opacity:.6}}>
@@ -397,6 +397,51 @@ export default function FoodCostTab(props) {
                   <div style={{width:Math.min(v.food_cost_pct,60)/60*100+'%',background:barColor,height:'100%',borderRadius:20}} />
                 </div>
                 {alert && <div style={{fontSize:10,color:'#CC0066',fontWeight:900,marginTop:4}}>⚠️ Au-dessus du seuil de {fcSeuil}%</div>}
+              </div>
+            )
+          })}
+
+          {/* BOISSONS REVENTE — affichées quand filtre "tous" ou "boisson" */}
+          {(fcCatFilter === 'tous' || fcCatFilter === 'boisson') && drinks.map(function(d){
+            var tvaR = tvaToRatio(d.tva_rate)
+            if (tvaR === 0) tvaR = 0.20
+            var prixHT = Number(d.selling_price_ttc) / (1 + tvaR)
+            var marge = Math.round((prixHT - Number(d.purchase_price_ht)) * 100) / 100
+            var pct = prixHT > 0 ? Math.round(Number(d.purchase_price_ht) / prixHT * 1000) / 10 : 0
+            var isEdit = drinkEdit && drinkEdit.id === d.id
+            var alert = pct > fcSeuil
+            var barColor = alert ? '#CC0066' : '#009D3A'
+            return (
+              <div key={'drink_'+d.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(alert?'#CC0066':'#009D3A')}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                  <div style={{flex:1,minHeight:44,display:'flex',flexDirection:'column',justifyContent:'center'}}>
+                    <div style={{fontWeight:900,fontSize:14,display:'flex',alignItems:'center',gap:6}}>
+                      {d.name}
+                      <span style={{fontSize:9,background:'#F0F0F0',color:'#555',padding:'2px 6px',borderRadius:4,fontWeight:900}}>📦 REVENTE</span>
+                    </div>
+                    <div style={{fontSize:11,opacity:.6}}>
+                      {d.supplier_name} · PV {fmt(d.selling_price_ttc)}€ TTC · Marge HT {fmt(marge)}€
+                      {' · Achat : '}
+                      {!isEdit && (
+                        <span style={{fontWeight:900,cursor:'pointer',color:'#005FFF',textDecoration:'underline'}} onClick={function(e){e.stopPropagation();setDrinkEdit({id:d.id, price: Number(d.purchase_price_ht)})}}>{fmt(d.purchase_price_ht)}€ HT</span>
+                      )}
+                      {isEdit && (
+                        <span onClick={function(e){e.stopPropagation()}} style={{display:'inline-flex',gap:4,alignItems:'center',marginLeft:4}}>
+                          <input type="number" step="0.01" value={drinkEdit.price} onChange={function(e){setDrinkEdit({id:d.id,price:parseFloat(e.target.value)||0})}} style={{width:60,padding:'2px 4px',fontSize:11,fontWeight:700,border:'2px solid #005FFF',borderRadius:4,textAlign:'right'}} autoFocus />
+                          <button className="btn btn-sm btn-y" style={{fontSize:9,padding:'2px 6px'}} onClick={function(){saveDrinkPrice(d, drinkEdit.price)}}>✓</button>
+                          <button className="btn btn-sm" style={{fontSize:9,padding:'2px 6px'}} onClick={function(){setDrinkEdit(null)}}>✕</button>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{textAlign:'right',padding:'4px 8px'}}>
+                    <div style={{fontSize:20,fontWeight:900,color:barColor}}>{pct}%</div>
+                    <div style={{fontSize:10,opacity:.5}}>food cost</div>
+                  </div>
+                </div>
+                <div style={{background:'#F0F0F0',borderRadius:20,height:6,overflow:'hidden'}}>
+                  <div style={{width:Math.min(pct,60)/60*100+'%',background:barColor,height:'100%',borderRadius:20}} />
+                </div>
               </div>
             )
           })}
@@ -586,57 +631,6 @@ export default function FoodCostTab(props) {
         )
       })()}
 
-      {/* ========== VUE BOISSONS REVENTE ========== */}
-      {fcView === 'boissons' && (
-        <div>
-          <div style={{background:'#fff',borderRadius:12,padding:16,border:'1.5px solid #EBEBEB',marginBottom:12}}>
-            <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923',marginBottom:4}}>Boissons revente</div>
-            <div style={{fontSize:12,opacity:.6}}>Achat HT, prix de vente TTC et marge par bouteille — TVA 20%.</div>
-          </div>
-          {drinks.map(function(d){
-            var tvaR = tvaToRatio(d.tva_rate)
-            if (tvaR === 0) tvaR = 0.20
-            var prixHT = Number(d.selling_price_ttc) / (1 + tvaR)
-            var marge = Math.round((prixHT - Number(d.purchase_price_ht)) * 100) / 100
-            var pct = prixHT > 0 ? Math.round(Number(d.purchase_price_ht) / prixHT * 1000) / 10 : 0
-            var isEdit = drinkEdit && drinkEdit.id === d.id
-            return (
-              <div key={d.id} className="card" style={{marginBottom:8,borderLeft:'4px solid #FF82D7'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-                  <div style={{flex:1,minWidth:150}}>
-                    <div style={{fontWeight:900,fontSize:14}}>{d.name}</div>
-                    <div style={{fontSize:10,opacity:.5}}>{d.supplier_name} · TVA {(tvaR * 100).toFixed(0)}%</div>
-                  </div>
-                  <div style={{display:'flex',gap:14,alignItems:'center'}}>
-                    <div style={{textAlign:'center'}}>
-                      <div style={{fontSize:9,opacity:.5,textTransform:'uppercase'}}>Achat HT</div>
-                      {!isEdit && (
-                        <div style={{fontWeight:900,fontSize:14,cursor:'pointer'}} onClick={function(){setDrinkEdit({id:d.id, price: Number(d.purchase_price_ht)})}}>{fmt(d.purchase_price_ht)}€</div>
-                      )}
-                      {isEdit && (
-                        <div style={{display:'flex',gap:4,alignItems:'center'}}>
-                          <input type="number" step="0.01" value={drinkEdit.price} onChange={function(e){setDrinkEdit({id:d.id,price:parseFloat(e.target.value)||0})}} style={{width:65,padding:'4px 6px',fontSize:13,fontWeight:700,border:'2px solid #005FFF',borderRadius:4,textAlign:'right'}} />
-                          <button className="btn btn-sm btn-y" style={{fontSize:10,padding:'4px 8px'}} onClick={function(){saveDrinkPrice(d, drinkEdit.price)}}>✓</button>
-                          <button className="btn btn-sm" style={{fontSize:10,padding:'4px 8px'}} onClick={function(){setDrinkEdit(null)}}>✕</button>
-                        </div>
-                      )}
-                    </div>
-                    <div style={{textAlign:'center'}}>
-                      <div style={{fontSize:9,opacity:.5,textTransform:'uppercase'}}>Vente TTC</div>
-                      <div style={{fontWeight:900,fontSize:14}}>{fmt(d.selling_price_ttc)}€</div>
-                    </div>
-                    <div style={{textAlign:'center'}}>
-                      <div style={{fontSize:9,opacity:.5,textTransform:'uppercase'}}>Marge HT</div>
-                      <div style={{fontWeight:900,fontSize:14,color:'#009D3A'}}>{marge.toFixed(2)}€</div>
-                      <div style={{fontSize:9,opacity:.5}}>({pct}% FC)</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
 
       {/* ========== VUE FOURNISSEURS ========== */}
       {fcView === 'fournisseurs' && (function(){
