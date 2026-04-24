@@ -41,6 +41,10 @@ export default function FoodCostTab(props) {
   var [addIngSearch, setAddIngSearch] = useState('')
 
   var [editingPrixTTC, setEditingPrixTTC] = useState(null)
+  var [editingMeta, setEditingMeta] = useState(null) // { name, categorie, tva }
+
+  var [newRecipeModal, setNewRecipeModal] = useState(null) // null ou {name, categorie, prix_vente_ttc, tva}
+  var [newDrinkModal, setNewDrinkModal] = useState(null)    // null ou {name, supplier_name, purchase_price_ht, selling_price_ttc}
 
   var [fcInvoiceModal, setFcInvoiceModal] = useState(false)
   var [fcInvoiceLoading, setFcInvoiceLoading] = useState(false)
@@ -272,6 +276,114 @@ export default function FoodCostTab(props) {
     })
   }
 
+  // ============= DELETE RECIPE (toutes variantes du parent_slug) =============
+  function deleteRecipeParent(parentSlug, parentName) {
+    if (!confirm('Supprimer définitivement la recette "' + parentName + '" (toutes variantes + ingrédients) ?\n\nCette action est irréversible.')) return
+    var client = sb()
+    // Récupérer les IDs de toutes les variantes
+    var variantIds = []
+    var i
+    for (i = 0; i < recipes.length; i++) {
+      if (recipes[i].parent_slug === parentSlug) variantIds.push(recipes[i].id)
+    }
+    if (variantIds.length === 0) return
+    // 1. Delete ingredients
+    client.from('recipe_ingredients').delete().in('recipe_id', variantIds).then(function(r1){
+      if (r1.error) { toast('Erreur: ' + r1.error.message); return }
+      // 2. Delete recipes
+      client.from('recipes').delete().in('id', variantIds).then(function(r2){
+        if (r2.error) { toast('Erreur: ' + r2.error.message); return }
+        toast('🗑️ ' + parentName + ' supprimée')
+        setFcSelectedParent(null)
+        loadData()
+      })
+    })
+  }
+
+  // ============= DELETE DRINK =============
+  function deleteDrink(drink) {
+    if (!confirm('Supprimer définitivement "' + drink.name + '" ?\n\nCette action est irréversible.')) return
+    sb().from('drinks_resale').delete().eq('id', drink.id).then(function(res){
+      if (res.error) { toast('Erreur: ' + res.error.message); return }
+      toast('🗑️ ' + drink.name + ' supprimée')
+      loadData()
+    })
+  }
+
+  // ============= UPDATE META RECIPE (name / categorie / tva) =============
+  function startEditMeta(v, parent) {
+    setEditingMeta({
+      recipe_id: v.id,
+      name: v.name,
+      categorie: parent.category,
+      tva: v.tva_ratio * 100 // en pourcentage pour l'UI
+    })
+  }
+
+  function saveEditMeta() {
+    if (!editingMeta) return
+    if (!editingMeta.name) { toast('Nom obligatoire'); return }
+    var payload = {
+      name: editingMeta.name,
+      categorie: editingMeta.categorie,
+      tva: editingMeta.tva, // stocké en pourcentage comme le reste de la DB
+      updated_at: new Date().toISOString()
+    }
+    sb().from('recipes').update(payload).eq('id', editingMeta.recipe_id).then(function(res){
+      if (res.error) { toast('Erreur: ' + res.error.message); return }
+      toast('✅ Recette mise à jour')
+      setEditingMeta(null)
+      loadData()
+    })
+  }
+
+  // ============= CREATE RECIPE =============
+  function createRecipe() {
+    if (!newRecipeModal || !newRecipeModal.name) { toast('Nom obligatoire'); return }
+    var slug = (newRecipeModal.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+    var newId = slug + '_' + Date.now().toString(36)
+    var payload = {
+      id: newId,
+      name: newRecipeModal.name,
+      categorie: newRecipeModal.categorie || 'classique',
+      prix_vente_ttc: Number(newRecipeModal.prix_vente_ttc || 0),
+      tva: Number(newRecipeModal.tva || 5.5),
+      parent_slug: slug,
+      variant_key: 'standard',
+      variant_label: 'Standard',
+      is_active: true
+    }
+    sb().from('recipes').insert(payload).then(function(res){
+      if (res.error) { toast('Erreur: ' + res.error.message); return }
+      toast('✅ Recette "' + newRecipeModal.name + '" créée')
+      setNewRecipeModal(null)
+      loadData()
+      setTimeout(function(){ setFcSelectedParent(slug) }, 400)
+    })
+  }
+
+  // ============= CREATE DRINK =============
+  function createDrink() {
+    if (!newDrinkModal || !newDrinkModal.name) { toast('Nom obligatoire'); return }
+    var slug = (newDrinkModal.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+    var payload = {
+      slug: slug + '_' + Date.now().toString(36),
+      name: newDrinkModal.name,
+      supplier_name: newDrinkModal.supplier_name || '',
+      purchase_price_ht: Number(newDrinkModal.purchase_price_ht || 0),
+      selling_price_ttc: Number(newDrinkModal.selling_price_ttc || 0),
+      tva_rate: 0.20,
+      is_active: true,
+      display_order: drinks.length
+    }
+    sb().from('drinks_resale').insert(payload).then(function(res){
+      if (res.error) { toast('Erreur: ' + res.error.message); return }
+      toast('✅ Boisson "' + newDrinkModal.name + '" ajoutée')
+      setNewDrinkModal(null)
+      loadData()
+    })
+  }
+
   // ============= RENDER =============
   if (loading) {
     return (
@@ -295,6 +407,8 @@ export default function FoodCostTab(props) {
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
           <button className="btn btn-y btn-sm" style={{background:fcView==='recettes'?'#191923':'transparent',color:fcView==='recettes'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('recettes');setFcSelectedParent(null)}}>Recettes</button>
           <button className="btn btn-y btn-sm" style={{background:fcView==='fournisseurs'?'#191923':'transparent',color:fcView==='fournisseurs'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('fournisseurs');setFcSelectedParent(null)}}>Fournisseurs</button>
+          <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
+          <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewDrinkModal({name:'',supplier_name:'',purchase_price_ht:0,selling_price_ttc:0})}}>+ Boisson</button>
           <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Facture</button>
         </div>
       </div>
@@ -392,6 +506,7 @@ export default function FoodCostTab(props) {
                     <div style={{fontSize:20,fontWeight:900,color:barColor}}>{v.food_cost_pct}%</div>
                     <div style={{fontSize:10,opacity:.5}}>food cost</div>
                   </div>
+                  <button style={{background:'#FFE5E5',border:'none',color:'#CC0066',fontSize:14,cursor:'pointer',borderRadius:6,padding:'6px 10px',flexShrink:0,marginLeft:4}} onClick={function(e){e.stopPropagation();deleteRecipeParent(parent.parent_slug, parent.name)}}>🗑️</button>
                 </div>
                 <div style={{background:'#F0F0F0',borderRadius:20,height:6,overflow:'hidden'}}>
                   <div style={{width:Math.min(v.food_cost_pct,60)/60*100+'%',background:barColor,height:'100%',borderRadius:20}} />
@@ -438,6 +553,7 @@ export default function FoodCostTab(props) {
                     <div style={{fontSize:20,fontWeight:900,color:barColor}}>{pct}%</div>
                     <div style={{fontSize:10,opacity:.5}}>food cost</div>
                   </div>
+                  <button style={{background:'#FFE5E5',border:'none',color:'#CC0066',fontSize:14,cursor:'pointer',borderRadius:6,padding:'6px 10px',flexShrink:0,marginLeft:4}} onClick={function(e){e.stopPropagation();deleteDrink(d)}}>🗑️</button>
                 </div>
                 <div style={{background:'#F0F0F0',borderRadius:20,height:6,overflow:'hidden'}}>
                   <div style={{width:Math.min(pct,60)/60*100+'%',background:barColor,height:'100%',borderRadius:20}} />
@@ -462,9 +578,46 @@ export default function FoodCostTab(props) {
         return (
           <div>
             <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
-              <button className="btn btn-sm" onClick={function(){setFcSelectedParent(null);setAddIngOpen(false);setEditingIngId(null);setEditingPrixTTC(null)}}>← Retour</button>
+              <button className="btn btn-sm" onClick={function(){setFcSelectedParent(null);setAddIngOpen(false);setEditingIngId(null);setEditingPrixTTC(null);setEditingMeta(null)}}>← Retour</button>
               <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923',flex:1}}>{parent.name}</div>
+              <button className="btn btn-sm" style={{background:'#FFEB5A',fontWeight:900}} onClick={function(){startEditMeta(v, parent)}}>✏️ Modifier</button>
+              <button className="btn btn-sm" style={{background:'#FFE5E5',color:'#CC0066',fontWeight:900}} onClick={function(){deleteRecipeParent(parent.parent_slug, parent.name)}}>🗑️ Supprimer</button>
             </div>
+
+            {/* MODAL ÉDITION META */}
+            {editingMeta && editingMeta.recipe_id === v.id && (
+              <div style={{background:'#F8F9FF',borderRadius:12,padding:16,marginBottom:12,border:'2px solid #005FFF'}}>
+                <div style={{fontWeight:900,fontSize:13,textTransform:'uppercase',marginBottom:10,color:'#005FFF'}}>✏️ Modifier la recette</div>
+                <div style={{marginBottom:10}}>
+                  <div style={{fontSize:10,opacity:.5,marginBottom:3}}>Nom</div>
+                  <input className="inp" value={editingMeta.name} onChange={function(e){setEditingMeta(function(p){return Object.assign({},p,{name:e.target.value})})}} />
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                  <div>
+                    <div style={{fontSize:10,opacity:.5,marginBottom:3}}>Catégorie</div>
+                    <select className="inp" value={editingMeta.categorie} onChange={function(e){setEditingMeta(function(p){return Object.assign({},p,{categorie:e.target.value})})}}>
+                      <option value="classique">🥪 Sandwich</option>
+                      <option value="salade">🥗 Salade</option>
+                      <option value="accompagnement">🍟 Accomp.</option>
+                      <option value="boisson">🥤 Boisson</option>
+                      <option value="mini">🥨 Mini</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{fontSize:10,opacity:.5,marginBottom:3}}>TVA (%)</div>
+                    <select className="inp" value={editingMeta.tva} onChange={function(e){setEditingMeta(function(p){return Object.assign({},p,{tva:parseFloat(e.target.value)})})}}>
+                      <option value="5.5">5,5% (restauration à emporter)</option>
+                      <option value="10">10% (restauration sur place)</option>
+                      <option value="20">20% (alcool, boissons)</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
+                  <button className="btn btn-sm" onClick={function(){setEditingMeta(null)}}>Annuler</button>
+                  <button className="btn btn-sm btn-y" style={{fontWeight:900}} onClick={saveEditMeta}>💾 Enregistrer</button>
+                </div>
+              </div>
+            )}
 
             {/* Toggle variantes : ROSE quand actif */}
             {variantsList.length > 1 && (
@@ -678,6 +831,86 @@ export default function FoodCostTab(props) {
           </div>
         )
       })()}
+
+      {/* ========== MODAL NOUVELLE RECETTE ========== */}
+      {newRecipeModal && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:300,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={function(){setNewRecipeModal(null)}}>
+          <div style={{background:'#fff',borderRadius:'16px 16px 0 0',padding:20,width:'100%',maxWidth:520,maxHeight:'90vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+              <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923'}}>+ Nouvelle recette</div>
+              <button style={{background:'none',border:'none',fontSize:22,cursor:'pointer',color:'#888'}} onClick={function(){setNewRecipeModal(null)}}>✕</button>
+            </div>
+            <div style={{marginBottom:10}}>
+              <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Nom *</div>
+              <input className="inp" value={newRecipeModal.name} onChange={function(e){setNewRecipeModal(function(p){return Object.assign({},p,{name:e.target.value})})}} placeholder="Ex : Reuben sandwich" autoFocus />
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+              <div>
+                <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Catégorie</div>
+                <select className="inp" value={newRecipeModal.categorie} onChange={function(e){setNewRecipeModal(function(p){return Object.assign({},p,{categorie:e.target.value})})}}>
+                  <option value="classique">🥪 Sandwich</option>
+                  <option value="salade">🥗 Salade</option>
+                  <option value="accompagnement">🍟 Accomp.</option>
+                  <option value="boisson">🥤 Boisson</option>
+                  <option value="mini">🥨 Mini</option>
+                </select>
+              </div>
+              <div>
+                <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>TVA (%)</div>
+                <select className="inp" value={newRecipeModal.tva} onChange={function(e){setNewRecipeModal(function(p){return Object.assign({},p,{tva:parseFloat(e.target.value)})})}}>
+                  <option value="5.5">5,5% (à emporter)</option>
+                  <option value="10">10% (sur place)</option>
+                  <option value="20">20% (alcool, boissons)</option>
+                </select>
+              </div>
+            </div>
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Prix de vente TTC (€)</div>
+              <input type="number" step="0.1" className="inp" style={{fontSize:18,fontWeight:900}} value={newRecipeModal.prix_vente_ttc||''} onChange={function(e){setNewRecipeModal(function(p){return Object.assign({},p,{prix_vente_ttc:parseFloat(e.target.value)||0})})}} placeholder="0.00" />
+            </div>
+            <div style={{fontSize:11,opacity:.5,marginBottom:12,background:'#F8F9FF',padding:10,borderRadius:6,border:'1px solid #DDEEFF'}}>💡 Tu pourras ajouter les ingrédients juste après la création, sur la fiche de la recette.</div>
+            <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
+              <button className="btn btn-sm" onClick={function(){setNewRecipeModal(null)}}>Annuler</button>
+              <button className="btn btn-y" style={{fontWeight:900}} onClick={createRecipe}>✅ Créer la recette</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== MODAL NOUVELLE BOISSON REVENTE ========== */}
+      {newDrinkModal && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:300,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={function(){setNewDrinkModal(null)}}>
+          <div style={{background:'#fff',borderRadius:'16px 16px 0 0',padding:20,width:'100%',maxWidth:520,maxHeight:'90vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+              <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923'}}>+ Nouvelle boisson (revente)</div>
+              <button style={{background:'none',border:'none',fontSize:22,cursor:'pointer',color:'#888'}} onClick={function(){setNewDrinkModal(null)}}>✕</button>
+            </div>
+            <div style={{marginBottom:10}}>
+              <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Nom *</div>
+              <input className="inp" value={newDrinkModal.name} onChange={function(e){setNewDrinkModal(function(p){return Object.assign({},p,{name:e.target.value})})}} placeholder="Ex : San Pellegrino" autoFocus />
+            </div>
+            <div style={{marginBottom:10}}>
+              <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Fournisseur</div>
+              <input className="inp" value={newDrinkModal.supplier_name} onChange={function(e){setNewDrinkModal(function(p){return Object.assign({},p,{supplier_name:e.target.value})})}} placeholder="Ex : Rouquette, Episaveurs…" />
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
+              <div>
+                <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Prix achat HT (€)</div>
+                <input type="number" step="0.01" className="inp" value={newDrinkModal.purchase_price_ht||''} onChange={function(e){setNewDrinkModal(function(p){return Object.assign({},p,{purchase_price_ht:parseFloat(e.target.value)||0})})}} placeholder="0.00" />
+              </div>
+              <div>
+                <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Prix vente TTC (€)</div>
+                <input type="number" step="0.1" className="inp" value={newDrinkModal.selling_price_ttc||''} onChange={function(e){setNewDrinkModal(function(p){return Object.assign({},p,{selling_price_ttc:parseFloat(e.target.value)||0})})}} placeholder="0.00" />
+              </div>
+            </div>
+            <div style={{fontSize:11,opacity:.5,marginBottom:12,background:'#F8F9FF',padding:10,borderRadius:6,border:'1px solid #DDEEFF'}}>💡 TVA de 20% appliquée automatiquement (boissons revente).</div>
+            <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
+              <button className="btn btn-sm" onClick={function(){setNewDrinkModal(null)}}>Annuler</button>
+              <button className="btn btn-y" style={{fontWeight:900}} onClick={createDrink}>✅ Créer la boisson</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ========== MODAL FACTURE ========== */}
       {fcInvoiceModal && (
