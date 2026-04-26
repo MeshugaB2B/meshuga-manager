@@ -8,6 +8,7 @@ import NotifsTab from './NotifsTab'
 import JournalTab from './JournalTab'
 import InstaTab from './InstaTab'
 import DashboardModals from './DashboardModals'
+import QuotesTab from './catering/QuotesTab'
 import { G } from './styles'
 import { LOGO_PINK, LOGO_YELLOW, STAMP_YELLOW, STAMP_PINK } from './logos'
 import {
@@ -59,6 +60,7 @@ function DashboardImpl() {
   const [devisList, setDevisList] = useState([])
   const [devisView, setDevisView] = useState('list')
   const [currentDevisId, setCurrentDevisId] = useState(null)
+  const [devisMode, setDevisMode] = useState('catering')
   const [devisLivraison, setDevisLivraison] = useState(0)
   const [devisLivraisonOffert, setDevisLivraisonOffert] = useState(false)
   const [devisMepOffert, setDevisMepOffert] = useState(false)
@@ -2121,6 +2123,21 @@ function DashboardImpl() {
 
           {page === 'devis' && (
             <div>
+              {/* PHASE 2 — MODE TOGGLE: Catering (nouveau) vs Classique (legacy) */}
+              <div style={{display:'flex',gap:8,marginBottom:14,padding:'10px 14px',background:'#FFFFFF',borderRadius:7,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',alignItems:'center',flexWrap:'wrap'}}>
+                <span style={{fontFamily:"'Yellowtail',cursive",fontSize:15,marginRight:4}}>Mode :</span>
+                <button className={'btn btn-sm' + (devisMode === 'catering' ? ' btn-p' : '')} onClick={function(){setDevisMode('catering')}}>📦 Catering (Phase 2)</button>
+                <button className={'btn btn-sm' + (devisMode === 'legacy' ? ' btn-y' : '')} onClick={function(){setDevisMode('legacy')}}>🥪 Classique</button>
+              </div>
+              {devisMode === 'catering' && (
+                <QuotesTab
+                  supabase={sb()}
+                  profile={profile}
+                  onNew={function(){toast('🛠 Éditeur catering — Phase 3 à venir')}}
+                  onOpen={function(d){toast('🛠 Édition catering — Phase 3 à venir' + (d && d.client_nom ? ' : ' + d.client_nom : ''))}}
+                />
+              )}
+              <div style={{display: devisMode === 'catering' ? 'none' : 'block'}}>
               <div className="ph">
                 <div><div className="pt">Devis</div><div className="ps">{devisView==='list'?devisList.length+' devis':'Editeur'}</div></div>
                 <div style={{display:'flex',gap:6}}>
@@ -2414,6 +2431,7 @@ function DashboardImpl() {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           )}
 
