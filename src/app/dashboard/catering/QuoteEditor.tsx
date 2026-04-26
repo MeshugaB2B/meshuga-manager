@@ -176,7 +176,21 @@ var QE_CSS =
   '.qe-checkbox-row input{width:14px;height:14px;accent-color:#009D3A}' +
   '.qe-toggle-internes{position:absolute;top:14px;right:14px}' +
   '.qe-densite-suggest{font-size:10px;background:#005FFF;color:#fff;padding:3px 8px;border-radius:3px;font-weight:900;display:inline-block;margin-top:2px}' +
-  '.qe-livraison-auto{font-size:10px;color:#009D3A;font-weight:900;margin-top:3px;font-style:italic}'
+  '.qe-livraison-auto{font-size:10px;color:#009D3A;font-weight:900;margin-top:3px;font-style:italic}' +
+  '.qe-cov{position:sticky;top:8px;z-index:10;background:#191923;color:#FFEB5A;border:2px solid #191923;border-radius:7px;padding:10px 14px;box-shadow:3px 3px 0 #FF82D7;margin-bottom:0}' +
+  '.qe-cov-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap}' +
+  '.qe-cov-title{font-family:Yellowtail,cursive;font-size:15px;color:#FFEB5A;line-height:1}' +
+  '.qe-cov-status{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.4px;padding:3px 8px;border-radius:3px;display:inline-block;border:1.5px solid transparent;line-height:1.4;white-space:nowrap}' +
+  '.qe-cov-status.ok{background:#7AFF82;color:#191923;border-color:#191923}' +
+  '.qe-cov-status.warn{background:#FFEB5A;color:#191923;border-color:#191923}' +
+  '.qe-cov-status.under{background:#FF82D7;color:#191923;border-color:#191923}' +
+  '.qe-cov-status.over{background:#005FFF;color:#fff;border-color:#005FFF}' +
+  '.qe-cov-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:6px}' +
+  '.qe-cov-cell{background:rgba(255,235,90,.08);border:1px solid rgba(255,235,90,.25);border-radius:4px;padding:6px 8px;line-height:1}' +
+  '.qe-cov-num{font-weight:900;font-size:18px;color:#FFEB5A;line-height:1}' +
+  '.qe-cov-lbl{font-family:Yellowtail,cursive;font-size:12px;color:#FFEB5A;opacity:.85;margin-top:3px;line-height:1}' +
+  '.qe-cov-sub{font-size:9px;color:#FFEB5A;opacity:.6;margin-top:2px;line-height:1.2;font-family:Arial Narrow,Arial,sans-serif}' +
+  '.qe-cov-empty{font-size:11px;color:#FFEB5A;opacity:.5;font-style:italic;padding:4px 0}'
 
 // ============================================================
 // COMPOSANT PRINCIPAL
@@ -392,6 +406,93 @@ export default function QuoteEditor(props) {
   // Auto-suggest livraison offerte si > 500 HT
   var livraisonAutoOfferte = totals.sousTotalHT > 500 && livraison > 0 && !livraisonOffert
 
+  // Couverture pièces (compteurs minis / lunch / parts / forfaits)
+  var coverage = useMemo(
+    function() {
+      var nbMinis = 0
+      var nbLunch = 0
+      var nbPlateauxParts = 0
+      var nbLiveForfait = 0
+      var nbAddons = 0
+      var nbBoxes = 0
+      var liveForfaitNames = []
+      lineDetails.forEach(function(l) {
+        var o = l.offering
+        var qty = l.qty
+        if (o.category === 'box_mini') {
+          nbMinis += qty * (Number(o.size_pers) || 40)
+          nbBoxes += qty
+        } else if (o.category === 'live_mini') {
+          nbMinis += qty
+        } else if (o.category === 'lunch_box') {
+          nbLunch += qty
+        } else if (o.category === 'platter') {
+          nbPlateauxParts += qty * (Number(o.size_pers) || 0)
+        } else if (o.category === 'live_forfait') {
+          nbLiveForfait += qty
+          liveForfaitNames.push(qty + '× ' + o.name)
+        } else if (o.category === 'addon') {
+          nbAddons += qty
+        }
+      })
+      var status = null
+      var statusLabel = null
+      var ratio = nbPersonnes > 0 ? nbMinis / nbPersonnes : 0
+      if (eventFormat === 'cocktail' && nbPersonnes > 0 && nbMinis > 0) {
+        if (ratio < 6) {
+          status = 'under'
+          statusLabel = '⚠ Sous-dimensionné · viser 6 à 8 minis/pers (manque ' + Math.ceil(6 * nbPersonnes - nbMinis) + ')'
+        } else if (ratio <= 8) {
+          status = 'ok'
+          statusLabel = '✓ Couverture OK (' + ratio.toFixed(1) + ' minis/pers)'
+        } else if (ratio <= 12) {
+          status = 'warn'
+          statusLabel = '↑ Confortable (' + ratio.toFixed(1) + ' minis/pers)'
+        } else {
+          status = 'over'
+          statusLabel = '↑↑ Très généreux (' + ratio.toFixed(1) + ' minis/pers)'
+        }
+      } else if (eventFormat === 'lunch' && nbPersonnes > 0 && (nbLunch > 0 || nbMinis > 0 || nbPlateauxParts > 0)) {
+        if (nbLunch > 0 && nbLunch < nbPersonnes) {
+          status = 'under'
+          statusLabel = '⚠ Manque ' + (nbPersonnes - nbLunch) + ' lunch box'
+        } else if (nbLunch === nbPersonnes && nbLunch > 0) {
+          status = 'ok'
+          statusLabel = '✓ Couverture exacte'
+        } else if (nbLunch > nbPersonnes) {
+          status = 'over'
+          statusLabel = '+' + (nbLunch - nbPersonnes) + ' lunch box en plus'
+        }
+      } else if (eventFormat === 'soiree' && nbPersonnes > 0 && nbMinis > 0) {
+        if (ratio < 8) {
+          status = 'under'
+          statusLabel = '⚠ Sous-dimensionné · viser 8 à 12 minis/pers'
+        } else if (ratio <= 12) {
+          status = 'ok'
+          statusLabel = '✓ Couverture OK (' + ratio.toFixed(1) + ' minis/pers)'
+        } else {
+          status = 'warn'
+          statusLabel = '↑ Très généreux (' + ratio.toFixed(1) + ' minis/pers)'
+        }
+      }
+      return {
+        nbMinis: nbMinis,
+        nbLunch: nbLunch,
+        nbPlateauxParts: nbPlateauxParts,
+        nbLiveForfait: nbLiveForfait,
+        nbAddons: nbAddons,
+        nbBoxes: nbBoxes,
+        liveForfaitNames: liveForfaitNames,
+        ratio: ratio,
+        status: status,
+        statusLabel: statusLabel
+      }
+    },
+    [lineDetails, eventFormat, nbPersonnes]
+  )
+
+  var hasAnyItem = coverage.nbMinis > 0 || coverage.nbLunch > 0 || coverage.nbPlateauxParts > 0 || coverage.nbLiveForfait > 0 || coverage.nbAddons > 0
+
   // Densité suggérée
   var densiteSuggeree = useMemo(
     function() {
@@ -583,6 +684,66 @@ export default function QuoteEditor(props) {
       </div>
 
       {error ? <div className="qe-error">⚠ {error}</div> : null}
+
+      {/* COMPTEUR COUVERTURE — sticky en haut, toujours visible */}
+      <div className="qe-cov">
+        <div className="qe-cov-head">
+          <div className="qe-cov-title">🍽 Couverture · {nbPersonnes} pers.</div>
+          {coverage.statusLabel ? (
+            <span className={'qe-cov-status ' + (coverage.status || 'warn')}>{coverage.statusLabel}</span>
+          ) : null}
+        </div>
+        {!hasAnyItem ? (
+          <div className="qe-cov-empty">
+            Ajoute des items pour voir le décompte temps réel (minis, lunch box, plateaux…).
+          </div>
+        ) : (
+          <div className="qe-cov-grid">
+            {coverage.nbMinis > 0 ? (
+              <div className="qe-cov-cell">
+                <div className="qe-cov-num">{coverage.nbMinis}</div>
+                <div className="qe-cov-lbl">Minis (pcs)</div>
+                {coverage.nbBoxes > 0 ? (
+                  <div className="qe-cov-sub">{coverage.nbBoxes} box · {coverage.ratio.toFixed(1)}/pers</div>
+                ) : (
+                  <div className="qe-cov-sub">{coverage.ratio.toFixed(1)} / pers</div>
+                )}
+              </div>
+            ) : null}
+            {coverage.nbLunch > 0 ? (
+              <div className="qe-cov-cell">
+                <div className="qe-cov-num">{coverage.nbLunch}</div>
+                <div className="qe-cov-lbl">Lunch box</div>
+                {nbPersonnes > 0 ? (
+                  <div className="qe-cov-sub">{coverage.nbLunch}/{nbPersonnes} pers</div>
+                ) : null}
+              </div>
+            ) : null}
+            {coverage.nbPlateauxParts > 0 ? (
+              <div className="qe-cov-cell">
+                <div className="qe-cov-num">{coverage.nbPlateauxParts}</div>
+                <div className="qe-cov-lbl">Parts plateaux</div>
+                {nbPersonnes > 0 ? (
+                  <div className="qe-cov-sub">{(coverage.nbPlateauxParts / nbPersonnes).toFixed(1)}/pers</div>
+                ) : null}
+              </div>
+            ) : null}
+            {coverage.nbLiveForfait > 0 ? (
+              <div className="qe-cov-cell">
+                <div className="qe-cov-num">{coverage.nbLiveForfait}</div>
+                <div className="qe-cov-lbl">Live forfait</div>
+                <div className="qe-cov-sub">{coverage.liveForfaitNames.join(', ')}</div>
+              </div>
+            ) : null}
+            {coverage.nbAddons > 0 ? (
+              <div className="qe-cov-cell">
+                <div className="qe-cov-num">{coverage.nbAddons}</div>
+                <div className="qe-cov-lbl">Add-ons</div>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
 
       <div className="qe-grid">
         {/* COL GAUCHE — édition */}
