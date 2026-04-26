@@ -9,6 +9,7 @@ import JournalTab from './JournalTab'
 import InstaTab from './InstaTab'
 import DashboardModals from './DashboardModals'
 import QuotesTab from './catering/QuotesTab'
+import QuoteEditor from './catering/QuoteEditor'
 import { G } from './styles'
 import { LOGO_PINK, LOGO_YELLOW, STAMP_YELLOW, STAMP_PINK } from './logos'
 import {
@@ -61,6 +62,8 @@ function DashboardImpl() {
   const [devisView, setDevisView] = useState('list')
   const [currentDevisId, setCurrentDevisId] = useState(null)
   const [devisMode, setDevisMode] = useState('catering')
+  const [cateringEditorOpen, setCateringEditorOpen] = useState(false)
+  const [cateringEditingId, setCateringEditingId] = useState(null)
   const [devisLivraison, setDevisLivraison] = useState(0)
   const [devisLivraisonOffert, setDevisLivraisonOffert] = useState(false)
   const [devisMepOffert, setDevisMepOffert] = useState(false)
@@ -2129,12 +2132,36 @@ function DashboardImpl() {
                 <button className={'btn btn-sm' + (devisMode === 'catering' ? ' btn-p' : '')} onClick={function(){setDevisMode('catering')}}>📦 Catering (Phase 2)</button>
                 <button className={'btn btn-sm' + (devisMode === 'legacy' ? ' btn-y' : '')} onClick={function(){setDevisMode('legacy')}}>🥪 Classique</button>
               </div>
-              {devisMode === 'catering' && (
+             {devisMode === 'catering' && !cateringEditorOpen && (
                 <QuotesTab
                   supabase={sb()}
                   profile={profile}
-                  onNew={function(){toast('🛠 Éditeur catering — Phase 3 à venir')}}
-                  onOpen={function(d){toast('🛠 Édition catering — Phase 3 à venir' + (d && d.client_nom ? ' : ' + d.client_nom : ''))}}
+                  onNew={function(){
+                    setCateringEditingId(null)
+                    setCateringEditorOpen(true)
+                  }}
+                  onOpen={function(d){
+                    setCateringEditingId(d && d.id ? d.id : null)
+                    setCateringEditorOpen(true)
+                  }}
+                />
+              )}
+              {devisMode === 'catering' && cateringEditorOpen && (
+                <QuoteEditor
+                  supabase={sb()}
+                  profile={profile}
+                  devisId={cateringEditingId}
+                  prospects={prospects}
+                  onClose={function(){
+                    setCateringEditorOpen(false)
+                    setCateringEditingId(null)
+                  }}
+                  onSaved={function(saved){
+                    loadDevis()
+                    setCateringEditorOpen(false)
+                    setCateringEditingId(null)
+                  }}
+                  toast={toast}
                 />
               )}
               <div style={{display: devisMode === 'catering' ? 'none' : 'block'}}>
