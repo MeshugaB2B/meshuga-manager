@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { LOGO_YELLOW } from '../logos'
 
 // ============================================================
 // QuoteEditor.tsx — Phase 3 du Dashboard B2B Catering Meshuga
@@ -137,6 +138,338 @@ var parseComposition = function(comp, multiplier) {
     out.push({ qty: n * mult, name: name })
   })
   return out
+}
+
+// Echappement HTML pour insertion sûre dans le PDF
+var escapeHtml = function(s) {
+  if (s === null || s === undefined) return ''
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+// Format euros pour HTML (string)
+var fmtEurStr = function(n) {
+  var v = Number(n) || 0
+  return v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+}
+
+// Génère le HTML complet du devis catering brandé Meshuga
+// d = { numero, validite, clientNom, clientContact, clientEmail, clientPhone,
+//       eventDate, eventLieu, nbPersonnes, eventFormat, lineDetails,
+//       miseEnPlace, miseEnPlaceOffert, livraison, livraisonOffert,
+//       remiseTotalPct, notes, totals, sandwichBreakdown, coverage }
+var generateCateringPdfHtml = function(d, logoUrl) {
+  var todayStr = new Date().toLocaleDateString('fr-FR')
+  var validiteStr = ''
+  if (d.validite) {
+    var vd = new Date(d.validite + 'T12:00:00')
+    if (!isNaN(vd.getTime())) validiteStr = vd.toLocaleDateString('fr-FR')
+  }
+  var eventDateStr = ''
+  if (d.eventDate) {
+    var ed = new Date(d.eventDate + 'T12:00:00')
+    if (!isNaN(ed.getTime())) eventDateStr = ed.toLocaleDateString('fr-FR')
+  }
+  var formatLabels = {
+    cocktail: 'Cocktail dînatoire',
+    lunch: 'Déjeuner / Lunch',
+    soiree: 'Soirée',
+    autre: 'Événement'
+  }
+  var formatLbl = formatLabels[d.eventFormat] || 'Événement'
+
+  // Items rows
+  var itemRows = ''
+  d.lineDetails.forEach(function(l) {
+    var compDiv = l.offering.composition
+      ? '<div class="comp">' + escapeHtml(l.offering.composition) + '</div>'
+      : (l.offering.tagline ? '<div class="tag">' + escapeHtml(l.offering.tagline) + '</div>' : '')
+    var sizeBadge = l.offering.size_pers
+      ? '<span class="size-badge">' + l.offering.size_pers + ' pcs</span>'
+      : ''
+    var remiseBadge = l.remisePct > 0
+      ? '<div class="rem-badge">Remise -' + l.remisePct + '%</div>'
+      : ''
+    itemRows +=
+      '<tr>' +
+        '<td><div class="item-name">' + escapeHtml(l.offering.name) + ' ' + sizeBadge + '</div>' +
+          compDiv + remiseBadge +
+        '</td>' +
+        '<td class="c">' + l.qty + '</td>' +
+        '<td class="r">' + fmtEurStr(l.pvHt) + '</td>' +
+        '<td class="r b">' + fmtEurStr(l.totalLigneHT) + '</td>' +
+      '</tr>'
+  })
+
+  // MEP row
+  var mepRow = ''
+  if (Number(d.miseEnPlace) > 0 || d.miseEnPlaceOffert) {
+    var mepLbl = d.miseEnPlaceOffert
+      ? '<span class="strike">Mise en place / installation</span> <span class="offert">OFFERTE</span>'
+      : 'Mise en place / installation'
+    var mepPu = d.miseEnPlaceOffert
+      ? '<span class="strike">' + fmtEurStr(d.miseEnPlace) + '</span>'
+      : fmtEurStr(d.miseEnPlace)
+    var mepTot = d.miseEnPlaceOffert
+      ? '<span class="offert b">0,00 €</span>'
+      : '<strong>' + fmtEurStr(d.miseEnPlace) + '</strong>'
+    mepRow = '<tr><td>' + mepLbl + '</td><td class="c">1</td><td class="r">' + mepPu + '</td><td class="r">' + mepTot + '</td></tr>'
+  }
+
+  // Livraison row
+  var livRow = ''
+  if (Number(d.livraison) > 0 || d.livraisonOffert) {
+    var livLbl = d.livraisonOffert
+      ? '<span class="strike">Frais de livraison</span> <span class="offert">OFFERTS</span>'
+      : 'Frais de livraison'
+    var livPu = d.livraisonOffert
+      ? '<span class="strike">' + fmtEurStr(d.livraison) + '</span>'
+      : fmtEurStr(d.livraison)
+    var livTot = d.livraisonOffert
+      ? '<span class="offert b">0,00 €</span>'
+      : '<strong>' + fmtEurStr(d.livraison) + '</strong>'
+    livRow = '<tr><td>' + livLbl + '</td><td class="c">1</td><td class="r">' + livPu + '</td><td class="r">' + livTot + '</td></tr>'
+  }
+
+  // Remise row
+  var remRow = ''
+  if (d.totals.remiseGlobale > 0) {
+    remRow =
+      '<tr class="remise-row"><td>Remise commerciale (' + d.remiseTotalPct + '%)</td>' +
+      '<td class="c">—</td><td class="r">—</td>' +
+      '<td class="r b">−' + fmtEurStr(d.totals.remiseGlobale) + '</td></tr>'
+  }
+
+  // Breakdown HTML
+  var breakdownHtml = ''
+  if (d.sandwichBreakdown && d.sandwichBreakdown.length > 0) {
+    var pills = ''
+    d.sandwichBreakdown.forEach(function(s) {
+      pills += '<span class="bd-pill"><strong>' + s.qty + '</strong> ' + escapeHtml(s.name) + '</span>'
+    })
+    breakdownHtml =
+      '<div class="breakdown">' +
+        '<div class="breakdown-title">Récapitulatif par recette</div>' +
+        '<div class="breakdown-list">' + pills + '</div>' +
+      '</div>'
+  }
+
+  // Coverage strip
+  var coverageHtml = ''
+  if (d.coverage) {
+    var covParts = []
+    if (d.coverage.nbMinis > 0) covParts.push('<strong>' + d.coverage.nbMinis + '</strong> minis')
+    if (d.coverage.nbLunch > 0) covParts.push('<strong>' + d.coverage.nbLunch + '</strong> lunch box')
+    if (d.coverage.nbPlateauxParts > 0) covParts.push('<strong>' + d.coverage.nbPlateauxParts + '</strong> parts plateaux')
+    if (d.coverage.nbLiveForfait > 0 && d.coverage.liveForfaitNames && d.coverage.liveForfaitNames.length > 0) {
+      covParts.push(escapeHtml(d.coverage.liveForfaitNames.join(' + ')))
+    }
+    if (covParts.length > 0) {
+      coverageHtml =
+        '<div class="cov">' + covParts.join(' &middot; ') +
+        ' <span class="cov-pers">pour ' + d.nbPersonnes + ' personnes</span></div>'
+    }
+  }
+
+  // Notes
+  var notesHtml = ''
+  if (d.notes && d.notes.trim()) {
+    notesHtml =
+      '<div class="notes-block">' +
+        '<div class="notes-title">Notes</div>' +
+        '<div class="notes-content">' + escapeHtml(d.notes).replace(/\n/g, '<br>') + '</div>' +
+      '</div>'
+  }
+
+  // Per-person price
+  var perPersonHtml = ''
+  if (d.nbPersonnes > 0 && d.totals.totalTTC > 0) {
+    perPersonHtml = '<div class="per-person">soit ' + fmtEurStr(d.totals.totalTTC / d.nbPersonnes) + ' TTC / personne</div>'
+  }
+
+  // Logo HTML
+  var logoHtml = logoUrl
+    ? '<img src="' + logoUrl + '" alt="meshuga"/>'
+    : '<div class="logo-text-fb">meshuga</div>'
+
+  // CSS du PDF (une seule string concaténée)
+  var css =
+    '*{margin:0;padding:0;box-sizing:border-box}' +
+    'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:11px;background:#FFFFFF}' +
+    '@page{size:A4;margin:0mm}' +
+    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{page-break-inside:avoid}}' +
+    '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;display:flex;flex-direction:column;background:#FFFFFF}' +
+    '.content{flex:1}' +
+    '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:14px;border-bottom:4px solid #FF82D7;margin-bottom:18px}' +
+    '.logo img{height:60px;width:auto;display:block}' +
+    '.logo-text-fb{font-family:Yellowtail,cursive;font-size:36px;color:#191923;line-height:1}' +
+    '.logo-sub{font-size:8.5px;color:#999;margin-top:4px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700}' +
+    '.doc-info{text-align:right}' +
+    '.doc-type{font-family:Yellowtail,cursive;font-size:42px;color:#191923;line-height:.95}' +
+    '.doc-num{font-size:10px;color:#666;margin-top:3px;font-weight:700}' +
+    '.parties{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}' +
+    '.party{background:#FAFAFA;border-radius:5px;padding:10px 13px;border-left:4px solid #FFEB5A}' +
+    '.party.client{border-left-color:#FF82D7}' +
+    '.party-label{font-family:Yellowtail,cursive;font-size:14px;color:#888;margin-bottom:4px;line-height:1}' +
+    '.party-name{font-size:13px;font-weight:900;margin-bottom:3px}' +
+    '.party-detail{font-size:9.5px;color:#555;margin-top:1px;line-height:1.5}' +
+    '.event-detail{margin-top:6px;font-size:10px;color:#191923;line-height:1.5}' +
+    '.cov{background:#FFEB5A;border:2px solid #191923;border-radius:5px;padding:8px 14px;margin-bottom:14px;font-size:11px;text-align:center;letter-spacing:.3px;box-shadow:2px 2px 0 #191923}' +
+    '.cov strong{font-weight:900;font-size:12px}' +
+    '.cov-pers{font-style:italic;color:#191923;opacity:.7;margin-left:4px}' +
+    'table.items{width:100%;border-collapse:collapse;margin-bottom:8px}' +
+    'table.items thead th{padding:8px 10px;font-size:8.5px;text-transform:uppercase;letter-spacing:1.2px;font-weight:900;color:#191923;border-top:2px solid #191923;border-bottom:2px solid #191923;text-align:left;background:#FFFFFF}' +
+    'table.items thead th.w-qty{text-align:center;width:9%}' +
+    'table.items thead th.w-pu{text-align:right;width:18%}' +
+    'table.items thead th.w-tot{text-align:right;width:20%}' +
+    'table.items tbody td{padding:8px 10px;border-bottom:1px solid #EBEBEB;font-size:10.5px;vertical-align:top}' +
+    'table.items tbody tr:nth-child(even) td{background:#FAFAFA}' +
+    '.item-name{font-weight:900;font-size:11px;margin-bottom:3px;color:#191923}' +
+    '.size-badge{display:inline-block;background:#FFEB5A;border:1px solid #191923;border-radius:9px;padding:0 6px;font-size:8px;font-weight:900;margin-left:4px;letter-spacing:.5px;vertical-align:middle}' +
+    '.comp{font-size:9px;color:#555;line-height:1.4;margin-top:2px}' +
+    '.tag{font-size:9px;color:#888;line-height:1.4;font-style:italic;margin-top:2px}' +
+    '.rem-badge{display:inline-block;font-size:8.5px;color:#FF82D7;font-weight:900;margin-top:3px;background:#FFF1FA;border:1px solid #FF82D7;border-radius:3px;padding:1px 5px;letter-spacing:.3px}' +
+    '.c{text-align:center}' +
+    '.r{text-align:right}' +
+    '.b{font-weight:900}' +
+    '.strike{text-decoration:line-through;opacity:.5}' +
+    '.offert{color:#009D3A;font-weight:900}' +
+    '.remise-row td{color:#FF82D7}' +
+    '.breakdown{margin:10px 0 14px;padding:10px 13px;background:#FFFAEC;border-radius:5px;border-left:4px solid #FFEB5A}' +
+    '.breakdown-title{font-family:Yellowtail,cursive;font-size:15px;color:#191923;margin-bottom:7px;line-height:1}' +
+    '.breakdown-list{display:flex;flex-wrap:wrap;gap:5px}' +
+    '.bd-pill{display:inline-flex;align-items:center;background:#FFFFFF;border:1.5px solid #191923;border-radius:11px;padding:2px 9px;font-size:10px;font-weight:900;color:#191923;line-height:1.5}' +
+    '.bd-pill strong{margin-right:5px;color:#FF82D7;font-size:11px}' +
+    '.totals-wrap{display:flex;justify-content:flex-end;margin-bottom:14px}' +
+    '.totals{width:300px}' +
+    '.t-row{display:flex;justify-content:space-between;padding:6px 4px;border-bottom:1px solid #EBEBEB;font-size:11.5px}' +
+    '.t-row.gray{color:#888;font-size:10px}' +
+    '.t-row strong{font-weight:900;font-size:12px}' +
+    '.t-final{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;background:#FFEB5A;border:2px solid #191923;border-radius:5px;margin-top:8px;box-shadow:3px 3px 0 #191923}' +
+    '.t-final .lbl{font-family:Yellowtail,cursive;font-size:24px;color:#191923;line-height:1}' +
+    '.t-final .amt{font-weight:900;font-size:17px;color:#191923}' +
+    '.per-person{text-align:right;font-size:9.5px;color:#888;margin-top:5px;font-style:italic}' +
+    '.notes-block{background:#FFF9E5;border-left:4px solid #FFEB5A;padding:10px 13px;margin-bottom:12px;border-radius:0 4px 4px 0}' +
+    '.notes-title{font-family:Yellowtail,cursive;font-size:14px;color:#191923;margin-bottom:4px;line-height:1}' +
+    '.notes-content{font-size:10px;line-height:1.6;color:#333}' +
+    '.rib{border:1.5px solid #191923;border-radius:5px;padding:11px 14px;margin-bottom:12px;background:#FFFFFF}' +
+    '.rib-title{font-family:Yellowtail,cursive;font-size:17px;color:#FF82D7;margin-bottom:8px;line-height:1}' +
+    '.rib-grid{display:grid;grid-template-columns:1fr 1fr 2fr 1fr;gap:12px}' +
+    '.rib-item label{display:block;font-size:7px;text-transform:uppercase;letter-spacing:1px;color:#aaa;margin-bottom:3px;font-weight:900}' +
+    '.rib-item span{font-size:9.5px;font-weight:900;font-family:"Courier New",monospace;color:#191923;letter-spacing:.5px}' +
+    '.cond-block{margin-bottom:14px}' +
+    '.cond-title{font-family:Yellowtail,cursive;font-size:15px;color:#191923;margin-bottom:4px;line-height:1}' +
+    '.cond{font-size:9.5px;color:#555;line-height:1.6}' +
+    '.footer{padding:10px 0 8px;border-top:1px solid #EBEBEB;margin-top:auto}' +
+    '.legal{font-size:7px;color:#aaa;line-height:1.7;margin-bottom:8px;text-align:justify}' +
+    '.pink-bar{background:#FF82D7;padding:9px 14px;border-radius:4px;text-align:center;font-family:Yellowtail,cursive;font-size:18px;color:#191923;letter-spacing:.5px;border:1.5px solid #191923;line-height:1}' +
+    '.no-print{text-align:center;padding:24px 16px;background:#FFFFFF;border-top:2px dashed #FF82D7;margin-top:16px}' +
+    '.no-print p{margin-bottom:14px;font-size:11px;color:#666;line-height:1.6}' +
+    '.no-print button{padding:11px 28px;background:#FFEB5A;color:#191923;border:2px solid #191923;border-radius:5px;font-size:13px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;box-shadow:3px 3px 0 #191923;font-family:Arial,sans-serif;margin:0 4px}' +
+    '.no-print button.close-btn{background:#FFFFFF}' +
+    '.no-print button:active{transform:translate(1px,1px);box-shadow:1px 1px 0 #191923}'
+
+  // FULL HTML
+  return '<!DOCTYPE html><html lang="fr"><head>' +
+    '<meta charset="UTF-8">' +
+    '<title>Devis ' + escapeHtml(d.numero) + ' &mdash; Meshuga Catering</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">' +
+    '<style>' + css + '</style>' +
+    '</head><body>' +
+    '<div class="page">' +
+      '<div class="content">' +
+        // HEADER
+        '<div class="header">' +
+          '<div class="logo">' + logoHtml +
+            '<div class="logo-sub">Catering &middot; 3 rue Vavin 75006 Paris</div>' +
+          '</div>' +
+          '<div class="doc-info">' +
+            '<div class="doc-type">Devis</div>' +
+            '<div class="doc-num">N&deg; ' + escapeHtml(d.numero) + '</div>' +
+            '<div class="doc-num">&Eacute;mis le ' + todayStr + '</div>' +
+            (validiteStr ? '<div class="doc-num">Valable jusqu&#39;au ' + validiteStr + '</div>' : '') +
+          '</div>' +
+        '</div>' +
+        // PARTIES
+        '<div class="parties">' +
+          '<div class="party">' +
+            '<div class="party-label">&Eacute;metteur</div>' +
+            '<div class="party-name">SAS AEGIA FOOD</div>' +
+            '<div class="party-detail">Enseigne : Meshuga Crazy Deli</div>' +
+            '<div class="party-detail">3 rue Vavin, 75006 Paris</div>' +
+            '<div class="party-detail">SIRET 904 639 531 00014</div>' +
+            '<div class="party-detail">TVA FR31904639531</div>' +
+            '<div class="party-detail">hello@meshuga.fr</div>' +
+          '</div>' +
+          '<div class="party client">' +
+            '<div class="party-label">Client</div>' +
+            '<div class="party-name">' + escapeHtml(d.clientNom) + '</div>' +
+            (d.clientContact ? '<div class="party-detail">' + escapeHtml(d.clientContact) + '</div>' : '') +
+            (d.clientEmail ? '<div class="party-detail">' + escapeHtml(d.clientEmail) + '</div>' : '') +
+            (d.clientPhone ? '<div class="party-detail">' + escapeHtml(d.clientPhone) + '</div>' : '') +
+            '<div class="event-detail">' +
+              '<strong>' + formatLbl + '</strong> &middot; ' + d.nbPersonnes + ' pers.' +
+              (eventDateStr ? ' &middot; ' + eventDateStr : '') +
+              (d.eventLieu ? '<br>Lieu : ' + escapeHtml(d.eventLieu) : '') +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        // COVERAGE
+        coverageHtml +
+        // TABLE
+        '<table class="items">' +
+          '<thead><tr>' +
+            '<th class="w-name">D&eacute;signation</th>' +
+            '<th class="w-qty">Qt&eacute;</th>' +
+            '<th class="w-pu">PU HT</th>' +
+            '<th class="w-tot">Total HT</th>' +
+          '</tr></thead>' +
+          '<tbody>' + itemRows + mepRow + livRow + remRow + '</tbody>' +
+        '</table>' +
+        // BREAKDOWN
+        breakdownHtml +
+        // TOTALS
+        '<div class="totals-wrap"><div class="totals">' +
+          '<div class="t-row"><span>Total HT</span><strong>' + fmtEurStr(d.totals.totalHT) + '</strong></div>' +
+          '<div class="t-row gray"><span>TVA (10 % food / 20 % prestations)</span><span>' + fmtEurStr(d.totals.tva) + '</span></div>' +
+          '<div class="t-final"><span class="lbl">Total TTC</span><span class="amt">' + fmtEurStr(d.totals.totalTTC) + '</span></div>' +
+          perPersonHtml +
+        '</div></div>' +
+        // NOTES
+        notesHtml +
+        // RIB
+        '<div class="rib">' +
+          '<div class="rib-title">Coordonn&eacute;es bancaires pour l&#39;acompte</div>' +
+          '<div class="rib-grid">' +
+            '<div class="rib-item"><label>Titulaire</label><span>SAS AEGIA FOOD</span></div>' +
+            '<div class="rib-item"><label>Banque</label><span>Banque Populaire</span></div>' +
+            '<div class="rib-item"><label>IBAN</label><span>FR76 1020 7000 8723 2175 3218 077</span></div>' +
+            '<div class="rib-item"><label>BIC</label><span>CCBPFRPPMTG</span></div>' +
+          '</div>' +
+        '</div>' +
+        // CONDITIONS
+        '<div class="cond-block">' +
+          '<div class="cond-title">Conditions de r&egrave;glement</div>' +
+          '<div class="cond">Acompte de 30 % &agrave; la commande, solde 72 h avant l&#39;&eacute;v&eacute;nement. Devis valable 30 jours &agrave; compter de la date d&#39;&eacute;mission. Pour valider la commande, retournez ce devis sign&eacute; avec la mention "Bon pour accord" + virement de l&#39;acompte.</div>' +
+        '</div>' +
+      '</div>' +
+      // FOOTER
+      '<div class="footer">' +
+        '<div class="legal">SAS AEGIA FOOD (enseigne Meshuga Crazy Deli) &middot; SAS au capital de 1 000 &euro; &middot; RCS Paris 904 639 531 &middot; SIRET 904 639 531 00014 &middot; APE 56.10C &middot; TVA intracommunautaire FR31904639531 &middot; 3 rue Vavin 75006 Paris &middot; TVA &agrave; taux r&eacute;duit (10 %) sur les produits alimentaires et taux normal (20 %) sur les prestations de service. Tout commencement d&#39;ex&eacute;cution vaut acceptation du pr&eacute;sent devis.</div>' +
+        '<div class="pink-bar">meshuga &middot; catering &middot; 3 rue vavin, paris 6e &middot; hello@meshuga.fr</div>' +
+      '</div>' +
+    '</div>' +
+    // PRINT BAR (n'apparaît pas à l'impression)
+    '<div class="no-print">' +
+      '<p>Pour enregistrer en PDF : cliquez sur <strong>Imprimer</strong> puis choisissez <strong>Enregistrer au format PDF</strong> comme imprimante.<br>Pensez &agrave; d&eacute;cocher <em>En-t&ecirc;tes et pieds de page</em> dans les options.</p>' +
+      '<button onclick="window.print()">📄 Imprimer / Enregistrer PDF</button>' +
+      '<button class="close-btn" onclick="window.close()">Fermer</button>' +
+    '</div>' +
+    '</body></html>'
 }
 
 // ---------- CSS (scope qe-) ----------
@@ -705,6 +1038,51 @@ export default function QuoteEditor(props) {
       toastFn('Erreur : ' + (e && e.message ? e.message : 'inconnue'))
     }
     setSaving(false)
+  }
+
+  // Génère et ouvre l'aperçu PDF dans une nouvelle fenêtre (impression > sauvegarde PDF)
+  var handlePreviewPDF = function() {
+    if (lineDetails.length === 0) {
+      toastFn('Ajoute au moins un item pour générer le PDF')
+      return
+    }
+    if (!clientNom.trim()) {
+      toastFn('Nom du client requis pour le PDF')
+      return
+    }
+    var html = generateCateringPdfHtml(
+      {
+        numero: numero,
+        validite: validite,
+        clientNom: clientNom,
+        clientContact: clientContact,
+        clientEmail: clientEmail,
+        clientPhone: clientPhone,
+        eventDate: eventDate,
+        eventLieu: eventLieu,
+        nbPersonnes: nbPersonnes,
+        eventFormat: eventFormat,
+        lineDetails: lineDetails,
+        miseEnPlace: miseEnPlace,
+        miseEnPlaceOffert: miseEnPlaceOffert,
+        livraison: livraison,
+        livraisonOffert: livraisonOffert,
+        remiseTotalPct: remiseTotalPct,
+        notes: notes,
+        totals: totals,
+        sandwichBreakdown: sandwichBreakdown,
+        coverage: coverage
+      },
+      LOGO_YELLOW
+    )
+    var w = window.open('', '_blank')
+    if (!w) {
+      toastFn('Le navigateur a bloqué la fenêtre. Autorise les popups pour ce site.')
+      return
+    }
+    w.document.write(html)
+    w.document.close()
+    w.focus()
   }
 
   // Filtre offerings par catégorie active + grouping par subcategory
@@ -1378,11 +1756,20 @@ export default function QuoteEditor(props) {
             <div style={{ display: 'flex', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
               <button
                 className="btn btn-y"
-                style={{ flex: 1, justifyContent: 'center' }}
+                style={{ flex: '1 1 100%', justifyContent: 'center' }}
                 onClick={handleSave}
                 disabled={saving}
               >
-                {saving ? '⏳' : '💾 Sauvegarder'}
+                {saving ? '⏳ Enregistrement…' : '💾 Sauvegarder'}
+              </button>
+              <button
+                className="btn btn-p"
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={handlePreviewPDF}
+                disabled={lineDetails.length === 0 || !clientNom.trim()}
+                title={lineDetails.length === 0 ? 'Ajoute des items' : (!clientNom.trim() ? 'Renseigne le nom du client' : 'Aperçu du PDF brandé')}
+              >
+                📄 Aperçu PDF
               </button>
               <button
                 className="btn"
@@ -1393,7 +1780,7 @@ export default function QuoteEditor(props) {
               </button>
             </div>
             <div style={{ fontSize: 10, opacity: 0.5, marginTop: 8, textAlign: 'center', lineHeight: 1.4 }}>
-              PDF brandé + multi-options en Phase 4
+              Multi-options côte à côte en Phase 4 V2
             </div>
           </div>
         </div>
