@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { LOGO_YELLOW } from '../logos'
+import { LOGO_PINK } from '../logos'
 
 // ============================================================
 // QuoteEditor.tsx — Phase 3 du Dashboard B2B Catering Meshuga
@@ -244,17 +244,20 @@ var generateCateringPdfHtml = function(d, logoUrl) {
       '<td class="r b">−' + fmtEurStr(d.totals.remiseGlobale) + '</td></tr>'
   }
 
-  // Breakdown HTML
+  // Breakdown HTML — tableau 2 colonnes, qté rose à gauche + nom MAJ à droite
   var breakdownHtml = ''
   if (d.sandwichBreakdown && d.sandwichBreakdown.length > 0) {
-    var pills = ''
+    var rows = ''
+    var totalPieces = 0
     d.sandwichBreakdown.forEach(function(s) {
-      pills += '<span class="bd-pill"><strong>' + s.qty + '</strong> ' + escapeHtml(s.name) + '</span>'
+      totalPieces += s.qty
+      rows += '<div class="bd-row"><span class="bd-qty">' + s.qty + '</span><span class="bd-name">' + escapeHtml(s.name) + '</span></div>'
     })
     breakdownHtml =
       '<div class="breakdown">' +
-        '<div class="breakdown-title">Récapitulatif par recette</div>' +
-        '<div class="breakdown-list">' + pills + '</div>' +
+        '<div class="breakdown-title">Détail des recettes incluses</div>' +
+        '<div class="breakdown-sub">' + totalPieces + ' pièces réparties dans les boxes ci-dessous</div>' +
+        '<div class="breakdown-grid">' + rows + '</div>' +
       '</div>'
   }
 
@@ -301,7 +304,7 @@ var generateCateringPdfHtml = function(d, logoUrl) {
     '*{margin:0;padding:0;box-sizing:border-box}' +
     'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:11px;background:#FFFFFF}' +
     '@page{size:A4;margin:0mm}' +
-    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{page-break-inside:avoid}}' +
+    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{page-break-inside:avoid}.party,.parties,.cov,.t-final,.totals-wrap,.totals,.rib,.cond-block,.breakdown,.notes-block,.footer{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title{page-break-after:avoid;break-after:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}p,.legal{orphans:3;widows:3}}' +
     '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;display:flex;flex-direction:column;background:#FFFFFF}' +
     '.content{flex:1}' +
     '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:14px;border-bottom:4px solid #FF82D7;margin-bottom:18px}' +
@@ -339,11 +342,13 @@ var generateCateringPdfHtml = function(d, logoUrl) {
     '.strike{text-decoration:line-through;opacity:.5}' +
     '.offert{color:#009D3A;font-weight:900}' +
     '.remise-row td{color:#FF82D7}' +
-    '.breakdown{margin:10px 0 14px;padding:10px 13px;background:#FFFAEC;border-radius:5px;border-left:4px solid #FFEB5A}' +
-    '.breakdown-title{font-family:Yellowtail,cursive;font-size:15px;color:#191923;margin-bottom:7px;line-height:1}' +
-    '.breakdown-list{display:flex;flex-wrap:wrap;gap:5px}' +
-    '.bd-pill{display:inline-flex;align-items:center;background:#FFFFFF;border:1.5px solid #191923;border-radius:11px;padding:2px 9px;font-size:10px;font-weight:900;color:#191923;line-height:1.5}' +
-    '.bd-pill strong{margin-right:5px;color:#FF82D7;font-size:11px}' +
+    '.breakdown{margin:0 0 14px;padding:11px 13px;background:#FFFAEC;border-radius:5px;border-left:4px solid #FFEB5A;page-break-inside:avoid;break-inside:avoid}' +
+    '.breakdown-title{font-family:Yellowtail,cursive;font-size:17px;color:#191923;margin-bottom:8px;line-height:1}' +
+    '.breakdown-sub{font-size:9px;color:#888;font-style:italic;margin-bottom:8px;letter-spacing:.2px}' +
+    '.breakdown-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:#191923;border:1.5px solid #191923;border-radius:4px;overflow:hidden}' +
+    '.bd-row{display:flex;align-items:center;padding:6px 12px;background:#FFFFFF;font-size:11px;gap:10px}' +
+    '.bd-qty{font-weight:900;font-size:14px;color:#FF82D7;min-width:34px;text-align:right;font-family:"Arial Narrow",Arial,sans-serif;flex-shrink:0}' +
+    '.bd-name{font-weight:900;color:#191923;letter-spacing:.3px;flex:1;text-transform:uppercase}' +
     '.totals-wrap{display:flex;justify-content:flex-end;margin-bottom:14px}' +
     '.totals{width:300px}' +
     '.t-row{display:flex;justify-content:space-between;padding:6px 4px;border-bottom:1px solid #EBEBEB;font-size:11.5px}' +
@@ -418,8 +423,10 @@ var generateCateringPdfHtml = function(d, logoUrl) {
             '</div>' +
           '</div>' +
         '</div>' +
-        // COVERAGE
+        // COVERAGE (résumé visuel global pour pers.)
         coverageHtml +
+        // BREAKDOWN (détail des recettes — déplacé en haut sous coverage)
+        breakdownHtml +
         // TABLE
         '<table class="items">' +
           '<thead><tr>' +
@@ -430,8 +437,6 @@ var generateCateringPdfHtml = function(d, logoUrl) {
           '</tr></thead>' +
           '<tbody>' + itemRows + mepRow + livRow + remRow + '</tbody>' +
         '</table>' +
-        // BREAKDOWN
-        breakdownHtml +
         // TOTALS
         '<div class="totals-wrap"><div class="totals">' +
           '<div class="t-row"><span>Total HT</span><strong>' + fmtEurStr(d.totals.totalHT) + '</strong></div>' +
@@ -1073,7 +1078,7 @@ export default function QuoteEditor(props) {
         sandwichBreakdown: sandwichBreakdown,
         coverage: coverage
       },
-      LOGO_YELLOW
+      LOGO_PINK
     )
     var w = window.open('', '_blank')
     if (!w) {
