@@ -130,6 +130,10 @@ var parseComposition = function(comp, multiplier) {
       .replace(/\s+/g, ' ')
       .trim()
     if (!name) return
+    // Homogénéisation finale : strip "THE " en début + uppercase
+    // Ex: "THE LOBSTER" + "Lobster" => fusionnent en "LOBSTER"
+    name = name.replace(/^the\s+/i, '').toUpperCase().trim()
+    if (!name) return
     out.push({ qty: n * mult, name: name })
   })
   return out
