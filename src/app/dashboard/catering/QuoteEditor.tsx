@@ -95,6 +95,46 @@ var maxLiveRemise = function(offering) {
   return Math.floor(max)
 }
 
+// Parse une composition Meshuga style "10 Hot Dog · 10 THE MELT · 10 PBN"
+// Retourne [{qty, name}] avec name normalisé (sans "mini", "canapés", "sandwich")
+// Ignore les lignes sans quantité numérique au début (chips, coleslaw, etc.)
+// Ignore aussi les compositions qui contiennent "au choix" (lunch box monoplat).
+var parseComposition = function(comp, multiplier) {
+  if (!comp) return []
+  var lower = comp.toLowerCase()
+  if (lower.indexOf('au choix') > -1) return []
+  var mult = Number(multiplier) || 1
+  // Séparateurs : middle dot · ou bullet •
+  var parts = comp.split(/[·•]/)
+  var out = []
+  parts.forEach(function(rawPart) {
+    var p = rawPart.trim()
+    if (!p) return
+    var m = p.match(/^(\d+)\s+(.+)$/)
+    if (!m) return
+    var n = parseInt(m[1], 10)
+    var rawName = m[2].trim()
+    // Filtre des "non-sandwichs" qu'on ignore dans le décompte
+    var lowName = rawName.toLowerCase()
+    if (
+      lowName.indexOf('boisson') > -1 ||
+      lowName.indexOf('chips') > -1 ||
+      lowName.indexOf('coleslaw') > -1 ||
+      lowName.indexOf('cookie') > -1 ||
+      lowName.indexOf('frites') > -1
+    ) return
+    // Normalisation : supprime mini / canapé / canapés / sandwich + parenthèses
+    var name = rawName
+      .replace(/\(.*?\)/g, '')
+      .replace(/\b(mini|minis|canap[ée]s?|sandwich|sandwiches)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (!name) return
+    out.push({ qty: n * mult, name: name })
+  })
+  return out
+}
+
 // ---------- CSS (scope qe-) ----------
 
 var QE_CSS =
@@ -132,6 +172,8 @@ var QE_CSS =
   '.qe-pick:active{transform:translate(1px,1px)}' +
   '.qe-pick-name{font-weight:900;font-size:12px;line-height:1.2;text-transform:uppercase;letter-spacing:-.2px}' +
   '.qe-pick-tag{font-size:10px;line-height:1.3;color:#191923;opacity:.6}' +
+  '.qe-pick-comp{font-size:10px;line-height:1.4;color:#191923;background:#FFEB5A;border-radius:3px;padding:4px 6px;margin-top:4px;border:1.5px solid #191923;font-weight:700}' +
+  '.qe-line-comp{font-size:10px;line-height:1.4;color:#191923;opacity:.65;margin-top:2px;font-style:italic}' +
   '.qe-pick-row{display:flex;justify-content:space-between;align-items:center;margin-top:3px;gap:6px}' +
   '.qe-pick-price{font-weight:900;font-size:13px}' +
   '.qe-pick-size{font-family:Yellowtail,cursive;font-size:12px;opacity:.6}' +
@@ -164,33 +206,38 @@ var QE_CSS =
   '.qe-recap-final{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;background:#FFEB5A;border:2px solid #191923;border-radius:5px;margin-top:8px;box-shadow:2px 2px 0 #191923}' +
   '.qe-recap-final-lbl{font-family:Yellowtail,cursive;font-size:20px;line-height:1}' +
   '.qe-recap-final-amt{font-weight:900;font-size:17px}' +
-  '.qe-recap-internes{margin-top:10px;padding:10px 12px;background:#191923;color:#FFEB5A;border-radius:5px;border:2px solid #191923}' +
-  '.qe-recap-internes-title{font-family:Yellowtail,cursive;font-size:15px;color:#FFEB5A;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}' +
-  '.qe-recap-internes-toggle{background:transparent;border:1.5px solid #FFEB5A;color:#FFEB5A;border-radius:3px;padding:1px 6px;font-size:9px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.3px}' +
-  '.qe-recap-internes-row{display:flex;justify-content:space-between;font-size:11px;padding:3px 0}' +
+  '.qe-recap-internes{margin-top:10px;padding:10px 12px;background:#FFFFFF;color:#191923;border-radius:5px;border:2px solid #191923;border-left:6px solid #FF82D7;box-shadow:2px 2px 0 #191923}' +
+  '.qe-recap-internes-title{font-family:Yellowtail,cursive;font-size:15px;color:#191923;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}' +
+  '.qe-recap-internes-toggle{background:#FFFFFF;border:1.5px solid #191923;color:#191923;border-radius:3px;padding:1px 6px;font-size:9px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.3px}' +
+  '.qe-recap-internes-row{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;color:#191923}' +
   '.qe-recap-internes-row strong{font-weight:900}' +
-  '.qe-coeff-good{color:#7AFF82}' +
-  '.qe-coeff-warn{color:#FFEB5A}' +
-  '.qe-coeff-bad{color:#FF82D7}' +
+  '.qe-coeff-good{color:#009D3A}' +
+  '.qe-coeff-warn{color:#CC6600}' +
+  '.qe-coeff-bad{color:#CC0066}' +
   '.qe-checkbox-row{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:900}' +
   '.qe-checkbox-row input{width:14px;height:14px;accent-color:#009D3A}' +
   '.qe-toggle-internes{position:absolute;top:14px;right:14px}' +
   '.qe-densite-suggest{font-size:10px;background:#005FFF;color:#fff;padding:3px 8px;border-radius:3px;font-weight:900;display:inline-block;margin-top:2px}' +
   '.qe-livraison-auto{font-size:10px;color:#009D3A;font-weight:900;margin-top:3px;font-style:italic}' +
-  '.qe-cov{position:sticky;top:8px;z-index:10;background:#191923;color:#FFEB5A;border:2px solid #191923;border-radius:7px;padding:10px 14px;box-shadow:3px 3px 0 #FF82D7;margin-bottom:0}' +
+  '.qe-cov{position:sticky;top:8px;z-index:10;background:#FFEB5A;color:#191923;border:2px solid #191923;border-radius:7px;padding:10px 14px;box-shadow:3px 3px 0 #FF82D7;margin-bottom:0}' +
   '.qe-cov-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap}' +
-  '.qe-cov-title{font-family:Yellowtail,cursive;font-size:15px;color:#FFEB5A;line-height:1}' +
-  '.qe-cov-status{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.4px;padding:3px 8px;border-radius:3px;display:inline-block;border:1.5px solid transparent;line-height:1.4;white-space:nowrap}' +
-  '.qe-cov-status.ok{background:#7AFF82;color:#191923;border-color:#191923}' +
-  '.qe-cov-status.warn{background:#FFEB5A;color:#191923;border-color:#191923}' +
-  '.qe-cov-status.under{background:#FF82D7;color:#191923;border-color:#191923}' +
-  '.qe-cov-status.over{background:#005FFF;color:#fff;border-color:#005FFF}' +
+  '.qe-cov-title{font-family:Yellowtail,cursive;font-size:15px;color:#191923;line-height:1}' +
+  '.qe-cov-status{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.4px;padding:3px 8px;border-radius:3px;display:inline-block;border:1.5px solid #191923;line-height:1.4;white-space:nowrap}' +
+  '.qe-cov-status.ok{background:#7AFF82;color:#191923}' +
+  '.qe-cov-status.warn{background:#FFFFFF;color:#191923}' +
+  '.qe-cov-status.under{background:#FF82D7;color:#191923}' +
+  '.qe-cov-status.over{background:#005FFF;color:#FFFFFF;border-color:#005FFF}' +
   '.qe-cov-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:6px}' +
-  '.qe-cov-cell{background:rgba(255,235,90,.08);border:1px solid rgba(255,235,90,.25);border-radius:4px;padding:6px 8px;line-height:1}' +
-  '.qe-cov-num{font-weight:900;font-size:18px;color:#FFEB5A;line-height:1}' +
-  '.qe-cov-lbl{font-family:Yellowtail,cursive;font-size:12px;color:#FFEB5A;opacity:.85;margin-top:3px;line-height:1}' +
-  '.qe-cov-sub{font-size:9px;color:#FFEB5A;opacity:.6;margin-top:2px;line-height:1.2;font-family:Arial Narrow,Arial,sans-serif}' +
-  '.qe-cov-empty{font-size:11px;color:#FFEB5A;opacity:.5;font-style:italic;padding:4px 0}'
+  '.qe-cov-cell{background:#FFFFFF;border:1.5px solid #191923;border-radius:4px;padding:6px 8px;line-height:1}' +
+  '.qe-cov-num{font-weight:900;font-size:18px;color:#191923;line-height:1}' +
+  '.qe-cov-lbl{font-family:Yellowtail,cursive;font-size:12px;color:#191923;opacity:.7;margin-top:3px;line-height:1}' +
+  '.qe-cov-sub{font-size:9px;color:#191923;opacity:.55;margin-top:2px;line-height:1.2;font-family:Arial Narrow,Arial,sans-serif}' +
+  '.qe-cov-empty{font-size:11px;color:#191923;opacity:.6;font-style:italic;padding:4px 0}' +
+  '.qe-cov-bd{margin-top:8px;padding-top:8px;border-top:1.5px dashed #191923}' +
+  '.qe-cov-bd-title{font-family:Yellowtail,cursive;font-size:13px;color:#191923;margin-bottom:4px;line-height:1}' +
+  '.qe-cov-bd-list{display:flex;flex-wrap:wrap;gap:5px}' +
+  '.qe-cov-bd-pill{display:inline-flex;align-items:center;background:#FFFFFF;border:1.5px solid #191923;border-radius:11px;padding:2px 9px;font-size:11px;font-weight:900;color:#191923;line-height:1.5;letter-spacing:-.1px}' +
+  '.qe-cov-bd-pill strong{margin-right:4px;color:#FF82D7;font-size:12px}'
 
 // ============================================================
 // COMPOSANT PRINCIPAL
@@ -493,6 +540,35 @@ export default function QuoteEditor(props) {
 
   var hasAnyItem = coverage.nbMinis > 0 || coverage.nbLunch > 0 || coverage.nbPlateauxParts > 0 || coverage.nbLiveForfait > 0 || coverage.nbAddons > 0
 
+  // Décompte par recette : agrège la composition de chaque ligne
+  // Ex: 2× HOUSTON ST + 1× THE FLATIRON => {Hot Dog:20, THE MELT:28, THE EGG:28, PBN:20, THE REUBEN:8, LOX:8, SPICY TUNA:8, Chicken Caesar:8}
+  var sandwichBreakdown = useMemo(
+    function() {
+      var totals = {}
+      lineDetails.forEach(function(l) {
+        // Skip live_forfait : composition descriptive (cuisinier, ardoises, etc.) pas comptable
+        if (l.offering.category === 'live_forfait') return
+        // Skip addon : compositions soit vides soit non comptables
+        if (l.offering.category === 'addon') return
+        var parsed = parseComposition(l.offering.composition, l.qty)
+        parsed.forEach(function(it) {
+          if (!totals[it.name]) totals[it.name] = 0
+          totals[it.name] += it.qty
+        })
+      })
+      // Convertir en array trié par qty décroissante
+      var arr = []
+      Object.keys(totals).forEach(function(k) {
+        arr.push({ name: k, qty: totals[k] })
+      })
+      arr.sort(function(a, b) {
+        return b.qty - a.qty
+      })
+      return arr
+    },
+    [lineDetails]
+  )
+
   // Densité suggérée
   var densiteSuggeree = useMemo(
     function() {
@@ -743,6 +819,20 @@ export default function QuoteEditor(props) {
             ) : null}
           </div>
         )}
+        {sandwichBreakdown.length > 0 ? (
+          <div className="qe-cov-bd">
+            <div className="qe-cov-bd-title">Détail par recette</div>
+            <div className="qe-cov-bd-list">
+              {sandwichBreakdown.map(function(s) {
+                return (
+                  <span key={s.name} className="qe-cov-bd-pill">
+                    <strong>{s.qty}</strong> {s.name}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="qe-grid">
@@ -940,6 +1030,7 @@ export default function QuoteEditor(props) {
                         >
                           <div className="qe-pick-name">{o.name}</div>
                           {o.tagline ? <div className="qe-pick-tag">{o.tagline}</div> : null}
+                          {o.composition ? <div className="qe-pick-comp">📋 {o.composition}</div> : null}
                           <div className="qe-pick-row">
                             <span className="qe-pick-price">{fmtEur0(pv)} HT</span>
                             <span className="qe-pick-size">
@@ -997,6 +1088,9 @@ export default function QuoteEditor(props) {
                         {o.size_pers ? ' · ' + o.size_pers + ' pers.' : ''}
                         {l.remisePct > 0 ? ' · -' + l.remisePct + '%' : ''}
                       </div>
+                      {o.composition ? (
+                        <div className="qe-line-comp">📋 {o.composition}</div>
+                      ) : null}
                       {showInternes ? (
                         <div className="qe-line-internes">
                           FC : {fmtEur(l.fcLigneHT)} · Marge : {fmtEur(l.margeLigneHT)} · Coeff : {l.coeffLigne.toFixed(2)}
@@ -1176,7 +1270,22 @@ export default function QuoteEditor(props) {
           <div className="qe-card">
             <div className="qe-card-title">Récapitulatif</div>
 
-            <div className="qe-recap-row">
+          {sandwichBreakdown.length > 0 ? (
+            <div style={{ marginBottom: 10, paddingBottom: 8, borderBottom: '1.5px dashed #191923' }}>
+              <div className="qe-cov-bd-title" style={{ marginBottom: 6 }}>Détail par recette</div>
+              <div className="qe-cov-bd-list">
+                {sandwichBreakdown.map(function(s) {
+                  return (
+                    <span key={s.name} className="qe-cov-bd-pill">
+                      <strong>{s.qty}</strong> {s.name}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="qe-recap-row">
               <span>Sous-total items HT</span>
               <strong>{fmtEur(totals.sousTotalHT)}</strong>
             </div>
