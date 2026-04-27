@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 
 // ============================================================
 // QuotesTab.tsx — Phase 2 du Dashboard B2B Catering Meshuga
+// V2: compat colonnes legacy (statut FR, client_nom, etc.)
 // Liste des devis catering, stats, filtres, bouton "Nouveau devis"
 // Architecture: src/app/dashboard/catering/QuotesTab.tsx
 // Marges/coeffs internes uniquement (Edward + Emy)
@@ -34,6 +35,11 @@ var STATUS_COLORS = {
 // ---------- HELPERS PURS (pas de JSX) ----------
 var fmtEur = function(n) {
   var v = Number(n) || 0
+  return v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+}
+
+var fmtEur0 = function(n) {
+  var v = Number(n) || 0
   return v.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €'
 }
 
@@ -48,7 +54,17 @@ var fmtDate = function(s) {
 }
 
 var pickStatus = function(d) {
+  // Nouvelle schema (anglais) en premier
   if (d.status) return d.status
+  // Legacy colonne FR 'statut' — mappage vers le nouveau lifecycle
+  if (d.statut) {
+    if (d.statut === 'paye') return 'acquitte'
+    if (d.statut === 'accepte') return 'signe'
+    if (d.statut === 'refuse') return 'perdu'
+    if (d.statut === 'a_modifier') return 'envoye'
+    return d.statut // brouillon, envoye, facture passent en l'état
+  }
+  // Dérivé des timestamps
   if (d.facture_url) return 'facture'
   if (d.signed_at) return 'signe'
   if (d.sent_at) return 'envoye'
@@ -186,7 +202,7 @@ export default function QuotesTab(props) {
       var s = search.trim().toLowerCase()
       if (s) {
         list = list.filter(function(d) {
-          var name = ((d.client_name || d.prospect_name || '') + '').toLowerCase()
+          var name = ((d.client_nom || d.client_name || d.prospect_name || '') + '').toLowerCase()
           var num = ((d.numero || d.id || '') + '').toLowerCase()
           return name.indexOf(s) > -1 || num.indexOf(s) > -1
         })
@@ -283,7 +299,7 @@ export default function QuotesTab(props) {
         </div>
         <div className="kc" style={{ background: '#FF82D7' }}>
           <div className="kl">CA signé (mois)</div>
-          <div className="kv">{fmtEur(stats.caMois)}</div>
+          <div className="kv">{fmtEur0(stats.caMois)}</div>
           <div className="ki">€</div>
         </div>
         <div className="kc" style={{ background: '#FFFFFF' }}>
@@ -442,7 +458,7 @@ export default function QuotesTab(props) {
             var col = STATUS_COLORS[st] || STATUS_COLORS.brouillon
             var resp = (d.responsable_email || d.created_by || '') + ''
             var isEmy = resp && resp.toLowerCase().indexOf('emy') > -1
-            var clientName = d.client_name || d.prospect_name || 'Client à renseigner'
+            var clientName = d.client_nom || d.client_name || d.prospect_name || 'Client à renseigner'
             var idStr = (d.id || '') + ''
             var numero = d.numero || '#' + idStr.slice(0, 6).toUpperCase()
             var totalHt = Number(d.total_ht) || 0
