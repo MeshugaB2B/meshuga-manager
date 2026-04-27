@@ -303,12 +303,12 @@ var generateCateringPdfHtml = function(d, logoUrl) {
   var css =
     '*{margin:0;padding:0;box-sizing:border-box}' +
     'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:11px;background:#FFFFFF}' +
-    '@page{size:A4;margin:0mm}' +
-    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{page-break-inside:avoid}.party,.parties,.cov,.t-final,.totals-wrap,.totals,.rib,.cond-block,.breakdown,.notes-block,.footer{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title{page-break-after:avoid;break-after:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}p,.legal{orphans:3;widows:3}}' +
+    '@page{size:A4;margin:14mm 16mm 12mm 16mm}' +
+    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto}.party,.parties,.cov,.t-final,.totals-wrap,.totals,.rib,.cond-block,.breakdown,.notes-block,.footer{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title{page-break-after:avoid;break-after:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px}p,.legal{orphans:3;widows:3}}' +
     '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;display:flex;flex-direction:column;background:#FFFFFF}' +
     '.content{flex:1}' +
     '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:14px;border-bottom:4px solid #FF82D7;margin-bottom:18px}' +
-    '.logo img{height:60px;width:auto;display:block}' +
+    '.logo img{height:64px;width:auto;display:block;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;image-rendering:high-quality}' +
     '.logo-text-fb{font-family:Yellowtail,cursive;font-size:36px;color:#191923;line-height:1}' +
     '.logo-sub{font-size:8.5px;color:#999;margin-top:4px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700}' +
     '.doc-info{text-align:right}' +
