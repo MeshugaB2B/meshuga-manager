@@ -253,6 +253,11 @@ var generateCateringPdfHtml = function(d, logoUrl) {
       totalPieces += s.qty
       rows += '<div class="bd-row"><span class="bd-qty">' + s.qty + '</span><span class="bd-name">' + escapeHtml(s.name) + '</span></div>'
     })
+    // Si nombre de recettes impair, on comble la dernière case avec une cellule blanche
+    // sinon le fond noir de la grille se voit à travers
+    if (d.sandwichBreakdown.length % 2 === 1) {
+      rows += '<div class="bd-row bd-row-filler"></div>'
+    }
     breakdownHtml =
       '<div class="breakdown">' +
         '<div class="breakdown-title">Détail des recettes incluses</div>' +
@@ -272,9 +277,15 @@ var generateCateringPdfHtml = function(d, logoUrl) {
       covParts.push(escapeHtml(d.coverage.liveForfaitNames.join(' + ')))
     }
     if (covParts.length > 0) {
+      var perPersonNote = ''
+      if (d.nbPersonnes > 0 && d.totals && d.totals.totalTTC > 0) {
+        perPersonNote = '<br><span class="cov-pp">soit ' + fmtEurStr(d.totals.totalTTC / d.nbPersonnes) + ' TTC / personne</span>'
+      }
       coverageHtml =
         '<div class="cov">' + covParts.join(' &middot; ') +
-        ' <span class="cov-pers">pour ' + d.nbPersonnes + ' personnes</span></div>'
+        ' <span class="cov-pers">pour ' + d.nbPersonnes + ' personnes</span>' +
+        perPersonNote +
+        '</div>'
     }
   }
 
@@ -304,7 +315,7 @@ var generateCateringPdfHtml = function(d, logoUrl) {
     '*{margin:0;padding:0;box-sizing:border-box}' +
     'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:11px;background:#FFFFFF}' +
     '@page{size:A4;margin:14mm 16mm 18mm 16mm}' +
-    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto}.party,.parties,.cov,.t-final,.totals-wrap,.totals,.rib,.cond-block,.breakdown,.notes-block,.footer{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title{page-break-after:avoid;break-after:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:24px;padding-top:14px}p,.legal{orphans:3;widows:3}}' +
+    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.totals-wrap,.totals,.rib,.cond-block,.breakdown,.notes-block,.footer{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title{page-break-after:avoid;break-after:avoid}.cond-block{page-break-after:avoid;break-after:avoid}.rib{page-break-after:avoid;break-after:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:24px;padding-top:14px}p,.legal{orphans:3;widows:3}}' +
     '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;display:flex;flex-direction:column;background:#FFFFFF}' +
     '.content{flex:1}' +
     '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:14px;border-bottom:4px solid #FF82D7;margin-bottom:18px}' +
@@ -324,6 +335,7 @@ var generateCateringPdfHtml = function(d, logoUrl) {
     '.cov{background:#FFEB5A;border:2px solid #191923;border-radius:5px;padding:8px 14px;margin-bottom:14px;font-size:11px;text-align:center;letter-spacing:.3px;box-shadow:2px 2px 0 #191923}' +
     '.cov strong{font-weight:900;font-size:12px}' +
     '.cov-pers{font-style:italic;color:#191923;opacity:.7;margin-left:4px}' +
+    '.cov-pp{font-size:10px;font-weight:700;font-style:italic;color:#191923;opacity:.85;letter-spacing:.2px}' +
     'table.items{width:100%;border-collapse:collapse;margin-bottom:8px}' +
     'table.items thead th{padding:8px 10px;font-size:8.5px;text-transform:uppercase;letter-spacing:1.2px;font-weight:900;color:#191923;border-top:2px solid #191923;border-bottom:2px solid #191923;text-align:left;background:#FFFFFF}' +
     'table.items thead th.w-qty{text-align:center;width:9%}' +
@@ -347,6 +359,7 @@ var generateCateringPdfHtml = function(d, logoUrl) {
     '.breakdown-sub{font-size:9px;color:#888;font-style:italic;margin-bottom:8px;letter-spacing:.2px}' +
     '.breakdown-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:#191923;border:1.5px solid #191923;border-radius:4px;overflow:hidden}' +
     '.bd-row{display:flex;align-items:center;padding:6px 12px;background:#FFFFFF;font-size:11px;gap:10px}' +
+    '.bd-row-filler{background:#FFFFFF}' +
     '.bd-qty{font-weight:900;font-size:14px;color:#FF82D7;min-width:34px;text-align:right;font-family:"Arial Narrow",Arial,sans-serif;flex-shrink:0}' +
     '.bd-name{font-weight:900;color:#191923;letter-spacing:.3px;flex:1;text-transform:uppercase}' +
     '.totals-wrap{display:flex;justify-content:flex-end;margin-bottom:14px}' +
@@ -408,7 +421,7 @@ var generateCateringPdfHtml = function(d, logoUrl) {
             '<div class="party-detail">3 rue Vavin, 75006 Paris</div>' +
             '<div class="party-detail">SIRET 904 639 531 00014</div>' +
             '<div class="party-detail">TVA FR31904639531</div>' +
-            '<div class="party-detail">hello@meshuga.fr</div>' +
+            '<div class="party-detail">events@meshuga.fr</div>' +
           '</div>' +
           '<div class="party client">' +
             '<div class="party-label">Client</div>' +
@@ -465,7 +478,7 @@ var generateCateringPdfHtml = function(d, logoUrl) {
       // FOOTER
       '<div class="footer">' +
         '<div class="legal">SAS AEGIA FOOD (enseigne Meshuga Crazy Deli) &middot; SAS au capital de 1 000 &euro; &middot; RCS Paris 904 639 531 &middot; SIRET 904 639 531 00014 &middot; APE 56.10C &middot; TVA intracommunautaire FR31904639531 &middot; 3 rue Vavin 75006 Paris &middot; TVA &agrave; taux r&eacute;duit (10 %) sur les produits alimentaires et taux normal (20 %) sur les prestations de service. Tout commencement d&#39;ex&eacute;cution vaut acceptation du pr&eacute;sent devis.</div>' +
-        '<div class="pink-bar">meshuga &middot; catering &middot; 3 rue vavin, paris 6e &middot; hello@meshuga.fr</div>' +
+        '<div class="pink-bar">meshuga &middot; catering &middot; 3 rue vavin, paris 6e &middot; events@meshuga.fr</div>' +
       '</div>' +
     '</div>' +
     // PRINT BAR (n'apparaît pas à l'impression)
