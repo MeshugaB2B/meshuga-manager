@@ -321,7 +321,7 @@ var generateCateringPdfHtml = function(d, stampUrl, logotypeUrl) {
     '*{margin:0;padding:0;box-sizing:border-box}' +
     'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:11px;background:#FFFFFF}' +
     '@page{size:A4;margin:14mm 16mm 18mm 16mm}' +
-    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.tc-grid,.tc-cond,.tc-totals,.rib,.breakdown,.notes-block,.footer,.footer-brand{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title{page-break-after:avoid;break-after:avoid}.tc-grid{page-break-after:avoid;break-after:avoid}.rib{page-break-after:avoid;break-after:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px;padding-top:12px}p,.legal{orphans:3;widows:3}}' +
+    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.tc-grid,.tc-cond,.tc-totals,.rib,.sig,.breakdown,.notes-block,.footer,.footer-brand{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title,.sig-title{page-break-after:avoid;break-after:avoid}.tc-grid{page-break-after:avoid;break-after:avoid}.rib{page-break-after:avoid;break-after:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px;padding-top:12px}p,.legal{orphans:3;widows:3}}' +
     '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;display:flex;flex-direction:column;background:#FFFFFF}' +
     '.content{flex:1}' +
     '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px}' +
@@ -392,6 +392,23 @@ var generateCateringPdfHtml = function(d, stampUrl, logotypeUrl) {
     '.rib-grid{display:grid;grid-template-columns:1fr 1fr 2fr 1fr;gap:12px}' +
     '.rib-item label{display:block;font-size:7px;text-transform:uppercase;letter-spacing:1px;color:#aaa;margin-bottom:3px;font-weight:900}' +
     '.rib-item span{font-size:10.5px;font-weight:900;font-family:"Arial Narrow",Arial,sans-serif;color:#191923;letter-spacing:1.2px}' +
+    '.sig{border:2px solid #191923;border-radius:5px;padding:11px 14px 14px;margin-bottom:10px;background:#FFFFFF;box-shadow:3px 3px 0 #FF82D7}' +
+    '.sig-title{font-family:Yellowtail,cursive;font-size:20px;color:#191923;margin-bottom:5px;line-height:1}' +
+    '.sig-legal{font-size:8.5px;color:#444;line-height:1.55;margin-bottom:10px;text-align:justify}' +
+    '.sig-grid{display:grid;grid-template-columns:1fr 1fr 2fr;gap:14px;margin-bottom:11px}' +
+    '.sig-field label{display:block;font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:6px;font-weight:900}' +
+    '.sig-line{height:18px;border-bottom:1.2px solid #191923}' +
+    '.sig-box{border:1.5px dashed #191923;border-radius:4px;height:80px;padding:6px 10px;position:relative}' +
+    '.sig-box label{display:block;font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:900}' +
+    '.cgv-pagebreak{page-break-before:always;break-before:page;height:0}' +
+    '.cgv{padding-top:6px}' +
+    '.cgv-header{padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px}' +
+    '.cgv-title{font-family:Yellowtail,cursive;font-size:32px;color:#191923;line-height:1}' +
+    '.cgv-sub{font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;color:#777;letter-spacing:.4px;margin-top:4px}' +
+    '.cgv-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}' +
+    '.cgv-art{margin-bottom:9px;page-break-inside:avoid;break-inside:avoid}' +
+    '.cgv-art h4{font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#FF82D7;margin-bottom:3px;line-height:1.2}' +
+    '.cgv-art p{font-size:8.5px;color:#333;line-height:1.55;text-align:justify}' +
     '.footer{padding:10px 0 0;border-top:1px solid #EBEBEB;margin-top:auto}' +
     '.footer-brand{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:8px;padding-bottom:8px}' +
     '.footer-logo-img{height:34px;width:auto;display:block;image-rendering:high-quality}' +
@@ -481,13 +498,56 @@ var generateCateringPdfHtml = function(d, stampUrl, logotypeUrl) {
         // NOTES
         notesHtml +
         // RIB
+        // RIB
         '<div class="rib">' +
-          '<div class="rib-title">Coordonn&eacute;es bancaires pour l&#39;acompte</div>' +
+          '<div class="rib-title">Coordonn&eacute;es bancaires</div>' +
           '<div class="rib-grid">' +
             '<div class="rib-item"><label>Titulaire</label><span>SAS AEGIA FOOD</span></div>' +
             '<div class="rib-item"><label>Banque</label><span>Banque Populaire</span></div>' +
             '<div class="rib-item"><label>IBAN</label><span>FR76 1020 7000 8723 2175 3218 077</span></div>' +
             '<div class="rib-item"><label>BIC</label><span>CCBPFRPPMTG</span></div>' +
+          '</div>' +
+        '</div>' +
+        // SIGNATURE
+        '<div class="sig">' +
+          '<div class="sig-title">Bon pour accord</div>' +
+          '<div class="sig-legal">Le client reconna&icirc;t avoir pris connaissance des conditions de vente du pr&eacute;sent devis et des conditions g&eacute;n&eacute;rales de vente jointes en derni&egrave;re page, et accepte sans r&eacute;serve l&#39;ensemble des prestations, quantit&eacute;s et tarifs mentionn&eacute;s. La signature ci-dessous, accompagn&eacute;e de la mention manuscrite "Bon pour accord", vaut acceptation ferme et d&eacute;finitive de la commande et engage le signataire au r&egrave;glement de l&#39;acompte.</div>' +
+          '<div class="sig-grid">' +
+            '<div class="sig-field"><label>Date</label><div class="sig-line"></div></div>' +
+            '<div class="sig-field"><label>Lieu</label><div class="sig-line"></div></div>' +
+            '<div class="sig-field"><label>Nom &amp; qualit&eacute; du signataire</label><div class="sig-line"></div></div>' +
+          '</div>' +
+          '<div class="sig-box"><label>Signature et cachet (mention "Bon pour accord")</label></div>' +
+        '</div>' +
+        // CGV (page 2 ou 3 selon longueur du devis)
+        '<div class="cgv-pagebreak"></div>' +
+        '<div class="cgv">' +
+          '<div class="cgv-header">' +
+            '<div class="cgv-title">Conditions G&eacute;n&eacute;rales de Vente</div>' +
+            '<div class="cgv-sub">SAS AEGIA FOOD &middot; Meshuga Catering &middot; Applicables &agrave; toute commande de prestation traiteur &eacute;v&eacute;nementiel</div>' +
+          '</div>' +
+          '<div class="cgv-cols">' +
+            // COL 1
+            '<div>' +
+              '<div class="cgv-art"><h4>1. Champ d&#39;application</h4><p>Les pr&eacute;sentes Conditions G&eacute;n&eacute;rales de Vente (ci-apr&egrave;s "CGV") r&eacute;gissent l&#39;ensemble des prestations de traiteur &eacute;v&eacute;nementiel B2B fournies par la SAS AEGIA FOOD (enseigne Meshuga Catering) &agrave; ses clients professionnels. Toute commande emporte adh&eacute;sion sans r&eacute;serve aux pr&eacute;sentes CGV, qui pr&eacute;valent sur tout autre document du client.</p></div>' +
+              '<div class="cgv-art"><h4>2. Devis et commande</h4><p>Tout devis est valable 30 jours &agrave; compter de sa date d&#39;&eacute;mission. La commande est ferme et d&eacute;finitive d&egrave;s r&eacute;ception du devis sign&eacute; portant la mention manuscrite "Bon pour accord", accompagn&eacute; du r&egrave;glement de l&#39;acompte. La signature peut &ecirc;tre olographe ou &eacute;lectronique conform&eacute;ment aux articles 1366 et 1367 du Code civil.</p></div>' +
+              '<div class="cgv-art"><h4>3. Confirmation des effectifs</h4><p>Le nombre d&eacute;finitif de convives doit &ecirc;tre confirm&eacute; au plus tard 7 jours avant la date de l&#39;&eacute;v&eacute;nement. &Agrave; d&eacute;faut, le nombre figurant sur le devis est r&eacute;put&eacute; d&eacute;finitif. Toute majoration ult&eacute;rieure est sous r&eacute;serve de disponibilit&eacute; et entra&icirc;ne une facturation compl&eacute;mentaire au tarif unitaire indiqu&eacute;. Aucune minoration n&#39;est accept&eacute;e en de&ccedil;&agrave; de 7 jours.</p></div>' +
+              '<div class="cgv-art"><h4>4. Prix et facturation</h4><p>Les prix sont indiqu&eacute;s en euros, hors taxes (HT) et toutes taxes comprises (TTC). La TVA applicable est de 10 % sur les denr&eacute;es alimentaires et 20 % sur les prestations de service (animation live, mise en place, livraison). Toute prestation suppl&eacute;mentaire non pr&eacute;vue au devis fait l&#39;objet d&#39;un avenant ou d&#39;une facture compl&eacute;mentaire.</p></div>' +
+              '<div class="cgv-art"><h4>5. Modalit&eacute;s de paiement</h4><p>Un acompte de 30 % du montant TTC est exigible &agrave; la commande. Le solde est dus 72 heures avant la date de l&#39;&eacute;v&eacute;nement, par virement bancaire sur le compte indiqu&eacute; ci-dessus. Aucun escompte n&#39;est accord&eacute; pour paiement anticip&eacute;.</p></div>' +
+              '<div class="cgv-art"><h4>6. Retard de paiement</h4><p>Conform&eacute;ment &agrave; l&#39;article L. 441-10 du Code de commerce, tout retard de paiement entra&icirc;ne de plein droit l&#39;application de p&eacute;nalit&eacute;s calcul&eacute;es au taux d&#39;int&eacute;r&ecirc;t appliqu&eacute; par la Banque centrale europ&eacute;enne &agrave; son op&eacute;ration de refinancement la plus r&eacute;cente, major&eacute; de 10 points de pourcentage, ainsi qu&#39;une indemnit&eacute; forfaitaire pour frais de recouvrement de 40 &euro; (article D. 441-5 du Code de commerce).</p></div>' +
+              '<div class="cgv-art"><h4>7. Annulation par le client</h4><p>Toute annulation doit &ecirc;tre notifi&eacute;e par &eacute;crit. Les conditions financi&egrave;res sont les suivantes : annulation plus de 30 jours avant l&#39;&eacute;v&eacute;nement : remboursement int&eacute;gral de l&#39;acompte, hors frais d&eacute;j&agrave; engag&eacute;s. Entre 30 et 15 jours : 50 % du montant TTC factur&eacute;. Entre 14 et 7 jours : 75 % du montant TTC. Moins de 7 jours : 100 % du montant TTC.</p></div>' +
+            '</div>' +
+            // COL 2
+            '<div>' +
+              '<div class="cgv-art"><h4>8. Hygi&egrave;ne, allerg&egrave;nes et r&eacute;gimes alimentaires</h4><p>Meshuga Catering respecte la r&eacute;glementation HACCP et la d&eacute;claration des 14 allerg&egrave;nes majeurs (r&egrave;glement UE 1169/2011). Le client s&#39;engage &agrave; communiquer toute exigence di&eacute;t&eacute;tique, allergie ou intol&eacute;rance des convives au moins 7 jours avant l&#39;&eacute;v&eacute;nement. La responsabilit&eacute; de Meshuga ne saurait &ecirc;tre engag&eacute;e en cas de r&eacute;action consc&eacute;cutive &agrave; une information non communiqu&eacute;e ou erron&eacute;e.</p></div>' +
+              '<div class="cgv-art"><h4>9. Prestation sur site et live cooking</h4><p>Pour les prestations avec animation sur site, le client met &agrave; disposition gratuitement : un acc&egrave;s direct au lieu (ascenseur de service le cas &eacute;ch&eacute;ant), un point d&#39;eau, l&#39;alimentation &eacute;lectrique requise et un espace de pr&eacute;paration suffisant. Tout retard imputable au client (acc&egrave;s, autorisations, mat&eacute;riel manquant) ne peut pr&eacute;tendre &agrave; minoration. Le client demeure responsable du mat&eacute;riel de Meshuga mis &agrave; disposition.</p></div>' +
+              '<div class="cgv-art"><h4>10. Livraison</h4><p>La livraison est effectu&eacute;e &agrave; l&#39;adresse indiqu&eacute;e par le client, dans le cr&eacute;neau convenu. En cas d&#39;impossibilit&eacute; de livraison du fait du client (absence, acc&egrave;s impossible, adresse erron&eacute;e), les denr&eacute;es restent factur&eacute;es. Une nouvelle livraison est sous r&eacute;serve de disponibilit&eacute; et factur&eacute;e en suppl&eacute;ment.</p></div>' +
+              '<div class="cgv-art"><h4>11. Cha&icirc;ne du froid et conservation</h4><p>Les denr&eacute;es livr&eacute;es doivent &ecirc;tre consomm&eacute;es dans les 4 heures suivant la livraison ou la fin de la prestation, &agrave; temp&eacute;rature ambiante n&#39;exc&eacute;dant pas 22&deg;C. Au-del&agrave;, ou en cas de rupture de la cha&icirc;ne du froid imputable au client, la responsabilit&eacute; de Meshuga ne peut &ecirc;tre engag&eacute;e.</p></div>' +
+              '<div class="cgv-art"><h4>12. Force majeure</h4><p>Les obligations des parties sont suspendues en cas de force majeure au sens de l&#39;article 1218 du Code civil (intemp&eacute;ries exceptionnelles, gr&egrave;ve g&eacute;n&eacute;rale, pand&eacute;mie, mesure administrative). Les parties s&#39;efforceront de bonne foi de reporter l&#39;&eacute;v&eacute;nement. &Agrave; d&eacute;faut, l&#39;acompte est conserv&eacute; &agrave; titre de couverture des frais d&eacute;j&agrave; engag&eacute;s.</p></div>' +
+              '<div class="cgv-art"><h4>13. Droit &agrave; l&#39;image</h4><p>Meshuga Catering r&eacute;alise des photographies et vid&eacute;os de ses prestations &agrave; des fins de communication (site internet, r&eacute;seaux sociaux, supports commerciaux et &eacute;ditoriaux). En signant le pr&eacute;sent devis, le client accepte que ces images puissent &ecirc;tre captur&eacute;es lors de l&#39;&eacute;v&eacute;nement et exploit&eacute;es librement par Meshuga Catering, sur tout support et pour toute dur&eacute;e. Aucun convive ne sera identifi&eacute; nominativement. Toute opposition particuli&egrave;re relative &agrave; un convive identifiable doit &ecirc;tre formul&eacute;e par &eacute;crit avant le d&eacute;but de la prestation.</p></div>' +
+              '<div class="cgv-art"><h4>14. Donn&eacute;es personnelles</h4><p>Les donn&eacute;es collect&eacute;es sont trait&eacute;es conform&eacute;ment au RGPD et &agrave; la loi Informatique et Libert&eacute;s. Le client dispose d&#39;un droit d&#39;acc&egrave;s, de rectification, d&#39;effacement, de portabilit&eacute; et d&#39;opposition exer&ccedil;able par courriel &agrave; events@meshuga.fr.</p></div>' +
+              '<div class="cgv-art"><h4>15. Litiges et droit applicable</h4><p>Les pr&eacute;sentes CGV sont soumises au droit fran&ccedil;ais. &Agrave; d&eacute;faut de r&egrave;glement amiable, tout litige sera de la comp&eacute;tence exclusive du Tribunal de commerce de Paris, m&ecirc;me en cas de pluralit&eacute; de d&eacute;fendeurs ou d&#39;appel en garantie.</p></div>' +
+            '</div>' +
           '</div>' +
         '</div>' +
       '</div>' +
