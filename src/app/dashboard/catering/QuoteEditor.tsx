@@ -398,10 +398,10 @@ var generateCateringPdfHtml = function(d, stampUrl, logotypeUrl) {
     '.sig-grid{display:grid;grid-template-columns:1fr 1fr 2fr;gap:12px;margin-bottom:9px}' +
     '.sig-field label{display:block;font-size:7px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:5px;font-weight:900}' +
     '.sig-line{height:16px;border-bottom:1.2px solid #191923}' +
-    '.sig-box{border:1.5px dashed #191923;border-radius:4px;height:65px;padding:5px 9px;position:relative}' +
+    '.sig-box{border:1.5px dashed #191923;border-radius:4px;height:90px;padding:5px 9px;position:relative}' +
     '.sig-box label{display:block;font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:900}' +
     '.cgv-pagebreak{height:0}' +
-    '.cgv{padding-top:14px}' +
+    '.cgv{padding-top:28px}' +
     '.cgv-header{padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px;page-break-inside:avoid;break-inside:avoid;page-break-after:avoid;break-after:avoid}' +
     '.cgv-title{font-family:Yellowtail,cursive;font-size:32px;color:#191923;line-height:1}' +
     '.cgv-sub{font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;color:#777;letter-spacing:.4px;margin-top:4px}' +
