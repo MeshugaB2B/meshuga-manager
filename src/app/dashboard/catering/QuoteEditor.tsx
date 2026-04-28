@@ -391,12 +391,12 @@ var generateCateringPdfHtml = function(d, stampUrl, logotypeUrl) {
     '.rib-title{font-family:Yellowtail,cursive;font-size:16px;color:#FF82D7;margin-bottom:6px;line-height:1}' +
     '.rib-grid{display:grid;grid-template-columns:1fr 1fr 2fr 1fr;gap:12px}' +
     '.rib-item label{display:block;font-size:7px;text-transform:uppercase;letter-spacing:1px;color:#aaa;margin-bottom:3px;font-weight:900}' +
-    '.rib-item span{font-size:9.5px;font-weight:900;font-family:"Courier New",monospace;color:#191923;letter-spacing:.5px}' +
+    '.rib-item span{font-size:10.5px;font-weight:900;font-family:"Arial Narrow",Arial,sans-serif;color:#191923;letter-spacing:1.2px}' +
     '.footer{padding:10px 0 0;border-top:1px solid #EBEBEB;margin-top:auto}' +
     '.footer-brand{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:8px;padding-bottom:8px}' +
     '.footer-logo-img{height:34px;width:auto;display:block;image-rendering:high-quality}' +
-    '.footer-meta{font-family:"Arial Narrow",Arial,sans-serif;font-size:10px;color:#191923;letter-spacing:.4px;font-weight:700;text-align:right}' +
-    '.legal{font-size:7px;color:#aaa;line-height:1.7;text-align:justify}' +
+    '.footer-meta{font-family:"Arial Narrow",Arial,sans-serif;font-size:11px;color:#191923;letter-spacing:.5px;font-weight:400;text-align:right}' +
+    '.legal{font-size:7px;color:#777;line-height:1.7;text-align:justify}' +
     '.no-print{text-align:center;padding:24px 16px;background:#FFFFFF;border-top:2px dashed #FF82D7;margin-top:16px}' +
     '.no-print p{margin-bottom:14px;font-size:11px;color:#666;line-height:1.6}' +
     '.no-print button{padding:11px 28px;background:#FFEB5A;color:#191923;border:2px solid #191923;border-radius:5px;font-size:13px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;box-shadow:3px 3px 0 #191923;font-family:Arial,sans-serif;margin:0 4px}' +
