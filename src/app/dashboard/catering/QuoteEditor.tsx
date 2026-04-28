@@ -320,7 +320,7 @@ var generateCateringPdfHtml = function(d, stampUrl, logotypeUrl) {
   var css =
     '*{margin:0;padding:0;box-sizing:border-box}' +
     'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:11px;background:#FFFFFF}' +
-    '@page{size:A4;margin:14mm 16mm 18mm 16mm}' +
+    '@page{size:A4;margin:10mm 16mm 18mm 16mm}' +
     '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.tc-grid,.breakdown,.notes-block,.footer,.footer-brand,.sig,.rib{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title,.sig-title{page-break-after:avoid;break-after:avoid}.rib-grid,.sig-grid,.sig-box{page-break-inside:avoid;break-inside:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px;padding-top:12px}p,.legal{orphans:3;widows:3}}' +
     '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;display:flex;flex-direction:column;background:#FFFFFF}' +
     '.content{flex:1}' +
@@ -400,9 +400,9 @@ var generateCateringPdfHtml = function(d, stampUrl, logotypeUrl) {
     '.sig-line{height:16px;border-bottom:1.2px solid #191923}' +
     '.sig-box{border:1.5px dashed #191923;border-radius:4px;height:65px;padding:5px 9px;position:relative}' +
     '.sig-box label{display:block;font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:900}' +
-    '.cgv-pagebreak{page-break-before:always;break-before:page;height:0}' +
-    '.cgv{padding-top:6px}' +
-    '.cgv-header{padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px}' +
+    '.cgv-pagebreak{height:0}' +
+    '.cgv{padding-top:14px}' +
+    '.cgv-header{padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px;page-break-inside:avoid;break-inside:avoid;page-break-after:avoid;break-after:avoid}' +
     '.cgv-title{font-family:Yellowtail,cursive;font-size:32px;color:#191923;line-height:1}' +
     '.cgv-sub{font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;color:#777;letter-spacing:.4px;margin-top:4px}' +
     '.cgv-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}' +
