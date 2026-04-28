@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { LOGO_PINK } from '../logos'
+import { LOGO_PINK, STAMP_PINK } from '../logos'
 
 // ============================================================
 // QuoteEditor.tsx — Phase 3 du Dashboard B2B Catering Meshuga
@@ -162,7 +162,7 @@ var fmtEurStr = function(n) {
 //       eventDate, eventLieu, nbPersonnes, eventFormat, lineDetails,
 //       miseEnPlace, miseEnPlaceOffert, livraison, livraisonOffert,
 //       remiseTotalPct, notes, totals, sandwichBreakdown, coverage }
-var generateCateringPdfHtml = function(d, logoUrl) {
+var generateCateringPdfHtml = function(d, stampUrl, logotypeUrl) {
   var todayStr = new Date().toLocaleDateString('fr-FR')
   var validiteStr = ''
   if (d.validite) {
@@ -306,33 +306,43 @@ var generateCateringPdfHtml = function(d, logoUrl) {
   }
 
   // Logo HTML
-  var logoHtml = logoUrl
-    ? '<img src="' + logoUrl + '" alt="meshuga"/>'
+  // Stamp pour le header (rond, compact)
+  var stampHtml = stampUrl
+    ? '<img src="' + stampUrl + '" alt="meshuga"/>'
     : '<div class="logo-text-fb">meshuga</div>'
+
+  // Logotype pour le footer (rectangulaire, signature finale)
+  var logotypeHtml = logotypeUrl
+    ? '<img src="' + logotypeUrl + '" alt="meshuga" class="footer-logo-img"/>'
+    : '<div class="logo-text-fb" style="font-size:28px">meshuga</div>'
 
   // CSS du PDF (une seule string concaténée)
   var css =
     '*{margin:0;padding:0;box-sizing:border-box}' +
     'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:11px;background:#FFFFFF}' +
     '@page{size:A4;margin:14mm 16mm 18mm 16mm}' +
-    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.totals-wrap,.totals,.rib,.cond-block,.breakdown,.notes-block,.footer{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title{page-break-after:avoid;break-after:avoid}.cond-block{page-break-after:avoid;break-after:avoid}.rib{page-break-after:avoid;break-after:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:24px;padding-top:14px}p,.legal{orphans:3;widows:3}}' +
+    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.tc-grid,.tc-cond,.tc-totals,.rib,.breakdown,.notes-block,.footer,.footer-brand{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title{page-break-after:avoid;break-after:avoid}.tc-grid{page-break-after:avoid;break-after:avoid}.rib{page-break-after:avoid;break-after:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px;padding-top:12px}p,.legal{orphans:3;widows:3}}' +
     '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;display:flex;flex-direction:column;background:#FFFFFF}' +
     '.content{flex:1}' +
-    '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:14px;border-bottom:4px solid #FF82D7;margin-bottom:18px}' +
-    '.logo img{height:64px;width:auto;display:block;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;image-rendering:high-quality}' +
+    '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px}' +
+    '.logo{display:flex;align-items:center;gap:14px}' +
+    '.logo img{height:75px;width:75px;display:block;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;image-rendering:high-quality;border-radius:50%}' +
+    '.logo-tag{display:flex;flex-direction:column;justify-content:center}' +
+    '.logo-name{font-family:Yellowtail,cursive;font-size:26px;color:#191923;line-height:1}' +
+    '.logo-sub-pink{font-family:"Arial Narrow",Arial,sans-serif;font-size:8.5px;color:#FF82D7;letter-spacing:1.6px;text-transform:uppercase;font-weight:900;margin-top:3px}' +
     '.logo-text-fb{font-family:Yellowtail,cursive;font-size:36px;color:#191923;line-height:1}' +
     '.logo-sub{font-size:8.5px;color:#999;margin-top:4px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700}' +
     '.doc-info{text-align:right}' +
     '.doc-type{font-family:Yellowtail,cursive;font-size:42px;color:#191923;line-height:.95}' +
     '.doc-num{font-size:10px;color:#666;margin-top:3px;font-weight:700}' +
-    '.parties{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}' +
-    '.party{background:#FAFAFA;border-radius:5px;padding:10px 13px;border-left:4px solid #FFEB5A}' +
+    '.parties{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:11px}' +
+    '.party{background:#FAFAFA;border-radius:5px;padding:9px 12px;border-left:4px solid #FFEB5A}' +
     '.party.client{border-left-color:#FF82D7}' +
     '.party-label{font-family:Yellowtail,cursive;font-size:14px;color:#888;margin-bottom:4px;line-height:1}' +
     '.party-name{font-size:13px;font-weight:900;margin-bottom:3px}' +
     '.party-detail{font-size:9.5px;color:#555;margin-top:1px;line-height:1.5}' +
     '.event-detail{margin-top:6px;font-size:10px;color:#191923;line-height:1.5}' +
-    '.cov{background:#FFEB5A;border:2px solid #191923;border-radius:5px;padding:8px 14px;margin-bottom:14px;font-size:11px;text-align:center;letter-spacing:.3px;box-shadow:2px 2px 0 #191923}' +
+    '.cov{background:#FFEB5A;border:2px solid #191923;border-radius:5px;padding:7px 14px;margin-bottom:11px;font-size:11px;text-align:center;letter-spacing:.3px;box-shadow:2px 2px 0 #191923}' +
     '.cov strong{font-weight:900;font-size:12px}' +
     '.cov-pers{font-style:italic;color:#191923;opacity:.7;margin-left:4px}' +
     '.cov-pp{font-size:10px;font-weight:700;font-style:italic;color:#191923;opacity:.85;letter-spacing:.2px}' +
@@ -354,37 +364,39 @@ var generateCateringPdfHtml = function(d, logoUrl) {
     '.strike{text-decoration:line-through;opacity:.5}' +
     '.offert{color:#009D3A;font-weight:900}' +
     '.remise-row td{color:#FF82D7}' +
-    '.breakdown{margin:0 0 14px;padding:11px 13px;background:#FFFAEC;border-radius:5px;border-left:4px solid #FFEB5A;page-break-inside:avoid;break-inside:avoid}' +
-    '.breakdown-title{font-family:Yellowtail,cursive;font-size:17px;color:#191923;margin-bottom:8px;line-height:1}' +
+    '.breakdown{margin:0 0 11px;padding:9px 12px;background:#FFFAEC;border-radius:5px;border-left:4px solid #FFEB5A;page-break-inside:avoid;break-inside:avoid}' +
+    '.breakdown-title{font-family:Yellowtail,cursive;font-size:16px;color:#191923;margin-bottom:6px;line-height:1}' +
     '.breakdown-sub{font-size:9px;color:#888;font-style:italic;margin-bottom:8px;letter-spacing:.2px}' +
     '.breakdown-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:#191923;border:1.5px solid #191923;border-radius:4px;overflow:hidden}' +
     '.bd-row{display:flex;align-items:center;padding:6px 12px;background:#FFFFFF;font-size:11px;gap:10px}' +
     '.bd-row-filler{background:#FFFFFF}' +
     '.bd-qty{font-weight:900;font-size:14px;color:#FF82D7;min-width:34px;text-align:right;font-family:"Arial Narrow",Arial,sans-serif;flex-shrink:0}' +
     '.bd-name{font-weight:900;color:#191923;letter-spacing:.3px;flex:1;text-transform:uppercase}' +
-    '.totals-wrap{display:flex;justify-content:flex-end;margin-bottom:14px}' +
-    '.totals{width:300px}' +
-    '.t-row{display:flex;justify-content:space-between;padding:6px 4px;border-bottom:1px solid #EBEBEB;font-size:11.5px}' +
+    '.tc-grid{display:grid;grid-template-columns:1fr 290px;gap:16px;align-items:start;margin-bottom:11px}' +
+    '.tc-cond{background:#FAFAFA;border-left:4px solid #FF82D7;border-radius:0 4px 4px 0;padding:10px 13px}' +
+    '.tc-cond .cond-title{font-family:Yellowtail,cursive;font-size:16px;color:#191923;margin-bottom:4px;line-height:1}' +
+    '.tc-cond .cond{font-size:9.5px;color:#444;line-height:1.55}' +
+    '.tc-totals{display:flex;flex-direction:column;justify-content:flex-start}' +
+    '.t-row{display:flex;justify-content:space-between;padding:5px 4px;border-bottom:1px solid #EBEBEB;font-size:11.5px}' +
     '.t-row.gray{color:#888;font-size:10px}' +
     '.t-row strong{font-weight:900;font-size:12px}' +
-    '.t-final{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;background:#FFEB5A;border:2px solid #191923;border-radius:5px;margin-top:8px;box-shadow:3px 3px 0 #191923}' +
-    '.t-final .lbl{font-family:Yellowtail,cursive;font-size:24px;color:#191923;line-height:1}' +
-    '.t-final .amt{font-weight:900;font-size:17px;color:#191923}' +
-    '.per-person{text-align:right;font-size:9.5px;color:#888;margin-top:5px;font-style:italic}' +
-    '.notes-block{background:#FFF9E5;border-left:4px solid #FFEB5A;padding:10px 13px;margin-bottom:12px;border-radius:0 4px 4px 0}' +
+    '.t-final{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#FFEB5A;border:2px solid #191923;border-radius:5px;margin-top:6px;box-shadow:3px 3px 0 #191923}' +
+    '.t-final .lbl{font-family:Yellowtail,cursive;font-size:22px;color:#191923;line-height:1}' +
+    '.t-final .amt{font-weight:900;font-size:16px;color:#191923}' +
+    '.per-person{text-align:right;font-size:9.5px;color:#888;margin-top:4px;font-style:italic}' +
+    '.notes-block{background:#FFF9E5;border-left:4px solid #FFEB5A;padding:9px 13px;margin-bottom:10px;border-radius:0 4px 4px 0}' +
     '.notes-title{font-family:Yellowtail,cursive;font-size:14px;color:#191923;margin-bottom:4px;line-height:1}' +
-    '.notes-content{font-size:10px;line-height:1.6;color:#333}' +
-    '.rib{border:1.5px solid #191923;border-radius:5px;padding:11px 14px;margin-bottom:12px;background:#FFFFFF}' +
-    '.rib-title{font-family:Yellowtail,cursive;font-size:17px;color:#FF82D7;margin-bottom:8px;line-height:1}' +
+    '.notes-content{font-size:10px;line-height:1.55;color:#333}' +
+    '.rib{border:1.5px solid #191923;border-radius:5px;padding:9px 14px;margin-bottom:10px;background:#FFFFFF}' +
+    '.rib-title{font-family:Yellowtail,cursive;font-size:16px;color:#FF82D7;margin-bottom:6px;line-height:1}' +
     '.rib-grid{display:grid;grid-template-columns:1fr 1fr 2fr 1fr;gap:12px}' +
     '.rib-item label{display:block;font-size:7px;text-transform:uppercase;letter-spacing:1px;color:#aaa;margin-bottom:3px;font-weight:900}' +
     '.rib-item span{font-size:9.5px;font-weight:900;font-family:"Courier New",monospace;color:#191923;letter-spacing:.5px}' +
-    '.cond-block{margin-bottom:14px}' +
-    '.cond-title{font-family:Yellowtail,cursive;font-size:15px;color:#191923;margin-bottom:4px;line-height:1}' +
-    '.cond{font-size:9.5px;color:#555;line-height:1.6}' +
-    '.footer{padding:10px 0 8px;border-top:1px solid #EBEBEB;margin-top:auto}' +
-    '.legal{font-size:7px;color:#aaa;line-height:1.7;margin-bottom:8px;text-align:justify}' +
-    '.pink-bar{background:#FF82D7;padding:9px 14px;border-radius:4px;text-align:center;font-family:Yellowtail,cursive;font-size:18px;color:#191923;letter-spacing:.5px;border:1.5px solid #191923;line-height:1}' +
+    '.footer{padding:10px 0 0;border-top:1px solid #EBEBEB;margin-top:auto}' +
+    '.footer-brand{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:8px;padding-bottom:8px}' +
+    '.footer-logo-img{height:34px;width:auto;display:block;image-rendering:high-quality}' +
+    '.footer-meta{font-family:"Arial Narrow",Arial,sans-serif;font-size:10px;color:#191923;letter-spacing:.4px;font-weight:700;text-align:right}' +
+    '.legal{font-size:7px;color:#aaa;line-height:1.7;text-align:justify}' +
     '.no-print{text-align:center;padding:24px 16px;background:#FFFFFF;border-top:2px dashed #FF82D7;margin-top:16px}' +
     '.no-print p{margin-bottom:14px;font-size:11px;color:#666;line-height:1.6}' +
     '.no-print button{padding:11px 28px;background:#FFEB5A;color:#191923;border:2px solid #191923;border-radius:5px;font-size:13px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;box-shadow:3px 3px 0 #191923;font-family:Arial,sans-serif;margin:0 4px}' +
@@ -402,8 +414,11 @@ var generateCateringPdfHtml = function(d, logoUrl) {
       '<div class="content">' +
         // HEADER
         '<div class="header">' +
-          '<div class="logo">' + logoHtml +
-            '<div class="logo-sub">Catering &middot; 3 rue Vavin 75006 Paris</div>' +
+          '<div class="logo">' + stampHtml +
+            '<div class="logo-tag">' +
+              '<div class="logo-name">meshuga</div>' +
+              '<div class="logo-sub-pink">Catering &middot; Paris</div>' +
+            '</div>' +
           '</div>' +
           '<div class="doc-info">' +
             '<div class="doc-type">Devis</div>' +
@@ -450,13 +465,19 @@ var generateCateringPdfHtml = function(d, logoUrl) {
           '</tr></thead>' +
           '<tbody>' + itemRows + mepRow + livRow + remRow + '</tbody>' +
         '</table>' +
-        // TOTALS
-        '<div class="totals-wrap"><div class="totals">' +
-          '<div class="t-row"><span>Total HT</span><strong>' + fmtEurStr(d.totals.totalHT) + '</strong></div>' +
-          '<div class="t-row gray"><span>TVA (10 % food / 20 % prestations)</span><span>' + fmtEurStr(d.totals.tva) + '</span></div>' +
-          '<div class="t-final"><span class="lbl">Total TTC</span><span class="amt">' + fmtEurStr(d.totals.totalTTC) + '</span></div>' +
-          perPersonHtml +
-        '</div></div>' +
+        // TOTALS + CONDITIONS côte à côte
+        '<div class="tc-grid">' +
+          '<div class="tc-cond">' +
+            '<div class="cond-title">Conditions de r&egrave;glement</div>' +
+            '<div class="cond">Acompte de 30 % &agrave; la commande, solde 72 h avant l&#39;&eacute;v&eacute;nement. Devis valable 30 jours &agrave; compter de la date d&#39;&eacute;mission. Pour valider la commande, retournez ce devis sign&eacute; avec la mention "Bon pour accord" + virement de l&#39;acompte.</div>' +
+          '</div>' +
+          '<div class="tc-totals">' +
+            '<div class="t-row"><span>Total HT</span><strong>' + fmtEurStr(d.totals.totalHT) + '</strong></div>' +
+            '<div class="t-row gray"><span>TVA (10 % food / 20 % prestations)</span><span>' + fmtEurStr(d.totals.tva) + '</span></div>' +
+            '<div class="t-final"><span class="lbl">Total TTC</span><span class="amt">' + fmtEurStr(d.totals.totalTTC) + '</span></div>' +
+            perPersonHtml +
+          '</div>' +
+        '</div>' +
         // NOTES
         notesHtml +
         // RIB
@@ -469,16 +490,14 @@ var generateCateringPdfHtml = function(d, logoUrl) {
             '<div class="rib-item"><label>BIC</label><span>CCBPFRPPMTG</span></div>' +
           '</div>' +
         '</div>' +
-        // CONDITIONS
-        '<div class="cond-block">' +
-          '<div class="cond-title">Conditions de r&egrave;glement</div>' +
-          '<div class="cond">Acompte de 30 % &agrave; la commande, solde 72 h avant l&#39;&eacute;v&eacute;nement. Devis valable 30 jours &agrave; compter de la date d&#39;&eacute;mission. Pour valider la commande, retournez ce devis sign&eacute; avec la mention "Bon pour accord" + virement de l&#39;acompte.</div>' +
-        '</div>' +
       '</div>' +
-      // FOOTER
+      // FOOTER (logotype + texte + mentions)
       '<div class="footer">' +
+        '<div class="footer-brand">' +
+          logotypeHtml +
+          '<div class="footer-meta">3 rue Vavin, Paris 6e &middot; events@meshuga.fr</div>' +
+        '</div>' +
         '<div class="legal">SAS AEGIA FOOD (enseigne Meshuga Crazy Deli) &middot; SAS au capital de 1 000 &euro; &middot; RCS Paris 904 639 531 &middot; SIRET 904 639 531 00014 &middot; APE 56.10C &middot; TVA intracommunautaire FR31904639531 &middot; 3 rue Vavin 75006 Paris &middot; TVA &agrave; taux r&eacute;duit (10 %) sur les produits alimentaires et taux normal (20 %) sur les prestations de service. Tout commencement d&#39;ex&eacute;cution vaut acceptation du pr&eacute;sent devis.</div>' +
-        '<div class="pink-bar">meshuga &middot; catering &middot; 3 rue vavin, paris 6e &middot; events@meshuga.fr</div>' +
       '</div>' +
     '</div>' +
     // PRINT BAR (n'apparaît pas à l'impression)
@@ -1091,6 +1110,7 @@ export default function QuoteEditor(props) {
         sandwichBreakdown: sandwichBreakdown,
         coverage: coverage
       },
+      STAMP_PINK,
       LOGO_PINK
     )
     var w = window.open('', '_blank')
