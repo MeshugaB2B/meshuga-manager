@@ -321,7 +321,7 @@ var generateCateringPdfHtml = function(d, stampUrl, logotypeUrl) {
     '*{margin:0;padding:0;box-sizing:border-box}' +
     'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:11px;background:#FFFFFF}' +
     '@page{size:A4;margin:14mm 16mm 18mm 16mm}' +
-    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.tc-grid,.breakdown,.notes-block,.footer,.footer-brand{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title,.sig-title{page-break-after:avoid;break-after:avoid}.sig-grid,.sig-box{page-break-inside:avoid;break-inside:avoid}.rib-grid{page-break-inside:avoid;break-inside:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px;padding-top:12px}p,.legal{orphans:3;widows:3}}' +
+    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.tc-grid,.breakdown,.notes-block,.footer,.footer-brand,.sig,.rib{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title,.sig-title{page-break-after:avoid;break-after:avoid}.rib-grid,.sig-grid,.sig-box{page-break-inside:avoid;break-inside:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px;padding-top:12px}p,.legal{orphans:3;widows:3}}' +
     '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;display:flex;flex-direction:column;background:#FFFFFF}' +
     '.content{flex:1}' +
     '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px}' +
@@ -392,13 +392,13 @@ var generateCateringPdfHtml = function(d, stampUrl, logotypeUrl) {
     '.rib-grid{display:grid;grid-template-columns:1fr 1fr 2fr 1fr;gap:12px}' +
     '.rib-item label{display:block;font-size:7px;text-transform:uppercase;letter-spacing:1px;color:#aaa;margin-bottom:3px;font-weight:900}' +
     '.rib-item span{font-size:10.5px;font-weight:900;font-family:"Arial Narrow",Arial,sans-serif;color:#191923;letter-spacing:1.2px}' +
-    '.sig{border:2px solid #191923;border-radius:5px;padding:11px 14px 14px;margin-bottom:10px;background:#FFFFFF;box-shadow:3px 3px 0 #FF82D7}' +
-    '.sig-title{font-family:Yellowtail,cursive;font-size:20px;color:#191923;margin-bottom:5px;line-height:1}' +
-    '.sig-legal{font-size:8.5px;color:#444;line-height:1.55;margin-bottom:10px;text-align:justify}' +
-    '.sig-grid{display:grid;grid-template-columns:1fr 1fr 2fr;gap:14px;margin-bottom:11px}' +
-    '.sig-field label{display:block;font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:6px;font-weight:900}' +
-    '.sig-line{height:18px;border-bottom:1.2px solid #191923}' +
-    '.sig-box{border:1.5px dashed #191923;border-radius:4px;height:80px;padding:6px 10px;position:relative}' +
+    '.sig{border:2px solid #191923;border-radius:5px;padding:9px 13px 11px;margin-bottom:10px;background:#FFFFFF;box-shadow:3px 3px 0 #FF82D7}' +
+    '.sig-title{font-family:Yellowtail,cursive;font-size:18px;color:#191923;margin-bottom:4px;line-height:1}' +
+    '.sig-legal{font-size:8px;color:#444;line-height:1.5;margin-bottom:8px;text-align:justify}' +
+    '.sig-grid{display:grid;grid-template-columns:1fr 1fr 2fr;gap:12px;margin-bottom:9px}' +
+    '.sig-field label{display:block;font-size:7px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:5px;font-weight:900}' +
+    '.sig-line{height:16px;border-bottom:1.2px solid #191923}' +
+    '.sig-box{border:1.5px dashed #191923;border-radius:4px;height:65px;padding:5px 9px;position:relative}' +
     '.sig-box label{display:block;font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:900}' +
     '.cgv-pagebreak{page-break-before:always;break-before:page;height:0}' +
     '.cgv{padding-top:6px}' +
