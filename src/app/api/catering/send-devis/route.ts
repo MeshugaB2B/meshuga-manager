@@ -108,7 +108,8 @@ function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: 
     '.wrap{max-width:600px;margin:0 auto;padding:24px 20px}' +
     '.head{padding-bottom:8px;margin-bottom:20px;text-align:center}' +
     '.head img{height:54px;width:auto;display:inline-block;max-width:100%}' +
-    '.cta{display:inline-block;background:#FF82D7;color:#FFEB5A;border:2px solid #191923;border-radius:5px;padding:12px 22px;font-weight:900;text-decoration:none;font-size:14px;box-shadow:3px 3px 0 #191923;margin:8px 0}' +
+    '.cta{display:inline-block;background:#FF82D7;color:#FFEB5A !important;border:2px solid #191923;border-radius:5px;padding:12px 22px;font-weight:900;text-decoration:none !important;font-size:14px;box-shadow:3px 3px 0 #191923;margin:8px 0}' +
+    '.cta span{color:#FFEB5A !important;text-decoration:none !important}' +
     '.foot{margin-top:30px;padding-top:14px;border-top:1px solid #EEE;font-size:11px;color:#777;line-height:1.6}' +
     '.foot a{color:#FF82D7}' +
     '</style></head><body>' +
@@ -116,7 +117,7 @@ function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: 
     '<div class="head"><img src="' + LOGO_PINK + '" alt="MESHUGA" /></div>' +
     '<div class="msg">' + bodyHtml + '</div>' +
     '<div style="text-align:center;margin:26px 0">' +
-    '<a href="' + pdfPublicUrl + '" class="cta">📄 Voir le devis ' + devisNumero + '</a>' +
+    '<a href="' + pdfPublicUrl + '" class="cta" style="color:#FFEB5A !important;text-decoration:none"><span style="color:#FFEB5A !important;text-decoration:none">📄 Voir le devis ' + devisNumero + '</span></a>' +
     '</div>' +
     '<div class="foot">' +
     'Le devis détaillé est joint à ce message et également accessible via le lien ci-dessus.<br>' +
