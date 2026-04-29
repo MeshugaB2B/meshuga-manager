@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { LOGO_PINK } from '@/app/dashboard/logos'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -66,16 +67,15 @@ function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: 
     '<style>' +
     'body{font-family:Arial,sans-serif;color:#191923;line-height:1.6;background:#FFFFFF;margin:0;padding:0}' +
     '.wrap{max-width:600px;margin:0 auto;padding:24px 20px}' +
-    '.head{padding-bottom:16px;border-bottom:3px solid #FF82D7;margin-bottom:20px}' +
-    '.brand{font-family:cursive;font-size:26px;color:#191923;line-height:1}' +
-    '.subtitle{font-size:11px;color:#FF82D7;letter-spacing:1.4px;text-transform:uppercase;font-weight:700;margin-top:4px}' +
+    '.head{padding-bottom:18px;border-bottom:3px solid #FF82D7;margin-bottom:24px;text-align:center}' +
+    '.head img{height:54px;width:auto;display:inline-block;max-width:100%}' +
     '.msg{font-size:14px;color:#191923;margin-bottom:24px}' +
     '.cta{display:inline-block;background:#FFEB5A;color:#191923;border:2px solid #191923;border-radius:5px;padding:12px 22px;font-weight:900;text-decoration:none;font-size:14px;box-shadow:3px 3px 0 #191923;margin:8px 0}' +
     '.foot{margin-top:30px;padding-top:14px;border-top:1px solid #EEE;font-size:11px;color:#777;line-height:1.6}' +
     '.foot a{color:#FF82D7}' +
     '</style></head><body>' +
     '<div class="wrap">' +
-    '<div class="head"><div class="brand">meshuga</div><div class="subtitle">CATERING · PARIS</div></div>' +
+    '<div class="head"><img src="' + LOGO_PINK + '" alt="MESHUGA" /></div>' +
     '<div class="msg">' + safeMessage + '</div>' +
     '<div style="text-align:center;margin:26px 0">' +
     '<a href="' + pdfPublicUrl + '" class="cta">📄 Voir le devis ' + devisNumero + '</a>' +
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
     return serverError('Storage upload failed: ' + uploadRes.error.message)
   }
 
-  // 6. Generate signed URL valid 90 days for the PDF link
+  // 6. Generate signed URL valid 90 days (kept as fallback / archive reference)
   var SIGNED_URL_EXPIRY_SEC = 60 * 60 * 24 * 90 // 90 days
   var signedRes = await supabase.storage
     .from(BUCKET)
@@ -176,7 +176,15 @@ export async function POST(req: NextRequest) {
   if (signedRes.error || !signedRes.data) {
     return serverError('Signed URL failed: ' + (signedRes.error ? signedRes.error.message : 'unknown'))
   }
-  var publicUrl = signedRes.data.signedUrl
+  var supabaseSignedUrl = signedRes.data.signedUrl
+
+  // Build the public-facing URL that opens the HTML inline in the browser
+  // (we route through our own /api/catering/view-devis endpoint which forces Content-Disposition: inline)
+  var origin =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    req.headers.get('origin') ||
+    'https://meshuga-manager.vercel.app'
+  var publicUrl = origin.replace(/\/$/, '') + '/api/catering/view-devis/' + devisId
 
   // 7. Build email body HTML
   var emailHtml = buildEmailHtml(message, devisNumero, publicUrl)
@@ -227,7 +235,7 @@ export async function POST(req: NextRequest) {
       statut: newStatut,
       pdf_storage_path: storagePath,
       pdf_url: publicUrl,
-      pdf_signed_url: publicUrl,
+      pdf_signed_url: supabaseSignedUrl,
       email_to: to,
       email_cc: cc || null,
       email_bcc: bccList.join(', ') || null,
