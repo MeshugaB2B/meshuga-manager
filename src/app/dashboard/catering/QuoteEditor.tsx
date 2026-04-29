@@ -671,7 +671,20 @@ var QE_CSS =
   '.qe-cov-bd-title{font-family:Yellowtail,cursive;font-size:13px;color:#191923;margin-bottom:4px;line-height:1}' +
   '.qe-cov-bd-list{display:flex;flex-wrap:wrap;gap:5px}' +
   '.qe-cov-bd-pill{display:inline-flex;align-items:center;background:#FFFFFF;border:1.5px solid #191923;border-radius:11px;padding:2px 9px;font-size:11px;font-weight:900;color:#191923;line-height:1.5;letter-spacing:-.1px}' +
-  '.qe-cov-bd-pill strong{margin-right:4px;color:#FF82D7;font-size:12px}'
+  '.qe-cov-bd-pill strong{margin-right:4px;color:#FF82D7;font-size:12px}' +
+  '.qe-modal-overlay{position:fixed;inset:0;background:rgba(25,25,35,.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:14px;animation:qe-fadeIn .15s ease-out}' +
+  '@keyframes qe-fadeIn{from{opacity:0}to{opacity:1}}' +
+  '.qe-modal{background:#FFFFFF;border:2px solid #191923;border-radius:9px;box-shadow:5px 5px 0 #FF82D7;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding:18px 20px}' +
+  '.qe-modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px;padding-bottom:11px;border-bottom:2px solid #FFEB5A}' +
+  '.qe-modal-title{font-family:Yellowtail,cursive;font-size:24px;color:#191923;line-height:1}' +
+  '.qe-modal-sub{font-size:11px;color:#555;margin-top:3px;line-height:1.4}' +
+  '.qe-modal-close{background:transparent;border:none;font-size:22px;cursor:pointer;color:#191923;line-height:1;padding:4px 8px}' +
+  '.qe-modal-close:hover{background:#FFEB5A;border-radius:4px}' +
+  '.qe-modal-error{background:#FF82D7;color:#191923;border:2px solid #191923;border-radius:5px;padding:8px 12px;font-weight:900;font-size:12px;margin-bottom:12px;line-height:1.4}' +
+  '.qe-modal-info{background:#FFFAEC;border-left:4px solid #FFEB5A;padding:9px 12px;border-radius:0 4px 4px 0;margin-bottom:12px;font-size:11px;line-height:1.5;color:#191923}' +
+  '.qe-modal-info strong{color:#191923}' +
+  '.qe-modal-actions{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1.5px dashed #DDD;justify-content:flex-end;flex-wrap:wrap}' +
+  '.qe-modal-actions button{flex:1;justify-content:center;min-width:120px}'
 
 // ============================================================
 // COMPOSANT PRINCIPAL
@@ -688,6 +701,13 @@ export default function QuoteEditor(props) {
 
   var [loading, setLoading] = useState(true)
   var [saving, setSaving] = useState(false)
+  var [sendModalOpen, setSendModalOpen] = useState(false)
+  var [sending, setSending] = useState(false)
+  var [sendError, setSendError] = useState('')
+  var [emailTo, setEmailTo] = useState('')
+  var [emailCc, setEmailCc] = useState('')
+  var [emailSubject, setEmailSubject] = useState('')
+  var [emailMessage, setEmailMessage] = useState('')
   var [error, setError] = useState('')
   var [offerings, setOfferings] = useState([])
   var [activeCategory, setActiveCategory] = useState('box_mini')
@@ -1147,7 +1167,19 @@ export default function QuoteEditor(props) {
       toastFn('Nom du client requis pour le PDF')
       return
     }
-    var html = generateCateringPdfHtml(
+    var w = window.open('', '_blank')
+    if (!w) {
+      toastFn('Le navigateur a bloqué la fenêtre. Autorise les popups pour ce site.')
+      return
+    }
+    w.document.write(buildPdfHtml())
+    w.document.close()
+    w.focus()
+  }
+
+  // Construit le HTML complet du PDF (réutilisé pour preview et envoi)
+  var buildPdfHtml = function() {
+    return generateCateringPdfHtml(
       {
         numero: numero,
         validite: validite,
@@ -1173,14 +1205,103 @@ export default function QuoteEditor(props) {
       STAMP_PINK,
       LOGO_PINK
     )
-    var w = window.open('', '_blank')
-    if (!w) {
-      toastFn('Le navigateur a bloqué la fenêtre. Autorise les popups pour ce site.')
+  }
+
+  // Ouvre la modal d'envoi avec pré-fill intelligent
+  var handleOpenSendModal = function() {
+    if (lineDetails.length === 0) {
+      toastFn('Ajoute au moins un item avant d\'envoyer')
       return
     }
-    w.document.write(html)
-    w.document.close()
-    w.focus()
+    if (!clientNom.trim()) {
+      toastFn('Nom du client requis')
+      return
+    }
+    if (!devisId) {
+      toastFn('Sauvegarde le devis avant de l\'envoyer')
+      return
+    }
+    setSendError('')
+    setEmailTo(clientEmail || '')
+    setEmailCc('')
+    setEmailSubject('Votre devis catering Meshuga ' + numero)
+    var defaultMsg = 'Bonjour' + (clientContact ? ' ' + clientContact : '') + ',\n\n' +
+      'Suite à notre échange, je te transmets en pièce jointe le devis pour ' +
+      (eventFormat === 'cocktail' ? 'votre cocktail dînatoire' :
+       eventFormat === 'lunch' ? 'votre lunch' :
+       eventFormat === 'soiree' ? 'votre soirée' : 'votre événement') +
+      (nbPersonnes ? ' (' + nbPersonnes + ' personnes)' : '') +
+      (eventDate ? ' du ' + (function() {
+        var d = new Date(eventDate + 'T12:00:00')
+        return isNaN(d.getTime()) ? eventDate : d.toLocaleDateString('fr-FR')
+      })() : '') + '.\n\n' +
+      'Tu trouveras le détail complet ci-joint. N\'hésite pas si tu as la moindre question.\n\n' +
+      'Belle journée,\n' +
+      ((profile && profile.email && profile.email.indexOf('emy') > -1) ? 'Emy' : 'Edward') +
+      '\nMeshuga Catering'
+    setEmailMessage(defaultMsg)
+    setSendModalOpen(true)
+  }
+
+  // Envoie le devis via la route /api/catering/send-devis
+  var handleSendEmail = async function() {
+    setSendError('')
+    if (!emailTo || !emailTo.trim()) {
+      setSendError('Adresse destinataire requise')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTo.trim())) {
+      setSendError('Adresse email invalide')
+      return
+    }
+    if (emailCc && emailCc.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailCc.trim())) {
+      setSendError('CC : adresse email invalide')
+      return
+    }
+    if (!emailSubject.trim()) {
+      setSendError('Sujet requis')
+      return
+    }
+    setSending(true)
+    try {
+      var pdfHtml = buildPdfHtml()
+      var res = await fetch('/api/catering/send-devis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          devisId: devisId,
+          to: emailTo.trim(),
+          cc: emailCc ? emailCc.trim() : '',
+          bcc: '',
+          subject: emailSubject.trim(),
+          message: emailMessage,
+          pdfHtml: pdfHtml
+        })
+      })
+      var json = await res.json()
+      if (!res.ok || !json.ok) {
+        setSendError(json.error || 'Erreur d\'envoi (HTTP ' + res.status + ')')
+        setSending(false)
+        return
+      }
+      toastFn('📤 Devis envoyé à ' + emailTo + ' ✓')
+      setSendModalOpen(false)
+      setSending(false)
+      // Recharge l'état devis (statut, sent_at, sent_count) sans fermer l'éditeur
+      if (devisId && supabase) {
+        try {
+          var refresh = await supabase.from('devis').select('statut, sent_at').eq('id', devisId).single()
+          if (refresh.data && refresh.data.statut) {
+            setStatut(refresh.data.statut)
+          }
+        } catch (e) {
+          // silent : pas grave si le refresh statut rate, l'envoi a réussi
+        }
+      }
+    } catch (e) {
+      setSendError('Erreur réseau : ' + (e && e.message ? e.message : 'inconnue'))
+      setSending(false)
+    }
   }
 
   // Filtre offerings par catégorie active + grouping par subcategory
@@ -1861,13 +1982,27 @@ export default function QuoteEditor(props) {
                 {saving ? '⏳ Enregistrement…' : '💾 Sauvegarder'}
               </button>
               <button
+                className="btn"
+                style={{ flex: 1, justifyContent: 'center', background: '#7AFF82', borderColor: '#191923' }}
+                onClick={handleOpenSendModal}
+                disabled={lineDetails.length === 0 || !clientNom.trim() || !devisId}
+                title={
+                  !devisId ? 'Sauvegarde le devis avant de l\'envoyer' :
+                  lineDetails.length === 0 ? 'Ajoute des items' :
+                  !clientNom.trim() ? 'Renseigne le nom du client' :
+                  'Envoyer le devis par email'
+                }
+              >
+                📤 Envoyer
+              </button>
+              <button
                 className="btn btn-p"
                 style={{ flex: 1, justifyContent: 'center' }}
                 onClick={handlePreviewPDF}
                 disabled={lineDetails.length === 0 || !clientNom.trim()}
                 title={lineDetails.length === 0 ? 'Ajoute des items' : (!clientNom.trim() ? 'Renseigne le nom du client' : 'Aperçu du PDF brandé')}
               >
-                📄 Aperçu PDF
+                📄 Aperçu
               </button>
               <button
                 className="btn"
@@ -1878,11 +2013,92 @@ export default function QuoteEditor(props) {
               </button>
             </div>
             <div style={{ fontSize: 10, opacity: 0.5, marginTop: 8, textAlign: 'center', lineHeight: 1.4 }}>
-              Multi-options côte à côte en Phase 4 V2
+              {statut === 'envoye' || statut === 'accepte' || statut === 'facture' || statut === 'paye'
+                ? '✓ Devis déjà envoyé · 📤 pour relancer'
+                : 'Sauvegarde puis envoie au client'}
             </div>
           </div>
         </div>
       </div>
+      {sendModalOpen ? (
+        <div className="qe-modal-overlay" onClick={function(){ if(!sending) setSendModalOpen(false) }}>
+          <div className="qe-modal" onClick={function(e){ e.stopPropagation() }}>
+            <div className="qe-modal-head">
+              <div>
+                <div className="qe-modal-title">Envoyer le devis par email</div>
+                <div className="qe-modal-sub">{numero} → {clientNom || 'Client'}</div>
+              </div>
+              <button className="qe-modal-close" onClick={function(){ if(!sending) setSendModalOpen(false) }} disabled={sending}>×</button>
+            </div>
+            <div className="qe-modal-info">
+              📎 Le devis sera envoyé en pièce jointe (HTML imprimable en PDF) avec un lien de visualisation valide 90 jours.<br />
+              <strong>events@meshuga.fr</strong> est automatiquement en copie cachée pour archive.
+            </div>
+            {sendError ? <div className="qe-modal-error">⚠️ {sendError}</div> : null}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 4 }}>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6, color: '#666', display: 'block', marginBottom: 4 }}>Destinataire *</label>
+                <input
+                  type="email"
+                  value={emailTo}
+                  onChange={function(e){ setEmailTo(e.target.value) }}
+                  placeholder="client@exemple.fr"
+                  disabled={sending}
+                  style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #191923', borderRadius: 5, fontSize: 13, fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6, color: '#666', display: 'block', marginBottom: 4 }}>Copie (CC) — optionnel</label>
+                <input
+                  type="email"
+                  value={emailCc}
+                  onChange={function(e){ setEmailCc(e.target.value) }}
+                  placeholder="autre@exemple.fr"
+                  disabled={sending}
+                  style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #DDD', borderRadius: 5, fontSize: 13, fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6, color: '#666', display: 'block', marginBottom: 4 }}>Sujet *</label>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={function(e){ setEmailSubject(e.target.value) }}
+                  disabled={sending}
+                  style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #191923', borderRadius: 5, fontSize: 13, fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6, color: '#666', display: 'block', marginBottom: 4 }}>Message</label>
+                <textarea
+                  value={emailMessage}
+                  onChange={function(e){ setEmailMessage(e.target.value) }}
+                  disabled={sending}
+                  rows={9}
+                  style={{ width: '100%', padding: '9px 10px', border: '1.5px solid #DDD', borderRadius: 5, fontSize: 12, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5 }}
+                />
+              </div>
+            </div>
+            <div className="qe-modal-actions">
+              <button
+                className="btn"
+                onClick={function(){ if(!sending) setSendModalOpen(false) }}
+                disabled={sending}
+              >
+                Annuler
+              </button>
+              <button
+                className="btn"
+                style={{ background: '#7AFF82', borderColor: '#191923', fontWeight: 900 }}
+                onClick={handleSendEmail}
+                disabled={sending || !emailTo.trim() || !emailSubject.trim()}
+              >
+                {sending ? '⏳ Envoi en cours...' : '📤 Envoyer maintenant'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
