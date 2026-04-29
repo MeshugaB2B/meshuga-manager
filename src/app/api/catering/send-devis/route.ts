@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
   var uploadRes = await supabase.storage
     .from(BUCKET)
     .upload(storagePath, pdfBuffer, {
-      contentType: 'text/html; charset=utf-8',
+      contentType: 'text/html',
       upsert: false
     })
 
