@@ -30,7 +30,7 @@ var SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 var SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 var RESEND_API_KEY = process.env.RESEND_API_KEY || ''
 var EMAIL_FROM_DEFAULT = 'events@meshuga.fr'
-var EMAIL_FROM_NAME = 'Meshuga Catering'
+var EMAIL_FROM_NAME = 'Meshuga Events'
 var BCC_ARCHIVE_DEFAULT = 'events@meshuga.fr'
 var BUCKET = 'catering-quotes-pdfs'
 
@@ -56,33 +56,71 @@ function isValidEmail(s: string): boolean {
 }
 
 // Wrappe un message texte simple en HTML stylé Meshuga (pour le corps du mail uniquement)
+// Met en forme intelligemment : titre "Récapitulatif :", lignes "•", montants en gras.
 function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: string): string {
-  var safeMessage = (messageText || '')
+  // Étape 1 : escape HTML (sécurité)
+  var safe = (messageText || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/\n/g, '<br>')
+
+  // Étape 2 : formatage par ligne pour structure (récap, bullets, montants en gras)
+  var lines = safe.split('\n')
+  var rendered: string[] = []
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i]
+    var trimmed = line.trim()
+    // Ligne titre récap
+    if (/^Récapitulatif\s*:/i.test(trimmed)) {
+      rendered.push('<div style="font-weight:900;color:#191923;margin-top:14px;margin-bottom:6px;font-size:14px">' + trimmed + '</div>')
+      continue
+    }
+    // Ligne bullet "•" → liste stylée
+    if (/^•\s/.test(trimmed)) {
+      var bulletContent = trimmed.replace(/^•\s/, '')
+      // Mise en gras des montants (€) et personnes
+      bulletContent = bulletContent.replace(
+        /(\d[\d\s]*[.,]?\d*\s*€[^\s,)]*(?:\s*\/\s*personne)?)/g,
+        '<strong>$1</strong>'
+      )
+      // Met en gras "X personnes"
+      bulletContent = bulletContent.replace(
+        /(\d+\s*personnes?)/gi,
+        '<strong>$1</strong>'
+      )
+      rendered.push('<div style="margin-left:6px;margin-bottom:4px;line-height:1.5;font-size:14px;color:#191923">▸ ' + bulletContent + '</div>')
+      continue
+    }
+    // Ligne vide
+    if (trimmed === '') {
+      rendered.push('<div style="height:10px"></div>')
+      continue
+    }
+    // Ligne normale
+    rendered.push('<div style="margin-bottom:6px;line-height:1.6;font-size:14px;color:#191923">' + line + '</div>')
+  }
+  var bodyHtml = rendered.join('')
+
   return (
     '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
     '<style>' +
-    'body{font-family:Arial,sans-serif;color:#191923;line-height:1.6;background:#FFFFFF;margin:0;padding:0}' +
+    'body{font-family:Arial,Helvetica,sans-serif;color:#191923;background:#FFFFFF;margin:0;padding:0}' +
     '.wrap{max-width:600px;margin:0 auto;padding:24px 20px}' +
     '.head{padding-bottom:18px;border-bottom:3px solid #FF82D7;margin-bottom:24px;text-align:center}' +
     '.head img{height:54px;width:auto;display:inline-block;max-width:100%}' +
-    '.msg{font-size:14px;color:#191923;margin-bottom:24px}' +
     '.cta{display:inline-block;background:#FFEB5A;color:#191923;border:2px solid #191923;border-radius:5px;padding:12px 22px;font-weight:900;text-decoration:none;font-size:14px;box-shadow:3px 3px 0 #191923;margin:8px 0}' +
     '.foot{margin-top:30px;padding-top:14px;border-top:1px solid #EEE;font-size:11px;color:#777;line-height:1.6}' +
     '.foot a{color:#FF82D7}' +
     '</style></head><body>' +
     '<div class="wrap">' +
     '<div class="head"><img src="' + LOGO_PINK + '" alt="MESHUGA" /></div>' +
-    '<div class="msg">' + safeMessage + '</div>' +
+    '<div class="msg">' + bodyHtml + '</div>' +
     '<div style="text-align:center;margin:26px 0">' +
     '<a href="' + pdfPublicUrl + '" class="cta">📄 Voir le devis ' + devisNumero + '</a>' +
     '</div>' +
     '<div class="foot">' +
     'Le devis détaillé est joint à ce message et également accessible via le lien ci-dessus.<br>' +
-    'Une question ? Réponds simplement à ce mail, on te recontacte.<br><br>' +
+    'Une question ? Répondez simplement à ce mail, nous reviendrons vers vous.<br><br>' +
     '<strong>SAS AEGIA FOOD (enseigne MESHUGA)</strong> — 3 rue Vavin, Paris 6e<br>' +
     'events@meshuga.fr · meshuga.fr' +
     '</div></div></body></html>'
