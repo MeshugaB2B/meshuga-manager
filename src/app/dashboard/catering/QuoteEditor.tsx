@@ -157,6 +157,136 @@ var fmtEurStr = function(n) {
   return v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
 
+// Liste de prénoms typiquement féminins (ASCII lowercase) — utilisée pour deviner le genre
+// si la civilité (M./Mme) n'est pas explicite dans clientContact.
+// Liste réaliste pour un usage France/B2B parisien — pas exhaustive mais suffisante.
+var FEMALE_FIRST_NAMES = [
+  'agathe','agnes','alice','alicia','aline','amandine','amelie','anais','anita','anna','anne','annick',
+  'apolline','astrid','audrey','aurelie','aurore','barbara','beatrice','benedicte','bernadette',
+  'brigitte','camille','candice','capucine','carine','carla','carole','caroline','catherine','cecile',
+  'celia','celine','chantal','charlotte','chloe','christelle','christiane','christine','claire',
+  'clara','claude','claudine','clemence','clementine','colette','constance','coralie','corinne',
+  'cyrielle','daphne','delphine','diane','dominique','dorothee','edith','elena','eleonore','eliane',
+  'eliette','elisa','elisabeth','elise','elodie','eloise','elsa','emilie','emma','emmanuelle','estelle',
+  'eva','eve','fabienne','fanny','fatima','flavie','flora','florence','florine','francine','francoise',
+  'gabrielle','garance','genevieve','genevieve','ghislaine','gisele','helene','heloise','hermine',
+  'huguette','ines','ingrid','irene','isabelle','jacqueline','jeanne','jennifer','jessica','joelle',
+  'josephine','josette','josiane','julie','juliette','justine','karen','karine','katia','laetitia',
+  'laure','laurence','laurie','lea','leila','leonie','leonore','liliane','lina','linda','lise','lisa',
+  'lola','lou','louise','louna','lucie','ludivine','lydie','madeleine','madeline','magali','manon',
+  'margaux','margot','marguerite','maria','marianne','marie','marielle','marion','marlene','martine',
+  'maryline','mathilde','maud','maxime','melanie','melissa','michele','micheline','milena','mireille',
+  'monique','morgane','muriel','mylene','nadege','nadia','nadine','nancy','natacha','nathalie',
+  'nelly','nicole','nina','noemie','nora','odette','odile','olivia','ophelie','oriane','pascale',
+  'patricia','paule','pauline','peggy','perrine','philomene','priscillia','prune','rachel','raphaelle',
+  'raymonde','rebecca','regine','renee','romane','rosalie','rose','roxane','sabine','sabrina',
+  'salome','samira','sandra','sandrine','sara','sarah','severine','sidonie','simone','sofia','solange',
+  'solene','sonia','sophie','stephanie','suzanne','sylvia','sylvie','tania','tatiana','therese',
+  'thais','tiphaine','typhaine','valentine','valerie','vanessa','veronique','victoire','victoria',
+  'violaine','violette','virginie','vivienne','yasmine','yolande','yvette','yvonne','zelie','zoe'
+]
+
+// Normalise un prénom : enlève accents, met en lowercase, trim
+var normalizeFirstName = function(s) {
+  if (!s) return ''
+  return String(s)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[^a-z\-]/g, '')
+    .trim()
+}
+
+// Devine le genre d'un prénom : 'F' (féminin), 'M' (masculin), '' (inconnu)
+var guessGender = function(firstName) {
+  var n = normalizeFirstName(firstName)
+  if (!n) return ''
+  // gestion prénoms composés : on prend le premier
+  var first = n.split('-')[0]
+  if (FEMALE_FIRST_NAMES.indexOf(first) > -1) return 'F'
+  // si pas dans la liste féminine, on assume masculin pour les prénoms français courants
+  // (heuristique faillible mais raisonnable en B2B)
+  return 'M'
+}
+
+// Construit la salutation perso à partir du contact client
+// Inputs : clientContact (ex: "Pierre Dupont", "Mme Martin", "Sophie", "M. Jean Bernard")
+// Output : "Cher Monsieur Dupont", "Chère Madame Martin", "Cher Pierre", "Bonjour" en fallback
+var buildSalutation = function(rawContact) {
+  var c = (rawContact || '').trim()
+  if (!c) return 'Bonjour'
+
+  // Détecte civilité explicite en début de chaîne
+  var lc = c.toLowerCase()
+  var explicitCiv = ''
+  var rest = c
+  if (/^(m\.|mr\.?|monsieur)\s+/i.test(lc)) {
+    explicitCiv = 'M'
+    rest = c.replace(/^(m\.|mr\.?|monsieur)\s+/i, '').trim()
+  } else if (/^(mme|madame)\s+/i.test(lc)) {
+    explicitCiv = 'F'
+    rest = c.replace(/^(mme|madame)\s+/i, '').trim()
+  } else if (/^(mlle|mademoiselle)\s+/i.test(lc)) {
+    explicitCiv = 'F'
+    rest = c.replace(/^(mlle|mademoiselle)\s+/i, '').trim()
+  }
+
+  var parts = rest.split(/\s+/).filter(function(p) { return p.length > 0 })
+
+  if (explicitCiv) {
+    // On a la civilité, on prend le NOM (dernier mot) si possible
+    if (parts.length >= 2) {
+      var lastName = parts[parts.length - 1]
+      return (explicitCiv === 'F' ? 'Chère Madame ' : 'Cher Monsieur ') + lastName
+    } else if (parts.length === 1) {
+      // Civilité + 1 seul nom : on l'utilise (ex: "Mme Martin")
+      return (explicitCiv === 'F' ? 'Chère Madame ' : 'Cher Monsieur ') + parts[0]
+    }
+    return (explicitCiv === 'F' ? 'Chère Madame' : 'Cher Monsieur')
+  }
+
+  // Pas de civilité explicite : on essaie de deviner via le prénom
+  if (parts.length === 0) return 'Bonjour'
+  var firstName = parts[0]
+  // Capitalisation propre
+  var firstNameCap = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+  var gender = guessGender(firstName)
+  if (gender === 'F') return 'Chère ' + firstNameCap
+  if (gender === 'M') return 'Cher ' + firstNameCap
+  // genre inconnu : tonalité neutre
+  return 'Bonjour ' + firstNameCap
+}
+
+// Format date FR longue : "jeudi 30 avril 2026" (sans virgule, lecture naturelle)
+var formatDateLongFr = function(isoDate) {
+  if (!isoDate) return ''
+  try {
+    var d = new Date(isoDate + 'T12:00:00')
+    if (isNaN(d.getTime())) return isoDate
+    return d.toLocaleDateString('fr-FR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    })
+  } catch (e) {
+    return isoDate
+  }
+}
+
+// Libellé long du format événementiel
+var EVENT_FORMAT_LABELS = {
+  cocktail: 'votre cocktail dînatoire',
+  lunch: 'votre lunch',
+  soiree: 'votre soirée',
+  petit_dej: 'votre petit-déjeuner d\'entreprise',
+  buffet: 'votre buffet',
+  autre: 'votre événement'
+}
+var formatLabel = function(f) {
+  return EVENT_FORMAT_LABELS[f] || 'votre événement'
+}
+
 // Génère le HTML complet du devis catering brandé Meshuga
 // d = { numero, validite, clientNom, clientContact, clientEmail, clientPhone,
 //       eventDate, eventLieu, nbPersonnes, eventFormat, lineDetails,
@@ -1104,8 +1234,16 @@ export default function QuoteEditor(props) {
     setSaving(true)
     try {
       var responsableEmail = (profile && profile.email) || ''
-      var responsablePrenom =
-        profile && profile.email && profile.email.indexOf('emy') > -1 ? 'Emy' : 'Edward'
+      var responsablePrenom = 'Edward'
+      if (profile) {
+        if (profile.full_name && (profile.full_name === 'Emy' || profile.full_name === 'Edward')) {
+          responsablePrenom = profile.full_name
+        } else if (profile.role === 'emy') {
+          responsablePrenom = 'Emy'
+        } else if (profile.email && profile.email.toLowerCase().indexOf('emy') > -1) {
+          responsablePrenom = 'Emy'
+        }
+      }
 
       var payload = {
         numero: numero,
@@ -1224,21 +1362,71 @@ export default function QuoteEditor(props) {
     setSendError('')
     setEmailTo(clientEmail || '')
     setEmailCc('')
-    setEmailSubject('Votre devis catering Meshuga ' + numero)
-    var defaultMsg = 'Bonjour' + (clientContact ? ' ' + clientContact : '') + ',\n\n' +
-      'Suite à notre échange, je te transmets en pièce jointe le devis pour ' +
-      (eventFormat === 'cocktail' ? 'votre cocktail dînatoire' :
-       eventFormat === 'lunch' ? 'votre lunch' :
-       eventFormat === 'soiree' ? 'votre soirée' : 'votre événement') +
-      (nbPersonnes ? ' (' + nbPersonnes + ' personnes)' : '') +
-      (eventDate ? ' du ' + (function() {
-        var d = new Date(eventDate + 'T12:00:00')
-        return isNaN(d.getTime()) ? eventDate : d.toLocaleDateString('fr-FR')
-      })() : '') + '.\n\n' +
-      'Tu trouveras le détail complet ci-joint. N\'hésite pas si tu as la moindre question.\n\n' +
-      'Belle journée,\n' +
-      ((profile && profile.email && profile.email.indexOf('emy') > -1) ? 'Emy' : 'Edward') +
-      '\nMeshuga Catering'
+    setEmailSubject('Votre devis Meshuga Events ' + numero)
+
+    // Personnalisation : salutation selon contact + détails événement
+    var salutation = buildSalutation(clientContact)
+    var dateStr = eventDate ? formatDateLongFr(eventDate) : ''
+    var formatStr = formatLabel(eventFormat)
+    var nbStr = nbPersonnes ? String(nbPersonnes) : ''
+
+    // Récap chiffré du devis
+    var totalTTC = totals && totals.totalTTC ? Number(totals.totalTTC) : 0
+    var totalTtcStr = totalTTC.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+    var perPersonneStr = ''
+    if (nbPersonnes && Number(nbPersonnes) > 0 && totalTTC > 0) {
+      var perPers = totalTTC / Number(nbPersonnes)
+      perPersonneStr = perPers.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' € / personne'
+    }
+
+    // Signature : Edward ou Emy selon profil connecté
+    // Signataire : utilise profile.full_name si dispo (calculé en amont par DashboardContent),
+    // sinon fallback sur la détection email "emy" / "edward".
+    var signataire = 'Edward' // default
+    if (profile) {
+      if (profile.full_name && (profile.full_name === 'Emy' || profile.full_name === 'Edward')) {
+        signataire = profile.full_name
+      } else if (profile.role === 'emy') {
+        signataire = 'Emy'
+      } else if (profile.email && profile.email.toLowerCase().indexOf('emy') > -1) {
+        signataire = 'Emy'
+      }
+    }
+
+    // Construction du message
+    // ⚠️ FUTURE-PROOF MULTI-OPTIONS : quand on passera au multi-options en Phase 4V3,
+    // remplacer le bloc "details" par une boucle sur les 3 options avec chacune leur total.
+    // L'architecture du mail (salutation + intro + details + clôture) reste la même.
+    var lines = []
+    lines.push(salutation + ',')
+    lines.push('')
+    var introParts = ['Suite à votre demande, nous avons le plaisir de vous adresser ci-joint le devis pour ' + formatStr]
+    if (nbStr) introParts.push('(' + nbStr + ' personnes)')
+    if (dateStr) introParts.push('prévu le ' + dateStr)
+    lines.push(introParts.join(' ') + '.')
+    lines.push('')
+
+    // Récap chiffré (mis en avant)
+    lines.push('Récapitulatif :')
+    if (nbStr) lines.push('• ' + nbStr + ' personnes')
+    if (formatStr) lines.push('• Format : ' + formatStr.replace(/^votre /, ''))
+    if (dateStr) lines.push('• Date : ' + dateStr)
+    if (totalTtcStr) lines.push('• Montant total TTC : ' + totalTtcStr + (perPersonneStr ? ' (soit ' + perPersonneStr + ')' : ''))
+    lines.push('')
+
+    // Mention "alternatives possibles" (préparation au multi-options sans mentir)
+    lines.push('Cette proposition est entièrement modulable : n\'hésitez pas à nous solliciter pour vous adresser des alternatives ajustées à votre budget ou à vos préférences.')
+    lines.push('')
+
+    lines.push('Vous trouverez le détail complet de la prestation dans le devis ci-joint, ainsi que nos conditions de règlement et nos CGV.')
+    lines.push('')
+    lines.push('Restant à votre disposition pour toute question,')
+    lines.push('')
+    lines.push('Bien cordialement,')
+    lines.push(signataire)
+    lines.push('Meshuga Events')
+
+    var defaultMsg = lines.join('\n')
     setEmailMessage(defaultMsg)
     setSendModalOpen(true)
   }
