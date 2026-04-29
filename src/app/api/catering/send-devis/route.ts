@@ -106,9 +106,9 @@ function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: 
     '<style>' +
     'body{font-family:Arial,Helvetica,sans-serif;color:#191923;background:#FFFFFF;margin:0;padding:0}' +
     '.wrap{max-width:600px;margin:0 auto;padding:24px 20px}' +
-    '.head{padding-bottom:18px;border-bottom:3px solid #FF82D7;margin-bottom:24px;text-align:center}' +
+    '.head{padding-bottom:8px;margin-bottom:20px;text-align:center}' +
     '.head img{height:54px;width:auto;display:inline-block;max-width:100%}' +
-    '.cta{display:inline-block;background:#FFEB5A;color:#191923;border:2px solid #191923;border-radius:5px;padding:12px 22px;font-weight:900;text-decoration:none;font-size:14px;box-shadow:3px 3px 0 #191923;margin:8px 0}' +
+    '.cta{display:inline-block;background:#FF82D7;color:#FFEB5A;border:2px solid #191923;border-radius:5px;padding:12px 22px;font-weight:900;text-decoration:none;font-size:14px;box-shadow:3px 3px 0 #191923;margin:8px 0}' +
     '.foot{margin-top:30px;padding-top:14px;border-top:1px solid #EEE;font-size:11px;color:#777;line-height:1.6}' +
     '.foot a{color:#FF82D7}' +
     '</style></head><body>' +
