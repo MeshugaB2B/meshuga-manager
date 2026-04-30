@@ -903,15 +903,6 @@ export default function QuoteWizard(props) {
     )
   }
 
-  // ---------- MODAL NOUVEAU CLIENT ----------
-  function NewClientModal() {
-    if (!showNewClientModal) return null
-    return <NewClientModalInner onClose={function() { setShowNewClientModal(false) }} onCreated={function(p) {
-      setSelectedProspect(p)
-      setShowNewClientModal(false)
-    }} supabase={supabase} />
-  }
-
   // ---------- RENDU ----------
 
   return (
@@ -956,7 +947,16 @@ export default function QuoteWizard(props) {
         </div>
       </div>
 
-      <NewClientModal />
+      {showNewClientModal ? (
+        <NewClientModalInner
+          onClose={function() { setShowNewClientModal(false) }}
+          onCreated={function(p) {
+            setSelectedProspect(p)
+            setShowNewClientModal(false)
+          }}
+          supabase={supabase}
+        />
+      ) : null}
     </div>
   )
 }
