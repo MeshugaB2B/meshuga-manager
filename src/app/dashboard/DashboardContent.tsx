@@ -10,6 +10,7 @@ import InstaTab from './InstaTab'
 import DashboardModals from './DashboardModals'
 import QuotesTab from './catering/QuotesTab'
 import QuoteEditor from './catering/QuoteEditor'
+import QuoteWizard from './catering/QuoteWizard'
 import { G } from './styles'
 import { LOGO_PINK, LOGO_YELLOW, STAMP_YELLOW, STAMP_PINK } from './logos'
 import {
@@ -61,6 +62,7 @@ function DashboardImpl() {
   const [devisList, setDevisList] = useState([])
   const [devisView, setDevisView] = useState('list')
   const [currentDevisId, setCurrentDevisId] = useState(null)
+  const [cateringWizardOpen, setCateringWizardOpen] = useState(false)
   const [devisMode, setDevisMode] = useState('catering')
   const [cateringEditorOpen, setCateringEditorOpen] = useState(false)
   const [cateringEditingId, setCateringEditingId] = useState(null)
@@ -2137,11 +2139,24 @@ function DashboardImpl() {
                   supabase={sb()}
                   profile={profile}
                   onNew={function(){
-                    setCateringEditingId(null)
-                    setCateringEditorOpen(true)
+                    setCateringWizardOpen(true)
                   }}
                   onOpen={function(d){
                     setCateringEditingId(d && d.id ? d.id : null)
+                    setCateringEditorOpen(true)
+                  }}
+                />
+              )}
+              {devisMode === 'catering' && cateringWizardOpen && (
+                <QuoteWizard
+                  supabase={sb()}
+                  profile={profile}
+                  onClose={function(){
+                    setCateringWizardOpen(false)
+                  }}
+                  onOpenEditor={function(devisId, devisData){
+                    setCateringWizardOpen(false)
+                    setCateringEditingId(devisId)
                     setCateringEditorOpen(true)
                   }}
                 />
