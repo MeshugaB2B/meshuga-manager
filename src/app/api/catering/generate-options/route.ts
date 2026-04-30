@@ -52,12 +52,15 @@ function fmtEur(n: number): string {
 
 // Brief structuré pour Claude
 interface Brief {
-  eventFormat: string
+  eventFormat: string         // 'petit_dej' | 'business_lunch' | 'cocktail' | 'soiree'
   nbPersonnes: number
   eventDate: string
+  eventLieu: string           // adresse de livraison ou réception
+  logisticsMode: string       // 'livraison' | 'live_cooking'
+  eventHour: string           // 'HH:MM' — heure de livraison ou de début de réception
+  meshugaIsOnly: boolean      // si Cocktail/Soirée: true=seul, false=cocktail only avec autre traiteur
   budgetCibleHTPerPers?: number
   contextNotes?: string
-  configuration: string
 }
 
 // Item du catalogue passé à Claude (compact)
@@ -102,98 +105,171 @@ interface GeneratedOption {
 // Construit le prompt système pour Claude
 function buildSystemPrompt(): string {
   return [
-    'Tu es un expert traiteur événementiel pour Meshuga (deli new-yorkais à Paris).',
+    'Tu es l\'expert traiteur événementiel de Meshuga (deli new-yorkais à Paris, 3 rue Vavin 75006).',
     'Tu construis des devis B2B en piochant UNIQUEMENT dans le catalogue fourni.',
     '',
-    'RÈGLES STRICTES :',
-    '1. Utilise UNIQUEMENT les `id` du catalogue donné. Aucune invention.',
-    '2. Quantités cohérentes avec le nombre de personnes :',
-    '   - Cocktail dînatoire : 8-12 mini-pièces salées + 2-4 sucrées par personne',
-    '   - Lunch : 1 sandwich complet ou 1 lunch box par personne + 1 dessert',
-    '   - Petit-déjeuner : 1-2 viennoiseries + 1 boisson par personne',
-    '   - Soirée : 6-10 mini-pièces salées + 2-3 sucrées par personne',
-    '   - Buffet : 1 plat principal + accompagnements + dessert par personne',
-    '3. Mix équilibré : varier viandes / poisson / végétarien quand possible.',
-    '4. Si le client mentionne "vegan" / "végé" / "halal" / "casher" : adapte la sélection.',
-    '5. Si "live cooking" demandé ou format adapté : inclure un live_forfait + des live_minis.',
+    '════════════════ RÈGLES STRICTES ════════════════',
     '',
-    'BUDGET PAR OPTION :',
-    '- Essentiel : ~70% du budget cible (sélection essentielle, sans superflu)',
-    '- Signature : ~100% du budget cible (LE choix recommandé Meshuga)',
-    '- Excellence : ~130% du budget cible (généreux, varié, premium)',
+    '1. UTILISATION DU CATALOGUE',
+    '   Utilise UNIQUEMENT les `id` du catalogue donné. Aucune invention.',
+    '   Si un item demandé n\'existe pas dans le catalogue, ignore-le.',
     '',
-    'Si pas de budget cible donné : Signature ~25-30€ HT/personne par défaut.',
+    '2. RÈGLES MÉTIER PAR TYPE DE PRESTATION',
     '',
-    'OUTPUT : JSON strict UNIQUEMENT, pas de texte avant/après. Schema :',
+    '   PETIT-DÉJEUNER',
+    '   - Items autorisés : UNIQUEMENT sandwiches petit-déj catégorie box_mini sub="petitdej" : Egg, Lox, PBN, Lobster (et leurs variantes mini si format Mini).',
+    '   - Pas de viennoiseries (on n\'en fait pas).',
+    '   - Format STANDARD : 1 sandwich petit-déj complet par personne + 0,2 L de jus d\'orange par personne (vendu au litre, arrondi au 0,5L sup).',
+    '   - Format MINI : 2-3 minis par personne (Essentiel=2/pers, Signature=2,5/pers, Excellence=3/pers) + 0,15-0,2 L jus orange/pers.',
+    '   - Possibilité d\'ajouter "Orange pressée vendue au litre" si dispo dans catégorie addon.',
+    '   - Logistique : LIVRAISON BOX OU LIVE COOKING. Si live cooking : un sandwich petit-déj est préparé en live + un live_forfait inclus.',
+    '',
+    '   BUSINESS LUNCH (toujours format STANDARD)',
+    '   - Items autorisés : catégorie lunch_box (lunch boxes individuelles) + catégorie platter (plateaux à partager).',
+    '   - Tu arbitres avec flexibilité selon le contexte client (ex: groupe formel = lunch box, ambiance détendue = mix plateaux+box, équipe créative = plateaux à partager).',
+    '   - Quantité indicative : ~1 lunch box/pers OU 1 plateau pour 8-10 pers.',
+    '   - Logistique : LIVRAISON BOX UNIQUEMENT (pas de live cooking).',
+    '',
+    '   COCKTAIL DÎNATOIRE (toujours format MINI)',
+    '   - Items autorisés : catégorie box_mini (mini-pièces) + sucrés en box_mini sub="sucre".',
+    '   - Si Meshuga = SEUL traiteur : 5-6 minis/pers (Essentiel=5, Signature=5, Excellence=6).',
+    '   - Si Meshuga = COCKTAIL ONLY (mix avec autre traiteur) : 2-3 minis/pers (Essentiel=2, Signature=3, Excellence=3).',
+    '   - Mix recommandé : ~70% salé, ~30% sucré.',
+    '   - Logistique : LIVRAISON BOX OU LIVE COOKING.',
+    '',
+    '   SOIRÉE (toujours format MINI)',
+    '   - Mêmes règles que Cocktail dînatoire.',
+    '   - Si Meshuga seul : 5-6 minis/pers.',
+    '   - Si cocktail only : 2-3 minis/pers.',
+    '   - Logistique : LIVRAISON BOX OU LIVE COOKING.',
+    '',
+    '3. RÈGLES SELON LE MODE LOGISTIQUE',
+    '',
+    '   LIVRAISON BOX',
+    '   - ÉVITER les sandwiches avec fromage fondu (Reuben, Pastrami chaud, etc.) → ils seront froids à la livraison, mauvais.',
+    '   - Privilégier les sandwiches froids ou tièdes qui tiennent le transport.',
+    '   - Pas de live items.',
+    '',
+    '   LIVE COOKING',
+    '   - Inclure UN live_forfait approprié au nombre de personnes (le forfait inclut déjà la prestation 2h30 + setup 1h30).',
+    '   - Pas besoin d\'ajouter manuellement des "live_minis" : ils sont inclus dans le forfait choisi.',
+    '   - Compléter avec des items mini classiques de la catégorie box_mini si besoin.',
+    '',
+    '4. RÈGLES SUR LES 3 OPTIONS',
+    '',
+    '   ESSENTIEL (~70-80% du budget cible)',
+    '   - Sélection essentielle, sans superflu.',
+    '   - Quantités au minimum de la fourchette autorisée.',
+    '   - Items à coût direct plus modéré.',
+    '',
+    '   SIGNATURE (~100% du budget cible) — RECOMMANDÉ',
+    '   - LE choix Meshuga équilibré, le best of.',
+    '   - Quantités médianes.',
+    '   - Mix optimal entre signature items et items premium.',
+    '',
+    '   EXCELLENCE (~120-130% du budget cible)',
+    '   - Généreux, varié, inclut les items premium (lobster, smoked salmon, etc. si dispo).',
+    '   - Quantités au max de la fourchette.',
+    '   - Plus de variété d\'items.',
+    '',
+    '   IMPORTANT : les 3 options doivent avoir des items DIFFÉRENTS (pas de copier-coller, juste varier les quantités).',
+    '',
+    '5. GESTION CONTEXTE NOTES',
+    '   - Si "vegan" mentionné : éliminer viandes/poisson, privilégier items végétariens.',
+    '   - Si "allergie X" : éliminer items avec X.',
+    '   - Si "casher" / "halal" : adapter (privilégier poisson, éviter mélange viande/lait).',
+    '',
+    '6. BUDGET PAR DÉFAUT',
+    '   Si pas de budget cible donné : Signature à 25-30€ HT/personne pour Cocktail/Soirée, 18-22€ pour Lunch, 12-15€ pour Petit-déj.',
+    '',
+    '════════════════ FORMAT OUTPUT ════════════════',
+    '',
+    'Réponds UNIQUEMENT avec ce JSON, sans texte avant/après :',
     '{',
     '  "options": [',
     '    {',
     '      "key": "essentiel" | "signature" | "excellence",',
     '      "description": "phrase courte décrivant le parti pris (max 80 chars)",',
     '      "items": [',
-    '        { "offering_id": "id-du-catalogue", "qty": 50 }',
+    '        { "offering_id": "id-exact-du-catalogue", "qty": 50 }',
     '      ]',
     '    }',
     '  ]',
     '}',
     '',
-    'Pas de calculs de prix dans ton output (le serveur s\'en charge à partir du catalogue).',
-    'Les 3 options DOIVENT avoir des items différents (pas de copier-coller).'
+    'Pas de calculs de prix dans ton output (le serveur calcule les totaux à partir du catalogue).',
+    'Génère TOUJOURS les 3 options dans cet ordre : essentiel → signature → excellence.'
   ].join('\n')
 }
 
 // Construit le user message avec brief + catalogue
 function buildUserPrompt(brief: Brief, catalog: CatalogItem[]): string {
   var formatLabels: { [k: string]: string } = {
-    cocktail: 'cocktail dînatoire',
-    lunch: 'lunch',
-    soiree: 'soirée',
-    petit_dej: 'petit-déjeuner d\'entreprise',
-    buffet: 'buffet',
-    autre: 'événement'
+    petit_dej: 'PETIT-DÉJEUNER',
+    business_lunch: 'BUSINESS LUNCH',
+    cocktail: 'COCKTAIL DÎNATOIRE',
+    soiree: 'SOIRÉE'
   }
-  var formatLabel = formatLabels[brief.eventFormat] || 'événement'
-  var configLabel =
-    brief.configuration === 'meshuga_seul'
-      ? 'EXCLUSIVEMENT des items signature Meshuga (sandwiches, deli, sucrés)'
-      : 'Meshuga en cocktail (mix sandwiches Meshuga + plateaux + autres)'
+  var formatLabel = formatLabels[brief.eventFormat] || brief.eventFormat
+
+  var logisticsLabel =
+    brief.logisticsMode === 'live_cooking'
+      ? 'LIVE COOKING sur site (mise en place 1h30 avant + 2h30 prestation incluses)'
+      : 'LIVRAISON BOX'
+
+  var meshugaLabel =
+    brief.meshugaIsOnly
+      ? 'SEUL TRAITEUR (Meshuga couvre tous les besoins)'
+      : 'COCKTAIL ONLY (Meshuga complète l\'offre d\'un autre traiteur principal — format mini imposé, 2-3 pièces/pers)'
 
   var lines: string[] = []
-  lines.push('BRIEF :')
-  lines.push('- Format : ' + formatLabel)
-  lines.push('- Nombre de personnes : ' + brief.nbPersonnes)
-  lines.push('- Date : ' + brief.eventDate)
-  lines.push('- Configuration : ' + configLabel)
+  lines.push('═════════ BRIEF DEVIS ═════════')
+  lines.push('Type de prestation : ' + formatLabel)
+  lines.push('Nombre de personnes : ' + brief.nbPersonnes)
+  lines.push('Date événement : ' + brief.eventDate)
+  if (brief.eventLieu) lines.push('Lieu : ' + brief.eventLieu)
+  if (brief.eventHour) {
+    var hourLabel = brief.logisticsMode === 'live_cooking'
+      ? 'Heure de début de réception : ' + brief.eventHour
+      : 'Heure de livraison : ' + brief.eventHour
+    lines.push(hourLabel)
+  }
+  lines.push('Mode logistique : ' + logisticsLabel)
+  if (brief.eventFormat === 'cocktail' || brief.eventFormat === 'soiree') {
+    lines.push('Configuration Meshuga : ' + meshugaLabel)
+  }
   if (brief.budgetCibleHTPerPers && brief.budgetCibleHTPerPers > 0) {
-    lines.push('- Budget cible (option Signature) : ' + brief.budgetCibleHTPerPers + ' € HT par personne')
+    lines.push('Budget cible (option Signature) : ' + brief.budgetCibleHTPerPers + ' € HT par personne')
   }
   if (brief.contextNotes && brief.contextNotes.trim()) {
-    lines.push('- Contexte / notes : ' + brief.contextNotes.trim())
+    lines.push('Notes / contexte : ' + brief.contextNotes.trim())
   }
   lines.push('')
-  lines.push('CATALOGUE DISPONIBLE (' + catalog.length + ' items) :')
+  lines.push('═════════ CATALOGUE DISPO (' + catalog.length + ' items) ═════════')
   lines.push('')
-  // Catalogue groupé par catégorie pour lisibilité
-  var byCategory: { [k: string]: CatalogItem[] } = {}
+  // Catalogue groupé par catégorie + sous-catégorie pour lisibilité
+  var byCat: { [k: string]: CatalogItem[] } = {}
   catalog.forEach(function (item) {
-    if (!byCategory[item.category]) byCategory[item.category] = []
-    byCategory[item.category].push(item)
+    var k = item.category + (item.subcategory ? ' / ' + item.subcategory : '')
+    if (!byCat[k]) byCat[k] = []
+    byCat[k].push(item)
   })
-  Object.keys(byCategory).forEach(function (cat) {
+  Object.keys(byCat).sort().forEach(function (cat) {
     lines.push('## ' + cat.toUpperCase())
-    byCategory[cat].forEach(function (item) {
+    byCat[cat].forEach(function (item) {
       var parts: string[] = []
       parts.push('  - id="' + item.id + '"')
       parts.push('"' + item.name + '"')
       if (item.composition) parts.push('(' + item.composition.slice(0, 80) + ')')
       parts.push(item.pv_ht + '€HT')
       if (item.size_pers) parts.push('size:' + item.size_pers + 'pers')
-      if (item.is_hot) parts.push('🔥')
+      if (item.is_hot) parts.push('🔥hot')
       lines.push(parts.join(' '))
     })
     lines.push('')
   })
-  lines.push('GÉNÈRE 3 OPTIONS (Essentiel / Signature / Excellence) maintenant.')
+  lines.push('═════════ TÂCHE ═════════')
+  lines.push('Génère MAINTENANT les 3 options (Essentiel / Signature / Excellence) selon les règles métier.')
   lines.push('Réponds UNIQUEMENT avec le JSON demandé, rien d\'autre.')
   return lines.join('\n')
 }
@@ -266,12 +342,24 @@ export async function POST(req: NextRequest) {
     eventFormat: String(body.eventFormat || ''),
     nbPersonnes: Number(body.nbPersonnes) || 0,
     eventDate: String(body.eventDate || ''),
+    eventLieu: String(body.eventLieu || ''),
+    logisticsMode: String(body.logisticsMode || 'livraison'),
+    eventHour: String(body.eventHour || ''),
+    meshugaIsOnly: body.meshugaIsOnly === true || body.meshugaIsOnly === 'true',
     budgetCibleHTPerPers: body.budgetCibleHTPerPers ? Number(body.budgetCibleHTPerPers) : undefined,
-    contextNotes: body.contextNotes ? String(body.contextNotes) : undefined,
-    configuration: String(body.configuration || 'meshuga_cocktail')
+    contextNotes: body.contextNotes ? String(body.contextNotes) : undefined
   }
-  if (!brief.eventFormat) return badRequest('eventFormat required')
+  var validFormats = ['petit_dej', 'business_lunch', 'cocktail', 'soiree']
+  if (validFormats.indexOf(brief.eventFormat) === -1) {
+    return badRequest('eventFormat invalid (must be petit_dej / business_lunch / cocktail / soiree)')
+  }
   if (!brief.nbPersonnes || brief.nbPersonnes < 1) return badRequest('nbPersonnes required (>=1)')
+
+  // Validation logistique : business_lunch n'autorise QUE livraison.
+  // Petit-déj, cocktail, soirée : livraison ou live cooking au choix.
+  if (brief.eventFormat === 'business_lunch' && brief.logisticsMode === 'live_cooking') {
+    return badRequest('Live cooking non autorisé pour business_lunch (livraison uniquement)')
+  }
 
   // 3. Charger le catalogue actif
   var supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
