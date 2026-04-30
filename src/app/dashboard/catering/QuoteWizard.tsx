@@ -1062,7 +1062,7 @@ function NewClientModalInner(props) {
         email: emailVal.trim() || null,
         phone: phoneVal.trim() || null,
         address: fullAddress || null,
-        status: 'nouveau',
+        status: 'to_contact',
         source: 'wizard_devis'
       }])
       .select()
