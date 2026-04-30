@@ -269,10 +269,21 @@ export default function QuoteWizard(props) {
       if (profile.full_name === 'Emy' || profile.role === 'emy') responsablePrenom = 'Emy'
     }
 
+    // Préfill les totaux avec l'option Signature (la recommandée) pour que le devis
+    // s'affiche correctement dans QuotesTab même avant que le client ait choisi.
+    var sigOption = null
+    for (var i = 0; i < generatedOptions.length; i++) {
+      if (generatedOptions[i].key === 'signature') {
+        sigOption = generatedOptions[i]
+        break
+      }
+    }
+    if (!sigOption && generatedOptions.length > 0) sigOption = generatedOptions[1] || generatedOptions[0]
+
     var payload = {
       numero: numero,
       statut: 'brouillon',
-      prospect_id: selectedProspect.id,
+      prospect_id: String(selectedProspect.id),
       client_nom: selectedProspect.company_name || '',
       client_contact: selectedProspect.contact_name || '',
       client_email: selectedProspect.email || '',
@@ -282,11 +293,16 @@ export default function QuoteWizard(props) {
       event_hour: eventHour,
       nb_personnes: Number(nbPersonnes),
       event_format: eventFormat,
+      format: eventFormat,
       logistics_mode: logisticsMode,
       item_format: itemFormat,
       meshuga_is_only: (eventFormat === 'cocktail' || eventFormat === 'soiree') ? (meshugaIsOnly === 'oui') : true,
       notes: contextNotes || '',
+      items: [], // Phase 4V3.1 : items vide tant que le client n'a pas choisi son option (la colonne items est NOT NULL)
       variants: generatedOptions, // Phase 4V3.1 : on stocke les 3 options en jsonb
+      total_ht: sigOption ? sigOption.total_ht : 0,
+      tva: sigOption ? sigOption.total_tva : 0,
+      total_ttc: sigOption ? sigOption.total_ttc : 0,
       responsable_email: responsableEmail,
       responsable_prenom: responsablePrenom
     }
@@ -931,6 +947,62 @@ function NewClientModalInner(props) {
   var [saving, setSaving] = useState(false)
   var [err, setErr] = useState('')
 
+  // ---- Autocomplete adresse via api-adresse.data.gouv.fr ----
+  var [addressSuggestions, setAddressSuggestions] = useState([])
+  var [addressSearchLoading, setAddressSearchLoading] = useState(false)
+  var [addressJustPicked, setAddressJustPicked] = useState(false)
+  var addressTimeoutRef = useRef(null)
+
+  useEffect(function() {
+    // Si l'utilisateur vient juste de cliquer une suggestion, on n'interroge pas
+    if (addressJustPicked) {
+      setAddressJustPicked(false)
+      setAddressSuggestions([])
+      return
+    }
+    if (!address || address.length < 3) {
+      setAddressSuggestions([])
+      return
+    }
+    if (addressTimeoutRef.current) clearTimeout(addressTimeoutRef.current)
+    addressTimeoutRef.current = setTimeout(function() {
+      setAddressSearchLoading(true)
+      var url = 'https://api-adresse.data.gouv.fr/search/?q=' + encodeURIComponent(address) + '&limit=6&autocomplete=1'
+      fetch(url)
+        .then(function(r) { return r.json() })
+        .then(function(data) {
+          setAddressSearchLoading(false)
+          if (data && data.features) {
+            var sugg = data.features.map(function(f) {
+              return {
+                label: f.properties.label,
+                postcode: f.properties.postcode,
+                city: f.properties.city,
+                housenumber: f.properties.housenumber,
+                street: f.properties.street,
+                citycode: f.properties.citycode
+              }
+            })
+            setAddressSuggestions(sugg)
+          } else {
+            setAddressSuggestions([])
+          }
+        }, function() {
+          setAddressSearchLoading(false)
+          setAddressSuggestions([])
+        })
+    }, 300)
+    return function() {
+      if (addressTimeoutRef.current) clearTimeout(addressTimeoutRef.current)
+    }
+  }, [address])
+
+  function pickAddressSuggestion(s) {
+    setAddressJustPicked(true)
+    setAddress(s.label)
+    setAddressSuggestions([])
+  }
+
   function handleSave() {
     if (!supabase) return
     if (!companyName.trim()) { setErr('Nom entreprise requis'); return }
@@ -959,6 +1031,12 @@ function NewClientModalInner(props) {
       })
   }
 
+  // Empêche la soumission native du <form> (qui pourrait causer le bug Tab/autofill)
+  function handleFormSubmit(e) {
+    e.preventDefault()
+    handleSave()
+  }
+
   var s_innerOverlay = {
     position: 'fixed',
     top: 0, left: 0, right: 0, bottom: 0,
@@ -975,7 +1053,9 @@ function NewClientModalInner(props) {
     maxWidth: '540px',
     borderRadius: '12px',
     padding: '24px',
-    boxShadow: '0 20px 50px rgba(0,0,0,0.4)'
+    boxShadow: '0 20px 50px rgba(0,0,0,0.4)',
+    maxHeight: '90vh',
+    overflowY: 'auto'
   }
   var s_innerLabel = {
     display: 'block',
@@ -998,6 +1078,22 @@ function NewClientModalInner(props) {
     boxSizing: 'border-box',
     color: '#191923'
   }
+  var s_suggestions = {
+    border: '1px solid #eee',
+    borderRadius: '6px',
+    background: '#fff',
+    marginTop: '4px',
+    maxHeight: '180px',
+    overflowY: 'auto',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+  }
+  var s_suggestionItem = {
+    padding: '8px 12px',
+    fontSize: '13px',
+    cursor: 'pointer',
+    borderBottom: '1px solid #f5f5f5',
+    color: '#191923'
+  }
 
   return (
     <div style={s_innerOverlay}>
@@ -1007,44 +1103,118 @@ function NewClientModalInner(props) {
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999' }}>✕</button>
         </div>
 
-        <label style={s_innerLabel}>Nom entreprise *</label>
-        <input style={s_innerInput} value={companyName} onChange={function(e){ setCompanyName(e.target.value) }} placeholder="Acme Corp" autoFocus />
+        {/* form pour gérer Enter et empêcher autofill agressif */}
+        <form onSubmit={handleFormSubmit} autoComplete="off">
+          {/* Champs cachés pour leurrer Safari (qui ignore parfois autoComplete=off sur le 1er field) */}
+          <input type="text" name="prevent_autofill" autoComplete="off" style={{ display: 'none' }} />
+          <input type="password" name="password_fake" autoComplete="off" style={{ display: 'none' }} />
 
-        <label style={s_innerLabel}>Contact (Prénom Nom)</label>
-        <input style={s_innerInput} value={contactName} onChange={function(e){ setContactName(e.target.value) }} placeholder="Jean Dupont" />
+          <label style={s_innerLabel}>Nom entreprise *</label>
+          <input
+            style={s_innerInput}
+            value={companyName}
+            onChange={function(e){ setCompanyName(e.target.value) }}
+            placeholder="Acme Corp"
+            autoFocus
+            autoComplete="off"
+            name="meshuga_company_name_xyz123"
+            id="meshuga_company_name_xyz123"
+          />
 
-        <label style={s_innerLabel}>Email</label>
-        <input style={s_innerInput} type="email" value={email} onChange={function(e){ setEmail(e.target.value) }} placeholder="jean@acme.fr" />
+          <label style={s_innerLabel}>Contact (Prénom Nom)</label>
+          <input
+            style={s_innerInput}
+            value={contactName}
+            onChange={function(e){ setContactName(e.target.value) }}
+            placeholder="Jean Dupont"
+            autoComplete="off"
+            name="meshuga_contact_name_xyz123"
+            id="meshuga_contact_name_xyz123"
+          />
 
-        <label style={s_innerLabel}>Téléphone</label>
-        <input style={s_innerInput} type="tel" value={phone} onChange={function(e){ setPhone(e.target.value) }} placeholder="+33 6 ..." />
+          <label style={s_innerLabel}>Email</label>
+          <input
+            style={s_innerInput}
+            type="email"
+            value={email}
+            onChange={function(e){ setEmail(e.target.value) }}
+            placeholder="jean@acme.fr"
+            autoComplete="off"
+            name="meshuga_email_xyz123"
+            id="meshuga_email_xyz123"
+          />
 
-        <label style={s_innerLabel}>Adresse</label>
-        <input style={s_innerInput} value={address} onChange={function(e){ setAddress(e.target.value) }} placeholder="12 rue de la Paix, 75002 Paris" />
+          <label style={s_innerLabel}>Téléphone</label>
+          <input
+            style={s_innerInput}
+            type="tel"
+            value={phone}
+            onChange={function(e){ setPhone(e.target.value) }}
+            placeholder="+33 6 ..."
+            autoComplete="off"
+            name="meshuga_phone_xyz123"
+            id="meshuga_phone_xyz123"
+          />
 
-        {err ? <div style={{ marginTop: '12px', padding: '8px 10px', background: '#FEE', border: '1px solid #C33', color: '#C33', borderRadius: '4px', fontSize: '12px' }}>{err}</div> : null}
+          <label style={s_innerLabel}>Adresse</label>
+          <div style={{ position: 'relative' }}>
+            <input
+              style={s_innerInput}
+              value={address}
+              onChange={function(e){ setAddress(e.target.value) }}
+              placeholder="Tape une adresse, des suggestions apparaîtront…"
+              autoComplete="off"
+              name="meshuga_address_xyz123"
+              id="meshuga_address_xyz123"
+            />
+            {addressSearchLoading ? (
+              <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>Recherche…</div>
+            ) : null}
+            {addressSuggestions.length > 0 ? (
+              <div style={s_suggestions}>
+                {addressSuggestions.map(function(s, idx) {
+                  return (
+                    <div
+                      key={idx}
+                      style={s_suggestionItem}
+                      onMouseDown={function(e){ e.preventDefault(); pickAddressSuggestion(s) }}
+                    >
+                      <div style={{ fontWeight: 600 }}>{s.label}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : null}
+            <div style={{ fontSize: '10px', color: '#999', marginTop: '4px', fontStyle: 'italic' }}>
+              📍 Suggestions Base Adresse Nationale (data.gouv.fr)
+            </div>
+          </div>
 
-        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <button
-            onClick={onClose}
-            style={{ background: '#fff', color: '#191923', border: '2px solid #191923', borderRadius: '6px', padding: '10px 18px', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
-          >Annuler</button>
-          <button
-            onClick={handleSave}
-            disabled={saving || !companyName.trim()}
-            style={{
-              background: companyName.trim() ? '#FF82D7' : '#eee',
-              color: companyName.trim() ? '#FFEB5A' : '#999',
-              border: '2px solid #191923',
-              borderRadius: '6px',
-              padding: '10px 18px',
-              fontWeight: 900,
-              fontSize: '13px',
-              cursor: companyName.trim() ? 'pointer' : 'not-allowed',
-              boxShadow: companyName.trim() ? '3px 3px 0 #191923' : 'none'
-            }}
-          >{saving ? 'Création…' : 'Créer le client'}</button>
-        </div>
+          {err ? <div style={{ marginTop: '12px', padding: '8px 10px', background: '#FEE', border: '1px solid #C33', color: '#C33', borderRadius: '4px', fontSize: '12px' }}>{err}</div> : null}
+
+          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ background: '#fff', color: '#191923', border: '2px solid #191923', borderRadius: '6px', padding: '10px 18px', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+            >Annuler</button>
+            <button
+              type="submit"
+              disabled={saving || !companyName.trim()}
+              style={{
+                background: companyName.trim() ? '#FF82D7' : '#eee',
+                color: companyName.trim() ? '#FFEB5A' : '#999',
+                border: '2px solid #191923',
+                borderRadius: '6px',
+                padding: '10px 18px',
+                fontWeight: 900,
+                fontSize: '13px',
+                cursor: companyName.trim() ? 'pointer' : 'not-allowed',
+                boxShadow: companyName.trim() ? '3px 3px 0 #191923' : 'none'
+              }}
+            >{saving ? 'Création…' : 'Créer le client'}</button>
+          </div>
+        </form>
       </div>
     </div>
   )
