@@ -329,7 +329,7 @@ export default function QuoteWizard(props) {
   var s_overlay = {
     position: 'fixed',
     top: 0, left: 0, right: 0, bottom: 0,
-    background: 'rgba(25, 25, 35, 0.55)',
+    background: 'rgba(25, 25, 35, 0.65)',
     zIndex: 1000,
     display: 'flex',
     alignItems: 'center',
@@ -339,52 +339,63 @@ export default function QuoteWizard(props) {
   var s_modal = {
     background: COLORS.white,
     width: '100%',
-    maxWidth: '900px',
+    maxWidth: '920px',
     maxHeight: '95vh',
     borderRadius: '12px',
-    boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+    boxShadow: '0 20px 50px rgba(0,0,0,0.4)',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    margin: '20px'
+    margin: '20px',
+    border: '3px solid ' + COLORS.noir
   }
   var s_header = {
-    padding: '18px 24px',
-    borderBottom: '2px solid ' + COLORS.grisLight,
+    padding: '20px 24px',
+    background: COLORS.rose,
+    borderBottom: '3px solid ' + COLORS.noir,
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    background: COLORS.white
+    justifyContent: 'space-between'
   }
   var s_title = {
     fontFamily: 'Yellowtail, cursive',
-    fontSize: '28px',
-    color: COLORS.noir,
+    fontSize: '32px',
+    color: COLORS.jaune,
     margin: 0,
-    lineHeight: 1
+    lineHeight: 1,
+    textShadow: '2px 2px 0 ' + COLORS.noir
   }
   var s_btnClose = {
-    background: 'transparent',
-    border: 'none',
-    fontSize: '22px',
+    background: COLORS.jaune,
+    border: '2px solid ' + COLORS.noir,
+    width: '32px',
+    height: '32px',
+    borderRadius: '6px',
+    fontSize: '16px',
     cursor: 'pointer',
-    color: COLORS.gris,
-    padding: '4px 8px',
+    color: COLORS.noir,
+    fontWeight: 900,
+    boxShadow: '2px 2px 0 ' + COLORS.noir,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 0,
     lineHeight: 1
   }
   var s_body = {
     padding: '20px 24px',
     overflowY: 'auto',
-    flex: 1
+    flex: 1,
+    background: COLORS.white
   }
   var s_footer = {
-    padding: '14px 24px',
-    borderTop: '2px solid ' + COLORS.grisLight,
+    padding: '16px 24px',
+    borderTop: '3px solid ' + COLORS.noir,
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: '10px',
-    background: COLORS.grisVeryLight
+    background: '#FFFAEC'
   }
   var s_btnPrimary = {
     background: COLORS.rose,
@@ -394,12 +405,14 @@ export default function QuoteWizard(props) {
     padding: '12px 22px',
     fontFamily: 'Arial Narrow, Arial, sans-serif',
     fontWeight: 900,
-    fontSize: '14px',
+    fontSize: '13px',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
     cursor: 'pointer',
     boxShadow: '3px 3px 0 ' + COLORS.noir
   }
   var s_btnPrimaryDisabled = Object.assign({}, s_btnPrimary, {
-    background: COLORS.grisLight,
+    background: '#E0E0E0',
     color: COLORS.gris,
     cursor: 'not-allowed',
     boxShadow: 'none'
@@ -412,23 +425,26 @@ export default function QuoteWizard(props) {
     padding: '10px 18px',
     fontFamily: 'Arial Narrow, Arial, sans-serif',
     fontWeight: 700,
-    fontSize: '14px',
+    fontSize: '13px',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
     cursor: 'pointer'
   }
   var s_section = { marginBottom: '20px' }
   var s_label = {
     display: 'block',
-    fontSize: '12px',
+    fontFamily: 'Arial Narrow, Arial, sans-serif',
+    fontSize: '11px',
     fontWeight: 700,
     color: COLORS.noir,
     textTransform: 'uppercase',
-    letterSpacing: '0.5px',
+    letterSpacing: '1px',
     marginBottom: '8px'
   }
   var s_input = {
     width: '100%',
     padding: '10px 12px',
-    border: '1.5px solid ' + COLORS.grisLight,
+    border: '1.5px solid #E0E0E0',
     borderRadius: '6px',
     fontSize: '14px',
     fontFamily: 'Arial, sans-serif',
@@ -525,11 +541,18 @@ export default function QuoteWizard(props) {
             <div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <input
-                  type="text"
+                  type="search"
                   value={clientSearch}
                   onChange={function(e) { setClientSearch(e.target.value) }}
                   placeholder="🔍 Rechercher entreprise, contact ou email…"
                   style={Object.assign({}, s_input, { flex: '1 1 250px' })}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  data-form-type="other"
+                  name="mshg_clientsearch_xq7"
                 />
                 <button
                   onClick={function() { setShowNewClientModal(true) }}
@@ -628,11 +651,18 @@ export default function QuoteWizard(props) {
                 <div style={s_section}>
                   <label style={s_label}>📍 Lieu (adresse de livraison ou de réception)</label>
                   <input
-                    type="text"
+                    type="search"
                     value={eventLieu}
                     onChange={function(e) { setEventLieu(e.target.value) }}
                     placeholder="12 rue de la Paix, 75002 Paris"
                     style={s_input}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-form-type="other"
+                    name="mshg_eventlieu_xq7"
                   />
                 </div>
               </div>
@@ -940,47 +970,49 @@ function NewClientModalInner(props) {
   var supabase = props.supabase
 
   var [companyName, setCompanyName] = useState('')
-  var [contactName, setContactName] = useState('')
-  var [email, setEmail] = useState('')
-  var [phone, setPhone] = useState('')
-  var [address, setAddress] = useState('')
+  var [contactPrenom, setContactPrenom] = useState('')
+  var [contactNom, setContactNom] = useState('')
+  var [emailVal, setEmailVal] = useState('')
+  var [phoneVal, setPhoneVal] = useState('')
+  var [addressVal, setAddressVal] = useState('')
+  var [postcodeVal, setPostcodeVal] = useState('')
+  var [cityVal, setCityVal] = useState('')
   var [saving, setSaving] = useState(false)
   var [err, setErr] = useState('')
 
-  // ---- Autocomplete adresse via api-adresse.data.gouv.fr ----
+  // Autocomplete adresse data.gouv.fr
   var [addressSuggestions, setAddressSuggestions] = useState([])
-  var [addressSearchLoading, setAddressSearchLoading] = useState(false)
+  var [addressLoading, setAddressLoading] = useState(false)
   var [addressJustPicked, setAddressJustPicked] = useState(false)
   var addressTimeoutRef = useRef(null)
 
   useEffect(function() {
-    // Si l'utilisateur vient juste de cliquer une suggestion, on n'interroge pas
     if (addressJustPicked) {
       setAddressJustPicked(false)
       setAddressSuggestions([])
       return
     }
-    if (!address || address.length < 3) {
+    if (!addressVal || addressVal.length < 3) {
       setAddressSuggestions([])
       return
     }
     if (addressTimeoutRef.current) clearTimeout(addressTimeoutRef.current)
     addressTimeoutRef.current = setTimeout(function() {
-      setAddressSearchLoading(true)
-      var url = 'https://api-adresse.data.gouv.fr/search/?q=' + encodeURIComponent(address) + '&limit=6&autocomplete=1'
+      setAddressLoading(true)
+      var url = 'https://api-adresse.data.gouv.fr/search/?q=' + encodeURIComponent(addressVal) + '&limit=6&autocomplete=1'
       fetch(url)
         .then(function(r) { return r.json() })
         .then(function(data) {
-          setAddressSearchLoading(false)
+          setAddressLoading(false)
           if (data && data.features) {
             var sugg = data.features.map(function(f) {
               return {
                 label: f.properties.label,
-                postcode: f.properties.postcode,
-                city: f.properties.city,
-                housenumber: f.properties.housenumber,
-                street: f.properties.street,
-                citycode: f.properties.citycode
+                postcode: f.properties.postcode || '',
+                city: f.properties.city || '',
+                housenumber: f.properties.housenumber || '',
+                street: f.properties.street || f.properties.name || '',
+                citycode: f.properties.citycode || ''
               }
             })
             setAddressSuggestions(sugg)
@@ -988,18 +1020,25 @@ function NewClientModalInner(props) {
             setAddressSuggestions([])
           }
         }, function() {
-          setAddressSearchLoading(false)
+          setAddressLoading(false)
           setAddressSuggestions([])
         })
     }, 300)
     return function() {
       if (addressTimeoutRef.current) clearTimeout(addressTimeoutRef.current)
     }
-  }, [address])
+  }, [addressVal])
 
   function pickAddressSuggestion(s) {
     setAddressJustPicked(true)
-    setAddress(s.label)
+    // Compose la rue (numero + nom de rue)
+    var streetPart = ''
+    if (s.housenumber) streetPart = s.housenumber + ' '
+    if (s.street) streetPart += s.street
+    if (!streetPart) streetPart = s.label
+    setAddressVal(streetPart.trim())
+    setPostcodeVal(s.postcode || '')
+    setCityVal(s.city || '')
     setAddressSuggestions([])
   }
 
@@ -1008,14 +1047,21 @@ function NewClientModalInner(props) {
     if (!companyName.trim()) { setErr('Nom entreprise requis'); return }
     setSaving(true)
     setErr('')
+    // Compose contact_name à partir prenom + nom
+    var fullContactName = (contactPrenom.trim() + ' ' + contactNom.trim()).trim()
+    // Compose adresse complète
+    var fullAddress = addressVal.trim()
+    if (postcodeVal.trim() || cityVal.trim()) {
+      fullAddress += (fullAddress ? ', ' : '') + (postcodeVal.trim() + ' ' + cityVal.trim()).trim()
+    }
     supabase
       .from('prospects')
       .insert([{
         company_name: companyName.trim(),
-        contact_name: contactName.trim() || null,
-        email: email.trim() || null,
-        phone: phone.trim() || null,
-        address: address.trim() || null,
+        contact_name: fullContactName || null,
+        email: emailVal.trim() || null,
+        phone: phoneVal.trim() || null,
+        address: fullAddress || null,
         status: 'nouveau',
         source: 'wizard_devis'
       }])
@@ -1031,13 +1077,8 @@ function NewClientModalInner(props) {
       })
   }
 
-  // Empêche la soumission native du <form> (qui pourrait causer le bug Tab/autofill)
-  function handleFormSubmit(e) {
-    e.preventDefault()
-    handleSave()
-  }
-
-  var s_innerOverlay = {
+  // Styles brandés Meshuga
+  var s_overlay = {
     position: 'fixed',
     top: 0, left: 0, right: 0, bottom: 0,
     background: 'rgba(25,25,35,0.7)',
@@ -1047,128 +1088,252 @@ function NewClientModalInner(props) {
     justifyContent: 'center',
     padding: '20px'
   }
-  var s_innerModal = {
-    background: '#fff',
+  var s_modal = {
+    background: '#FFFFFF',
     width: '100%',
-    maxWidth: '540px',
+    maxWidth: '560px',
     borderRadius: '12px',
-    padding: '24px',
+    padding: '0',
     boxShadow: '0 20px 50px rgba(0,0,0,0.4)',
-    maxHeight: '90vh',
-    overflowY: 'auto'
+    maxHeight: '92vh',
+    overflowY: 'auto',
+    border: '3px solid #191923'
   }
-  var s_innerLabel = {
+  var s_modalHeader = {
+    background: '#FF82D7',
+    padding: '20px 24px',
+    borderBottom: '3px solid #191923',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  }
+  var s_modalBody = {
+    padding: '20px 24px'
+  }
+  var s_title = {
+    fontFamily: 'Yellowtail, cursive',
+    fontSize: '32px',
+    margin: 0,
+    color: '#FFEB5A',
+    lineHeight: 1,
+    textShadow: '2px 2px 0 #191923'
+  }
+  var s_btnClose = {
+    background: '#FFEB5A',
+    border: '2px solid #191923',
+    width: '32px',
+    height: '32px',
+    borderRadius: '6px',
+    fontSize: '16px',
+    cursor: 'pointer',
+    color: '#191923',
+    fontWeight: 900,
+    boxShadow: '2px 2px 0 #191923',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 0,
+    lineHeight: 1
+  }
+  var s_label = {
     display: 'block',
-    fontSize: '12px',
+    fontFamily: 'Arial Narrow, Arial, sans-serif',
+    fontSize: '11px',
     fontWeight: 700,
     color: '#191923',
     textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    marginBottom: '6px',
+    letterSpacing: '1px',
+    marginBottom: '5px',
     marginTop: '12px'
   }
-  var s_innerInput = {
+  var s_labelRequired = {
+    color: '#FF82D7',
+    marginLeft: '4px',
+    fontWeight: 900
+  }
+  var s_input = {
     width: '100%',
     padding: '10px 12px',
-    border: '1.5px solid #eee',
+    border: '1.5px solid #E0E0E0',
     borderRadius: '6px',
     fontSize: '14px',
     fontFamily: 'Arial, sans-serif',
-    background: '#fff',
+    background: '#FFFFFF',
     boxSizing: 'border-box',
     color: '#191923'
   }
+  var s_row = {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '10px'
+  }
   var s_suggestions = {
-    border: '1px solid #eee',
+    border: '2px solid #191923',
     borderRadius: '6px',
-    background: '#fff',
+    background: '#FFFFFF',
     marginTop: '4px',
-    maxHeight: '180px',
+    maxHeight: '200px',
     overflowY: 'auto',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+    boxShadow: '3px 3px 0 #191923'
   }
   var s_suggestionItem = {
-    padding: '8px 12px',
+    padding: '10px 12px',
     fontSize: '13px',
     cursor: 'pointer',
-    borderBottom: '1px solid #f5f5f5',
-    color: '#191923'
+    borderBottom: '1px solid #F0F0F0',
+    color: '#191923',
+    fontFamily: 'Arial, sans-serif'
+  }
+  var s_btnPrimary = {
+    background: '#FF82D7',
+    color: '#FFEB5A',
+    border: '2px solid #191923',
+    borderRadius: '6px',
+    padding: '11px 22px',
+    fontFamily: 'Arial Narrow, Arial, sans-serif',
+    fontWeight: 900,
+    fontSize: '13px',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    cursor: 'pointer',
+    boxShadow: '3px 3px 0 #191923'
+  }
+  var s_btnPrimaryDisabled = Object.assign({}, s_btnPrimary, {
+    background: '#E0E0E0',
+    color: '#999',
+    cursor: 'not-allowed',
+    boxShadow: 'none'
+  })
+  var s_btnSecondary = {
+    background: '#FFFFFF',
+    color: '#191923',
+    border: '2px solid #191923',
+    borderRadius: '6px',
+    padding: '10px 18px',
+    fontFamily: 'Arial Narrow, Arial, sans-serif',
+    fontWeight: 700,
+    fontSize: '13px',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    cursor: 'pointer'
+  }
+
+  // Anti-autofill : props communs à tous les inputs sensibles.
+  // type="search" empêche les navigateurs de proposer autofill (vs "text" / "email" / "tel").
+  // Les data-* désactivent LastPass / 1Password / Bitwarden / Dashlane.
+  // autoComplete="off" + role + name unique tente de bloquer Chrome/Safari/Firefox.
+  function antiAutofillProps(uniqueId) {
+    return {
+      autoComplete: 'off',
+      autoCorrect: 'off',
+      autoCapitalize: 'off',
+      spellCheck: false,
+      'data-lpignore': 'true',
+      'data-1p-ignore': 'true',
+      'data-bwignore': 'true',
+      'data-form-type': 'other',
+      name: 'mshg_' + uniqueId + '_xq7',
+      id: 'mshg_' + uniqueId + '_xq7'
+    }
   }
 
   return (
-    <div style={s_innerOverlay}>
-      <div style={s_innerModal}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <h3 style={{ fontFamily: 'Yellowtail, cursive', fontSize: '24px', margin: 0, color: '#191923' }}>+ Nouveau client</h3>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#999' }}>✕</button>
+    <div style={s_overlay}>
+      <div style={s_modal}>
+        {/* Header */}
+        <div style={s_modalHeader}>
+          <h3 style={s_title}>+ Nouveau client</h3>
+          <button onClick={onClose} style={s_btnClose}>✕</button>
         </div>
 
-        {/* form pour gérer Enter et empêcher autofill agressif */}
-        <form onSubmit={handleFormSubmit} autoComplete="off">
-          {/* Champs cachés pour leurrer Safari (qui ignore parfois autoComplete=off sur le 1er field) */}
-          <input type="text" name="prevent_autofill" autoComplete="off" style={{ display: 'none' }} />
-          <input type="password" name="password_fake" autoComplete="off" style={{ display: 'none' }} />
+        {/* Body */}
+        <div style={s_modalBody}>
+          {/* Honey-pot fields invisibles pour leurrer les gestionnaires de mots de passe */}
+          <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', visibility: 'hidden' }}>
+            <input type="text" name="username" tabIndex={-1} autoComplete="username" />
+            <input type="password" name="password" tabIndex={-1} autoComplete="new-password" />
+          </div>
 
-          <label style={s_innerLabel}>Nom entreprise *</label>
+          <label style={s_label}>
+            Nom entreprise<span style={s_labelRequired}>*</span>
+          </label>
           <input
-            style={s_innerInput}
+            type="search"
+            style={s_input}
             value={companyName}
             onChange={function(e){ setCompanyName(e.target.value) }}
             placeholder="Acme Corp"
             autoFocus
-            autoComplete="off"
-            name="meshuga_company_name_xyz123"
-            id="meshuga_company_name_xyz123"
+            {...antiAutofillProps('co1')}
           />
 
-          <label style={s_innerLabel}>Contact (Prénom Nom)</label>
-          <input
-            style={s_innerInput}
-            value={contactName}
-            onChange={function(e){ setContactName(e.target.value) }}
-            placeholder="Jean Dupont"
-            autoComplete="off"
-            name="meshuga_contact_name_xyz123"
-            id="meshuga_contact_name_xyz123"
-          />
+          {/* Contact prénom + nom sur la même ligne */}
+          <div style={s_row}>
+            <div>
+              <label style={s_label}>Prénom du contact</label>
+              <input
+                type="search"
+                style={s_input}
+                value={contactPrenom}
+                onChange={function(e){ setContactPrenom(e.target.value) }}
+                placeholder="Pierre"
+                {...antiAutofillProps('cp1')}
+              />
+            </div>
+            <div>
+              <label style={s_label}>Nom du contact</label>
+              <input
+                type="search"
+                style={s_input}
+                value={contactNom}
+                onChange={function(e){ setContactNom(e.target.value) }}
+                placeholder="Dupont"
+                {...antiAutofillProps('cn1')}
+              />
+            </div>
+          </div>
 
-          <label style={s_innerLabel}>Email</label>
-          <input
-            style={s_innerInput}
-            type="email"
-            value={email}
-            onChange={function(e){ setEmail(e.target.value) }}
-            placeholder="jean@acme.fr"
-            autoComplete="off"
-            name="meshuga_email_xyz123"
-            id="meshuga_email_xyz123"
-          />
+          {/* Email + Tel sur la même ligne */}
+          <div style={s_row}>
+            <div>
+              <label style={s_label}>E-mail</label>
+              <input
+                type="search"
+                inputMode="email"
+                style={s_input}
+                value={emailVal}
+                onChange={function(e){ setEmailVal(e.target.value) }}
+                placeholder="pierre@acme.fr"
+                {...antiAutofillProps('em1')}
+              />
+            </div>
+            <div>
+              <label style={s_label}>Téléphone</label>
+              <input
+                type="search"
+                inputMode="tel"
+                style={s_input}
+                value={phoneVal}
+                onChange={function(e){ setPhoneVal(e.target.value) }}
+                placeholder="+33 6 12 34 56 78"
+                {...antiAutofillProps('ph1')}
+              />
+            </div>
+          </div>
 
-          <label style={s_innerLabel}>Téléphone</label>
-          <input
-            style={s_innerInput}
-            type="tel"
-            value={phone}
-            onChange={function(e){ setPhone(e.target.value) }}
-            placeholder="+33 6 ..."
-            autoComplete="off"
-            name="meshuga_phone_xyz123"
-            id="meshuga_phone_xyz123"
-          />
-
-          <label style={s_innerLabel}>Adresse</label>
+          {/* Adresse avec autocomplete data.gouv */}
+          <label style={s_label}>Adresse (rue + numéro)</label>
           <div style={{ position: 'relative' }}>
             <input
-              style={s_innerInput}
-              value={address}
-              onChange={function(e){ setAddress(e.target.value) }}
-              placeholder="Tape une adresse, des suggestions apparaîtront…"
-              autoComplete="off"
-              name="meshuga_address_xyz123"
-              id="meshuga_address_xyz123"
+              type="search"
+              style={s_input}
+              value={addressVal}
+              onChange={function(e){ setAddressVal(e.target.value) }}
+              placeholder="Tape un début d'adresse, des suggestions apparaissent…"
+              {...antiAutofillProps('ad1')}
             />
-            {addressSearchLoading ? (
-              <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>Recherche…</div>
+            {addressLoading ? (
+              <div style={{ fontSize: '11px', color: '#999', marginTop: '4px', fontStyle: 'italic' }}>Recherche…</div>
             ) : null}
             {addressSuggestions.length > 0 ? (
               <div style={s_suggestions}>
@@ -1179,42 +1344,74 @@ function NewClientModalInner(props) {
                       style={s_suggestionItem}
                       onMouseDown={function(e){ e.preventDefault(); pickAddressSuggestion(s) }}
                     >
-                      <div style={{ fontWeight: 600 }}>{s.label}</div>
+                      <div style={{ fontWeight: 700 }}>📍 {s.label}</div>
                     </div>
                   )
                 })}
               </div>
             ) : null}
             <div style={{ fontSize: '10px', color: '#999', marginTop: '4px', fontStyle: 'italic' }}>
-              📍 Suggestions Base Adresse Nationale (data.gouv.fr)
+              Suggestions Base Adresse Nationale (data.gouv.fr)
             </div>
           </div>
 
-          {err ? <div style={{ marginTop: '12px', padding: '8px 10px', background: '#FEE', border: '1px solid #C33', color: '#C33', borderRadius: '4px', fontSize: '12px' }}>{err}</div> : null}
+          {/* Code postal + Ville sur la même ligne */}
+          <div style={s_row}>
+            <div>
+              <label style={s_label}>Code postal</label>
+              <input
+                type="search"
+                inputMode="numeric"
+                style={s_input}
+                value={postcodeVal}
+                onChange={function(e){ setPostcodeVal(e.target.value) }}
+                placeholder="75002"
+                {...antiAutofillProps('zp1')}
+              />
+            </div>
+            <div>
+              <label style={s_label}>Ville</label>
+              <input
+                type="search"
+                style={s_input}
+                value={cityVal}
+                onChange={function(e){ setCityVal(e.target.value) }}
+                placeholder="Paris"
+                {...antiAutofillProps('ct1')}
+              />
+            </div>
+          </div>
 
-          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+          {err ? (
+            <div style={{
+              marginTop: '14px',
+              padding: '10px 12px',
+              background: '#FEE',
+              border: '2px solid #C33',
+              color: '#C33',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontFamily: 'Arial Narrow, Arial, sans-serif',
+              fontWeight: 700
+            }}>{err}</div>
+          ) : null}
+
+          <div style={{
+            marginTop: '24px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '10px',
+            paddingTop: '16px',
+            borderTop: '1.5px solid #F0F0F0'
+          }}>
+            <button onClick={onClose} style={s_btnSecondary}>Annuler</button>
             <button
-              type="button"
-              onClick={onClose}
-              style={{ background: '#fff', color: '#191923', border: '2px solid #191923', borderRadius: '6px', padding: '10px 18px', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
-            >Annuler</button>
-            <button
-              type="submit"
+              onClick={handleSave}
               disabled={saving || !companyName.trim()}
-              style={{
-                background: companyName.trim() ? '#FF82D7' : '#eee',
-                color: companyName.trim() ? '#FFEB5A' : '#999',
-                border: '2px solid #191923',
-                borderRadius: '6px',
-                padding: '10px 18px',
-                fontWeight: 900,
-                fontSize: '13px',
-                cursor: companyName.trim() ? 'pointer' : 'not-allowed',
-                boxShadow: companyName.trim() ? '3px 3px 0 #191923' : 'none'
-              }}
+              style={(saving || !companyName.trim()) ? s_btnPrimaryDisabled : s_btnPrimary}
             >{saving ? 'Création…' : 'Créer le client'}</button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   )
