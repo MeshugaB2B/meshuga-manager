@@ -363,7 +363,7 @@ export default function QuoteWizard(props) {
     color: COLORS.jaune,
     margin: 0,
     lineHeight: 1,
-    textShadow: '2px 2px 0 ' + COLORS.noir
+
   }
   var s_btnClose = {
     background: COLORS.jaune,
@@ -1116,7 +1116,7 @@ function NewClientModalInner(props) {
     margin: 0,
     color: '#FFEB5A',
     lineHeight: 1,
-    textShadow: '2px 2px 0 #191923'
+
   }
   var s_btnClose = {
     background: '#FFEB5A',
