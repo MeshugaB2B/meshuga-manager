@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@supabase/supabase-js"
+import { LOGO_PINK } from "./logos"
 
 // ============================================================
 // Meshuga RH — Onglet Ressources Humaines
@@ -13,10 +14,8 @@ var supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 )
 
-// === Logo Meshuga (rose) intégré base64 — chargé dynamiquement depuis logos.ts ===
-// Pour ne pas dupliquer, on utilise le même pattern que catering : import depuis logos.ts
-// (Edward fournira en remplaçant LOGO_PINK ci-dessous par l'import)
-var LOGO_PINK_PLACEHOLDER = "" // Remplir avec import { LOGO_PINK } from './logos'
+// === Logo Meshuga rose, importé depuis logos.ts ===
+var LOGO_PINK_PLACEHOLDER = LOGO_PINK
 
 // === Constantes ===
 var CIVILITES = ["Madame", "Monsieur", "Mademoiselle"]
