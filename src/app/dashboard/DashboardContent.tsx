@@ -11,6 +11,7 @@ import DashboardModals from './DashboardModals'
 import QuotesTab from './catering/QuotesTab'
 import QuoteEditor from './catering/QuoteEditor'
 import QuoteWizard from './catering/QuoteWizard'
+import RhTab from './RhTab'
 import { G } from './styles'
 import { LOGO_PINK, LOGO_YELLOW, STAMP_YELLOW, STAMP_PINK } from './logos'
 import {
@@ -850,6 +851,7 @@ function DashboardImpl() {
     {id: 'notifs', label: 'Notifications', icon: '🔔'},
     {id: 'foodcost', label: 'Food Cost', icon: '🥩'},
     {id: 'fournisseurs', label: 'Fournisseurs', icon: '📦'},
+    {id: 'rh', label: 'Ressources Humaines', icon: '👥'},
     {id: 'messagerie', label: 'Messagerie', icon: '💬'},
   ]
 
@@ -897,7 +899,7 @@ function DashboardImpl() {
               )
             })}
             <div className="sb-sec">Gestion</div>
-            {NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['chasse','foodcost','fournisseurs','annuaire','reporting','vault'].indexOf(n.id) > -1 }).map(function(n) {
+            {NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['chasse','foodcost','fournisseurs','rh','annuaire','reporting','vault'].indexOf(n.id) > -1 }).map(function(n) {
               return (
                 <div key={n.id} className={page === n.id ? 'ni active' : 'ni'} onClick={function() { nav(n.id) }}>
                   <span style={{fontSize:14}}>{n.icon}</span>{n.label}
@@ -2505,7 +2507,8 @@ function DashboardImpl() {
               </div>
             )}
 
-          {page === 'foodcost' && (
+          {page === 'rh' && <RhTab />}
+            {page === 'foodcost' && (
             <FoodCostTab
               fcRecipes={fcRecipes}
               setFcRecipes={setFcRecipes}
@@ -2674,6 +2677,7 @@ function DashboardImpl() {
           <div className={page === "chasse" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("chasse"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔍"}</div><div className="mms-tile-lbl">Chasse</div></div>
           <div className={page === "reporting" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("reporting"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📊"}</div><div className="mms-tile-lbl">Reporting</div></div>
           <div className={page === "vault" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("vault"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔐"}</div><div className="mms-tile-lbl">Coffre</div></div>
+       <div className={page === "rh" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("rh"); setMenuOpen(false) }}><div className="mms-tile-ico">{"👥"}</div><div className="mms-tile-lbl">RH</div></div>
         </div>
         <div className="mms-sec">Outils</div>
         <div className="mms-grid">
