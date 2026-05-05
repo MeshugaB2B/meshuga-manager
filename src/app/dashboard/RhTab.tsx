@@ -1245,7 +1245,7 @@ function ContractPreview(props) {
       + '.sig-space{padding:14px 16px;display:flex;flex-direction:column;font-size:11px;color:#666;font-style:italic}'
       + '.sig-foot{background:#FAFAFA;border-top:1px solid #DDD;padding:0 16px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#666;font-style:italic}'
       + '@media print{@page{size:A4;margin:2.2cm 1.4cm 1.6cm 1.4cm;@top-center{content:element(running-header)}}.toolbar{display:none}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-inside:avoid;page-break-inside:avoid}.sig-block{break-inside:avoid;page-break-inside:avoid}'
-      + '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.running-header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+      + '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.running-header,.sig-section h2,.parties h3,.art-title{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
       + '.running-header{position:running(running-header);display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #FF82D7;padding-bottom:6px;font-family:Arial Narrow,sans-serif;font-size:9px;color:#666}'
       + '.running-header img{height:18px;width:auto}'
       + '.running-header .tag{font-style:italic;letter-spacing:1px;text-transform:uppercase}'
