@@ -44,6 +44,22 @@ export var MESHUGA_LEGAL = {
   retraite: {
     nom: "KLESIA Retraite AGIRC-ARRCO",
     adresse: "4 rue Georges Picquart, 75017 Paris"
+  },
+  // Service de santé au travail (médecine du travail)
+  medecine_travail: {
+    nom: "Efficience — Centre Vaugirard",
+    adresse: "64 rue de Vaugirard, 75006 Paris",
+    telephone: "01 45 44 23 71"
+  },
+  // Organisme de complémentaire santé (mutuelle)
+  complementaire_sante: {
+    nom: "APRIL Santé",
+    adresse: "12 rue Juliette Récamier, 69006 Lyon"
+  },
+  // Organisme de prévoyance
+  prevoyance: {
+    nom: "GAN EUROCOURTAGE VIE",
+    adresse: "8-10 rue d'Astorg, 75008 Paris"
   }
 }
 
@@ -420,8 +436,8 @@ export var CONTRACT_TYPES = [
   },
   {
     key: "cdi_cadre",
-    label: "CDI Cadre / Agent de maîtrise",
-    sublabel: "Niveau IV à V · responsabilités",
+    label: "CDI Responsable / Manager",
+    sublabel: "Niveau IV à V · postes à responsabilités",
     icon: "🎯",
     color: "#191923"
   }
