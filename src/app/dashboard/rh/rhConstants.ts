@@ -439,7 +439,7 @@ export var CONTRACT_TYPES = [
     label: "CDI Responsable / Manager",
     sublabel: "Niveau IV à V · postes à responsabilités",
     icon: "🎯",
-    color: "#191923"
+    color: "#FFEB5A"
   }
 ]
 
