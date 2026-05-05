@@ -282,15 +282,19 @@ export default function RhTab() {
                 <div
                   key={e.id}
                   className="row"
-                  onClick={function () { setViewingEmployee(e) }}
                   style={{
                     gridTemplateColumns: "auto 2fr 1fr 1fr 1fr",
-                    gap: 10,
-                    cursor: "pointer"
+                    gap: 10
                   }}
                 >
-                  <div style={{ fontSize: 22 }}>👤</div>
-                  <div>
+                  <div
+                    style={{ fontSize: 22, cursor: "pointer" }}
+                    onClick={function () { setViewingEmployee({ employee: e, defaultTab: "infos" }) }}
+                  >👤</div>
+                  <div
+                    style={{ cursor: "pointer" }}
+                    onClick={function () { setViewingEmployee({ employee: e, defaultTab: "infos" }) }}
+                  >
                     <div style={{ fontWeight: 900, fontSize: 13 }}>
                       {e.prenom || "—"} {(e.nom || "").toUpperCase()}
                     </div>
@@ -298,14 +302,30 @@ export default function RhTab() {
                       {e.email || e.telephone || "—"}
                     </div>
                   </div>
-                  <div style={{ fontSize: 11 }}>
+                  <div
+                    style={{ fontSize: 11, cursor: "pointer" }}
+                    onClick={function () { setViewingEmployee({ employee: e, defaultTab: "contrats" }) }}
+                    title="Voir les contrats"
+                  >
                     <b>{nbContracts}</b> contrat{nbContracts > 1 ? "s" : ""}
                   </div>
-                  <div style={{ fontSize: 11 }}>
-                    📁 <b>{nbDocs}</b> document{nbDocs > 1 ? "s" : ""}
+                  <div
+                    style={{
+                      fontSize: 11,
+                      cursor: "pointer",
+                      color: nbDocs > 0 ? "#FF82D7" : "#666",
+                      fontWeight: nbDocs > 0 ? 900 : 400
+                    }}
+                    onClick={function () { setViewingEmployee({ employee: e, defaultTab: "documents" }) }}
+                    title="Voir les documents en 1 clic"
+                  >
+                    📁 <b>{nbDocs}</b> doc{nbDocs > 1 ? "s" : ""}
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <button className="btn btn-sm btn-y">Voir →</button>
+                    <button
+                      className="btn btn-sm btn-y"
+                      onClick={function () { setViewingEmployee({ employee: e, defaultTab: "infos" }) }}
+                    >Voir →</button>
                   </div>
                 </div>
               )
@@ -398,7 +418,7 @@ export default function RhTab() {
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                     <button
                       className="btn btn-sm"
-                      onClick={function () { if (emp && emp.id) setViewingEmployee(emp) }}
+                      onClick={function () { if (emp && emp.id) setViewingEmployee({ employee: emp, defaultTab: "infos" }) }}
                       title="Voir la fiche du salarié"
                     >👤 Salarié</button>
                     <button
@@ -459,9 +479,15 @@ export default function RhTab() {
       {/* === EMPLOYEE DETAIL === */}
       {viewingEmployee && (
         <EmployeeDetail
-          employee={viewingEmployee}
+          employee={viewingEmployee.employee}
+          defaultTab={viewingEmployee.defaultTab || "infos"}
           onClose={function () { setViewingEmployee(null); loadAll() }}
           onSaved={function (msg) { showToast(msg); loadAll() }}
+          onDeleted={function (msg) {
+            setViewingEmployee(null)
+            showToast(msg || "Salarié supprimé")
+            loadAll()
+          }}
           onContractClick={function (c) {
             setViewingEmployee(null)
             setPreviewContract(c)
