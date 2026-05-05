@@ -4,5 +4,7 @@
     { "path": "/api/daily-briefing", "schedule": "0 6 * * *" },
     { "path": "/api/midday-reminder", "schedule": "30 10 * * 1-5" },
     { "path": "/api/evening-summary", "schedule": "0 16 * * 1-5" }
+    { "path": "/api/cron-leave-reminders", "schedule": "0 7 * * *" },
+    { "path": "/api/cron-relances-devis", "schedule": "..." }
   ]
 }
