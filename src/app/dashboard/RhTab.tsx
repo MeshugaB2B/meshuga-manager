@@ -213,30 +213,6 @@ export default function RhTab() {
       </div>
       <div className="strip"></div>
 
-      {/* === KPIs === */}
-      <div className="g4">
-        <div className="kc" style={{ background: "#FFEB5A" }}>
-          <div className="kl">Extras en cours</div>
-          <div className="kv">{kpiActive}</div>
-          <div className="ki">⏱</div>
-        </div>
-        <div className="kc" style={{ background: "#FF82D7" }}>
-          <div className="kl">Total contrats</div>
-          <div className="kv">{kpiTotal}</div>
-          <div className="ki">📋</div>
-        </div>
-        <div className="kc" style={{ background: "#FFFFFF" }}>
-          <div className="kl">Contrats signés</div>
-          <div className="kv">{kpiSigned}</div>
-          <div className="ki">✓</div>
-        </div>
-        <div className="kc" style={{ background: "#FFFFFF" }}>
-          <div className="kl">Total heures planifiées</div>
-          <div className="kv" style={{ fontSize: 22 }}>{fmtDur(kpiHours)}</div>
-          <div className="ki">⌛</div>
-        </div>
-      </div>
-
       {/* === FILTRES === */}
       <div className="card">
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
