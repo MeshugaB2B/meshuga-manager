@@ -55,7 +55,34 @@ var MESHUGA_LEGAL = {
 
 // === Constantes ===
 var CIVILITES = ["Madame", "Monsieur", "Mademoiselle"]
-var NATIONALITES = ["française", "belge", "suisse", "luxembourgeoise", "italienne", "espagnole", "portugaise", "allemande", "britannique", "américaine", "autre"]
+var NATIONALITES = [
+  "afghane","albanaise","algérienne","allemande","américaine","andorrane","angolaise","antiguaise",
+  "argentine","arménienne","australienne","autrichienne","azerbaïdjanaise","bahaméenne","bahreïnienne",
+  "bangladaise","barbadienne","biélorusse","belge","bélizienne","béninoise","bhoutanaise","bolivienne",
+  "bosnienne","botswanaise","brésilienne","britannique","brunéienne","bulgare","burkinabée","burundaise",
+  "cambodgienne","camerounaise","canadienne","cap-verdienne","centrafricaine","chilienne","chinoise",
+  "chypriote","colombienne","comorienne","congolaise","congolaise (RDC)","costaricienne","croate","cubaine",
+  "danoise","djiboutienne","dominicaine","dominicaise","égyptienne","émirienne","équatorienne","érythréenne",
+  "espagnole","estonienne","éthiopienne","fidjienne","finlandaise","française","gabonaise","gambienne",
+  "géorgienne","ghanéenne","grecque","grenadienne","guatémaltèque","guinéenne","guinéenne-bissau",
+  "guinéenne équatoriale","guyanienne","haïtienne","hondurienne","hongroise","indienne","indonésienne",
+  "irakienne","iranienne","irlandaise","islandaise","israélienne","italienne","ivoirienne","jamaïcaine",
+  "japonaise","jordanienne","kazakhe","kényane","kirghize","kiribatienne","kittitienne-et-névicienne",
+  "koweïtienne","laotienne","lesothane","lettone","libanaise","libérienne","libyenne","liechtensteinoise",
+  "lituanienne","luxembourgeoise","macédonienne","malaisienne","malawite","maldivienne","malgache",
+  "malienne","maltaise","marocaine","marshallaise","mauricienne","mauritanienne","mexicaine",
+  "micronésienne","moldave","monégasque","mongole","monténégrine","mozambicaine","namibienne","nauruane",
+  "néerlandaise","néo-zélandaise","népalaise","nicaraguayenne","nigériane","nigérienne","norvégienne",
+  "omanaise","ougandaise","ouzbèke","pakistanaise","palaosienne","palestinienne","panaméenne",
+  "papouane-néo-guinéenne","paraguayenne","péruvienne","philippine","polonaise","portugaise","qatarienne",
+  "roumaine","russe","rwandaise","saint-lucienne","saint-marinaise","saint-vincentaise","salomonaise",
+  "salvadorienne","samoane","santoméenne","saoudienne","sénégalaise","serbe","seychelloise",
+  "sierra-léonaise","singapourienne","slovaque","slovène","somalienne","soudanaise","sud-africaine",
+  "sud-coréenne","sud-soudanaise","sri-lankaise","suédoise","suisse","surinamaise","syrienne",
+  "tadjike","taïwanaise","tanzanienne","tchadienne","tchèque","thaïlandaise","timoraise","togolaise",
+  "tonguienne","trinidadienne","tunisienne","turkmène","turque","tuvaluane","ukrainienne","uruguayenne",
+  "vanuatuane","vaticane","vénézuélienne","vietnamienne","yéménite","zambienne","zimbabwéenne"
+]
 var FONCTIONS = ["Caissier(ère)", "Cuisinier(ère)", "Commis de cuisine", "Serveur(se)", "Équipier(ère) polyvalent(e)", "Plongeur(se)"]
 var CLASSIFICATIONS = [
   "Niveau I — Échelon 1 (employé(e) débutant(e))",
@@ -109,6 +136,54 @@ function diffMin(a, b) {
   var mb = (+pb[0]) * 60 + (+pb[1])
   if (mb < ma) mb += 24 * 60
   return mb - ma
+}
+
+// === Conversion nombre → lettres en français (jusqu'à 9999) ===
+function numToFrenchWords(num) {
+  if (num === null || num === undefined || num === "") return ""
+  var n = parseFloat(num)
+  if (isNaN(n)) return ""
+  // Séparer entier et décimales (centimes)
+  var intPart = Math.floor(n)
+  var cents = Math.round((n - intPart) * 100)
+  var unites = ["zéro","un","deux","trois","quatre","cinq","six","sept","huit","neuf","dix","onze","douze","treize","quatorze","quinze","seize","dix-sept","dix-huit","dix-neuf"]
+  var dizaines = ["","","vingt","trente","quarante","cinquante","soixante","soixante","quatre-vingt","quatre-vingt"]
+  function below100(v) {
+    if (v < 20) return unites[v]
+    var d = Math.floor(v / 10)
+    var u = v % 10
+    if (d === 7 || d === 9) {
+      var base = dizaines[d]
+      var rest = (d === 7 ? 10 + u : 10 + u)
+      return base + (d === 7 ? "-" : "-") + unites[rest]
+    }
+    if (u === 0) return dizaines[d] + (d === 8 ? "s" : "")
+    if (u === 1 && d !== 8) return dizaines[d] + " et un"
+    return dizaines[d] + "-" + unites[u]
+  }
+  function below1000(v) {
+    if (v < 100) return below100(v)
+    var c = Math.floor(v / 100)
+    var rest = v % 100
+    var prefix = c === 1 ? "cent" : unites[c] + " cent" + (rest === 0 ? "s" : "")
+    if (rest === 0) return prefix
+    return prefix + " " + below100(rest)
+  }
+  var result = ""
+  if (intPart === 0) result = "zéro"
+  else if (intPart < 1000) result = below1000(intPart)
+  else if (intPart < 1000000) {
+    var th = Math.floor(intPart / 1000)
+    var rest = intPart % 1000
+    var prefix = th === 1 ? "mille" : below1000(th) + " mille"
+    result = rest === 0 ? prefix : prefix + " " + below1000(rest)
+  } else {
+    return String(num) // hors scope contrat
+  }
+  if (cents > 0) {
+    result += " euros et " + below100(cents) + " centime" + (cents > 1 ? "s" : "")
+  }
+  return result
 }
 
 // ============================================================
@@ -402,8 +477,8 @@ function ContractWizard(props) {
     date_fin: "",
     fonction: "",
     classification: "",
-    taux_horaire_brut: "",
-    taux_horaire_lettres: "",
+    taux_horaire_brut: "17",
+    taux_horaire_lettres: "dix-sept",
     capital_aegia_food: "",
     capital_sas_aegia: "",
     rcs_sas_aegia: "",
@@ -675,13 +750,17 @@ function ContractWizard(props) {
                 </div>
                 <div className="fg">
                   <label className="lbl">Nationalité</label>
-                  <select
+                  <input
                     className="inp"
+                    list="nationalities-list"
                     value={emp.nationalite}
                     onChange={function (e) { setEmp(Object.assign({}, emp, { nationalite: e.target.value })) }}
-                  >
-                    {NATIONALITES.map(function (n) { return <option key={n} value={n}>{n}</option> })}
-                  </select>
+                    placeholder="Tape les premières lettres..."
+                    autoComplete="off"
+                  />
+                  <datalist id="nationalities-list">
+                    {NATIONALITES.map(function (n) { return <option key={n} value={n} /> })}
+                  </datalist>
                 </div>
               </div>
 
@@ -869,17 +948,24 @@ function ContractWizard(props) {
                     type="number"
                     step="0.01"
                     value={contract.taux_horaire_brut}
-                    onChange={function (e) { setContract(Object.assign({}, contract, { taux_horaire_brut: e.target.value })) }}
+                    onChange={function (e) {
+                      var v = e.target.value
+                      setContract(Object.assign({}, contract, {
+                        taux_horaire_brut: v,
+                        taux_horaire_lettres: numToFrenchWords(v)
+                      }))
+                    }}
                     placeholder="17.00"
                   />
                 </div>
                 <div className="fg">
-                  <label className="lbl">En lettres</label>
+                  <label className="lbl">En lettres (auto-rempli)</label>
                   <input
                     className="inp"
                     value={contract.taux_horaire_lettres}
                     onChange={function (e) { setContract(Object.assign({}, contract, { taux_horaire_lettres: e.target.value })) }}
                     placeholder="dix-sept"
+                    style={{background:"#FAFAFA",fontStyle:"italic",color:"#666"}}
                   />
                 </div>
               </div>
@@ -1120,7 +1206,7 @@ function ContractPreview(props) {
       + '.cover h2{font-size:24px;font-weight:900;letter-spacing:1px;margin-bottom:4px}'
       + '.cover .subtitle{font-size:11px;color:#666;font-style:italic}'
       + '.cover .rule{height:3px;background:#FF82D7;margin:18px auto 0}'
-      + '.parties h3{font-family:"Yellowtail",cursive;font-size:22px;font-weight:400;margin:14px 0 8px;color:#C2185B}'
+      + '.parties h3{font-family:"Yellowtail",cursive;font-size:22px;font-weight:400;margin:14px 0 8px;color:#FF82D7}'
       + '.parties p{margin-bottom:8px;text-align:justify;font-size:12.5px}'
       + '.party-tag{display:block;text-align:right;font-style:italic;color:#666;font-size:11px;margin-top:2px}'
       + '.party-side{display:block;text-align:right;font-weight:900;font-size:11px;letter-spacing:1px;margin-top:2px;margin-bottom:14px}'
@@ -1145,10 +1231,10 @@ function ContractPreview(props) {
       + '.planning tfoot td{background:#FFEB5A;font-weight:900;font-size:12.5px;padding:9px 10px;border:1px solid #191923}'
       + '.note{font-size:11px;color:#666;font-style:italic;margin:6px 0 14px}'
       + '.note b{color:#C2185B;font-style:normal;font-weight:900}'
-      + '.sig-section{margin-top:32px;page-break-before:always;padding-top:8px}'
+      + '.sig-section{margin-top:24px;padding-top:8px;break-inside:avoid;page-break-inside:avoid}'
       + '.sig-section h2{font-family:"Yellowtail",cursive;font-size:42px;color:#FF82D7;text-align:center;font-weight:400;line-height:1;margin-bottom:8px}'
       + '.sig-section .rule{height:2px;background:#FF82D7;margin:0 0 28px}'
-      + '.fait-banner{background:#FFF8E1;border-top:3px solid #FF82D7;border-bottom:3px solid #FF82D7;padding:18px;text-align:center;margin-bottom:32px;font-size:14px}'
+      + '.fait-banner{background:#FFFFFF;border-top:2.5px solid #FF82D7;border-bottom:2.5px solid #FF82D7;padding:16px 18px;text-align:center;margin-bottom:24px;font-size:13.5px;color:#191923}'
       + '.fait-banner .small{display:block;font-size:11px;color:#666;font-style:italic;margin-top:6px}'
       + '.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}'
       + '.sig-block{display:grid;grid-template-rows:48px 96px minmax(160px,1fr) 40px;border:2px solid #FF82D7;background:#fff}'
@@ -1158,7 +1244,7 @@ function ContractPreview(props) {
       + '.sig-id .role{font-size:11px;color:#666;font-style:italic;line-height:1.3}'
       + '.sig-space{padding:14px 16px;display:flex;flex-direction:column;font-size:11px;color:#666;font-style:italic}'
       + '.sig-foot{background:#FAFAFA;border-top:1px solid #DDD;padding:0 16px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#666;font-style:italic}'
-      + '@media print{@page{size:A4;margin:2.2cm 1.4cm 1.6cm 1.4cm;@top-center{content:element(running-header)}}.toolbar{display:none}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-before:page}.sig-block{break-inside:avoid}'
+      + '@media print{@page{size:A4;margin:2.2cm 1.4cm 1.6cm 1.4cm;@top-center{content:element(running-header)}}.toolbar{display:none}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-inside:avoid;page-break-inside:avoid}.sig-block{break-inside:avoid;page-break-inside:avoid}'
       + '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.running-header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
       + '.running-header{position:running(running-header);display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #FF82D7;padding-bottom:6px;font-family:Arial Narrow,sans-serif;font-size:9px;color:#666}'
       + '.running-header img{height:18px;width:auto}'
