@@ -835,29 +835,36 @@ function Step2ExtraMission(props) {
         </div>
       </div>
 
-      <div className="ct" style={{ marginTop: 16 }}>Mentions légales obligatoires</div>
-      <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 10, fontStyle: "italic", lineHeight: 1.5 }}>
-        Données AEGIA enregistrées. Saisis ici les 2 organismes de protection sociale.
+      <div className="ct" style={{ marginTop: 16 }}>Protection sociale</div>
+      <div style={{ background: "#FFF8E1", borderLeft: "3px solid #FF82D7", padding: "10px 14px", marginBottom: 10, fontSize: 11.5, lineHeight: 1.6 }}>
+        ✓ <b>Médecine du travail :</b> Efficience — Centre Vaugirard, 64 rue de Vaugirard, 75006 Paris<br />
+        ✓ <b>Retraite complémentaire :</b> KLESIA AGIRC-ARRCO<br />
+        ✓ <b>Prévoyance :</b> GAN EUROCOURTAGE VIE<br />
+        ✓ <b>Complémentaire santé :</b> APRIL Santé<br />
+        <span style={{ fontSize: 10, opacity: 0.7, fontStyle: "italic" }}>Ces 4 organismes sont automatiquement intégrés dans le contrat.</span>
       </div>
-
-      <div className="fg">
-        <label className="lbl">Service de santé au travail</label>
-        <input className="inp" value={contract.service_sante_travail}
-          onChange={function (e) { setContract(Object.assign({}, contract, { service_sante_travail: e.target.value })) }} placeholder="CMIE, ACMS, AMETIF..." />
-      </div>
-
-      <div className="fg2">
-        <div className="fg">
-          <label className="lbl">Organisme de prévoyance</label>
-          <input className="inp" value={contract.prevoyance_organisme}
-            onChange={function (e) { setContract(Object.assign({}, contract, { prevoyance_organisme: e.target.value })) }} placeholder="KLESIA Prévoyance, Malakoff Humanis..." />
+      <details style={{ marginBottom: 10, fontSize: 11 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 700, color: "#666" }}>Cas particulier : remplacer ces organismes pour ce contrat ?</summary>
+        <div style={{ marginTop: 10, padding: 10, background: "#FAFAFA", borderRadius: 4 }}>
+          <div className="fg">
+            <label className="lbl">Service de santé au travail (override)</label>
+            <input className="inp" value={contract.service_sante_travail}
+              onChange={function (e) { setContract(Object.assign({}, contract, { service_sante_travail: e.target.value })) }} placeholder="Laisser vide = Efficience" />
+          </div>
+          <div className="fg2">
+            <div className="fg">
+              <label className="lbl">Organisme de prévoyance (override)</label>
+              <input className="inp" value={contract.prevoyance_organisme}
+                onChange={function (e) { setContract(Object.assign({}, contract, { prevoyance_organisme: e.target.value })) }} placeholder="Laisser vide = GAN" />
+            </div>
+            <div className="fg">
+              <label className="lbl">Adresse prévoyance (override)</label>
+              <input className="inp" value={contract.prevoyance_adresse}
+                onChange={function (e) { setContract(Object.assign({}, contract, { prevoyance_adresse: e.target.value })) }} />
+            </div>
+          </div>
         </div>
-        <div className="fg">
-          <label className="lbl">Adresse prévoyance</label>
-          <input className="inp" value={contract.prevoyance_adresse}
-            onChange={function (e) { setContract(Object.assign({}, contract, { prevoyance_adresse: e.target.value })) }} />
-        </div>
-      </div>
+      </details>
     </div>
   )
 }
@@ -1128,24 +1135,36 @@ function Step3CdiSalary(props) {
         </div>
       )}
 
-      <div className="ct" style={{ marginTop: 18 }}>Mentions sociales obligatoires</div>
-      <div className="fg">
-        <label className="lbl">Service de santé au travail</label>
-        <input className="inp" value={contract.service_sante_travail}
-          onChange={function (e) { setContract(Object.assign({}, contract, { service_sante_travail: e.target.value })) }} placeholder="CMIE, ACMS, AMETIF..." />
+      <div className="ct" style={{ marginTop: 18 }}>Protection sociale</div>
+      <div style={{ background: "#FFF8E1", borderLeft: "3px solid #FF82D7", padding: "10px 14px", marginBottom: 10, fontSize: 11.5, lineHeight: 1.6 }}>
+        ✓ <b>Médecine du travail :</b> Efficience — Centre Vaugirard, 64 rue de Vaugirard, 75006 Paris<br />
+        ✓ <b>Retraite complémentaire :</b> KLESIA AGIRC-ARRCO<br />
+        ✓ <b>Prévoyance :</b> GAN EUROCOURTAGE VIE<br />
+        ✓ <b>Complémentaire santé :</b> APRIL Santé<br />
+        <span style={{ fontSize: 10, opacity: 0.7, fontStyle: "italic" }}>Ces 4 organismes sont automatiquement intégrés dans le contrat.</span>
       </div>
-      <div className="fg2">
-        <div className="fg">
-          <label className="lbl">Organisme de prévoyance</label>
-          <input className="inp" value={contract.prevoyance_organisme}
-            onChange={function (e) { setContract(Object.assign({}, contract, { prevoyance_organisme: e.target.value })) }} placeholder="KLESIA, Malakoff..." />
+      <details style={{ marginBottom: 10, fontSize: 11 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 700, color: "#666" }}>Cas particulier : remplacer ces organismes pour ce contrat ?</summary>
+        <div style={{ marginTop: 10, padding: 10, background: "#FAFAFA", borderRadius: 4 }}>
+          <div className="fg">
+            <label className="lbl">Service de santé au travail (override)</label>
+            <input className="inp" value={contract.service_sante_travail}
+              onChange={function (e) { setContract(Object.assign({}, contract, { service_sante_travail: e.target.value })) }} placeholder="Laisser vide = Efficience" />
+          </div>
+          <div className="fg2">
+            <div className="fg">
+              <label className="lbl">Organisme de prévoyance (override)</label>
+              <input className="inp" value={contract.prevoyance_organisme}
+                onChange={function (e) { setContract(Object.assign({}, contract, { prevoyance_organisme: e.target.value })) }} placeholder="Laisser vide = GAN" />
+            </div>
+            <div className="fg">
+              <label className="lbl">Adresse prévoyance (override)</label>
+              <input className="inp" value={contract.prevoyance_adresse}
+                onChange={function (e) { setContract(Object.assign({}, contract, { prevoyance_adresse: e.target.value })) }} />
+            </div>
+          </div>
         </div>
-        <div className="fg">
-          <label className="lbl">Adresse prévoyance</label>
-          <input className="inp" value={contract.prevoyance_adresse}
-            onChange={function (e) { setContract(Object.assign({}, contract, { prevoyance_adresse: e.target.value })) }} />
-        </div>
-      </div>
+      </details>
     </div>
   )
 }
