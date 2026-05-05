@@ -170,6 +170,42 @@ export default function DocumentsManager(props) {
     return y + "-" + m
   }
 
+  // === Suggestion de placeholder selon le type ===
+  function getPlaceholderForType(typeKey) {
+    var hints = {
+      cni: "Ex: CNI recto, CNI verso",
+      passeport: "Ex: Passeport 2024-2034",
+      titre_sejour: "Ex: Titre de séjour valable jusqu'à 2027",
+      secu: "Ex: Attestation de droits à jour",
+      mutuelle: "Ex: Carte mutuelle APRIL 2026",
+      rib: "Ex: RIB Crédit Mutuel compte courant",
+      diplome: "Ex: BTS Hôtellerie 2020",
+      haccp: "Ex: Formation HACCP du 15 mars 2026",
+      casier: "Ex: Casier vierge demandé en avril 2026",
+      justif_domicile: "Ex: Facture EDF avril 2026",
+      cv: "Ex: CV à jour avril 2026",
+      lettre_motiv: "Ex: Lettre motivation poste serveur",
+      permis: "Ex: Permis B obtenu en 2018",
+      visite_medicale: "Ex: Aptitude au poste 12 mai 2026",
+      attestation_emp: "Ex: Attestation Pizza Pino 2024",
+      pole_emploi: "Ex: Inscription Pôle Emploi 01/2026",
+      avis_imposition: "Ex: Avis d'imposition 2024",
+      fiche_paie: "Ex: Fiche de paie",
+      contrat_signe: "Ex: Contrat signé original",
+      avenant: "Ex: Avenant changement horaires",
+      lettre_demission: "Ex: Démission notifiée le...",
+      lettre_licenciement: "Ex: Lettre licenciement faute grave",
+      rupture_conv: "Ex: Convention de rupture",
+      demande_conges: "Ex: Demande congés été 2026",
+      arret_maladie: "Ex: Arrêt 3 jours grippe Dr. Martin",
+      conge_maternite: "Ex: Congé maternité du... au...",
+      avertissement: "Ex: Avertissement retards répétés",
+      attestation_employeur: "Ex: Attestation Pôle Emploi",
+      autre: "Décris brièvement le contenu du document"
+    }
+    return hints[typeKey] || hints.autre
+  }
+
   // === Le selected type courant (pour savoir si needsPeriod) ===
   var selectedMeta = getMeta(selectedType)
   var needsPeriod = (context === "contract") && selectedMeta && selectedMeta.needsPeriod
@@ -210,13 +246,16 @@ export default function DocumentsManager(props) {
               </select>
             </div>
             <div className="fg">
-              <label className="lbl">Libellé (optionnel)</label>
+              <label className="lbl">Titre / description (recommandé)</label>
               <input
                 className="inp"
                 value={customLabel}
                 onChange={function (e) { setCustomLabel(e.target.value) }}
-                placeholder="Ex: CNI recto, RIB Crédit Mutuel..."
+                placeholder={getPlaceholderForType(selectedType)}
               />
+              <div style={{ fontSize: 10, opacity: 0.6, marginTop: 4 }}>
+                Par exemple : "CNI recto", "RIB Crédit Mutuel", "Arrêt 3 jours grippe"...
+              </div>
             </div>
           </div>
 
