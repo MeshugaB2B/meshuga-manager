@@ -5,7 +5,7 @@
 //   - Extra (CDD d'usage)
 //   - CDI Cuisinier(ère)
 //   - CDI Caissier(ère) / Équipier(ère)
-//   - CDI Cadre / Agent de maîtrise (template Emy)
+//   - CDI Responsable / Manager (template Emy, statut agent de maîtrise/cadre)
 //
 // Chaque builder retourne un HTML complet (cover + parties + articles + signatures).
 // Le HTML inclut tout le CSS inline pour fonctionner dans une iframe ou être
@@ -293,14 +293,14 @@ export function buildExtraContract(c, emp, vacs, logoUri) {
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 7.</span><span class="art-title">Visite d\'information et de prévention</span></div>'
-    + '<div class="body"><p>Conformément à l\'article R.4624-10 du Code du travail, le/la Salarié(e) bénéficiera d\'une VIP réalisée par le service de prévention et de santé au travail dans un délai maximal de 3 mois.</p></div>'
+    + '<div class="body"><p>Conformément à l\'article R.4624-10 du Code du travail, le/la Salarié(e) bénéficiera d\'une VIP réalisée par le service de prévention et de santé au travail (<strong>' + (c.service_sante_travail || MESHUGA_LEGAL.medecine_travail.nom) + '</strong>' + (c.service_sante_travail ? '' : ', ' + MESHUGA_LEGAL.medecine_travail.adresse) + ') dans un délai maximal de 3 mois.</p></div>'
 
     + '<div class="art"><span class="art-num">Article 8.</span><span class="art-title">Convention collective et protection sociale</span></div>'
     + '<div class="body">'
     + '<p class="sub-clause"><span class="clause-label">8.1 — CCN.</span> Les conditions de travail sont régies par la CCN de la Restauration Rapide (IDCC 1501).</p>'
     + '<p class="sub-clause"><span class="clause-label">8.2 — Caisse de retraite complémentaire.</span> L\'Employeur cotise auprès de <strong>' + MESHUGA_LEGAL.retraite.nom + '</strong>, ' + MESHUGA_LEGAL.retraite.adresse + '.</p>'
-    + (c.service_sante_travail ? '<p class="sub-clause"><span class="clause-label">8.3 — Service de santé au travail.</span> ' + esc(c.service_sante_travail) + '</p>' : '')
-    + (c.prevoyance_organisme ? '<p class="sub-clause"><span class="clause-label">8.4 — Prévoyance.</span> ' + esc(c.prevoyance_organisme) + (c.prevoyance_adresse ? ', ' + esc(c.prevoyance_adresse) : '') + '.</p>' : '')
+    + '<p class="sub-clause"><span class="clause-label">8.3 — Prévoyance.</span> <strong>' + (c.prevoyance_organisme || MESHUGA_LEGAL.prevoyance.nom) + '</strong>' + (c.prevoyance_organisme ? (c.prevoyance_adresse ? ', ' + esc(c.prevoyance_adresse) : '') : ', ' + MESHUGA_LEGAL.prevoyance.adresse) + '.</p>'
+    + '<p class="sub-clause"><span class="clause-label">8.4 — Complémentaire santé.</span> <strong>' + MESHUGA_LEGAL.complementaire_sante.nom + '</strong>, ' + MESHUGA_LEGAL.complementaire_sante.adresse + '.</p>'
     + '<p class="sub-clause"><span class="clause-label">8.5 — Déclarations sociales.</span> DPAE auprès de l\'URSSAF d\'Île-de-France.</p>'
     + '</div>'
 
@@ -351,7 +351,7 @@ export function buildExtraContract(c, emp, vacs, logoUri) {
 }
 
 // ============================================================
-// 2. BUILDER : CDI Cadre / Agent de maîtrise (template Emy)
+// 2. BUILDER : CDI Responsable / Manager (template Emy, postes à responsabilités)
 // ============================================================
 export function buildCdiCadreContract(c, emp, logoUri) {
   // Données dérivées
@@ -502,7 +502,7 @@ export function buildCdiCadreContract(c, emp, logoUri) {
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Visite d\'information et de prévention</span></div>'
     + '<div class="body">'
     + '<p>Conformément à l\'article R.4624-10 du Code du travail, le/la Salarié(e) bénéficiera d\'une <strong>Visite d\'Information et de Prévention (VIP)</strong> réalisée par le service de prévention et de santé au travail dont relève l\'Employeur'
-    + (c.service_sante_travail ? ' (<strong>' + esc(c.service_sante_travail) + '</strong>)' : ' (<em>[nom et adresse du service à compléter]</em>)')
+    + ' (<strong>' + (c.service_sante_travail || MESHUGA_LEGAL.medecine_travail.nom) + '</strong>, ' + (c.service_sante_travail ? '' : MESHUGA_LEGAL.medecine_travail.adresse + ' — Tél. ' + MESHUGA_LEGAL.medecine_travail.telephone) + ')'
     + ', dans un délai maximal de 3 mois à compter de la prise effective de poste.</p>'
     + '</div>'
 
@@ -510,12 +510,13 @@ export function buildCdiCadreContract(c, emp, logoUri) {
     + '<div class="body">'
     + '<p class="sub-clause"><span class="clause-label">13.1 — Convention collective applicable.</span> Les conditions de travail du/de la Salarié(e) sont régies par les dispositions de la <strong>Convention Collective Nationale de la Restauration Rapide (IDCC 1501)</strong>, ainsi que ses avenants, accords et annexes en vigueur. Un exemplaire de la convention est tenu à la disposition du/de la Salarié(e) auprès de la direction.</p>'
     + '<p class="sub-clause"><span class="clause-label">13.2 — Caisse de retraite complémentaire.</span> L\'Employeur cotise auprès de <strong>' + MESHUGA_LEGAL.retraite.nom + '</strong>, ' + MESHUGA_LEGAL.retraite.adresse + ', au régime de retraite complémentaire des salariés ' + (statut === "cadre" ? "cadres" : "non-cadres") + '.</p>'
-    + '<p class="sub-clause"><span class="clause-label">13.3 — Prévoyance et complémentaire santé.</span> '
-    + (c.prevoyance_organisme
-        ? 'L\'Employeur a souscrit auprès de <strong>' + esc(c.prevoyance_organisme) + '</strong>' + (c.prevoyance_adresse ? ', dont le siège est situé <strong>' + esc(c.prevoyance_adresse) + '</strong>,' : '') + ' un contrat collectif obligatoire de prévoyance et de complémentaire santé conformément aux dispositions conventionnelles applicables.'
-        : 'L\'Employeur a souscrit auprès de <em>[nom de l\'organisme à compléter]</em>, dont le siège est situé <em>[adresse à compléter]</em>, un contrat collectif obligatoire de prévoyance et de complémentaire santé conformément aux dispositions conventionnelles applicables.')
-    + ' Le/la Salarié(e) est affilié(e) d\'office à ce régime à compter de sa prise de poste.</p>'
-    + '<p class="sub-clause"><span class="clause-label">13.4 — Déclarations sociales.</span> La Société établit la Déclaration Préalable à l\'Embauche (DPAE) auprès de l\'URSSAF d\'Île-de-France et transmet, via la Déclaration Sociale Nominative (DSN), l\'ensemble des informations sociales relatives au/à la Salarié(e). Celui-ci/celle-ci dispose, conformément au RGPD et à la loi « Informatique et libertés », d\'un droit d\'accès, de rectification, d\'effacement et de portabilité de ses données.</p>'
+    + '<p class="sub-clause"><span class="clause-label">13.3 — Prévoyance.</span> '
+    + 'L\'Employeur a souscrit auprès de <strong>' + (c.prevoyance_organisme || MESHUGA_LEGAL.prevoyance.nom) + '</strong>'
+    + (c.prevoyance_organisme ? (c.prevoyance_adresse ? ', ' + esc(c.prevoyance_adresse) : '') : ', ' + MESHUGA_LEGAL.prevoyance.adresse)
+    + ', un contrat collectif obligatoire de prévoyance conformément aux dispositions conventionnelles applicables. Le/la Salarié(e) est affilié(e) d\'office à ce régime à compter de sa prise de poste.</p>'
+    + '<p class="sub-clause"><span class="clause-label">13.4 — Complémentaire santé.</span> '
+    + 'L\'Employeur a également souscrit auprès de <strong>' + MESHUGA_LEGAL.complementaire_sante.nom + '</strong>, ' + MESHUGA_LEGAL.complementaire_sante.adresse + ', un contrat collectif obligatoire de complémentaire santé (« mutuelle ») conformément à l\'article L.911-7 du Code de la sécurité sociale. Le/la Salarié(e) est affilié(e) d\'office à ce régime à compter de sa prise de poste.</p>'
+    + '<p class="sub-clause"><span class="clause-label">13.5 — Déclarations sociales.</span> La Société établit la Déclaration Préalable à l\'Embauche (DPAE) auprès de l\'URSSAF d\'Île-de-France et transmet, via la Déclaration Sociale Nominative (DSN), l\'ensemble des informations sociales relatives au/à la Salarié(e). Celui-ci/celle-ci dispose, conformément au RGPD et à la loi « Informatique et libertés », d\'un droit d\'accès, de rectification, d\'effacement et de portabilité de ses données.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Confidentialité</span></div>'
@@ -714,8 +715,8 @@ function buildCdiSimpleContract(c, emp, logoUri, profil) {
 
     + '<div class="art"><span class="art-num">Article 11.</span><span class="art-title">Visite d\'information et de prévention</span></div>'
     + '<div class="body">'
-    + '<p>Le/la Salarié(e) bénéficiera d\'une VIP réalisée par '
-    + (c.service_sante_travail ? '<strong>' + esc(c.service_sante_travail) + '</strong>' : '<em>[service de santé au travail à compléter]</em>')
+    + '<p>Le/la Salarié(e) bénéficiera d\'une VIP réalisée par <strong>' + (c.service_sante_travail || MESHUGA_LEGAL.medecine_travail.nom) + '</strong>'
+    + (c.service_sante_travail ? '' : ', ' + MESHUGA_LEGAL.medecine_travail.adresse)
     + ' dans un délai maximal de 3 mois (article R.4624-10 du Code du travail).</p>'
     + '</div>'
 
@@ -723,12 +724,9 @@ function buildCdiSimpleContract(c, emp, logoUri, profil) {
     + '<div class="body">'
     + '<p class="sub-clause"><span class="clause-label">12.1 — CCN.</span> Les conditions de travail sont régies par la CCN Restauration Rapide (IDCC 1501).</p>'
     + '<p class="sub-clause"><span class="clause-label">12.2 — Retraite complémentaire.</span> ' + MESHUGA_LEGAL.retraite.nom + ', ' + MESHUGA_LEGAL.retraite.adresse + '.</p>'
-    + '<p class="sub-clause"><span class="clause-label">12.3 — Prévoyance et complémentaire santé.</span> '
-    + (c.prevoyance_organisme
-        ? 'L\'Employeur a souscrit auprès de <strong>' + esc(c.prevoyance_organisme) + '</strong>' + (c.prevoyance_adresse ? ', ' + esc(c.prevoyance_adresse) : '') + '. Le/la Salarié(e) y est affilié(e) d\'office.'
-        : '<em>[Organisme à compléter]</em>')
-    + '</p>'
-    + '<p class="sub-clause"><span class="clause-label">12.4 — Déclarations sociales.</span> DPAE et DSN auprès de l\'URSSAF d\'Île-de-France.</p>'
+    + '<p class="sub-clause"><span class="clause-label">12.3 — Prévoyance.</span> <strong>' + (c.prevoyance_organisme || MESHUGA_LEGAL.prevoyance.nom) + '</strong>' + (c.prevoyance_organisme ? (c.prevoyance_adresse ? ', ' + esc(c.prevoyance_adresse) : '') : ', ' + MESHUGA_LEGAL.prevoyance.adresse) + '. Le/la Salarié(e) y est affilié(e) d\'office.</p>'
+    + '<p class="sub-clause"><span class="clause-label">12.4 — Complémentaire santé.</span> <strong>' + MESHUGA_LEGAL.complementaire_sante.nom + '</strong>, ' + MESHUGA_LEGAL.complementaire_sante.adresse + '. Le/la Salarié(e) y est affilié(e) d\'office.</p>'
+    + '<p class="sub-clause"><span class="clause-label">12.5 — Déclarations sociales.</span> DPAE et DSN auprès de l\'URSSAF d\'Île-de-France.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 13.</span><span class="art-title">Tenue et hygiène (HACCP)</span></div>'
