@@ -33,6 +33,45 @@ function esc(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 }
 
+// === Helper : genderize() — transforme les formules épicènes en forme genrée ===
+// Exemple : "Le/la Salarié(e) est engagé(e)" → "La Salariée est engagée" (féminin)
+//                                            → "Le Salarié est engagé" (masculin)
+// Patterns ordonnés du plus long au plus court pour éviter les collisions
+// (ex: "il/elle" est un sous-pattern de "Celui-ci/celle-ci")
+function genderize(html, isFemale) {
+  if (!html) return ""
+  var rules = [
+    // Articles + Salarié(e) — patterns longs en premier
+    { from: /du\/de la Salarié\(e\)/g, to: isFemale ? "de la Salariée" : "du Salarié" },
+    { from: /au\/à la Salarié\(e\)/g,  to: isFemale ? "à la Salariée"  : "au Salarié" },
+    { from: /Le\/la Salarié\(e\)/g,    to: isFemale ? "La Salariée"    : "Le Salarié" },
+    { from: /le\/la Salarié\(e\)/g,    to: isFemale ? "la Salariée"    : "le Salarié" },
+    // Pronoms composés (avant les pronoms simples, sinon collision)
+    { from: /Celui-ci\/celle-ci/g,     to: isFemale ? "Celle-ci"  : "Celui-ci" },
+    { from: /celui-ci\/celle-ci/g,     to: isFemale ? "celle-ci"  : "celui-ci" },
+    // Pronoms simples
+    { from: /\bIl\/elle\b/g,           to: isFemale ? "Elle" : "Il" },
+    { from: /\bil\/elle\b/g,           to: isFemale ? "elle" : "il" },
+    // Participes passés et adjectifs en (e) — l'ordre n'a pas d'importance ici
+    { from: /engagé\(e\)/g,            to: isFemale ? "engagée"   : "engagé" },
+    { from: /classé\(e\)/g,            to: isFemale ? "classée"   : "classé" },
+    { from: /amené\(e\)/g,             to: isFemale ? "amenée"    : "amené" },
+    { from: /soumis\(e\)/g,            to: isFemale ? "soumise"   : "soumis" },
+    { from: /informé\(e\)/g,           to: isFemale ? "informée"  : "informé" },
+    { from: /affilié\(e\)/g,           to: isFemale ? "affiliée"  : "affilié" },
+    { from: /dénommé\(e\)/g,           to: isFemale ? "dénommée"  : "dénommé" },
+    { from: /habilité\(e\)/g,          to: isFemale ? "habilitée" : "habilité" },
+    { from: /libre\(e\)/g,             to: "libre" }, // épicène mais au cas où
+    // Pluriel (rare mais on couvre)
+    { from: /salarié\(e\)s/g,          to: isFemale ? "salariées" : "salariés" }
+  ]
+  var out = html
+  for (var i = 0; i < rules.length; i++) {
+    out = out.replace(rules[i].from, rules[i].to)
+  }
+  return out
+}
+
 // ============================================================
 // CSS partagé entre tous les contrats
 // ============================================================
@@ -775,8 +814,15 @@ function buildCdiSimpleContract(c, emp, logoUri, profil) {
 export function buildContract(c, emp, vacs, logoUri) {
   if (!c || !emp) return ''
   var t = c.type || "extra"
-  if (t === "cdi_cadre") return buildCdiCadreContract(c, emp, logoUri)
-  if (t === "cdi_cuisinier") return buildCdiCuisinierContract(c, emp, logoUri)
-  if (t === "cdi_caissier") return buildCdiCaissierContract(c, emp, logoUri)
-  return buildExtraContract(c, emp, vacs, logoUri)
+  // Détection du genre : féminin si civilité Madame/Mademoiselle
+  var civ = (emp.civilite || "Madame")
+  var isFemale = (civ === "Madame" || civ === "Mademoiselle")
+  // Génération du HTML brut
+  var html
+  if (t === "cdi_cadre") html = buildCdiCadreContract(c, emp, logoUri)
+  else if (t === "cdi_cuisinier") html = buildCdiCuisinierContract(c, emp, logoUri)
+  else if (t === "cdi_caissier") html = buildCdiCaissierContract(c, emp, logoUri)
+  else html = buildExtraContract(c, emp, vacs, logoUri)
+  // Application de la transformation genrée
+  return genderize(html, isFemale)
 }
