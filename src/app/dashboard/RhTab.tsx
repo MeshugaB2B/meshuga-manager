@@ -16,6 +16,42 @@ var supabase = createClient(
 
 // === Logo Meshuga rose, importé depuis logos.ts ===
 var LOGO_PINK_PLACEHOLDER = LOGO_PINK
+var STAMP_PINK_PATH = "/stamp-pink.png"  // si dispo dans /public, sinon utilise wordmark fallback
+
+// === Données légales Meshuga (hardcodées car invariantes) ===
+var MESHUGA_LEGAL = {
+  // AEGIA FOOD — l'opérationnelle qui exploite Meshuga Crazy Deli
+  aegia_food: {
+    nom: "AEGIA FOOD",
+    forme: "Société par Actions Simplifiée",
+    capital: "1 000",
+    siren: "904 639 531",
+    siret: "904 639 531 00014",
+    rcs: "Paris 904 639 531",
+    tva: "FR31 904 639 531",
+    ape: "5610C",
+    adresse: "3 rue Vavin, 75006 Paris",
+    enseigne: "MESHUGA Crazy Deli"
+  },
+  // SAS AEGIA — la holding, Présidente d'AEGIA FOOD
+  sas_aegia: {
+    nom: "SAS AEGIA",
+    forme: "Société par Actions Simplifiée",
+    capital: "1 000",
+    siren: "889 354 965",
+    siret: "889 354 965 00028",
+    rcs: "Paris 889 354 965",
+    tva: "FR76 889 354 965",
+    adresse: "78 avenue des Champs-Élysées, Bureau 326, 75008 Paris"
+  },
+  // Représentant légal final
+  president: "Edward TOURET",
+  // Caisse de retraite (figée)
+  retraite: {
+    nom: "KLESIA Retraite AGIRC-ARRCO",
+    adresse: "4 rue Georges Picquart, 75017 Paris"
+  }
+}
 
 // === Constantes ===
 var CIVILITES = ["Madame", "Monsieur", "Mademoiselle"]
@@ -158,18 +194,10 @@ export default function RhTab() {
   var filtered = contracts
   if (filter !== "all") filtered = contracts.filter(function (c) { return c.status === filter })
 
-  // ===== KPI =====
+  // Compteur extras en cours (utilisé dans le sous-titre)
   var kpiActive = contracts.filter(function (c) {
     return c.status !== "archived" && c.date_fin && new Date(c.date_fin) >= new Date()
   }).length
-  var kpiTotal = contracts.length
-  var kpiSigned = contracts.filter(function (c) { return c.status === "signed" }).length
-  var kpiHours = 0
-  contracts.forEach(function (c) {
-    if (c.hr_contract_vacations) {
-      c.hr_contract_vacations.forEach(function (v) { kpiHours += (v.duree_minutes || 0) })
-    }
-  })
 
   return (
     <div>
@@ -177,7 +205,7 @@ export default function RhTab() {
       <div className="ph">
         <div>
           <div className="pt">RESSOURCES HUMAINES</div>
-          <div className="ps">Contrats d'extra · CDD d'usage · CCN Restauration Rapide</div>
+          <div className="ps">{kpiActive > 0 ? kpiActive + " extra" + (kpiActive > 1 ? "s" : "") + " en cours · " : ""}CDD d'usage · CCN Restauration Rapide</div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn btn-p" onClick={startNew}>+ Nouvelle embauche extra</button>
@@ -880,48 +908,9 @@ function ContractWizard(props) {
                 </div>
               </div>
 
-              <div className="ct" style={{ marginTop: 16 }}>Mentions légales société</div>
-
-              <div className="fg2">
-                <div className="fg">
-                  <label className="lbl">Capital AEGIA FOOD (€)</label>
-                  <input
-                    className="inp"
-                    value={contract.capital_aegia_food}
-                    onChange={function (e) { setContract(Object.assign({}, contract, { capital_aegia_food: e.target.value })) }}
-                    placeholder="1000"
-                  />
-                </div>
-                <div className="fg">
-                  <label className="lbl">Capital SAS AEGIA (€)</label>
-                  <input
-                    className="inp"
-                    value={contract.capital_sas_aegia}
-                    onChange={function (e) { setContract(Object.assign({}, contract, { capital_sas_aegia: e.target.value })) }}
-                    placeholder="1000"
-                  />
-                </div>
-              </div>
-
-              <div className="fg2">
-                <div className="fg">
-                  <label className="lbl">RCS Paris SAS AEGIA</label>
-                  <input
-                    className="inp"
-                    value={contract.rcs_sas_aegia}
-                    onChange={function (e) { setContract(Object.assign({}, contract, { rcs_sas_aegia: e.target.value })) }}
-                    placeholder="900 000 000"
-                  />
-                </div>
-                <div className="fg">
-                  <label className="lbl">Adresse SAS AEGIA</label>
-                  <input
-                    className="inp"
-                    value={contract.adresse_sas_aegia}
-                    onChange={function (e) { setContract(Object.assign({}, contract, { adresse_sas_aegia: e.target.value })) }}
-                    placeholder="3 rue Vavin, 75006 Paris"
-                  />
-                </div>
+              <div className="ct" style={{ marginTop: 16 }}>Mentions légales obligatoires</div>
+              <div style={{fontSize:11,opacity:0.6,marginBottom:10,fontStyle:"italic",lineHeight:1.5}}>
+                Les données AEGIA FOOD et SAS AEGIA sont enregistrées définitivement (capitaux, RCS, adresses, dirigeants). Saisis ici les 2 organismes de protection sociale obligatoires.
               </div>
 
               <div className="fg">
@@ -1155,14 +1144,14 @@ function ContractPreview(props) {
       + '.cover h2{font-size:24px;font-weight:900;letter-spacing:1px;margin-bottom:4px}'
       + '.cover .subtitle{font-size:11px;color:#666;font-style:italic}'
       + '.cover .rule{height:3px;background:#FF82D7;margin:18px auto 0}'
-      + '.parties h3{font-family:"Yellowtail",cursive;font-size:28px;font-weight:400;margin:18px 0 10px;color:#C2185B}'
+      + '.parties h3{font-family:"Yellowtail",cursive;font-size:22px;font-weight:400;margin:14px 0 8px;color:#C2185B}'
       + '.parties p{margin-bottom:8px;text-align:justify;font-size:12.5px}'
       + '.party-tag{display:block;text-align:right;font-style:italic;color:#666;font-size:11px;margin-top:2px}'
       + '.party-side{display:block;text-align:right;font-weight:900;font-size:11px;letter-spacing:1px;margin-top:2px;margin-bottom:14px}'
       + '.bold-center{text-align:center;font-weight:900;font-size:14px;letter-spacing:1px;margin:18px 0 24px}'
-      + '.art{margin:28px 0 14px;padding-bottom:8px;border-bottom:2px solid #FF82D7;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;page-break-after:avoid}'
-      + '.art-num{font-family:"Yellowtail",cursive;font-size:42px;color:#FF82D7;line-height:1}'
-      + '.art-title{font-family:"Yellowtail",cursive;font-size:28px;color:#191923;line-height:1.1}'
+      + '.art{margin:22px 0 10px;padding-bottom:5px;border-bottom:1.5px solid #FF82D7;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;page-break-after:avoid}'
+      + '.art-num{font-family:"Yellowtail",cursive;font-size:24px;color:#FF82D7;line-height:1}'
+      + '.art-title{font-family:"Yellowtail",cursive;font-size:18px;color:#191923;line-height:1.1}'
       + '.body p{margin-bottom:9px;text-align:justify;font-size:12.5px;line-height:1.55}'
       + '.body ul{list-style:none;margin:6px 0 12px 18px}'
       + '.body ul li{position:relative;padding-left:18px;margin-bottom:4px;text-align:justify;font-size:12.5px}'
@@ -1181,7 +1170,7 @@ function ContractPreview(props) {
       + '.note{font-size:11px;color:#666;font-style:italic;margin:6px 0 14px}'
       + '.note b{color:#C2185B;font-style:normal;font-weight:900}'
       + '.sig-section{margin-top:32px;page-break-before:always;padding-top:8px}'
-      + '.sig-section h2{font-family:"Yellowtail",cursive;font-size:54px;color:#FF82D7;text-align:center;font-weight:400;line-height:1;margin-bottom:8px}'
+      + '.sig-section h2{font-family:"Yellowtail",cursive;font-size:42px;color:#FF82D7;text-align:center;font-weight:400;line-height:1;margin-bottom:8px}'
       + '.sig-section .rule{height:2px;background:#FF82D7;margin:0 0 28px}'
       + '.fait-banner{background:#FFF8E1;border-top:3px solid #FF82D7;border-bottom:3px solid #FF82D7;padding:18px;text-align:center;margin-bottom:32px;font-size:14px}'
       + '.fait-banner .small{display:block;font-size:11px;color:#666;font-style:italic;margin-top:6px}'
@@ -1193,9 +1182,15 @@ function ContractPreview(props) {
       + '.sig-id .role{font-size:11px;color:#666;font-style:italic;line-height:1.3}'
       + '.sig-space{padding:14px 16px;display:flex;flex-direction:column;font-size:11px;color:#666;font-style:italic}'
       + '.sig-foot{background:#FAFAFA;border-top:1px solid #DDD;padding:0 16px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#666;font-style:italic}'
-      + '@media print{@page{size:A4;margin:1.6cm 1.4cm}.toolbar{display:none}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-before:page}.sig-block{break-inside:avoid}'
-      + '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+      + '@media print{@page{size:A4;margin:2.2cm 1.4cm 1.6cm 1.4cm;@top-center{content:element(running-header)}}.toolbar{display:none}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-before:page}.sig-block{break-inside:avoid}'
+      + '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.running-header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+      + '.running-header{position:running(running-header);display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #FF82D7;padding-bottom:6px;font-family:Arial Narrow,sans-serif;font-size:9px;color:#666}'
+      + '.running-header img{height:18px;width:auto}'
+      + '.running-header .tag{font-style:italic;letter-spacing:1px;text-transform:uppercase}'
       + '</style></head><body>'
+      + '<div class="running-header">'
+      + (LOGO_PINK_PLACEHOLDER ? '<img src="' + LOGO_PINK_PLACEHOLDER + '" alt="Meshuga">' : '<span style="font-family:Yellowtail,cursive;font-size:18px;color:#FF82D7">meshuga</span>')
+      + '<span class="tag">CONTRAT D\'EXTRA · ' + (emp.prenom || '') + ' ' + ((emp.nom || '').toUpperCase()) + '</span></div>'
       + '<div class="toolbar"><h1>meshuga · contrat d\'extra</h1>'
       + '<button class="btn primary" onclick="window.print()">Imprimer en PDF</button></div>'
       + '<div class="page">'
@@ -1207,7 +1202,8 @@ function ContractPreview(props) {
       + '<div class="rule"></div></div>'
       // PARTIES
       + '<div class="parties"><h3>Entre les soussignés</h3>'
-      + '<p><strong>La société AEGIA FOOD</strong>, Société par Actions Simplifiée au capital social de <strong>' + safe(c.capital_aegia_food) + '</strong> €, immatriculée au Registre du Commerce et des Sociétés de Paris sous le numéro <strong>904 639 531</strong>, dont le siège social est situé <strong>3 rue Vavin, 75006 Paris</strong>, code APE 5610A, exploitant l\'enseigne <strong>MESHUGA Crazy Deli</strong>, représentée par sa Présidente, <strong>la société SAS AEGIA</strong>, SAS au capital de <strong>' + safe(c.capital_sas_aegia) + '</strong> €, immatriculée au RCS de Paris sous le numéro <strong>' + safe(c.rcs_sas_aegia) + '</strong>, dont le siège social est situé <strong>' + safe(c.adresse_sas_aegia) + '</strong>, elle-même représentée par son Président, <strong>Monsieur Edward TOURET</strong>, dûment habilité aux fins des présentes.</p>'
+      + '<p><strong>La société ' + MESHUGA_LEGAL.aegia_food.nom + '</strong>, ' + MESHUGA_LEGAL.aegia_food.forme + ' au capital social de <strong>' + MESHUGA_LEGAL.aegia_food.capital + ' €</strong>, immatriculée au Registre du Commerce et des Sociétés de ' + MESHUGA_LEGAL.aegia_food.rcs + ', dont le siège social est situé <strong>' + MESHUGA_LEGAL.aegia_food.adresse + '</strong>, code APE ' + MESHUGA_LEGAL.aegia_food.ape + ', SIRET ' + MESHUGA_LEGAL.aegia_food.siret + ', N° TVA intracommunautaire ' + MESHUGA_LEGAL.aegia_food.tva + ', exploitant l\'enseigne <strong>' + MESHUGA_LEGAL.aegia_food.enseigne + '</strong>,</p>'
+      + '<p>représentée par sa Présidente, la société <strong>' + MESHUGA_LEGAL.sas_aegia.nom + '</strong>, ' + MESHUGA_LEGAL.sas_aegia.forme + ' au capital de <strong>' + MESHUGA_LEGAL.sas_aegia.capital + ' €</strong>, immatriculée au RCS de ' + MESHUGA_LEGAL.sas_aegia.rcs + ', dont le siège social est situé <strong>' + MESHUGA_LEGAL.sas_aegia.adresse + '</strong>, SIRET ' + MESHUGA_LEGAL.sas_aegia.siret + ', elle-même représentée par son Président, <strong>Monsieur ' + MESHUGA_LEGAL.president + '</strong>, dûment habilité aux fins des présentes.</p>'
       + '<span class="party-tag">Ci-après dénommée « <b>l\'Employeur</b> » ou « <b>la Société</b> »</span>'
       + '<span class="party-side">D\'UNE PART</span>'
       + '<p class="bold-center" style="margin:8px 0 14px">ET</p>'
@@ -1270,7 +1266,7 @@ function ContractPreview(props) {
       + '<div class="art"><span class="art-num">Article 8.</span><span class="art-title">Convention collective et protection sociale</span></div>'
       + '<div class="body">'
       + '<p class="sub-clause"><span class="clause-label">8.1 — Convention collective applicable.</span> Les conditions de travail du/de la Salarié(e) sont régies par les dispositions de la <strong>Convention Collective Nationale de la Restauration Rapide (IDCC 1501)</strong>.</p>'
-      + '<p class="sub-clause"><span class="clause-label">8.2 — Caisse de retraite complémentaire.</span> L\'Employeur cotise auprès de <strong>KLESIA Retraite AGIRC-ARRCO</strong>, 4 rue Georges Picquart, 75017 Paris.</p>'
+      + '<p class="sub-clause"><span class="clause-label">8.2 — Caisse de retraite complémentaire.</span> L\'Employeur cotise auprès de <strong>' + MESHUGA_LEGAL.retraite.nom + '</strong>, ' + MESHUGA_LEGAL.retraite.adresse + '.</p>'
       + '<p class="sub-clause"><span class="clause-label">8.3 — Organisme de prévoyance et complémentaire santé.</span> L\'Employeur a souscrit auprès de <strong>' + safe(c.prevoyance_organisme) + '</strong>, ' + safe(c.prevoyance_adresse) + ', un contrat collectif de prévoyance et de complémentaire santé conformément aux dispositions conventionnelles applicables.</p>'
       + '<p class="sub-clause"><span class="clause-label">8.4 — Déclarations sociales.</span> La Société établit la Déclaration Préalable à l\'Embauche (DPAE) auprès de l\'URSSAF d\'Île-de-France et transmet, via la Déclaration Sociale Nominative (DSN), l\'ensemble des informations sociales relatives au/à la Salarié(e).</p>'
       + '</div>'
@@ -1328,7 +1324,11 @@ function ContractPreview(props) {
       + '<div class="sig-head">Pour l\'Employeur</div>'
       + '<div class="sig-id"><div class="name">AEGIA FOOD</div><div class="role">SAS AEGIA, Présidente<br>représentée par Edward TOURET, Président</div></div>'
       + '<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé »</div>'
-      + '<div class="sig-foot">Cachet de la société</div>'
+      + '<div class="sig-foot" style="display:flex;align-items:center;justify-content:center;gap:8px">'
+      + '<span style="font-family:Yellowtail,cursive;font-size:14px;color:#FF82D7">cachet</span>'
+      + '<span style="opacity:.5">·</span>'
+      + '<span style="font-style:italic">SAS AEGIA</span>'
+      + '</div>'
       + '</div>'
       + '<div class="sig-block">'
       + '<div class="sig-head">Le/la Salarié(e)</div>'
