@@ -39,6 +39,9 @@ export default function FoodCostTab(props) {
 
   var [addIngOpen, setAddIngOpen] = useState(false)
   var [addIngSearch, setAddIngSearch] = useState('')
+  var [creatingProduct, setCreatingProduct] = useState(false)
+  var [newProductDraft, setNewProductDraft] = useState(null) // {name, supplier_mode, supplier_id, new_supplier_name, current_price, unit, category}
+  var [creatingProductSaving, setCreatingProductSaving] = useState(false)
 
   var [editingPrixTTC, setEditingPrixTTC] = useState(null)
   var [editingMeta, setEditingMeta] = useState(null) // { name, categorie, tva }
@@ -254,6 +257,101 @@ export default function FoodCostTab(props) {
       setAddIngSearch('')
       loadData()
     })
+  }
+
+  // ============= CREATE PRODUCT INLINE (depuis fiche recette) =============
+  function openCreateProduct(prefilledName) {
+    setNewProductDraft({
+      name: prefilledName || '',
+      supplier_mode: 'existing', // 'existing' ou 'new'
+      supplier_id: '',
+      new_supplier_name: '',
+      current_price: 0,
+      unit: 'kg',
+      category: 'ingredient'
+    })
+    setCreatingProduct(true)
+  }
+
+  function cancelCreateProduct() {
+    setCreatingProduct(false)
+    setNewProductDraft(null)
+  }
+
+  function createProductAndAddToRecipe(recipeId) {
+    if (!newProductDraft) return
+    var d = newProductDraft
+    if (!d.name || d.name.trim().length < 2) { toast('Nom du produit obligatoire (min 2 caractères)'); return }
+    if (d.supplier_mode === 'existing' && !d.supplier_id) { toast('Sélectionne un fournisseur'); return }
+    if (d.supplier_mode === 'new' && (!d.new_supplier_name || d.new_supplier_name.trim().length < 2)) { toast('Nom du nouveau fournisseur obligatoire'); return }
+    if (!Number(d.current_price) || Number(d.current_price) <= 0) { toast('Prix HT obligatoire (> 0)'); return }
+
+    setCreatingProductSaving(true)
+
+    var doInsertProduct = function(supplierId, supplierName) {
+      var prodPayload = {
+        name: d.name.trim(),
+        supplier_id: supplierId,
+        current_price: Number(d.current_price),
+        unit: d.unit || 'kg',
+        category: d.category || 'ingredient',
+        is_active: true
+      }
+      sb().from('products').insert(prodPayload).select().single().then(function(res){
+        if (res.error) {
+          toast('Erreur produit : ' + res.error.message)
+          setCreatingProductSaving(false)
+          return
+        }
+        var p = res.data
+        sb().from('recipe_ingredients').insert({
+          recipe_id: recipeId,
+          article: p.name,
+          fournisseur: supplierName,
+          unite: p.unit || 'kg',
+          prix_achat: Number(p.current_price || 0),
+          qte: 0,
+          cout: 0,
+          product_id: p.id
+        }).then(function(res2){
+          if (res2.error) {
+            toast('Produit créé mais erreur ajout : ' + res2.error.message)
+            setCreatingProductSaving(false)
+            return
+          }
+          toast('✅ Produit créé et ajouté à la recette (quantité à renseigner)')
+          setCreatingProductSaving(false)
+          setCreatingProduct(false)
+          setNewProductDraft(null)
+          setAddIngOpen(false)
+          setAddIngSearch('')
+          loadData()
+        })
+      })
+    }
+
+    if (d.supplier_mode === 'existing') {
+      var supName = ''
+      var si2
+      for (si2 = 0; si2 < suppliers.length; si2++) {
+        if (suppliers[si2].id === d.supplier_id) { supName = suppliers[si2].name; break }
+      }
+      doInsertProduct(d.supplier_id, supName)
+    } else {
+      // Créer le supplier d'abord
+      var supCat = d.category === 'boisson' ? 'boisson' : (d.category || 'ingredient')
+      sb().from('suppliers').insert({
+        name: d.new_supplier_name.trim(),
+        category: supCat
+      }).select().single().then(function(supRes){
+        if (supRes.error) {
+          toast('Erreur fournisseur : ' + supRes.error.message)
+          setCreatingProductSaving(false)
+          return
+        }
+        doInsertProduct(supRes.data.id, supRes.data.name)
+      })
+    }
   }
 
   function saveRecipePriceTTC(recipeId, newPrix) {
@@ -578,7 +676,7 @@ export default function FoodCostTab(props) {
         return (
           <div>
             <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
-              <button className="btn btn-sm" onClick={function(){setFcSelectedParent(null);setAddIngOpen(false);setEditingIngId(null);setEditingPrixTTC(null);setEditingMeta(null)}}>← Retour</button>
+              <button className="btn btn-sm" onClick={function(){setFcSelectedParent(null);setAddIngOpen(false);setEditingIngId(null);setEditingPrixTTC(null);setEditingMeta(null);setCreatingProduct(false);setNewProductDraft(null)}}>← Retour</button>
               <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923',flex:1}}>{parent.name}</div>
               <button className="btn btn-sm" style={{background:'#FFEB5A',fontWeight:900}} onClick={function(){startEditMeta(v, parent)}}>✏️ Modifier</button>
               <button className="btn btn-sm" style={{background:'#FFE5E5',color:'#CC0066',fontWeight:900}} onClick={function(){deleteRecipeParent(parent.parent_slug, parent.name)}}>🗑️ Supprimer</button>
@@ -625,7 +723,7 @@ export default function FoodCostTab(props) {
                 {variantsList.map(function(vv){
                   var active = vv.variant_key === fcSelectedVariant
                   return (
-                    <button key={vv.variant_key} onClick={function(){setFcSelectedVariant(vv.variant_key);setEditingIngId(null);setAddIngOpen(false);setEditingPrixTTC(null)}} style={{flex:1,padding:'10px 14px',background:active?'#FF82D7':'transparent',color:active?'#fff':'#555',border:'none',borderRadius:8,fontWeight:900,fontSize:13,cursor:'pointer'}}>
+                    <button key={vv.variant_key} onClick={function(){setFcSelectedVariant(vv.variant_key);setEditingIngId(null);setAddIngOpen(false);setEditingPrixTTC(null);setCreatingProduct(false);setNewProductDraft(null)}} style={{flex:1,padding:'10px 14px',background:active?'#FF82D7':'transparent',color:active?'#fff':'#555',border:'none',borderRadius:8,fontWeight:900,fontSize:13,cursor:'pointer'}}>
                       {vv.variant_label} · {fmt(vv.prix_vente_ttc)}€
                     </button>
                   )
@@ -651,27 +749,32 @@ export default function FoodCostTab(props) {
 
             {/* RECAP prix actuel + édition prix TTC inline */}
             <div style={{background:'#fff',borderRadius:12,padding:16,border:'1.5px solid #EBEBEB',marginBottom:12}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:8}}>
                 <div style={{background:'#F8F9FF',borderRadius:8,padding:'10px 12px',border:'1.5px solid #DDEEFF'}}>
-                  <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginBottom:3}}>Prix de vente TTC actuel</div>
+                  <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginBottom:3}}>Prix de vente TTC</div>
                   {editingPrixTTC === null && (
                     <div>
-                      <div style={{fontWeight:900,fontSize:20,cursor:'pointer'}} onClick={function(){setEditingPrixTTC(v.prix_vente_ttc)}}>{fmt(v.prix_vente_ttc)}€</div>
-                      <div style={{fontSize:10,opacity:.4,marginTop:2}}>HT : {fmt(v.prix_vente_ht)}€ · clic pour modifier</div>
+                      <div style={{fontWeight:900,fontSize:18,cursor:'pointer'}} onClick={function(){setEditingPrixTTC(v.prix_vente_ttc)}}>{fmt(v.prix_vente_ttc)}€</div>
+                      <div style={{fontSize:10,opacity:.4,marginTop:2}}>HT : {fmt(v.prix_vente_ht)}€</div>
                     </div>
                   )}
                   {editingPrixTTC !== null && (
-                    <div style={{display:'flex',gap:4,alignItems:'center',marginTop:3}}>
-                      <input type="number" step="0.1" value={editingPrixTTC} onChange={function(e){setEditingPrixTTC(parseFloat(e.target.value)||0)}} style={{width:80,padding:'4px 6px',fontSize:16,fontWeight:900,border:'2px solid #005FFF',borderRadius:4}} autoFocus />
-                      <button className="btn btn-sm btn-y" style={{fontSize:10,padding:'4px 8px'}} onClick={function(){saveRecipePriceTTC(v.id, editingPrixTTC)}}>✓</button>
-                      <button className="btn btn-sm" style={{fontSize:10,padding:'4px 8px'}} onClick={function(){setEditingPrixTTC(null)}}>✕</button>
+                    <div style={{display:'flex',gap:4,alignItems:'center',marginTop:3,flexWrap:'wrap'}}>
+                      <input type="number" step="0.1" value={editingPrixTTC} onChange={function(e){setEditingPrixTTC(parseFloat(e.target.value)||0)}} style={{width:64,padding:'4px 6px',fontSize:14,fontWeight:900,border:'2px solid #005FFF',borderRadius:4}} autoFocus />
+                      <button className="btn btn-sm btn-y" style={{fontSize:10,padding:'4px 6px'}} onClick={function(){saveRecipePriceTTC(v.id, editingPrixTTC)}}>✓</button>
+                      <button className="btn btn-sm" style={{fontSize:10,padding:'4px 6px'}} onClick={function(){setEditingPrixTTC(null)}}>✕</button>
                     </div>
                   )}
                 </div>
+                <div style={{background:'#FFF5FB',borderRadius:8,padding:'10px 12px',border:'1.5px solid #FFD3EE'}}>
+                  <div style={{fontSize:10,opacity:.6,textTransform:'uppercase',marginBottom:3,color:'#CC0066'}}>Coût HT total</div>
+                  <div style={{fontWeight:900,fontSize:18,color:'#CC0066'}}>{fmt(v.food_cost_ht)}€</div>
+                  <div style={{fontSize:10,opacity:.6,marginTop:2}}>{v.ingredients.length} ingrédient{v.ingredients.length > 1 ? 's' : ''}</div>
+                </div>
                 <div style={{background:'#FFEB5A',borderRadius:8,padding:'10px 12px'}}>
                   <div style={{fontSize:10,opacity:.6,textTransform:'uppercase',marginBottom:3}}>Coeff actuel</div>
-                  <div style={{fontWeight:900,fontSize:20}}>x{coeffActuel} <span style={{fontSize:13,opacity:.7}}>({v.food_cost_pct}%)</span></div>
-                  <div style={{fontSize:10,opacity:.6,marginTop:2}}>Marge HT {fmt(v.marge_ht)}€</div>
+                  <div style={{fontWeight:900,fontSize:18}}>x{coeffActuel}</div>
+                  <div style={{fontSize:10,opacity:.6,marginTop:2}}>{v.food_cost_pct}% · Marge {fmt(v.marge_ht)}€</div>
                 </div>
               </div>
             </div>
@@ -679,16 +782,26 @@ export default function FoodCostTab(props) {
             {/* INGREDIENTS - bulles BLANCHES + édition inline au clic + ajout/suppr direct */}
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
               <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:.5,opacity:.5}}>Ingrédients ({v.ingredients.length})</div>
-              <button className="btn btn-sm btn-y" style={{fontSize:10,fontWeight:900}} onClick={function(){setAddIngOpen(!addIngOpen);setAddIngSearch('')}}>
+              <button className="btn btn-sm btn-y" style={{fontSize:10,fontWeight:900}} onClick={function(){
+                if (addIngOpen) {
+                  setAddIngOpen(false)
+                  setAddIngSearch('')
+                  setCreatingProduct(false)
+                  setNewProductDraft(null)
+                } else {
+                  setAddIngOpen(true)
+                  setAddIngSearch('')
+                }
+              }}>
                 {addIngOpen ? '✕ Fermer' : '+ Ajouter'}
               </button>
             </div>
 
-            {addIngOpen && (
+            {addIngOpen && !creatingProduct && (
               <div style={{background:'#fff',borderRadius:10,padding:12,marginBottom:10,border:'2px solid #FFEB5A'}}>
                 <input className="inp" placeholder="Chercher un produit (pain, saumon, ketchup...)" value={addIngSearch} onChange={function(e){setAddIngSearch(e.target.value)}} style={{marginBottom:8}} autoFocus />
                 {addIngSearch.length >= 2 && (
-                  <div style={{maxHeight:220,overflowY:'auto',background:'#FAFAFA',borderRadius:6,border:'1px solid #EEE'}}>
+                  <div style={{maxHeight:220,overflowY:'auto',background:'#FAFAFA',borderRadius:6,border:'1px solid #EEE',marginBottom:8}}>
                     {products.filter(function(p){
                       return (p.name || '').toLowerCase().indexOf(addIngSearch.toLowerCase()) > -1
                     }).slice(0, 10).map(function(p){
@@ -705,10 +818,104 @@ export default function FoodCostTab(props) {
                       )
                     })}
                     {products.filter(function(p){return (p.name || '').toLowerCase().indexOf(addIngSearch.toLowerCase()) > -1}).length === 0 && (
-                      <div style={{padding:12,fontSize:11,opacity:.5,textAlign:'center'}}>Aucun produit trouvé</div>
+                      <div style={{padding:12,fontSize:11,opacity:.5,textAlign:'center'}}>Aucun produit trouvé dans la base</div>
                     )}
                   </div>
                 )}
+                <button className="btn btn-sm" style={{width:'100%',background:'#FF82D7',color:'#fff',fontWeight:900,fontSize:12}} onClick={function(){openCreateProduct(addIngSearch)}}>
+                  + Créer un nouveau produit{addIngSearch ? ' « ' + addIngSearch + ' »' : ''}
+                </button>
+              </div>
+            )}
+
+            {addIngOpen && creatingProduct && newProductDraft && (
+              <div style={{background:'#fff',borderRadius:10,padding:14,marginBottom:10,border:'2px solid #FF82D7'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                  <div style={{fontWeight:900,fontSize:13,textTransform:'uppercase',color:'#FF82D7'}}>+ Nouveau produit</div>
+                  <button style={{background:'none',border:'none',fontSize:18,cursor:'pointer',color:'#888'}} onClick={cancelCreateProduct} disabled={creatingProductSaving}>✕</button>
+                </div>
+
+                <div style={{marginBottom:8}}>
+                  <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Nom du produit *</div>
+                  <input className="inp" value={newProductDraft.name} onChange={function(e){
+                    var val = e.target.value
+                    setNewProductDraft(function(prev){return Object.assign({}, prev, {name: val})})
+                  }} placeholder="Ex : Saumon fumé, Pain Rye…" autoFocus />
+                </div>
+
+                <div style={{marginBottom:8}}>
+                  <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Fournisseur *</div>
+                  <div style={{display:'flex',gap:4,marginBottom:6}}>
+                    <button className="btn btn-sm" style={{flex:1,fontSize:11,background:newProductDraft.supplier_mode==='existing'?'#191923':'#F5F5F5',color:newProductDraft.supplier_mode==='existing'?'#FFEB5A':'#555',fontWeight:900}} onClick={function(){
+                      setNewProductDraft(function(prev){return Object.assign({}, prev, {supplier_mode: 'existing'})})
+                    }}>Existant</button>
+                    <button className="btn btn-sm" style={{flex:1,fontSize:11,background:newProductDraft.supplier_mode==='new'?'#191923':'#F5F5F5',color:newProductDraft.supplier_mode==='new'?'#FFEB5A':'#555',fontWeight:900}} onClick={function(){
+                      setNewProductDraft(function(prev){return Object.assign({}, prev, {supplier_mode: 'new'})})
+                    }}>+ Nouveau</button>
+                  </div>
+                  {newProductDraft.supplier_mode === 'existing' && (
+                    <select className="inp" value={newProductDraft.supplier_id} onChange={function(e){
+                      var val = e.target.value
+                      setNewProductDraft(function(prev){return Object.assign({}, prev, {supplier_id: val})})
+                    }}>
+                      <option value="">— Sélectionner —</option>
+                      {suppliers.map(function(s){
+                        return <option key={s.id} value={s.id}>{s.name}</option>
+                      })}
+                    </select>
+                  )}
+                  {newProductDraft.supplier_mode === 'new' && (
+                    <input className="inp" value={newProductDraft.new_supplier_name} onChange={function(e){
+                      var val = e.target.value
+                      setNewProductDraft(function(prev){return Object.assign({}, prev, {new_supplier_name: val})})
+                    }} placeholder="Nom du fournisseur (ex : Norbert, Foodflow…)" />
+                  )}
+                </div>
+
+                <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:8,marginBottom:8}}>
+                  <div>
+                    <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Prix HT *</div>
+                    <input type="number" step="0.01" className="inp" value={newProductDraft.current_price || ''} onChange={function(e){
+                      var val = parseFloat(e.target.value) || 0
+                      setNewProductDraft(function(prev){return Object.assign({}, prev, {current_price: val})})
+                    }} placeholder="0.00" />
+                  </div>
+                  <div>
+                    <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>par</div>
+                    <select className="inp" value={newProductDraft.unit} onChange={function(e){
+                      var val = e.target.value
+                      setNewProductDraft(function(prev){return Object.assign({}, prev, {unit: val})})
+                    }}>
+                      <option value="kg">kg</option>
+                      <option value="L">L</option>
+                      <option value="U">unité</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Catégorie</div>
+                  <select className="inp" value={newProductDraft.category} onChange={function(e){
+                    var val = e.target.value
+                    setNewProductDraft(function(prev){return Object.assign({}, prev, {category: val})})
+                  }}>
+                    <option value="ingredient">Ingrédient</option>
+                    <option value="packaging">Packaging</option>
+                    <option value="consommable">Consommable</option>
+                    <option value="boisson">Boisson</option>
+                  </select>
+                </div>
+
+                <div style={{fontSize:10,opacity:.6,background:'#FAFAFA',padding:8,borderRadius:6,marginBottom:10}}>
+                  💡 Le produit sera ajouté à la base puis directement à cette recette. La quantité utilisée se renseigne ensuite (clic sur l'ingrédient).
+                </div>
+
+                <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
+                  <button className="btn btn-sm" onClick={cancelCreateProduct} disabled={creatingProductSaving}>Annuler</button>
+                  <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){createProductAndAddToRecipe(v.id)}} disabled={creatingProductSaving}>
+                    {creatingProductSaving ? '…' : '✅ Créer + ajouter'}
+                  </button>
+                </div>
               </div>
             )}
 
