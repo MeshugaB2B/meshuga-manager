@@ -201,6 +201,44 @@ export default function EmployeeDetail(props) {
     }
   }
 
+  // === Demander les congés (envoie un email automatique) ===
+  async function requestLeave() {
+    if (!emp.email) {
+      alert("Ce salarié n'a pas d'adresse email enregistrée. Ajoute-la d'abord dans la fiche.")
+      return
+    }
+    var customMessage = prompt(
+      "Tu vas envoyer une demande de planification des congés à " + emp.prenom + " " + (emp.nom || "") + " (" + emp.email + ").\n\n" +
+      "Optionnel — message personnel à ajouter (laisse vide pour le mail standard) :",
+      ""
+    )
+    if (customMessage === null) return // user a cliqué Annuler
+
+    var activeContract = contracts.filter(function (c) { return c.status !== "archived" })[0]
+
+    setSaving(true)
+    try {
+      var res = await fetch("/api/leave-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employee_id: emp.id,
+          contract_id: activeContract ? activeContract.id : null,
+          message: customMessage || null
+        })
+      })
+      var data = await res.json()
+      if (!res.ok) {
+        alert("Erreur envoi : " + (data.error || "inconnue"))
+      } else {
+        if (props.onSaved) props.onSaved("✉️ Demande envoyée à " + emp.email)
+      }
+    } catch (err) {
+      alert("Erreur réseau : " + (err.message || err))
+    }
+    setSaving(false)
+  }
+
   // === Render ===
   if (loading || !emp) {
     return (
@@ -250,12 +288,17 @@ export default function EmployeeDetail(props) {
             <button
               className="btn btn-y"
               onClick={function () {
-                // Trouver le 1er contrat en draft/finalized pour upload signé
                 var target = contracts.filter(function (c) { return c.status !== "archived" })[0]
                 if (target) triggerSignedUpload(target)
                 else alert("Pas de contrat actif pour uploader le signé. Crée d'abord un contrat.")
               }}
             >📥 Uploader contrat signé</button>
+            <button
+              className="btn"
+              onClick={requestLeave}
+              disabled={!emp.email}
+              title={emp.email ? "Envoyer la demande de planification des congés" : "Le salarié doit avoir une adresse email"}
+            >📅 Demander les congés</button>
           </div>
         </div>
 
