@@ -455,23 +455,40 @@ export function getContractTypeMeta(typeKey) {
 // ============================================================
 // Documents persistants liés au salarié (suivent la personne, pas le contrat)
 export var EMPLOYEE_DOC_TYPES = [
-  { key: "cni",            label: "Pièce d'identité (CNI)",       icon: "📇" },
-  { key: "passeport",      label: "Passeport",                    icon: "📘" },
-  { key: "titre_sejour",   label: "Titre de séjour",              icon: "🌍" },
-  { key: "secu",           label: "Attestation Sécurité sociale", icon: "🏥" },
-  { key: "rib",            label: "RIB",                          icon: "🏦" },
-  { key: "diplome",        label: "Diplôme",                      icon: "📜" },
-  { key: "justif_domicile",label: "Justificatif de domicile",     icon: "🏠" },
-  { key: "autre",          label: "Autre document",               icon: "📁" }
+  { key: "cni",            label: "Pièce d'identité (CNI)",         icon: "📇" },
+  { key: "passeport",      label: "Passeport",                      icon: "📘" },
+  { key: "titre_sejour",   label: "Titre de séjour / visa travail", icon: "🌍" },
+  { key: "secu",           label: "Carte vitale / attestation Sécu",icon: "🏥" },
+  { key: "mutuelle",       label: "Carte de mutuelle",              icon: "💊" },
+  { key: "rib",            label: "RIB",                            icon: "🏦" },
+  { key: "diplome",        label: "Diplôme / certification",        icon: "📜" },
+  { key: "haccp",          label: "Formation HACCP / hygiène",      icon: "🍽️" },
+  { key: "casier",         label: "Casier judiciaire (B3)",         icon: "⚖️" },
+  { key: "justif_domicile",label: "Justificatif de domicile",       icon: "🏠" },
+  { key: "cv",             label: "CV",                             icon: "📄" },
+  { key: "lettre_motiv",   label: "Lettre de motivation",           icon: "✉️" },
+  { key: "permis",         label: "Permis de conduire",             icon: "🚗" },
+  { key: "visite_medicale",label: "Visite médicale d'aptitude",     icon: "👨‍⚕️" },
+  { key: "attestation_emp",label: "Attestation employeur précédent",icon: "📑" },
+  { key: "pole_emploi",    label: "Document Pôle Emploi",           icon: "💼" },
+  { key: "avis_imposition",label: "Avis d'imposition",              icon: "📊" },
+  { key: "autre",          label: "Autre document",                 icon: "📁" }
 ]
 
 // Documents liés à un contrat (mensuels/ponctuels)
 export var CONTRACT_DOC_TYPES = [
-  { key: "fiche_paie",            label: "Fiche de paie",         icon: "💰", needsPeriod: true },
-  { key: "attestation_employeur", label: "Attestation employeur", icon: "📋", needsPeriod: false },
-  { key: "demande_conges",        label: "Demande de congés",     icon: "🏖️", needsPeriod: false },
-  { key: "arret_maladie",         label: "Arrêt maladie",         icon: "🤒", needsPeriod: false },
-  { key: "autre",                 label: "Autre document",        icon: "📁", needsPeriod: false }
+  { key: "fiche_paie",            label: "Fiche de paie",                icon: "💰", needsPeriod: true },
+  { key: "contrat_signe",         label: "Contrat signé",                icon: "✍️", needsPeriod: false },
+  { key: "avenant",               label: "Avenant au contrat",           icon: "📋", needsPeriod: false },
+  { key: "lettre_demission",      label: "Lettre de démission",          icon: "🚪", needsPeriod: false },
+  { key: "lettre_licenciement",   label: "Lettre de licenciement",       icon: "🚫", needsPeriod: false },
+  { key: "rupture_conv",          label: "Rupture conventionnelle",      icon: "🤝", needsPeriod: false },
+  { key: "demande_conges",        label: "Demande de congés",            icon: "🏖️", needsPeriod: false },
+  { key: "arret_maladie",         label: "Arrêt maladie / de travail",   icon: "🤒", needsPeriod: false },
+  { key: "conge_maternite",       label: "Congé maternité / paternité",  icon: "👶", needsPeriod: false },
+  { key: "avertissement",         label: "Avertissement / sanction",     icon: "⚠️", needsPeriod: false },
+  { key: "attestation_employeur", label: "Attestation employeur",        icon: "📊", needsPeriod: false },
+  { key: "autre",                 label: "Autre document",               icon: "📁", needsPeriod: false }
 ]
 
 export function getEmployeeDocTypeMeta(typeKey) {
@@ -486,6 +503,13 @@ export function getContractDocTypeMeta(typeKey) {
     if (CONTRACT_DOC_TYPES[i].key === typeKey) return CONTRACT_DOC_TYPES[i]
   }
   return { key: "autre", label: "Document", icon: "📁", needsPeriod: false }
+}
+
+// Helper : capitaliser la première lettre d'une chaîne (utile pour nationalités)
+export function capitalize(s) {
+  if (!s) return ""
+  var str = String(s)
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
 
 // Helper : formater un poids de fichier en KB / MB lisibles
