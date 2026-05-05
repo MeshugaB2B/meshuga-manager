@@ -6,13 +6,16 @@
 // Props:
 //   - context: "employee" | "contract"
 //   - parentId: UUID du salarié ou du contrat
-//   - onCountChange?: callback (count) => void  (optionnel, pour afficher un compteur ailleurs)
+//   - onCountChange?: callback (count) => void
+//   - mergeContractDocs?: bool — si true en mode employee, charge aussi les docs
+//     de tous les contractIds passés en prop (vue salarié-centrée déroulée)
+//   - contractIds?: array d'UUID — utilisé si mergeContractDocs=true
 //
 // Le composant s'auto-charge :
-//   - Liste les docs existants depuis hr_employee_documents ou hr_contract_documents
-//   - Permet d'uploader un nouveau doc avec choix du type + label + période (si fiche de paie)
+//   - Liste les docs existants
+//   - Permet d'uploader un nouveau doc (avec choix contexte si merge)
 //   - Génère un signed URL temporaire (1h) pour visualiser
-//   - Supprime un doc (storage + DB en cascade)
+//   - Supprime un doc (storage + DB)
 //
 // SWC-safe : var dans JSX, pas de generics, function(){} partout
 // ============================================================
@@ -37,22 +40,36 @@ export default function DocumentsManager(props) {
   var context = props.context // "employee" | "contract"
   var parentId = props.parentId
   var onCountChange = props.onCountChange
+  var mergeMode = !!(props.mergeContractDocs && context === "employee")
+  var contractIds = props.contractIds || []
 
   var [docs, setDocs] = useState([])
   var [loading, setLoading] = useState(true)
   var [showUpload, setShowUpload] = useState(false)
   var [uploading, setUploading] = useState(false)
-  var [selectedType, setSelectedType] = useState(context === "employee" ? "cni" : "fiche_paie")
+  // En mode merge, on doit savoir si l'utilisateur veut uploader un doc perso ou un doc contrat
+  var [uploadCategory, setUploadCategory] = useState(mergeMode ? "employee" : context)
+  var [selectedType, setSelectedType] = useState(
+    mergeMode ? "cni" : (context === "employee" ? "cni" : "fiche_paie")
+  )
+  var [selectedContractId, setSelectedContractId] = useState(contractIds[0] || null)
   var [customLabel, setCustomLabel] = useState("")
   var [periodMonth, setPeriodMonth] = useState("")
   var fileInputRef = useRef(null)
 
-  // === Configuration selon contexte ===
-  var TABLE = context === "employee" ? "hr_employee_documents" : "hr_contract_documents"
-  var BUCKET = context === "employee" ? "hr-employee-docs" : "hr-contract-docs"
-  var FK_FIELD = context === "employee" ? "employee_id" : "contract_id"
-  var DOC_TYPES = context === "employee" ? EMPLOYEE_DOC_TYPES : CONTRACT_DOC_TYPES
-  var getMeta = context === "employee" ? getEmployeeDocTypeMeta : getContractDocTypeMeta
+  // === Helpers d'inspection des constantes par catégorie ===
+  function getDocTypesFor(cat) {
+    return cat === "employee" ? EMPLOYEE_DOC_TYPES : CONTRACT_DOC_TYPES
+  }
+  function getMetaFor(cat, key) {
+    return cat === "employee" ? getEmployeeDocTypeMeta(key) : getContractDocTypeMeta(key)
+  }
+  function getBucketFor(cat) {
+    return cat === "employee" ? "hr-employee-docs" : "hr-contract-docs"
+  }
+  function getTableFor(cat) {
+    return cat === "employee" ? "hr_employee_documents" : "hr_contract_documents"
+  }
 
   // === Charge la liste des documents ===
   async function loadDocs() {
@@ -62,35 +79,82 @@ export default function DocumentsManager(props) {
       return
     }
     setLoading(true)
-    var query = supabase
-      .from(TABLE)
-      .select("*")
-      .eq(FK_FIELD, parentId)
-      .order("uploaded_at", { ascending: false })
-    var res = await query
-    var list = res.data || []
-    setDocs(list)
-    if (onCountChange) onCountChange(list.length)
+
+    if (mergeMode) {
+      // 1. Docs perso de l'employé
+      var resE = await supabase
+        .from("hr_employee_documents")
+        .select("*")
+        .eq("employee_id", parentId)
+        .order("uploaded_at", { ascending: false })
+      var empDocs = (resE.data || []).map(function (d) {
+        return Object.assign({}, d, { _source: "employee" })
+      })
+
+      // 2. Docs des contrats si présents
+      var contDocs = []
+      if (contractIds.length > 0) {
+        var resC = await supabase
+          .from("hr_contract_documents")
+          .select("*")
+          .in("contract_id", contractIds)
+          .order("uploaded_at", { ascending: false })
+        contDocs = (resC.data || []).map(function (d) {
+          return Object.assign({}, d, { _source: "contract" })
+        })
+      }
+
+      // Fusion + tri par date desc
+      var all = empDocs.concat(contDocs)
+      all.sort(function (a, b) {
+        return new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+      })
+      setDocs(all)
+      if (onCountChange) onCountChange(all.length)
+    } else {
+      // Mode normal : 1 seule source
+      var TABLE_ = context === "employee" ? "hr_employee_documents" : "hr_contract_documents"
+      var FK_ = context === "employee" ? "employee_id" : "contract_id"
+      var query = supabase
+        .from(TABLE_)
+        .select("*")
+        .eq(FK_, parentId)
+        .order("uploaded_at", { ascending: false })
+      var res = await query
+      var list = res.data || []
+      setDocs(list)
+      if (onCountChange) onCountChange(list.length)
+    }
     setLoading(false)
   }
 
-  useEffect(function () { loadDocs() }, [parentId])
+  useEffect(function () { loadDocs() }, [parentId, contractIds.length])
 
   // === Upload d'un fichier ===
   async function handleFileUpload(file) {
     if (!file) return
     if (!parentId) {
-      alert("Le salarié/contrat doit être enregistré avant d'ajouter des documents.")
+      alert("Le salarié doit être enregistré avant d'ajouter des documents.")
       return
     }
+    // En mode merge avec catégorie contract, il faut un contrat sélectionné
+    if (mergeMode && uploadCategory === "contract" && !selectedContractId) {
+      alert("Sélectionne d'abord un contrat pour ce document.")
+      return
+    }
+
     setUploading(true)
     try {
-      // Construit un chemin unique : {parentId}/{type}/{timestamp}-{filename}
+      var cat = mergeMode ? uploadCategory : context
+      var BUCKET = getBucketFor(cat)
+      var TABLE = getTableFor(cat)
+      var FK = cat === "employee" ? "employee_id" : "contract_id"
+      var fkValue = cat === "employee" ? parentId : selectedContractId
+
       var ext = (file.name.split(".").pop() || "bin").toLowerCase()
       var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
-      var path = parentId + "/" + selectedType + "/" + Date.now() + "-" + safeName
+      var path = fkValue + "/" + selectedType + "/" + Date.now() + "-" + safeName
 
-      // Upload dans le bucket
       var up = await supabase.storage.from(BUCKET).upload(path, file, {
         cacheControl: "3600",
         upsert: false,
@@ -98,7 +162,6 @@ export default function DocumentsManager(props) {
       })
       if (up.error) throw up.error
 
-      // Insertion en DB
       var row = {
         doc_type: selectedType,
         label: customLabel || file.name,
@@ -106,23 +169,21 @@ export default function DocumentsManager(props) {
         mime_type: file.type || null,
         size_bytes: file.size || null
       }
-      row[FK_FIELD] = parentId
-
-      // Si fiche de paie, ajouter la période
-      if (context === "contract" && selectedType === "fiche_paie" && periodMonth) {
+      row[FK] = fkValue
+      // Période pour fiches de paie
+      if (cat === "contract" && selectedType === "fiche_paie" && periodMonth) {
         row.period_month = periodMonth
       }
 
       var ins = await supabase.from(TABLE).insert([row]).select().single()
       if (ins.error) throw ins.error
 
-      // Reset form
+      // Reset
       setCustomLabel("")
       setPeriodMonth("")
       setShowUpload(false)
       if (fileInputRef.current) fileInputRef.current.value = ""
 
-      // Reload
       loadDocs()
     } catch (err) {
       alert("Erreur upload : " + (err.message || err))
@@ -130,8 +191,10 @@ export default function DocumentsManager(props) {
     setUploading(false)
   }
 
-  // === Visualiser un doc (génère un signed URL 1h) ===
+  // === Visualiser un doc ===
   async function viewDoc(doc) {
+    var cat = doc._source || context
+    var BUCKET = getBucketFor(cat)
     var res = await supabase.storage.from(BUCKET).createSignedUrl(doc.file_path, 3600)
     if (res.error) {
       alert("Erreur ouverture : " + res.error.message)
@@ -142,17 +205,17 @@ export default function DocumentsManager(props) {
     }
   }
 
-  // === Supprimer un doc (storage + DB) ===
+  // === Supprimer un doc ===
   async function deleteDoc(doc) {
     if (!confirm("Supprimer définitivement ce document ?\n\n" + (doc.label || "Document"))) return
     try {
-      // Supprime d'abord le fichier dans le bucket
+      var cat = doc._source || context
+      var BUCKET = getBucketFor(cat)
+      var TABLE = getTableFor(cat)
       var rm = await supabase.storage.from(BUCKET).remove([doc.file_path])
       if (rm.error) {
-        // On log mais on continue (le fichier peut déjà être absent)
         console.warn("Storage remove failed:", rm.error.message)
       }
-      // Puis la ligne en DB
       var del = await supabase.from(TABLE).delete().eq("id", doc.id)
       if (del.error) throw del.error
       loadDocs()
@@ -206,9 +269,11 @@ export default function DocumentsManager(props) {
     return hints[typeKey] || hints.autre
   }
 
-  // === Le selected type courant (pour savoir si needsPeriod) ===
-  var selectedMeta = getMeta(selectedType)
-  var needsPeriod = (context === "contract") && selectedMeta && selectedMeta.needsPeriod
+  // === Le selected type courant et meta ===
+  var currentDocTypes = getDocTypesFor(mergeMode ? uploadCategory : context)
+  var selectedMeta = getMetaFor(mergeMode ? uploadCategory : context, selectedType)
+  var currentCat = mergeMode ? uploadCategory : context
+  var needsPeriod = (currentCat === "contract") && selectedMeta && selectedMeta.needsPeriod
 
   // === Render ===
   return (
@@ -224,7 +289,7 @@ export default function DocumentsManager(props) {
             disabled={!parentId}
             title={parentId ? "" : "Enregistre d'abord la fiche pour pouvoir ajouter des documents"}
           >
-            + Ajouter
+            + Ajouter un document
           </button>
         )}
       </div>
@@ -232,6 +297,76 @@ export default function DocumentsManager(props) {
       {/* Form d'ajout */}
       {showUpload && (
         <div style={{ background: "#FAFAFA", border: "2px solid #FF82D7", borderRadius: 6, padding: 12, marginBottom: 10 }}>
+          {mergeMode && (
+            <div className="fg">
+              <label className="lbl">Catégorie de document</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={function () {
+                    setUploadCategory("employee")
+                    setSelectedType("cni")
+                  }}
+                  style={{
+                    flex: "1 1 0",
+                    padding: "8px 8px",
+                    background: uploadCategory === "employee" ? "#FFEB5A" : "#FFFFFF",
+                    color: "#191923",
+                    border: "2px solid #191923",
+                    borderRadius: 4,
+                    fontWeight: 700,
+                    fontSize: 11,
+                    cursor: "pointer",
+                    textTransform: "uppercase",
+                    letterSpacing: ".5px"
+                  }}
+                >
+                  👤 Doc personnel (CNI, RIB...)
+                </button>
+                <button
+                  type="button"
+                  onClick={function () {
+                    setUploadCategory("contract")
+                    setSelectedType("fiche_paie")
+                  }}
+                  disabled={contractIds.length === 0}
+                  style={{
+                    flex: "1 1 0",
+                    padding: "8px 8px",
+                    background: uploadCategory === "contract" ? "#FFEB5A" : "#FFFFFF",
+                    color: contractIds.length === 0 ? "#999" : "#191923",
+                    border: "2px solid " + (contractIds.length === 0 ? "#999" : "#191923"),
+                    borderRadius: 4,
+                    fontWeight: 700,
+                    fontSize: 11,
+                    cursor: contractIds.length === 0 ? "not-allowed" : "pointer",
+                    textTransform: "uppercase",
+                    letterSpacing: ".5px"
+                  }}
+                  title={contractIds.length === 0 ? "Crée d'abord un contrat" : ""}
+                >
+                  📄 Doc contractuel (fiche paie...)
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Sélecteur de contrat si on uploade un doc contractuel et qu'il y en a plusieurs */}
+          {mergeMode && uploadCategory === "contract" && contractIds.length > 1 && (
+            <div className="fg">
+              <label className="lbl">Lié à quel contrat ?</label>
+              <select
+                className="inp"
+                value={selectedContractId || ""}
+                onChange={function (e) { setSelectedContractId(e.target.value) }}
+              >
+                {contractIds.map(function (cid, idx) {
+                  return <option key={cid} value={cid}>Contrat #{idx + 1}</option>
+                })}
+              </select>
+            </div>
+          )}
+
           <div className="fg2">
             <div className="fg">
               <label className="lbl">Type de document</label>
@@ -240,7 +375,7 @@ export default function DocumentsManager(props) {
                 value={selectedType}
                 onChange={function (e) { setSelectedType(e.target.value) }}
               >
-                {DOC_TYPES.map(function (t) {
+                {currentDocTypes.map(function (t) {
                   return <option key={t.key} value={t.key}>{t.icon} {t.label}</option>
                 })}
               </select>
@@ -319,7 +454,8 @@ export default function DocumentsManager(props) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {docs.map(function (doc) {
-            var meta = getMeta(doc.doc_type)
+            var docCat = doc._source || context
+            var meta = getMetaFor(docCat, doc.doc_type)
             return (
               <div
                 key={doc.id}
@@ -334,15 +470,23 @@ export default function DocumentsManager(props) {
                   borderRadius: 4
                 }}
               >
-                <div style={{ fontSize: 22 }}>{meta.icon}</div>
-                <div>
+                <div
+                  style={{ fontSize: 22, cursor: "pointer" }}
+                  onClick={function () { viewDoc(doc) }}
+                  title="Cliquer pour ouvrir"
+                >{meta.icon}</div>
+                <div
+                  style={{ cursor: "pointer" }}
+                  onClick={function () { viewDoc(doc) }}
+                  title="Cliquer pour ouvrir"
+                >
                   <div style={{ fontWeight: 700, fontSize: 12 }}>
                     {doc.label || meta.label}
                   </div>
                   <div style={{ fontSize: 10, opacity: 0.6 }}>
                     {meta.label}
-                    {doc.period_month && (" · " + formatPeriodMonth(doc.period_month))}
-                    {doc.size_bytes && (" · " + formatFileSize(doc.size_bytes))}
+                    {doc.period_month ? (" · " + formatPeriodMonth(doc.period_month)) : ""}
+                    {doc.size_bytes ? (" · " + formatFileSize(doc.size_bytes)) : ""}
                     {" · " + new Date(doc.uploaded_at).toLocaleDateString("fr-FR")}
                   </div>
                 </div>
