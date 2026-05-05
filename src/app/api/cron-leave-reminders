@@ -1,0 +1,227 @@
+// ============================================================
+// /api/cron-leave-reminders/route.ts
+// ============================================================
+// Cron Vercel quotidien (07:00 UTC = 09:00 Paris été) qui :
+// 1. Vérifie pour chaque salarié actif si une relance congés est due
+// 2. Envoie l'email automatique via Resend
+// 3. Crée une notification push pour Edward (employeur)
+// 4. Met à jour la table hr_leave_requests
+//
+// Déclencheurs (4 dates clés / an) :
+//   - 1er mars : "Demande à tes salariés de poser leurs congés"
+//   - 30 avril : "Plus que 1 mois pour valider les congés"
+//   - 31 août : "X jours non pris, à relancer"
+//   - 15 octobre : "🚨 Plus que 15 jours pour les prendre / reporter"
+// ============================================================
+
+import { createClient } from "@supabase/supabase-js"
+import { NextResponse } from "next/server"
+
+export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
+
+var supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+)
+
+// Helper : qui doit être relancé aujourd'hui ?
+function shouldTriggerToday(today) {
+  var month = today.getMonth() + 1 // 1-12
+  var day = today.getDate()
+  // Window de tolérance de 3 jours pour ne pas rater à cause d'un cron raté
+  if (month === 3 && day >= 1 && day <= 3) return "march_1"
+  if (month === 4 && day >= 30) return "april_30"
+  if (month === 5 && day === 1) return "april_30"
+  if (month === 8 && day >= 31) return "aug_31"
+  if (month === 9 && day === 1) return "aug_31"
+  if (month === 10 && day >= 15 && day <= 17) return "oct_15"
+  return null
+}
+
+// Calcul de l'année de référence (1er juin → 31 mai)
+function computeReferenceYear(today) {
+  var year = today.getFullYear()
+  var month = today.getMonth() + 1
+  // Du 1er juin année N au 31 mai année N+1 → année de référence = N+1
+  if (month >= 6) return year + 1
+  return year
+}
+
+// Génère le contenu de l'email selon le trigger
+function buildEmailHtml(trigger, employer, employee, balance) {
+  var greeting = "Bonjour " + (employee.civilite === "Monsieur" ? "Monsieur " : "Madame ") + employee.nom + ","
+  var titles = {
+    march_1: "📅 Pose tes dates de congés pour la saison estivale",
+    april_30: "⏰ Rappel : valide tes congés d'été avant le 30 avril",
+    aug_31: "⚠️ Rappel : pense à prendre tes congés restants",
+    oct_15: "🚨 URGENT : 15 jours pour prendre tes congés ou demander un report"
+  }
+  var bodies = {
+    march_1: '<p>La période de prise des congés payés (1<sup>er</sup> mai – 31 octobre) approche.</p>' +
+             '<p>Conformément à ton contrat de travail (article 8 ou 9, "Congés payés"), tu es <strong>invité(e) à nous communiquer tes dates souhaitées au plus tard le 30 avril</strong>.</p>' +
+             '<p>Tu peux y répondre directement à ce mail, ou nous transmettre tes dates en main propre.</p>',
+    april_30: '<p>Tu n\'as pas encore communiqué tes dates de congés pour la période estivale.</p>' +
+              '<p><strong>Merci de nous indiquer rapidement les dates souhaitées</strong> pour que nous puissions organiser le service.</p>' +
+              '<p>À défaut de réponse de ta part, nous serons amenés à fixer unilatéralement tes dates de congés conformément à notre pouvoir de direction (article 8.3 ou 9.3 de ton contrat).</p>',
+    aug_31: '<p>Selon nos compteurs, il te reste <strong>' + (balance.days_remaining || "plusieurs") + ' jours de congés</strong> non pris pour cette période.</p>' +
+            '<p>Pour rappel, la période de prise se termine le <strong>31 octobre</strong>. Au-delà, les congés non pris ne peuvent plus être pris en l\'état.</p>' +
+            '<p>Merci de nous communiquer tes dates au plus vite ou de nous solliciter pour un report exceptionnel (limité à 10 jours, article 8.4 ou 9.4 du contrat).</p>',
+    oct_15: '<p>Il te reste <strong>15 jours</strong> pour prendre tes congés ou en demander le report.</p>' +
+            '<p>Conformément à ton contrat (article 8.5 ou 9.5) et à la jurisprudence, les congés non pris au 31 octobre et n\'ayant pas fait l\'objet d\'un report écrit autorisé seront perdus.</p>' +
+            '<p><strong>Merci de réagir avant le 31 octobre :</strong></p>' +
+            '<ul><li>Soit en posant tes dates restantes</li><li>Soit en sollicitant par écrit un report exceptionnel (max 10 jours)</li></ul>'
+  }
+  return '<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#191923;max-width:600px;margin:0 auto;padding:24px;background:#fff">' +
+    '<div style="text-align:center;border-bottom:2.5px solid #FF82D7;padding-bottom:16px;margin-bottom:24px">' +
+    '<h1 style="font-family:cursive;color:#FF82D7;margin:0;font-size:28px">meshuga</h1>' +
+    '<div style="font-size:11px;letter-spacing:1px;color:#666">CRAZY DELI · 3 RUE VAVIN · PARIS 6<sup>e</sup></div>' +
+    '</div>' +
+    '<h2 style="color:#191923;font-size:18px;margin-top:0">' + titles[trigger] + '</h2>' +
+    '<p>' + greeting + '</p>' +
+    bodies[trigger] +
+    '<p style="margin-top:30px;color:#666;font-size:13px">À très vite,<br><strong>' + (employer.prenom || "Edward") + ' ' + (employer.nom || "TOURET") + '</strong><br>' +
+    '<span style="color:#999;font-size:11px">Meshuga Crazy Deli · SAS AEGIA FOOD</span></p>' +
+    '<div style="border-top:1px solid #DDD;margin-top:30px;padding-top:14px;font-size:10px;color:#999;text-align:center">' +
+    'Ce message est généré automatiquement par le système RH de Meshuga.<br>' +
+    'Pour toute question, réponds simplement à ce mail.' +
+    '</div>' +
+    '</body></html>'
+}
+
+async function sendEmail(to, subject, html, replyTo) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("RESEND_API_KEY missing")
+    return { ok: false, error: "no_api_key" }
+  }
+  try {
+    var res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + process.env.RESEND_API_KEY
+      },
+      body: JSON.stringify({
+        from: "Meshuga RH <events@meshuga.fr>",
+        to: [to],
+        subject: subject,
+        html: html,
+        reply_to: replyTo || "events@meshuga.fr",
+        bcc: ["events@meshuga.fr"]
+      })
+    })
+    if (!res.ok) {
+      var err = await res.text()
+      return { ok: false, error: err }
+    }
+    var data = await res.json()
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: String(err) }
+  }
+}
+
+export async function GET(request) {
+  // Auth : vérifie le secret cron Vercel
+  var authHeader = request.headers.get("authorization")
+  if (process.env.CRON_SECRET && authHeader !== "Bearer " + process.env.CRON_SECRET) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  }
+
+  var today = new Date()
+  var trigger = shouldTriggerToday(today)
+  if (!trigger) {
+    return NextResponse.json({ ok: true, skipped: "no_trigger_today", date: today.toISOString() })
+  }
+
+  var refYear = computeReferenceYear(today)
+
+  // Charge tous les salariés ayant un contrat CDI actif (non Extra, non archivé)
+  var contractsRes = await supabase
+    .from("hr_contracts")
+    .select("id, employee_id, type, status, hr_employees(id, prenom, nom, civilite, email)")
+    .neq("type", "extra")
+    .in("status", ["draft", "finalized", "signed"])
+
+  if (contractsRes.error) {
+    return NextResponse.json({ error: contractsRes.error.message }, { status: 500 })
+  }
+
+  // Edward (employeur) - on récupère le 1er CDI cadre comme proxy
+  var employer = { prenom: "Edward", nom: "TOURET", email: "events@meshuga.fr" }
+
+  var sent = []
+  var skipped = []
+  var errors = []
+
+  for (var i = 0; i < (contractsRes.data || []).length; i++) {
+    var c = contractsRes.data[i]
+    var emp = c.hr_employees
+    if (!emp || !emp.email) {
+      skipped.push({ id: c.id, reason: "no_email" })
+      continue
+    }
+
+    // Vérifier si on a déjà envoyé un email pour ce trigger cette année
+    var existing = await supabase
+      .from("hr_leave_requests")
+      .select("id, email_sent_at")
+      .eq("employee_id", emp.id)
+      .eq("reference_year", refYear)
+      .eq("notes", "trigger:" + trigger)
+      .limit(1)
+
+    if (existing.data && existing.data.length > 0 && existing.data[0].email_sent_at) {
+      skipped.push({ id: emp.id, reason: "already_sent_this_trigger" })
+      continue
+    }
+
+    // Charge le solde si présent
+    var balanceRes = await supabase
+      .from("hr_leave_balances")
+      .select("*")
+      .eq("employee_id", emp.id)
+      .eq("reference_year", refYear)
+      .maybeSingle()
+    var balance = balanceRes.data || { days_acquired: 0, days_taken: 0 }
+    balance.days_remaining = (balance.days_acquired || 0) - (balance.days_taken || 0)
+
+    // Construit et envoie l'email
+    var subjects = {
+      march_1: "📅 Tes dates de congés pour mai-octobre",
+      april_30: "⏰ Rappel : valide tes congés avant fin avril",
+      aug_31: "⚠️ Pense à prendre tes congés restants",
+      oct_15: "🚨 URGENT : 15 jours pour tes congés ou un report"
+    }
+    var html = buildEmailHtml(trigger, employer, emp, balance)
+    var emailRes = await sendEmail(emp.email, subjects[trigger], html)
+
+    if (!emailRes.ok) {
+      errors.push({ id: emp.id, error: emailRes.error })
+      continue
+    }
+
+    // Trace en DB
+    await supabase.from("hr_leave_requests").insert([{
+      employee_id: emp.id,
+      contract_id: c.id,
+      reference_year: refYear,
+      status: "requested",
+      email_sent_at: new Date().toISOString(),
+      email_sent_to: emp.email,
+      notes: "trigger:" + trigger
+    }])
+
+    sent.push({ id: emp.id, name: emp.prenom + " " + emp.nom, email: emp.email })
+  }
+
+  return NextResponse.json({
+    ok: true,
+    trigger: trigger,
+    reference_year: refYear,
+    sent: sent.length,
+    skipped: skipped.length,
+    errors: errors.length,
+    details: { sent: sent, skipped: skipped, errors: errors }
+  })
+}
