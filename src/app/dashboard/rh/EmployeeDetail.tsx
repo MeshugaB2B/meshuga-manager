@@ -21,7 +21,8 @@ import DocumentsManager from "./DocumentsManager"
 import {
   NATIONALITES,
   CONTRACT_TYPES,
-  getContractTypeMeta
+  getContractTypeMeta,
+  capitalize
 } from "./rhConstants"
 
 var supabase = createClient(
@@ -36,7 +37,7 @@ export default function EmployeeDetail(props) {
   var [loadingContracts, setLoadingContracts] = useState(true)
   var [saving, setSaving] = useState(false)
   var [editing, setEditing] = useState(false)
-  var [tab, setTab] = useState("infos") // "infos" | "documents" | "contrats"
+  var [tab, setTab] = useState(props.defaultTab || "infos") // "infos" | "documents" | "contrats"
 
   // === Charge les contrats du salarié ===
   async function loadContracts() {
@@ -68,7 +69,8 @@ export default function EmployeeDetail(props) {
       ville: emp.ville || null,
       num_secu: emp.num_secu || null,
       email: emp.email || null,
-      telephone: emp.telephone || null
+      telephone: emp.telephone || null,
+      notes: emp.notes || null
     }
     var res = await supabase.from("hr_employees").update(update).eq("id", emp.id)
     if (res.error) {
@@ -78,6 +80,53 @@ export default function EmployeeDetail(props) {
       if (props.onSaved) props.onSaved("Salarié mis à jour ✓")
     }
     setSaving(false)
+  }
+
+  // === Suppression du salarié (cascade : contrats + docs) ===
+  async function deleteEmployee() {
+    if (!confirm(
+      "⚠️ SUPPRESSION IRRÉVERSIBLE\n\n" +
+      "Tu vas supprimer " + emp.prenom + " " + (emp.nom || "").toUpperCase() + " et tout son contenu :\n" +
+      "  • Sa fiche personnelle\n" +
+      "  • Ses " + contracts.length + " contrat(s)\n" +
+      "  • Toutes les vacations associées\n" +
+      "  • Tous ses documents persistants (CNI, RIB, etc.)\n" +
+      "  • Tous les documents de ses contrats (fiches de paie, etc.)\n\n" +
+      "Cette action ne peut pas être annulée. Continuer ?"
+    )) return
+
+    setSaving(true)
+    try {
+      // 1. Récupérer tous les paths storage à supprimer
+      var empDocs = await supabase.from("hr_employee_documents")
+        .select("file_path").eq("employee_id", emp.id)
+      var contractIds = contracts.map(function (c) { return c.id })
+      var contDocs = { data: [] }
+      if (contractIds.length > 0) {
+        contDocs = await supabase.from("hr_contract_documents")
+          .select("file_path").in("contract_id", contractIds)
+      }
+
+      // 2. Supprimer les fichiers storage (ignore erreurs)
+      var empPaths = (empDocs.data || []).map(function (d) { return d.file_path })
+      var contPaths = (contDocs.data || []).map(function (d) { return d.file_path })
+      if (empPaths.length > 0) {
+        await supabase.storage.from("hr-employee-docs").remove(empPaths)
+      }
+      if (contPaths.length > 0) {
+        await supabase.storage.from("hr-contract-docs").remove(contPaths)
+      }
+
+      // 3. Supprimer le salarié (cascade FK supprime contrats, vacations, docs en DB)
+      var del = await supabase.from("hr_employees").delete().eq("id", emp.id)
+      if (del.error) throw del.error
+
+      if (props.onDeleted) props.onDeleted(emp.prenom + " " + (emp.nom || "") + " supprimé(e)")
+      props.onClose()
+    } catch (err) {
+      alert("Erreur suppression : " + (err.message || err))
+      setSaving(false)
+    }
   }
 
   // === Format date FR ===
@@ -139,15 +188,31 @@ export default function EmployeeDetail(props) {
                 <div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}>
                     <div><b>Civilité :</b> {emp.civilite || "—"}</div>
-                    <div><b>Nationalité :</b> {emp.nationalite || "—"}</div>
+                    <div><b>Nationalité :</b> {emp.nationalite ? capitalize(emp.nationalite) : "—"}</div>
                     <div><b>Né(e) le :</b> {fmtDate(emp.date_naissance)}</div>
                     <div><b>Lieu de naissance :</b> {emp.lieu_naissance || "—"}</div>
-                    <div style={{ gridColumn: "1 / span 2" }}><b>Adresse :</b> {emp.adresse || "—"} {emp.code_postal || ""} {emp.ville || ""}</div>
+                    <div style={{ gridColumn: "1 / span 2" }}>
+                      <b>Adresse :</b> {emp.adresse || "—"}
+                      {(emp.code_postal || emp.ville) && (<span> · {emp.code_postal || ""} {emp.ville || ""}</span>)}
+                    </div>
                     <div><b>N° Sécu sociale :</b> {emp.num_secu || "—"}</div>
-                    <div><b>Email :</b> {emp.email || "—"}</div>
-                    <div><b>Téléphone :</b> {emp.telephone || "—"}</div>
+                    <div></div>
+                    <div><b>Email :</b> {emp.email ? <a href={"mailto:" + emp.email} style={{ color: "#FF82D7" }}>{emp.email}</a> : "—"}</div>
+                    <div><b>Téléphone :</b> {emp.telephone ? <a href={"tel:" + emp.telephone} style={{ color: "#FF82D7" }}>{emp.telephone}</a> : "—"}</div>
                   </div>
-                  <div style={{ marginTop: 16, textAlign: "right" }}>
+                  {emp.notes && (
+                    <div style={{ marginTop: 16, padding: 10, background: "#FFF8E1", borderLeft: "3px solid #FF82D7", borderRadius: 4 }}>
+                      <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>📝 Notes :</div>
+                      <div style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>{emp.notes}</div>
+                    </div>
+                  )}
+                  <div style={{ marginTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <button
+                      className="btn btn-sm btn-red"
+                      onClick={deleteEmployee}
+                      disabled={saving}
+                      title="Supprimer définitivement ce salarié"
+                    >🗑 Supprimer le salarié</button>
                     <button className="btn btn-p" onClick={function () { setEditing(true) }}>
                       ✏️ Modifier
                     </button>
@@ -172,11 +237,16 @@ export default function EmployeeDetail(props) {
                       <label className="lbl">Nationalité</label>
                       <input
                         className="inp" list="nat-list-detail"
-                        value={emp.nationalite || ""}
-                        onChange={function (e) { setEmp(Object.assign({}, emp, { nationalite: e.target.value })) }}
+                        value={emp.nationalite ? capitalize(emp.nationalite) : ""}
+                        onChange={function (e) {
+                          // On stocke en lowercase (cohérence avec la liste + le contrat),
+                          // mais on affiche toujours capitalisé
+                          setEmp(Object.assign({}, emp, { nationalite: (e.target.value || "").toLowerCase() }))
+                        }}
+                        placeholder="Tape les premières lettres..."
                       />
                       <datalist id="nat-list-detail">
-                        {NATIONALITES.map(function (n) { return <option key={n} value={n} /> })}
+                        {NATIONALITES.map(function (n) { return <option key={n} value={capitalize(n)} /> })}
                       </datalist>
                     </div>
                   </div>
@@ -237,6 +307,16 @@ export default function EmployeeDetail(props) {
                       <input className="inp" value={emp.telephone || ""}
                         onChange={function (e) { setEmp(Object.assign({}, emp, { telephone: e.target.value })) }} />
                     </div>
+                  </div>
+                  <div className="fg">
+                    <label className="lbl">Notes internes (visibles ici uniquement)</label>
+                    <textarea
+                      className="inp"
+                      rows={3}
+                      value={emp.notes || ""}
+                      onChange={function (e) { setEmp(Object.assign({}, emp, { notes: e.target.value })) }}
+                      placeholder="Ex: Recommandé(e) par X. Disponible le week-end. Permis B."
+                    />
                   </div>
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
                     <button className="btn" onClick={function () { setEmp(initialEmp); setEditing(false) }} disabled={saving}>
