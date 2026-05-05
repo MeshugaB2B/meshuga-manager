@@ -1,0 +1,134 @@
+// ============================================================
+// /api/leave-request/route.ts
+// ============================================================
+// POST endpoint déclenché manuellement depuis la fiche salarié
+// (bouton "Demander les congés" dans EmployeeDetail).
+//
+// Body : { employee_id: UUID, contract_id: UUID, message?: string }
+// Envoie un email + trace en DB.
+// ============================================================
+
+import { createClient } from "@supabase/supabase-js"
+import { NextResponse } from "next/server"
+
+export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
+
+var supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+)
+
+function computeReferenceYear(today) {
+  var year = today.getFullYear()
+  var month = today.getMonth() + 1
+  if (month >= 6) return year + 1
+  return year
+}
+
+function buildHtml(employer, employee, customMessage) {
+  var greeting = "Bonjour " + (employee.civilite === "Monsieur" ? "Monsieur " : "Madame ") + employee.nom + ","
+  return '<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#191923;max-width:600px;margin:0 auto;padding:24px;background:#fff">' +
+    '<div style="text-align:center;border-bottom:2.5px solid #FF82D7;padding-bottom:16px;margin-bottom:24px">' +
+    '<h1 style="font-family:cursive;color:#FF82D7;margin:0;font-size:28px">meshuga</h1>' +
+    '<div style="font-size:11px;letter-spacing:1px;color:#666">CRAZY DELI · 3 RUE VAVIN · PARIS 6<sup>e</sup></div>' +
+    '</div>' +
+    '<h2 style="color:#191923;font-size:18px;margin-top:0">📅 Demande de planification de tes congés payés</h2>' +
+    '<p>' + greeting + '</p>' +
+    (customMessage
+      ? '<p style="background:#FFF8E1;border-left:3px solid #FF82D7;padding:12px 14px;margin:16px 0">' + String(customMessage).replace(/</g, "&lt;").replace(/\n/g, "<br>") + '</p>'
+      : '') +
+    '<p>Conformément à ton contrat de travail (article "Congés payés"), nous te demandons de bien vouloir nous communiquer tes dates de congés souhaitées pour la période de prise en cours.</p>' +
+    '<p><strong>Pour rappel :</strong></p>' +
+    '<ul>' +
+    '<li>Période principale de prise : <strong>1<sup>er</sup> mai – 31 octobre</strong></li>' +
+    '<li>Tu acquiers <strong>2,5 jours ouvrables</strong> par mois travaillé (max 30 jours / 5 semaines par an)</li>' +
+    '<li>Demande à formuler <strong>au moins 2 mois avant</strong> la date de départ souhaitée</li>' +
+    '</ul>' +
+    '<p>Merci de répondre directement à ce mail en précisant les dates que tu souhaites poser.</p>' +
+    '<p style="margin-top:30px;color:#666;font-size:13px">À très vite,<br><strong>' + (employer.prenom || "Edward") + ' ' + (employer.nom || "TOURET") + '</strong><br>' +
+    '<span style="color:#999;font-size:11px">Meshuga Crazy Deli · SAS AEGIA FOOD</span></p>' +
+    '<div style="border-top:1px solid #DDD;margin-top:30px;padding-top:14px;font-size:10px;color:#999;text-align:center">' +
+    'Ce message tient lieu de demande formelle. Conformément à la jurisprudence, l\'Employeur doit mettre le/la Salarié(e) en mesure de prendre ses congés.' +
+    '</div>' +
+    '</body></html>'
+}
+
+export async function POST(request) {
+  try {
+    var body = await request.json()
+    var employee_id = body.employee_id
+    var contract_id = body.contract_id || null
+    var customMessage = body.message || null
+
+    if (!employee_id) {
+      return NextResponse.json({ error: "employee_id required" }, { status: 400 })
+    }
+
+    // Charge le salarié
+    var empRes = await supabase
+      .from("hr_employees")
+      .select("*")
+      .eq("id", employee_id)
+      .single()
+
+    if (empRes.error || !empRes.data) {
+      return NextResponse.json({ error: "employee not found" }, { status: 404 })
+    }
+
+    var emp = empRes.data
+    if (!emp.email) {
+      return NextResponse.json({ error: "employee has no email" }, { status: 400 })
+    }
+
+    var employer = { prenom: "Edward", nom: "TOURET" }
+    var refYear = computeReferenceYear(new Date())
+    var html = buildHtml(employer, emp, customMessage)
+
+    // Envoi email via Resend
+    if (!process.env.RESEND_API_KEY) {
+      return NextResponse.json({ error: "RESEND_API_KEY not configured" }, { status: 500 })
+    }
+
+    var sendRes = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + process.env.RESEND_API_KEY
+      },
+      body: JSON.stringify({
+        from: "Meshuga RH <events@meshuga.fr>",
+        to: [emp.email],
+        subject: "📅 Demande de planification de tes congés payés",
+        html: html,
+        reply_to: "events@meshuga.fr",
+        bcc: ["events@meshuga.fr"]
+      })
+    })
+
+    if (!sendRes.ok) {
+      var errText = await sendRes.text()
+      return NextResponse.json({ error: "email send failed: " + errText }, { status: 500 })
+    }
+
+    // Trace en DB
+    var ins = await supabase.from("hr_leave_requests").insert([{
+      employee_id: employee_id,
+      contract_id: contract_id,
+      reference_year: refYear,
+      status: "requested",
+      email_sent_at: new Date().toISOString(),
+      email_sent_to: emp.email,
+      notes: "manual:" + (customMessage ? "with_message" : "no_message")
+    }])
+
+    return NextResponse.json({
+      ok: true,
+      sent_to: emp.email,
+      reference_year: refYear,
+      db_traced: !ins.error
+    })
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
+}
