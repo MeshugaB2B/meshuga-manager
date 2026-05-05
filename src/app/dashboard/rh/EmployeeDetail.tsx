@@ -160,8 +160,8 @@ export default function EmployeeDetail(props) {
                   style={{
                     flex: "1 1 0",
                     padding: "8px 4px",
-                    background: tab === t.key ? "#191923" : "#FFFFFF",
-                    color: tab === t.key ? "#FFEB5A" : "#191923",
+                    background: tab === t.key ? "#FFEB5A" : "#FFFFFF",
+                    color: "#191923",
                     border: "2px solid #191923",
                     borderRadius: 4,
                     fontWeight: 700,
@@ -372,8 +372,8 @@ export default function EmployeeDetail(props) {
                         }}
                       >
                         <span style={{
-                          background: meta.color === "#191923" ? "#191923" : meta.color,
-                          color: meta.color === "#191923" ? "#FFEB5A" : "#191923",
+                          background: meta.color,
+                          color: "#191923",
                           padding: "4px 8px",
                           borderRadius: 4,
                           fontSize: 10,
