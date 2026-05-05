@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react"
 import { createClient } from "@supabase/supabase-js"
 import { LOGO_PINK } from "./logos"
 import RhWizard from "./rh/RhWizard"
+import EmployeeDetail from "./rh/EmployeeDetail"
 import { buildContract } from "./rh/contractBuilders"
 import { getContractTypeMeta, CONTRACT_TYPES } from "./rh/rhConstants"
 
@@ -58,10 +59,13 @@ function fmtDur(mins) {
 export default function RhTab() {
   var [contracts, setContracts] = useState([])
   var [employees, setEmployees] = useState([])
+  var [docCounts, setDocCounts] = useState({}) // { employeeId: count }
   var [loading, setLoading] = useState(true)
   var [showWizard, setShowWizard] = useState(false)
   var [editingContract, setEditingContract] = useState(null)
   var [previewContract, setPreviewContract] = useState(null)
+  var [viewingEmployee, setViewingEmployee] = useState(null)
+  var [activeView, setActiveView] = useState("contracts") // "contracts" | "employees"
   var [filter, setFilter] = useState("all")
   var [typeFilter, setTypeFilter] = useState("all")
   var [toast, setToast] = useState("")
@@ -81,6 +85,17 @@ export default function RhTab() {
       .from("hr_employees")
       .select("*")
       .order("nom", { ascending: true })
+    // Fetch doc counts for each employee
+    var resDocs = await supabase
+      .from("hr_employee_documents")
+      .select("employee_id")
+    var counts = {}
+    if (resDocs.data) {
+      resDocs.data.forEach(function (d) {
+        counts[d.employee_id] = (counts[d.employee_id] || 0) + 1
+      })
+    }
+    setDocCounts(counts)
     setContracts(resC.data || [])
     setEmployees(resE.data || [])
     setLoading(false)
@@ -169,7 +184,48 @@ export default function RhTab() {
       </div>
       <div className="strip"></div>
 
-      {/* === FILTRES === */}
+      {/* === BARRE D'ONGLETS VUE === */}
+      <div className="card" style={{ display: "flex", gap: 6, padding: 8 }}>
+        <button
+          onClick={function () { setActiveView("contracts") }}
+          style={{
+            flex: "1 1 0",
+            padding: "10px 8px",
+            background: activeView === "contracts" ? "#191923" : "#FFFFFF",
+            color: activeView === "contracts" ? "#FFEB5A" : "#191923",
+            border: "2px solid #191923",
+            borderRadius: 4,
+            fontWeight: 700,
+            fontSize: 12,
+            cursor: "pointer",
+            textTransform: "uppercase",
+            letterSpacing: ".5px"
+          }}
+        >
+          📄 Contrats ({contracts.length})
+        </button>
+        <button
+          onClick={function () { setActiveView("employees") }}
+          style={{
+            flex: "1 1 0",
+            padding: "10px 8px",
+            background: activeView === "employees" ? "#191923" : "#FFFFFF",
+            color: activeView === "employees" ? "#FFEB5A" : "#191923",
+            border: "2px solid #191923",
+            borderRadius: 4,
+            fontWeight: 700,
+            fontSize: 12,
+            cursor: "pointer",
+            textTransform: "uppercase",
+            letterSpacing: ".5px"
+          }}
+        >
+          👥 Salariés ({employees.length})
+        </button>
+      </div>
+
+      {/* === FILTRES (vue Contrats uniquement) === */}
+      {activeView === "contracts" && (
       <div className="card">
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           <span style={{ fontSize: 11, fontWeight: 900, textTransform: "uppercase", marginRight: 6 }}>Type :</span>
@@ -204,8 +260,63 @@ export default function RhTab() {
           })}
         </div>
       </div>
+      )}
 
-      {/* === LISTE === */}
+      {/* === VUE SALARIÉS === */}
+      {activeView === "employees" && (
+      <div className="card">
+        <div className="ct">Salariés</div>
+        {loading ? (
+          <div style={{ padding: 20, textAlign: "center", opacity: 0.5 }}>Chargement…</div>
+        ) : employees.length === 0 ? (
+          <div style={{ padding: 30, textAlign: "center", opacity: 0.5 }}>
+            <div style={{ fontFamily: "Yellowtail, cursive", fontSize: 24, marginBottom: 4 }}>Aucun salarié</div>
+            <div style={{ fontSize: 11 }}>Crée d'abord un contrat pour ajouter un salarié.</div>
+          </div>
+        ) : (
+          <div>
+            {employees.map(function (e) {
+              var nbContracts = contracts.filter(function (c) { return c.employee_id === e.id }).length
+              var nbDocs = docCounts[e.id] || 0
+              return (
+                <div
+                  key={e.id}
+                  className="row"
+                  onClick={function () { setViewingEmployee(e) }}
+                  style={{
+                    gridTemplateColumns: "auto 2fr 1fr 1fr 1fr",
+                    gap: 10,
+                    cursor: "pointer"
+                  }}
+                >
+                  <div style={{ fontSize: 22 }}>👤</div>
+                  <div>
+                    <div style={{ fontWeight: 900, fontSize: 13 }}>
+                      {e.prenom || "—"} {(e.nom || "").toUpperCase()}
+                    </div>
+                    <div style={{ fontSize: 10, opacity: 0.6 }}>
+                      {e.email || e.telephone || "—"}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11 }}>
+                    <b>{nbContracts}</b> contrat{nbContracts > 1 ? "s" : ""}
+                  </div>
+                  <div style={{ fontSize: 11 }}>
+                    📁 <b>{nbDocs}</b> document{nbDocs > 1 ? "s" : ""}
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <button className="btn btn-sm btn-y">Voir →</button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+      )}
+
+      {/* === LISTE DES CONTRATS (vue Contrats uniquement) === */}
+      {activeView === "contracts" && (
       <div className="card">
         <div className="ct">Contrats</div>
         {loading ? (
@@ -286,6 +397,11 @@ export default function RhTab() {
                   </div>
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                     <button
+                      className="btn btn-sm"
+                      onClick={function () { if (emp && emp.id) setViewingEmployee(emp) }}
+                      title="Voir la fiche du salarié"
+                    >👤 Salarié</button>
+                    <button
                       className="btn btn-sm btn-y"
                       onClick={function () { setPreviewContract(c) }}
                     >Voir / Imprimer</button>
@@ -315,6 +431,7 @@ export default function RhTab() {
           </div>
         )}
       </div>
+      )}
 
       {/* === WIZARD === */}
       {showWizard && (
@@ -336,6 +453,19 @@ export default function RhTab() {
         <ContractPreview
           contract={previewContract}
           onClose={function () { setPreviewContract(null) }}
+        />
+      )}
+
+      {/* === EMPLOYEE DETAIL === */}
+      {viewingEmployee && (
+        <EmployeeDetail
+          employee={viewingEmployee}
+          onClose={function () { setViewingEmployee(null); loadAll() }}
+          onSaved={function (msg) { showToast(msg); loadAll() }}
+          onContractClick={function (c) {
+            setViewingEmployee(null)
+            setPreviewContract(c)
+          }}
         />
       )}
 
