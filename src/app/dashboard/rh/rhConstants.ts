@@ -449,3 +449,61 @@ export function getContractTypeMeta(typeKey) {
   }
   return CONTRACT_TYPES[0]
 }
+
+// ============================================================
+// TYPES DE DOCUMENTS RH (employé + contrat)
+// ============================================================
+// Documents persistants liés au salarié (suivent la personne, pas le contrat)
+export var EMPLOYEE_DOC_TYPES = [
+  { key: "cni",            label: "Pièce d'identité (CNI)",       icon: "📇" },
+  { key: "passeport",      label: "Passeport",                    icon: "📘" },
+  { key: "titre_sejour",   label: "Titre de séjour",              icon: "🌍" },
+  { key: "secu",           label: "Attestation Sécurité sociale", icon: "🏥" },
+  { key: "rib",            label: "RIB",                          icon: "🏦" },
+  { key: "diplome",        label: "Diplôme",                      icon: "📜" },
+  { key: "justif_domicile",label: "Justificatif de domicile",     icon: "🏠" },
+  { key: "autre",          label: "Autre document",               icon: "📁" }
+]
+
+// Documents liés à un contrat (mensuels/ponctuels)
+export var CONTRACT_DOC_TYPES = [
+  { key: "fiche_paie",            label: "Fiche de paie",         icon: "💰", needsPeriod: true },
+  { key: "attestation_employeur", label: "Attestation employeur", icon: "📋", needsPeriod: false },
+  { key: "demande_conges",        label: "Demande de congés",     icon: "🏖️", needsPeriod: false },
+  { key: "arret_maladie",         label: "Arrêt maladie",         icon: "🤒", needsPeriod: false },
+  { key: "autre",                 label: "Autre document",        icon: "📁", needsPeriod: false }
+]
+
+export function getEmployeeDocTypeMeta(typeKey) {
+  for (var i = 0; i < EMPLOYEE_DOC_TYPES.length; i++) {
+    if (EMPLOYEE_DOC_TYPES[i].key === typeKey) return EMPLOYEE_DOC_TYPES[i]
+  }
+  return { key: "autre", label: "Document", icon: "📁" }
+}
+
+export function getContractDocTypeMeta(typeKey) {
+  for (var i = 0; i < CONTRACT_DOC_TYPES.length; i++) {
+    if (CONTRACT_DOC_TYPES[i].key === typeKey) return CONTRACT_DOC_TYPES[i]
+  }
+  return { key: "autre", label: "Document", icon: "📁", needsPeriod: false }
+}
+
+// Helper : formater un poids de fichier en KB / MB lisibles
+export function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return "—"
+  if (bytes < 1024) return bytes + " B"
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB"
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB"
+}
+
+// Helper : formater 'YYYY-MM' en 'avril 2026'
+export function formatPeriodMonth(periodMonth) {
+  if (!periodMonth) return ""
+  var parts = periodMonth.split("-")
+  if (parts.length !== 2) return periodMonth
+  var year = parts[0]
+  var monthIdx = parseInt(parts[1], 10) - 1
+  var months = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"]
+  if (monthIdx < 0 || monthIdx > 11) return periodMonth
+  return months[monthIdx] + " " + year
+}
