@@ -41,6 +41,7 @@ import {
   MISSIONS_CAISSIER
 } from "./rhConstants"
 import { buildContract } from "./contractBuilders"
+import DocumentsManager from "./DocumentsManager"
 
 var supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -520,6 +521,7 @@ export default function RhWizard(props) {
             <Step4Recap
               contract={contract} setContract={setContract} emp={emp}
               previewHtml={previewHtml} generatePreview={generatePreview}
+              existingContractId={existing ? existing.id : null}
             />
           )}
           {step === 4 && !isExtra && contract.type && (
@@ -539,6 +541,7 @@ export default function RhWizard(props) {
             <Step4Recap
               contract={contract} setContract={setContract} emp={emp}
               previewHtml={previewHtml} generatePreview={generatePreview}
+              existingContractId={existing ? existing.id : null}
             />
           )}
         </div>
@@ -1253,8 +1256,21 @@ function Step4Recap(props) {
         />
       )}
 
+      {/* Documents liés au contrat (uniquement si déjà sauvé une fois) */}
+      {props.existingContractId && (
+        <div style={{ marginTop: 20, padding: 12, background: "#FAFAFA", borderRadius: 6 }}>
+          <div style={{ fontSize: 11, fontStyle: "italic", color: "#666", marginBottom: 10 }}>
+            Documents liés à ce contrat (fiches de paie, attestations...) :
+          </div>
+          <DocumentsManager context="contract" parentId={props.existingContractId} />
+        </div>
+      )}
+
       <div className="note" style={{ background: "#FFF8E1", borderLeft: "3px solid #FF82D7", padding: "10px 14px", marginTop: 16, fontSize: 11.5, lineHeight: 1.5 }}>
         💾 Une fois enregistré comme brouillon, tu pourras revenir éditer ce contrat à tout moment depuis la liste.
+        {!props.existingContractId && (
+          <span><br />📁 Pour ajouter des documents (fiches de paie, etc.), enregistre d'abord le brouillon puis rouvre-le.</span>
+        )}
       </div>
     </div>
   )
