@@ -452,8 +452,8 @@ export default function RhWizard(props) {
                     style={{
                       flex: "1 1 0",
                       padding: "8px 4px",
-                      background: step === n ? "#191923" : "#FFFFFF",
-                      color: step === n ? "#FFEB5A" : "#191923",
+                      background: step === n ? "#FFEB5A" : "#FFFFFF",
+                      color: "#191923",
                       border: "2px solid #191923",
                       borderRadius: 4,
                       fontWeight: 700,
@@ -599,8 +599,8 @@ function Step0TypeChoice(props) {
               key={t.key}
               onClick={function () { props.onChoose(t.key) }}
               style={{
-                background: t.color === "#191923" ? "#191923" : t.color,
-                color: t.color === "#191923" ? "#FFEB5A" : "#191923",
+                background: t.color,
+                color: "#191923",
                 border: "2px solid #191923",
                 borderRadius: 8,
                 padding: "20px 16px",
