@@ -691,16 +691,20 @@ export function buildWelcomePack(emp, contract, logoUri) {
     ".chapter { break-before: page; page-break-before: always; }" +
     ".chapter:first-of-type { break-before: avoid; page-break-before: avoid; }" +
     "h2.yt { font-family: 'Yellowtail', cursive; color: #FF82D7; font-weight: 400; font-size: 36pt; line-height: 1.2; padding-bottom: 3mm; margin-bottom: 5mm; border-bottom: 3px solid #FF82D7; break-after: avoid; page-break-after: avoid; }" +
-    "h3.bc { font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-weight: 800; font-size: 13pt; text-transform: uppercase; letter-spacing: 1px; color: #FF82D7; margin-top: 5mm; margin-bottom: 2mm; break-after: avoid; page-break-after: avoid; }" +
+    "h3.bc { font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-weight: 800; font-size: 13pt; text-transform: uppercase; letter-spacing: 1px; color: #FF82D7; margin-top: 8mm; margin-bottom: 3mm; break-after: avoid; page-break-after: avoid; }" +
     "h3.bc.pink { color: #FF82D7; }" +
-    ".section { break-inside: avoid; page-break-inside: avoid; margin-bottom: 3mm; }" +
+    "h3.bc:first-child { margin-top: 0; }" +
+    ".chapter > div > p { margin: 0 0 3mm 0; }" +
+    ".section { margin-bottom: 5mm; }" +
     ".legal-box { background: #FFFEF5; border-left: 4px solid #FF82D7; padding: 10px 14px; margin: 3mm 0; font-size: 11pt; line-height: 1.55; break-inside: avoid; page-break-inside: avoid; }" +
-    ".legal-box .ref { font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 9pt; text-transform: uppercase; letter-spacing: 1px; color: #FF82D7; margin-bottom: 4px; display: block; }" +
-    ".sig-block { break-inside: avoid; page-break-inside: avoid; }" +
+    ".legal-box .ref { font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 9pt; text-transform: uppercase; letter-spacing: 1px; color: #FF82D7; margin-bottom: 5px; display: block; }" +
+    ".legal-box p { margin: 0 0 2mm 0; }" +
+    ".legal-box p:last-child { margin-bottom: 0; }" +
+    ".sig-block { break-inside: avoid; page-break-inside: avoid; break-before: avoid; page-break-before: avoid; }" +
     "p { margin-bottom: 6px; }" +
     "p.lead { font-size: 11pt; line-height: 1.55; margin-bottom: 6mm; opacity: 0.85; }" +
-    "ul.tidy { list-style: none; padding: 0; margin: 3mm 0; }" +
-    "ul.tidy li { padding: 4px 0 4px 22px; position: relative; font-size: 11pt; line-height: 1.55; break-inside: avoid; page-break-inside: avoid; }" +
+    "ul.tidy { list-style: none; padding: 0; margin: 4mm 0; }" +
+    "ul.tidy li { padding: 6px 0 6px 22px; position: relative; font-size: 11pt; line-height: 1.55; break-inside: avoid; page-break-inside: avoid; }" +
     "ul.tidy li::before { content: '•'; position: absolute; left: 0; color: #FF82D7; font-weight: 700; font-size: 13pt; line-height: 0.8; }" +
     ".grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 8mm; }" +
     ".field { display: flex; flex-direction: column; padding: 5px 0; border-bottom: 1px solid #EEEEEE; break-inside: avoid; }" +
@@ -847,7 +851,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '<div class="rule" style="margin: 3mm 0;"></div>' +
 
         '<h3 class="bc pink" style="font-size: 11pt;">Tes informations professionnelles</h3>' +
-        '<div class="grid2" style="margin-top: 1mm; gap: 0 8mm;">' +
+        '<div class="grid2" style="margin-top: 3mm; gap: 0 8mm;">' +
           fld("Type de contrat", typeLabel) +
           fld("Date d\'embauche / début", dateEmbaucheFmt) +
           fld("Fonction", contract.fonction) +
@@ -857,31 +861,31 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '</div>' +
 
         '<h3 class="bc pink" style="margin-top: 3mm; font-size: 11pt;">Période d\'essai</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Articles L1221-19 à L1221-26 du Code du travail · CCN 1501 art. 9</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L1221-19 à L1221-26 du Code du travail · CCN 1501 art. 9</div>' +
           esc(periodeEssaiLine) +
         '</div>' +
 
         // Clause de mobilité (si activée dans le contrat)
         (contract.clause_mobilite === true ? (
           '<h3 class="bc pink" style="margin-top: 3mm; font-size: 11pt;">Clause de mobilité</h3>' +
-          '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-            '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Article L1222-6 du Code du travail · jurisprudence Cass. Soc. (zone géographique précise)</div>' +
+          '<div class="legal-box">' +
+            '<div class="ref">Article L1222-6 du Code du travail · jurisprudence Cass. Soc. (zone géographique précise)</div>' +
             'Conformément à ton contrat de travail, tu acceptes que ton lieu de travail puisse être modifié à l\'intérieur de la zone suivante&nbsp;: <b>' + esc(contract.clause_mobilite_zone || "—") + '</b>. Toute mutation dans cette zone constitue une simple modification des conditions de travail (et non du contrat) et ne nécessite pas d\'avenant. Hors de cette zone, ton accord écrit reste requis.' +
           '</div>'
         ) : "") +
         '<h3 class="bc pink" style="margin-top: 3mm; font-size: 11pt;">Formation hygiène alimentaire (HACCP)</h3>' +
         haccpHtml +
-        '<p style="font-size: 11pt; opacity: 0.7; margin-top: 1mm; font-style: italic; line-height: 1.55;">' +
+        '<p style="font-size: 11pt; opacity: 0.7; margin-top: 3mm; font-style: italic; line-height: 1.55;">' +
           'Décret n° 2011-731 du 24 juin 2011 — au moins une personne formée HACCP par établissement de restauration commerciale.' +
         '</p>' +
 
         '<h3 class="bc pink" style="margin-top: 3mm; font-size: 11pt;">Allergènes alimentaires (14 obligatoires)</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Règlement (UE) n° 1169/2011 (INCO), annexe II · Décret n° 2015-447</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Règlement (UE) n° 1169/2011 (INCO), annexe II · Décret n° 2015-447</div>' +
           '<b>1.</b> Céréales avec gluten · <b>2.</b> Crustacés · <b>3.</b> Œufs · <b>4.</b> Poissons · <b>5.</b> Arachides · <b>6.</b> Soja · <b>7.</b> Lait/lactose · <b>8.</b> Fruits à coque · <b>9.</b> Céleri · <b>10.</b> Moutarde · <b>11.</b> Sésame · <b>12.</b> Sulfites (>10 mg/kg) · <b>13.</b> Lupin · <b>14.</b> Mollusques.' +
         '</div>' +
-        '<p style="font-size: 11pt; margin-top: 1mm; line-height: 1.55;">' +
+        '<p style="font-size: 11pt; margin-top: 3mm; line-height: 1.55;">' +
           '<b>' + g('Tu es tenu', 'Tu es tenue') + ' de connaître la composition de chaque produit servi</b> et de répondre précisément à toute question client sur les allergènes. La fiche allergènes complète est affichée en cuisine et consultable dans le classeur récapitulatif.' +
         '</p>' +
 
@@ -897,11 +901,11 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '<div class="rule" style="margin: 3mm 0;"></div>' +
 
         '<h3 class="bc pink" style="font-size: 11pt;">Équipements de protection individuelle (EPI)</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Articles R4321-4 et R4323-95 du Code du travail</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles R4321-4 et R4323-95 du Code du travail</div>' +
           'L\'employeur fournit gratuitement les EPI nécessaires et veille à leur utilisation effective. ' + g('Le salarié', 'La salariée') + ' est ' + g('tenu', 'tenue') + ' d\'utiliser correctement ces équipements et de les maintenir en bon état.' +
         '</div>' +
-        '<p style="font-size: 11pt; margin: 1mm 0 0 0;"><b>Liste des EPI remis ' + g('au salarié', 'à la salariée') + ' à l\'embauche</b> (à cocher en présence de l\'employeur)&nbsp;:</p>' +
+        '<p style="font-size: 11pt; margin: 3mm 0 0 0;"><b>Liste des EPI remis ' + g('au salarié', 'à la salariée') + ' à l\'embauche</b> (à cocher en présence de l\'employeur)&nbsp;:</p>' +
         '<div style="margin-top: 2mm; display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 6mm; font-size: 11pt;">' +
           '<span class="cb">' + checkBox(false) + 'Uniforme Meshuga (haut + bas)</span>' +
           '<span class="cb">' + checkBox(false) + 'Charlotte / coiffe</span>' +
@@ -912,8 +916,8 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '</div>' +
 
         '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Sécurité incendie & numéros d\'urgence</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Articles R4227-37 à R4227-41 et R4141-2 du Code du travail</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles R4227-37 à R4227-41 et R4141-2 du Code du travail</div>' +
           'L\'employeur informe ' + g('le salarié', 'la salariée') + ' des consignes de sécurité incendie et des dispositifs de premiers secours dès l\'embauche. Les issues de secours, extincteurs et plans d\'évacuation sont affichés en cuisine et en salle.' +
         '</div>' +
         '<div style="margin-top: 2mm; display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 6mm; font-size: 11pt;">' +
@@ -926,23 +930,23 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '</div>' +
 
         '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Document Unique d\'Évaluation des Risques Professionnels (DUERP)</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Articles R4121-1 à R4121-4 du Code du travail</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles R4121-1 à R4121-4 du Code du travail</div>' +
           'L\'employeur tient à jour un DUERP listant les risques professionnels identifiés et les mesures de prévention mises en œuvre. Mise à jour annuelle obligatoire. <b>Le DUERP de Meshuga est consultable à tout moment dans le classeur récapitulatif présent au restaurant, sur simple demande.</b>' +
         '</div>' +
 
         '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Droit d\'alerte et droit de retrait</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Articles L4131-1 à L4131-3 du Code du travail</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L4131-1 à L4131-3 du Code du travail</div>' +
           'En cas de <b>danger grave et imminent</b> pour ta vie ou ta santé, tu as le droit&nbsp;: <b>(1)</b> d\'alerter immédiatement l\'employeur (oralement puis par écrit), <b>(2)</b> de te retirer de la situation dangereuse. <b>Aucune sanction ni retenue de salaire ne peut être prise contre ' + g('un salarié', 'une salariée') + ' ayant exercé ce droit de bonne foi.</b> L\'employeur ne peut imposer la reprise du travail tant que la situation de danger persiste.' +
         '</div>' +
 
         '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Règles d\'hygiène à respecter en cuisine</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Article L4122-1 du Code du travail</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Article L4122-1 du Code du travail</div>' +
           'Il t\'incombe de prendre soin, selon ta formation et tes possibilités, de ta santé, de ta sécurité et de celles des personnes concernées par tes actes ou omissions.' +
         '</div>' +
-        '<ul class="tidy" style="margin: 1mm 0; font-size: 11pt;">' +
+        '<ul class="tidy" style="margin: 3mm 0; font-size: 11pt;">' +
           '<li><b>Lavage des mains</b> : arrivée, après chaque pause, après toilettes, après cru/déchets — eau chaude + savon pro + essuie-mains UU.</li>' +
           '<li><b>Tenue complète</b> : uniforme, charlotte, gants nitrile, chaussures de sécurité antidérapantes. Pas de bijoux, pas d\'ongles longs/vernis, pas de téléphone sur le plan de travail.</li>' +
           '<li><b>Marche en avant</b> : crus → préparation → cuisson → refroidissement → distribution. Aucun croisement flux propre / flux sale.</li>' +
@@ -964,30 +968,30 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '<div class="rule" style="margin: 3mm 0;"></div>' +
 
         '<h3 class="bc pink" style="font-size: 11pt;">Harcèlement moral et sexuel · Référent</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Articles L1152-1 à L1152-6 (moral) · L1153-1 à L1153-6 (sexuel) · L1153-5-1 (information) du Code du travail · 222-33-2 du Code pénal</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L1152-1 à L1152-6 (moral) · L1153-1 à L1153-6 (sexuel) · L1153-5-1 (information) du Code du travail · 222-33-2 du Code pénal</div>' +
           'Aucun salarié ne doit subir d\'agissements répétés de harcèlement moral ni de propos ou comportements à connotation sexuelle. <b>Sanctions civiles et pénales</b>&nbsp;: jusqu\'à 2 ans (moral) ou 3 ans (sexuel) de prison + 30 000 € à 45 000 € d\'amende. ' + g('Le salarié', 'La salariée') + ' qui dénonce, témoigne ou refuse de subir un harcèlement bénéficie d\'une <b>protection contre le licenciement</b>.' +
         '</div>' +
-        '<p style="font-size: 11pt; margin: 1mm 0; line-height: 1.55;">' +
+        '<p style="font-size: 11pt; margin: 3mm 0; line-height: 1.55;">' +
           '<b>Référent harcèlement Meshuga</b>&nbsp;: Edward TOURET, Président SAS AEGIA FOOD — edward@meshuga.fr — 06 58 58 58 01.<br/>' +
           '<b>Autres canaux d\'alerte</b>&nbsp;: Inspection du travail (DREETS Île-de-France) · Médecin du travail (EFFICIENCE Vaugirard) · Défenseur des droits (defenseurdesdroits.fr) · Procureur de la République.' +
         '</p>' +
 
         '<h3 class="bc pink" style="margin-top: 3mm; font-size: 11pt;">Égalité et non-discrimination</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Articles L1132-1 (25 critères prohibés) et L1142-1 (égalité H/F) du Code du travail · 225-1 Code pénal</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L1132-1 (25 critères prohibés) et L1142-1 (égalité H/F) du Code du travail · 225-1 Code pénal</div>' +
           'Aucune décision (embauche, rémunération, sanction, licenciement…) ne peut être fondée sur l\'origine, le sexe, les mœurs, l\'orientation sexuelle, l\'identité de genre, l\'âge, la situation de famille, la grossesse, l\'état de santé, le handicap, l\'apparence physique, le nom, le lieu de résidence, les opinions politiques ou religieuses, l\'activité syndicale ou tout autre critère prohibé. <b>Sanctions</b>&nbsp;: 3 ans de prison + 45 000 € d\'amende.' +
         '</div>' +
 
         '<h3 class="bc pink" style="margin-top: 3mm; font-size: 11pt;">Convention Collective applicable</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Article R2262-1 du Code du travail</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Article R2262-1 du Code du travail</div>' +
           '<b>CCN nationale de la Restauration Rapide — IDCC 1501.</b> Texte intégral consultable à tout moment dans le classeur récapitulatif au restaurant et sur Légifrance (legifrance.gouv.fr). Tout salarié peut en demander une copie à l\'employeur.' +
         '</div>' +
 
         '<h3 class="bc pink" style="margin-top: 3mm; font-size: 11pt;">Médecine du travail · Mutuelle · Prévoyance</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Articles R4624-10 (VIP) du Code du travail · L911-8 du Code de la Sécurité sociale (notice mutuelle)</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles R4624-10 (VIP) du Code du travail · L911-8 du Code de la Sécurité sociale (notice mutuelle)</div>' +
           '<b>Médecine du travail</b>&nbsp;: EFFICIENCE — Centre Vaugirard, 64 rue de Vaugirard, 75006 Paris. <b>Visite d\'Information et de Prévention (VIP)</b> dans les 3 mois suivant l\'embauche, RDV pris par l\'employeur.<br/>' +
           '<b>Prévoyance</b>&nbsp;: Gan Eurocourtage Vie. Notice d\'information à venir sous 30 jours, l\'employeur s\'engage à la remettre dès réception (récépissé en page 6).' +
         '</div>' +
@@ -1003,13 +1007,13 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '</div>' +
         '<div class="rule" style="margin: 3mm 0;"></div>' +
 
-        '<p style="font-size: 11pt; margin: 1mm 0 2mm 0; line-height: 1.55;">' +
+        '<p style="font-size: 11pt; margin: 3mm 0 3mm 0; line-height: 1.55;">' +
           '<b>Cette page constitue ton information préalable individuelle</b> sur les traitements de données personnelles te concernant, conformément à l\'<b>article 13 du RGPD</b> et à l\'<b>article L1222-4 du Code du travail</b>. Elle est essentielle pour rendre opposables les images de vidéosurveillance et les traitements RH en cas de procédure.' +
         '</p>' +
 
         '<h3 class="bc pink" style="font-size: 11pt;">Vidéosurveillance de l\'établissement</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">Articles L1121-1, L1222-4 du Code du travail · RGPD art. 5, 6, 13, 30 · articles 226-1 et R625-10 du Code pénal · règlements (CE) 178/2002 et 852/2004 · recommandations CNIL · Cass. Soc. 23 juin 2010 n° 09-66.355</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L1121-1, L1222-4 du Code du travail · RGPD art. 5, 6, 13, 30 · articles 226-1 et R625-10 du Code pénal · règlements (CE) 178/2002 et 852/2004 · recommandations CNIL · Cass. Soc. 23 juin 2010 n° 09-66.355</div>' +
           '<b>L\'établissement Meshuga (3 rue Vavin, 75006 Paris) est placé sous vidéosurveillance.</b> Tu en es ' + g('informé', 'informée') + ' personnellement et préalablement à ta prise de poste, conformément à l\'obligation d\'information individuelle de l\'employeur (L1222-4) et au principe de loyauté (L1121-1).' +
         '</div>' +
 
@@ -1046,8 +1050,8 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '</p>' +
 
         '<h3 class="bc pink" style="margin-top: 2mm; font-size: 11pt;">Autres traitements de données personnelles</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">RGPD UE 2016/679 art. 13 · Code du travail D.1221-24</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">RGPD UE 2016/679 art. 13 · Code du travail D.1221-24</div>' +
           '<b>Responsable</b>&nbsp;: SAS AEGIA FOOD, représentée par Edward TOURET, Président — edward@meshuga.fr. <b>Finalités</b>&nbsp;: contrat de travail, paie, DPAE, déclarations URSSAF, suivi RH, médecine du travail, prévoyance. <b>Base légale</b>&nbsp;: contrat (art. 6.1.b RGPD) + obligations légales (art. 6.1.c). <b>Destinataires</b>&nbsp;: URSSAF, EFFICIENCE, Gan, expert-comptable. <b>Durée</b>&nbsp;: contrat + 5 ans après sortie (D.1221-24). <b>Tes droits</b>&nbsp;: accès, rectification, effacement, limitation, portabilité, opposition — edward@meshuga.fr · Réclamation CNIL.' +
         '</div>' +
 
@@ -1063,10 +1067,10 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '<div class="rule" style="margin: 2mm 0;"></div>' +
 
         '<h3 class="bc pink" style="font-size: 11pt;">Récépissé de remise des documents</h3>' +
-        '<p style="font-size: 11pt; margin: 1mm 0;">' +
+        '<p style="font-size: 11pt; margin: 3mm 0;">' +
           'Je ' + g("soussigné", "soussignée") + ' <b>' + esc(nomComplet) + '</b> reconnais avoir reçu en main propre, à la date de signature ci-dessous&nbsp;:' +
         '</p>' +
-        '<div style="margin-top: 1mm; font-size: 11pt; line-height: 1.55;">' +
+        '<div style="margin-top: 3mm; font-size: 11pt; line-height: 1.55;">' +
           '<div><span class="cb">' + checkBox(false) + '</span>Le présent <b>dossier de bienvenue Meshuga</b> (6 pages dont engagement signé)</div>' +
           '<div><span class="cb">' + checkBox(false) + '</span>Mon <b>contrat de travail</b> signé en double exemplaire</div>' +
           '<div><span class="cb">' + checkBox(false) + '</span>Information sur la <b>convention collective</b> CCN 1501 et son lieu de consultation</div>' +
@@ -1076,8 +1080,8 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '</div>' +
 
         '<h3 class="bc pink" style="margin-top: 2mm; font-size: 11pt;">Sanctions disciplinaires</h3>' +
-        '<div class="legal-box" style="padding: 4px 10px; margin: 1mm 0; font-size: 11pt;">' +
-          '<div class="ref" style="font-size: 11pt; margin-bottom: 1px;">L1331-1, L1332-1 à L1332-5 et R4741-1 du Code du travail</div>' +
+        '<div class="legal-box">' +
+          '<div class="ref">L1331-1, L1332-1 à L1332-5 et R4741-1 du Code du travail</div>' +
           'Tout manquement constitue une <b>faute</b> disciplinaire (entretien préalable + lettre motivée, prescription 2 mois). Selon la gravité&nbsp;: <b>avertissement</b>, <b>blâme</b>, <b>mise à pied</b>, <b>mutation/rétrogradation</b>, jusqu\'au <b>licenciement pour faute simple, grave ou lourde</b>.' +
         '</div>' +
 
@@ -1085,7 +1089,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '<p style="font-size: 11pt; margin: 0;">' +
           'Je ' + g("soussigné", "soussignée") + ' <b>' + esc(nomComplet) + '</b>, en signant ce document, reconnais&nbsp;:' +
         '</p>' +
-        '<ol style="margin: 1mm 0 1mm 16px; padding: 0; font-size: 11pt; line-height: 1.55;">' +
+        '<ol style="margin: 2mm 0 2mm 16px; padding: 0; font-size: 11pt; line-height: 1.55;">' +
           '<li><b>avoir lu attentivement</b> le présent dossier dans son intégralité&nbsp;;</li>' +
           '<li><b>avoir compris</b> les règles d\'hygiène (HACCP, allergènes, marche en avant), les consignes de sécurité (EPI, incendie, droit de retrait), le cadre social (CCN 1501, harcèlement, non-discrimination, vidéosurveillance, RGPD) et le régime disciplinaire&nbsp;;</li>' +
           '<li>avoir été ' + g("informé", "informée") + ' des canaux d\'alerte (référent harcèlement, inspection, médecine, défenseur des droits) et de mes <b>droits</b> (DUERP, CCN, CNIL, retrait, RGPD)&nbsp;;</li>' +
@@ -1093,12 +1097,13 @@ export function buildWelcomePack(emp, contract, logoUri) {
           '<li>accepter sans réserve la <b>mise sous vidéosurveillance</b> de l\'établissement aux finalités déclarées (sécurité, lutte contre le vol, traçabilité HACCP) et reconnaître avoir été ' + g("informé", "informée") + ' préalablement (L1222-4 Code du travail · art. 13 RGPD).</li>' +
         '</ol>' +
 
-        // ===== 2 BEAUX BLOCS SIGNATURES =====
-        '<div class="sig-block" style="display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin-top: 10mm;">' +
+        // ===== 2 BEAUX BLOCS SIGNATURES + MENTION FINALE — WRAPPER UNBREAKABLE =====
+        '<div style="margin-top: 6mm; break-inside: avoid; page-break-inside: avoid;">' +
+        '<div class="sig-block" style="display: grid; grid-template-columns: 1fr 1fr; gap: 4mm;">' +
           // Bloc gauche : Le/La salarié·e (rose Meshuga)
           '<div style="border: 2.5px solid #FF82D7; border-radius: 6px; padding: 4mm; background: rgba(255,130,215,0.04); position: relative;">' +
             '<div style="position: absolute; top: -3mm; left: 4mm; background: #FFFFFF; padding: 0 5px; font-family: Yellowtail, cursive; color: #FF82D7; font-size: 13pt; line-height: 1;">' + g("Le salarié", "La salariée") + '</div>' +
-            '<div style="display: grid; grid-template-columns: auto 1fr; gap: 1mm 4mm; font-size: 11pt; margin-top: 1mm;">' +
+            '<div style="display: grid; grid-template-columns: auto 1fr; gap: 1mm 4mm; font-size: 11pt; margin-top: 3mm;">' +
               '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Date</div>' +
               '<div style="border-bottom: 1px solid #191923; min-height: 4mm;"></div>' +
               '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Lieu</div>' +
@@ -1113,7 +1118,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
           // Bloc droit : L'employeur (noir charbon)
           '<div style="border: 2.5px solid #191923; border-radius: 6px; padding: 4mm; background: rgba(25,25,35,0.025); position: relative;">' +
             '<div style="position: absolute; top: -3mm; left: 4mm; background: #FFFFFF; padding: 0 5px; font-family: Yellowtail, cursive; color: #191923; font-size: 13pt; line-height: 1;">L\'employeur</div>' +
-            '<div style="display: grid; grid-template-columns: auto 1fr; gap: 1mm 4mm; font-size: 11pt; margin-top: 1mm;">' +
+            '<div style="display: grid; grid-template-columns: auto 1fr; gap: 1mm 4mm; font-size: 11pt; margin-top: 3mm;">' +
               '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Date</div>' +
               '<div style="border-bottom: 1px solid #191923; min-height: 4mm;">' + '</div>' +
               '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Lieu</div>' +
@@ -1128,9 +1133,10 @@ export function buildWelcomePack(emp, contract, logoUri) {
           '</div>' +
         '</div>' +
 
-        '<p style="margin-top: 2mm; font-size: 11pt; opacity: 0.55; font-style: italic; line-height: 1.55; text-align: center;">' +
+        '<p style="margin-top: 4mm; font-size: 11pt; opacity: 0.55; font-style: italic; line-height: 1.55; text-align: center;">' +
           'Document signé en double exemplaire, dont un remis ' + g("au salarié", "à la salariée") + '. Conservé dans le dossier RH pendant toute la durée du contrat et 5 ans après sortie effective (article D.1221-24 du Code du travail).' +
         '</p>' +
+        '</div>' +
 
       '</div>' +
       '</section>'
