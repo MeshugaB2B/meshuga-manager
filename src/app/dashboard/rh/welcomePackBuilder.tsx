@@ -541,6 +541,23 @@ export function buildWelcomePack(emp, contract, logoUri) {
     if (!s) return ""
     return s.charAt(0).toUpperCase() + s.slice(1)
   }
+  // Genre détecté à partir de la civilité (Mme/Mlle = féminin, M./Mr/Monsieur = masculin)
+  // Renvoie 'f' pour féminin, 'm' pour masculin (défaut si inconnu)
+  function detectGenre(e) {
+    var c = (e.civilite || "").toString().trim().toLowerCase().replace(/\./g, "")
+    if (c === "mme" || c === "madame" || c === "mlle" || c === "mademoiselle") return "f"
+    if (c === "m" || c === "mr" || c === "monsieur") return "m"
+    // Fallback : si pas de civilité, on essaie via le champ sexe si présent
+    var s = (e.sexe || e.gender || "").toString().trim().toLowerCase()
+    if (s === "f" || s === "femme" || s === "female") return "f"
+    if (s === "m" || s === "homme" || s === "male") return "m"
+    return "m"
+  }
+  var GENRE = detectGenre(emp)
+  // g(m, f) → renvoie f si féminin, m sinon. Helper d'accord.
+  function g(m, f) {
+    return GENRE === "f" ? f : m
+  }
 
   // ===== Données dérivées =====
   var nomComplet = (emp.prenom || "") + " " + (emp.nom || "").toUpperCase()
@@ -550,12 +567,12 @@ export function buildWelcomePack(emp, contract, logoUri) {
     + (emp.code_postal || "") + " " + (emp.ville || "")
   addressLine = addressLine.trim() || "—"
 
-  // Type de contrat
+  // Type de contrat (accordé au genre)
   var typeLabels = {
     "extra": "CDD d'usage (Extra)",
     "cdi_cadre": "CDI Cadre",
-    "cdi_cuisinier": "CDI Cuisinier(ère)",
-    "cdi_caissier": "CDI Caissier(ère)"
+    "cdi_cuisinier": "CDI " + g("Cuisinier", "Cuisinière"),
+    "cdi_caissier": "CDI " + g("Caissier", "Caissière")
   }
   var typeLabel = typeLabels[contract.type] || "—"
 
@@ -687,10 +704,10 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '<div>' +
           '<h1 style="font-family: Yellowtail, cursive; color: #FFEB5A; font-weight: 400; font-size: 80pt; line-height: 1; margin-bottom: 6mm;">Dossier de<br/>bienvenue</h1>' +
           '<div style="font-family: \'Barlow Condensed\', sans-serif; color: #FFEB5A; font-size: 12pt; font-weight: 600; text-transform: uppercase; letter-spacing: 2.5px; line-height: 1.6;">' +
-            '1 fiche salarié · 1 rappel hygiène · 1 engagement signé' +
+            '1 fiche ' + g('salarié', 'salariée') + ' · 1 rappel hygiène · 1 engagement signé' +
           '</div>' +
           '<div style="margin-top: 14mm; padding: 6mm 8mm; background: rgba(255,235,90,0.18); border-left: 4px solid #FFEB5A;">' +
-            '<div style="font-family: \'Barlow Condensed\', sans-serif; color: #FFEB5A; font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 3mm;">Salarié</div>' +
+            '<div style="font-family: \'Barlow Condensed\', sans-serif; color: #FFEB5A; font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 3mm;">' + g('Salarié', 'Salariée') + '</div>' +
             '<div style="color: #FFEB5A; font-size: 22pt; font-weight: 700; line-height: 1.1;">' + esc(nomComplet) + '</div>' +
             (contract.fonction ? '<div style="color: #FFEB5A; font-size: 11pt; opacity: 0.85; margin-top: 2mm; font-weight: 500;">' + esc(contract.fonction) + (dateEmbaucheFmt ? ' · embauche ' + esc(dateEmbaucheFmt) : '') + '</div>' : '') +
           '</div>' +
@@ -733,7 +750,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
       '<div class="bg-circle" style="width: 50mm; height: 50mm; background: #FF82D7; opacity: 0.10; bottom: 30mm; left: -20mm;"></div>' +
       '<div class="content">' +
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
-          '<h2 class="yt">Fiche du salarié</h2>' +
+          '<h2 class="yt">' + g("Fiche du salarié", "Fiche de la salariée") + '</h2>' +
           '<div class="pill">Page 1 / 3 administratif</div>' +
         '</div>' +
         '<div class="rule"></div>' +
@@ -764,10 +781,10 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '<h3 class="bc pink" style="margin-top: 6mm;">Situation familiale <span style="font-weight: 400; font-size: 8.5pt; text-transform: none; letter-spacing: 0; opacity: 0.6; font-family: Barlow, sans-serif; margin-left: 6px;">(non obligatoire — bonne pratique RH)</span></h3>' +
         '<div style="margin-top: 4mm;">' +
           '<span class="cb">' + checkBox(msCheck.celibataire) + 'Célibataire</span>' +
-          '<span class="cb">' + checkBox(msCheck.marie) + 'Marié(e)</span>' +
-          '<span class="cb">' + checkBox(msCheck.pacs) + 'Pacsé(e)</span>' +
-          '<span class="cb">' + checkBox(msCheck.divorce) + 'Divorcé(e)</span>' +
-          '<span class="cb">' + checkBox(msCheck.veuf) + 'Veuf(ve)</span>' +
+          '<span class="cb">' + checkBox(msCheck.marie) + g("Marié", "Mariée") + '</span>' +
+          '<span class="cb">' + checkBox(msCheck.pacs) + g("Pacsé", "Pacsée") + '</span>' +
+          '<span class="cb">' + checkBox(msCheck.divorce) + g("Divorcé", "Divorcée") + '</span>' +
+          '<span class="cb">' + checkBox(msCheck.veuf) + g("Veuf", "Veuve") + '</span>' +
         '</div>' +
 
         '<h3 class="bc pink" style="margin-top: 6mm;">Personne à prévenir en cas d\'urgence <span style="font-weight: 400; font-size: 8.5pt; text-transform: none; letter-spacing: 0; opacity: 0.6; font-family: Barlow, sans-serif; margin-left: 6px;">(non obligatoire — fortement recommandé)</span></h3>' +
@@ -847,7 +864,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '<div class="rule" style="margin: 3mm 0;"></div>' +
 
         '<p style="margin-top: 2mm; font-size: 10.5pt; line-height: 1.5;">' +
-          'En tant que nouveau membre de l\'équipe Meshuga, tu reconnais avoir reçu et lu attentivement le présent dossier de bienvenue, comprenant tes informations administratives, les règles d\'hygiène alimentaire et les obligations de sécurité au travail.' +
+          'En tant que ' + g("nouveau", "nouvelle") + ' membre de l\'équipe Meshuga, tu reconnais avoir reçu et lu attentivement le présent dossier de bienvenue, comprenant tes informations administratives, les règles d\'hygiène alimentaire et les obligations de sécurité au travail.' +
         '</p>' +
 
         '<h3 class="bc pink" style="margin-top: 4mm; font-size: 12pt;">Sanctions en cas de non-respect des règles</h3>' +
@@ -857,7 +874,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '</div>' +
         '<div class="legal-box" style="padding: 6px 10px; margin: 2mm 0; font-size: 9pt;">' +
           '<div class="ref" style="font-size: 8.5pt; margin-bottom: 2px;">Article R4741-1 du Code du travail</div>' +
-          'Le manquement aux règles d\'hygiène et de sécurité par le salarié peut être sanctionné, indépendamment de la responsabilité pénale de l\'employeur en cas d\'infraction constatée par les services de contrôle (DDPP, Inspection du travail).' +
+          'Le manquement aux règles d\'hygiène et de sécurité par ' + g("le salarié", "la salariée") + ' peut être ' + g("sanctionné", "sanctionnée") + ', indépendamment de la responsabilité pénale de l\'employeur en cas d\'infraction constatée par les services de contrôle (DDPP, Inspection du travail).' +
         '</div>' +
         '<p style="font-size: 9.5pt; margin-top: 2mm; line-height: 1.5;">' +
           'Selon la gravité du manquement constaté, l\'employeur peut prononcer&nbsp;: <b>avertissement écrit</b>, <b>blâme</b>, <b>mise à pied disciplinaire</b>, <b>mutation</b> ou <b>rétrogradation</b>, et jusqu\'au <b>licenciement pour faute simple, grave ou lourde</b> en cas de manquement caractérisé mettant en péril la santé publique, la sécurité de l\'équipe ou la réputation de l\'établissement.' +
@@ -865,7 +882,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
 
         '<h3 class="bc pink" style="margin-top: 4mm; font-size: 12pt;">Mes engagements</h3>' +
         '<p style="margin-top: 1mm; font-size: 10pt;">' +
-          '<b>Je soussigné(e) ' + esc(nomComplet) + '</b>, reconnais&nbsp;:' +
+          '<b>Je ' + g("soussigné", "soussignée") + ' ' + esc(nomComplet) + '</b>, reconnais&nbsp;:' +
         '</p>' +
         '<ul class="tidy" style="margin: 1mm 0;">' +
           '<li>avoir reçu en main propre le présent dossier de bienvenue Meshuga&nbsp;;</li>' +
@@ -875,12 +892,12 @@ export function buildWelcomePack(emp, contract, logoUri) {
 
         '<div class="sig-box" style="margin-top: 4mm; padding: 6mm;">' +
           '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; font-size: 9.5pt;">' +
-            'Mention manuscrite obligatoire avant signature : <span style="color: #FF82D7;">«&nbsp;Lu et approuvé&nbsp;»</span>' +
+            'Mention manuscrite obligatoire avant signature : <span style="color: #FF82D7;">«&nbsp;' + g('Lu et approuvé', 'Lue et approuvée') + '&nbsp;»</span>' +
           '</div>' +
           '<div class="sig-grid" style="margin-top: 4mm; gap: 6mm;">' +
             '<div>' +
               '<div class="sig-line" style="min-height: 14mm;"></div>' +
-              '<div class="sig-cap">Le salarié — date + « Lu et approuvé » + signature</div>' +
+              '<div class="sig-cap">' + g("Le salarié", "La salariée") + ' — date + «&nbsp;' + g('Lu et approuvé', 'Lue et approuvée') + '&nbsp;» + signature</div>' +
             '</div>' +
             '<div>' +
               '<div class="sig-line" style="min-height: 14mm;"></div>' +
@@ -890,7 +907,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '</div>' +
 
         '<p style="margin-top: 4mm; font-size: 8.5pt; opacity: 0.55; font-style: italic; line-height: 1.4;">' +
-          'Document conservé dans le dossier RH du salarié pendant toute la durée du contrat et 5 ans après sa sortie effective (article D.1221-24 du Code du travail).' +
+          'Document conservé dans le dossier RH ' + g("du salarié", "de la salariée") + ' pendant toute la durée du contrat et 5 ans après sa sortie effective (article D.1221-24 du Code du travail).' +
         '</p>' +
 
       '</div>' +
