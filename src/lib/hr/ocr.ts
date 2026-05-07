@@ -154,41 +154,67 @@ Schéma exact :
   }
 }`
 
-// Appel principal : prend N images en buffer + mime, retourne l'extraction structurée
+// Appel principal : prend N images en buffer + mime, retourne l'extraction structurée.
+// Accepte aussi un PDF unique (mime application/pdf) — Anthropic API supporte
+// les PDFs en input via type:'document' (nativement, sans rasterisation).
 export async function extractContractFromImages(
   pages: Array<{ buffer: Buffer; mimeType: string }>
 ): Promise<{ extraction: ContractExtraction; rawText: string; model: string }> {
   if (!pages.length) throw new Error('No pages provided to OCR')
 
-  // Normaliser chaque image (HEIC → JPEG si nécessaire)
-  var normalized: Array<{ base64: string; mimeType: string }> = []
-  for (var i = 0; i < pages.length; i++) {
-    var page = pages[i]
-    var norm = await normalizeImageForVision(page.buffer, page.mimeType)
-    normalized.push(norm)
-  }
+  // Détection mode PDF (un seul fichier PDF)
+  var isPdfMode = pages.length === 1 && (pages[0].mimeType || '').toLowerCase() === 'application/pdf'
 
-  // Construire le content array pour l'API : alternance texte + images
+  // Construire le content array pour l'API
   var content: any[] = []
-  content.push({
-    type: 'text',
-    text: `Voici ${pages.length} page(s) d'un contrat de travail à analyser. Pages dans l'ordre :`,
-  })
-  for (var j = 0; j < normalized.length; j++) {
+
+  if (isPdfMode) {
+    var pdfBase64 = pages[0].buffer.toString('base64')
     content.push({
       type: 'text',
-      text: `--- Page ${j + 1} / ${normalized.length} ---`,
+      text: 'Voici le PDF complet d\'un contrat de travail à analyser :',
     })
     content.push({
-      type: 'image',
+      type: 'document',
       source: {
         type: 'base64',
-        media_type: normalized[j].mimeType,
-        data: normalized[j].base64,
+        media_type: 'application/pdf',
+        data: pdfBase64,
       },
     })
+    content.push({ type: 'text', text: EXTRACTION_PROMPT })
+  } else {
+    // Mode photos : normaliser chaque image (HEIC → JPEG si nécessaire)
+    var normalized: Array<{ base64: string; mimeType: string }> = []
+    for (var i = 0; i < pages.length; i++) {
+      var page = pages[i]
+      // Si l'utilisateur a glissé un PDF dans une liste d'images, on refuse explicitement
+      if ((page.mimeType || '').toLowerCase() === 'application/pdf') {
+        throw new Error('Mix PDF + images non supporté. Envoyez soit UN PDF, soit des images.')
+      }
+      var norm = await normalizeImageForVision(page.buffer, page.mimeType)
+      normalized.push(norm)
+    }
+    content.push({
+      type: 'text',
+      text: `Voici ${pages.length} page(s) d'un contrat de travail à analyser. Pages dans l'ordre :`,
+    })
+    for (var j = 0; j < normalized.length; j++) {
+      content.push({
+        type: 'text',
+        text: `--- Page ${j + 1} / ${normalized.length} ---`,
+      })
+      content.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: normalized[j].mimeType,
+          data: normalized[j].base64,
+        },
+      })
+    }
+    content.push({ type: 'text', text: EXTRACTION_PROMPT })
   }
-  content.push({ type: 'text', text: EXTRACTION_PROMPT })
 
   // Appel API
   var apiKey = process.env.ANTHROPIC_API_KEY
