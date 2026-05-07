@@ -50,6 +50,13 @@ export function buildWelcomePack(emp, contract, logoUri) {
   function checked(cond) {
     return cond ? "checked" : "unchecked"
   }
+  // Renvoie le markup complet d'une case à cocher (vide ou cochée avec ✓ SVG)
+  function checkBox(cond) {
+    var svg = '<svg width="10" height="10" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+      '<path d="M2.5 7.5 L5.5 10.5 L11.5 3.5" stroke="#191923" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>'
+    return '<span class="box ' + (cond ? 'checked' : 'unchecked') + '">' + (cond ? svg : '') + '</span>'
+  }
   function capit(s) {
     if (!s) return ""
     return s.charAt(0).toUpperCase() + s.slice(1)
@@ -143,6 +150,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
     "  page-break-after: always;" +
     "}" +
     ".page:last-of-type { page-break-after: auto; margin-bottom: 0; }" +
+    ".page.cover { background: #FF82D7; padding: 22mm 22mm 22mm 22mm; }" +
     ".bg-circle { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; }" +
     ".content { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; }" +
     "h1.yt { font-family: 'Yellowtail', cursive; color: #FF82D7; font-weight: 400; font-size: 64pt; line-height: 1.05; }" +
@@ -156,17 +164,17 @@ export function buildWelcomePack(emp, contract, logoUri) {
     "p { margin-bottom: 8px; }" +
     "p.lead { font-size: 12pt; line-height: 1.6; }" +
     "ul.tidy { list-style: none; padding: 0; margin: 4mm 0; }" +
-    "ul.tidy li { padding: 4px 0 4px 22px; position: relative; font-size: 10.5pt; line-height: 1.55; }" +
+    "ul.tidy li { padding: 3px 0 3px 22px; position: relative; font-size: 9.5pt; line-height: 1.5; page-break-inside: avoid; break-inside: avoid; }" +
     "ul.tidy li::before { content: '—'; position: absolute; left: 0; color: #FF82D7; font-weight: 700; }" +
     ".grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 8mm; }" +
     ".field { display: flex; flex-direction: column; padding: 6px 0; border-bottom: 1px solid #EEEEEE; }" +
     ".field .lab { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 1px; color: #191923; opacity: 0.65; }" +
     ".field .val { font-size: 11pt; font-weight: 500; color: #191923; min-height: 14pt; padding-top: 2px; }" +
     ".field .val.empty { color: #BBBBBB; font-style: italic; font-weight: 400; }" +
-    ".cb { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; font-size: 10.5pt; }" +
-    ".cb .box { width: 14px; height: 14px; border: 2px solid #191923; display: inline-block; position: relative; flex-shrink: 0; background: #FFFFFF; }" +
+    ".cb { display: inline-flex; align-items: center; gap: 8px; margin-right: 14px; font-size: 10.5pt; vertical-align: middle; }" +
+    ".cb .box { width: 14px; height: 14px; border: 2px solid #191923; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: #FFFFFF; box-sizing: border-box; line-height: 0; vertical-align: middle; }" +
     ".cb .box.checked { background: #FFEB5A; }" +
-    ".cb .box.checked::after { content: '✓'; position: absolute; top: -3px; left: 1px; font-weight: 900; color: #191923; font-size: 13pt; }" +
+    ".cb .box.checked svg { display: block; }" +
     ".legal-box { background: #FFFEF5; border-left: 4px solid #FF82D7; padding: 10px 14px; margin: 4mm 0; font-size: 10pt; line-height: 1.55; }" +
     ".legal-box .ref { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 9pt; text-transform: uppercase; letter-spacing: 1px; color: #FF82D7; margin-bottom: 4px; }" +
     ".sig-box { margin-top: 8mm; border: 2px solid #191923; padding: 8mm; background: #FFFFFF; }" +
@@ -180,32 +188,53 @@ export function buildWelcomePack(emp, contract, logoUri) {
     "  .page:last-of-type { page-break-after: auto; }" +
     "}"
 
-  // ===== PAGE 1 — COUVERTURE =====
+  // ===== PAGE 1 — COUVERTURE (style Affiches cuisine : fond rose plein) =====
+  // Stamp circulaire jaune SVG inline (logo Meshuga simplifié — couronne + texte)
+  var stampSvg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">' +
+      '<circle cx="100" cy="100" r="98" fill="#FFEB5A" stroke="#191923" stroke-width="2.5"/>' +
+      '<circle cx="100" cy="100" r="80" fill="none" stroke="#191923" stroke-width="1"/>' +
+      '<text x="100" y="92" text-anchor="middle" font-family="Yellowtail, cursive" font-size="34" fill="#191923">meshuga</text>' +
+      '<text x="100" y="120" text-anchor="middle" font-family="Barlow Condensed, sans-serif" font-weight="800" font-size="11" letter-spacing="2" fill="#191923">CRAZY DELI</text>' +
+      '<path d="M 35 100 A 65 65 0 0 0 165 100" fill="none" stroke="#191923" stroke-width="0.8" stroke-dasharray="2,3"/>' +
+      '<path d="M 35 100 A 65 65 0 0 1 165 100" fill="none" stroke="#191923" stroke-width="0.8" stroke-dasharray="2,3"/>' +
+    '</svg>'
+
   var page1 =
-    '<div class="page" style="background: #FFFFFF;">' +
-      '<div class="bg-circle" style="width: 280mm; height: 280mm; background: #FF82D7; opacity: 0.10; top: -120mm; left: -90mm;"></div>' +
-      '<div class="bg-circle" style="width: 110mm; height: 110mm; background: #FFEB5A; opacity: 0.55; top: -30mm; right: -30mm;"></div>' +
-      '<div class="bg-circle" style="width: 70mm; height: 70mm; background: #FF82D7; opacity: 0.18; bottom: 20mm; right: 30mm;"></div>' +
-      '<div class="bg-circle" style="width: 36mm; height: 36mm; background: #FFEB5A; opacity: 0.85; bottom: 50mm; left: 18mm;"></div>' +
-      '<div class="content" style="justify-content: space-between;">' +
-        '<div style="display: flex; justify-content: flex-start; align-items: flex-start;">' +
-          logoTag +
-        '</div>' +
-        '<div style="margin-top: 30mm;">' +
-          '<div class="pill pink" style="margin-bottom: 10mm;">SAS AEGIA FOOD · CCN 1501</div>' +
-          '<h1 class="yt" style="margin-bottom: 8mm;">Bienvenue<br/>chez Meshuga !</h1>' +
-          '<div class="rule-y" style="width: 100mm; height: 5px; margin-bottom: 8mm;"></div>' +
-          '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; font-size: 14pt; letter-spacing: 2px; color: #191923;">Dossier de bienvenue</div>' +
-          '<div style="font-size: 22pt; font-weight: 600; margin-top: 6mm; color: #191923;">' + esc(nomComplet) + '</div>' +
-          '<div style="font-size: 11pt; opacity: 0.7; margin-top: 2mm;">' + esc(typeLabel) + (contract.fonction ? ' · ' + esc(contract.fonction) : '') + '</div>' +
-        '</div>' +
-        '<div style="margin-bottom: 0;">' +
-          '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; font-size: 10pt; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.7;">Édité le ' + esc(todayFr()) + '</div>' +
-          '<div style="font-size: 10pt; margin-top: 4mm; line-height: 1.5;">' +
-            '<b>SAS AEGIA FOOD</b><br/>' +
-            '3 rue Vavin — 75006 Paris<br/>' +
-            'RCS Paris 904 639 531' +
+    '<div class="page cover">' +
+      // Cercles décoratifs jaune translucide en arrière-plan
+      '<div class="bg-circle" style="width: 180mm; height: 180mm; background: #FFEB5A; opacity: 0.18; top: -60mm; right: -50mm;"></div>' +
+      '<div class="bg-circle" style="width: 110mm; height: 110mm; background: #FFEB5A; opacity: 0.10; bottom: -30mm; left: -30mm;"></div>' +
+      '<div class="content" style="justify-content: space-between; padding: 0;">' +
+        // Bloc haut : "meshuga" Yellowtail jaune + reference info
+        '<div>' +
+          '<div style="font-family: Yellowtail, cursive; color: #FFEB5A; font-size: 64pt; line-height: 1; letter-spacing: -1px;">meshuga</div>' +
+          '<div style="margin-top: 8mm; font-family: \'Barlow Condensed\', sans-serif; color: #FFEB5A; font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 3px;">' +
+            'PAGE RH · DOSSIER DE BIENVENUE · ' + esc(typeLabel.toUpperCase()) +
           '</div>' +
+        '</div>' +
+        // Bloc milieu : Titre Yellowtail jaune + description
+        '<div>' +
+          '<h1 style="font-family: Yellowtail, cursive; color: #FFEB5A; font-weight: 400; font-size: 80pt; line-height: 1; margin-bottom: 6mm;">Dossier de<br/>bienvenue</h1>' +
+          '<div style="font-family: \'Barlow Condensed\', sans-serif; color: #FFEB5A; font-size: 12pt; font-weight: 600; text-transform: uppercase; letter-spacing: 2.5px; line-height: 1.6;">' +
+            '1 fiche salarié · 1 rappel hygiène · 1 engagement signé' +
+          '</div>' +
+          '<div style="margin-top: 14mm; padding: 6mm 8mm; background: rgba(255,235,90,0.18); border-left: 4px solid #FFEB5A;">' +
+            '<div style="font-family: \'Barlow Condensed\', sans-serif; color: #FFEB5A; font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 3mm;">Salarié</div>' +
+            '<div style="color: #FFEB5A; font-size: 22pt; font-weight: 700; line-height: 1.1;">' + esc(nomComplet) + '</div>' +
+            (contract.fonction ? '<div style="color: #FFEB5A; font-size: 11pt; opacity: 0.85; margin-top: 2mm; font-weight: 500;">' + esc(contract.fonction) + (dateEmbaucheFmt ? ' · embauche ' + esc(dateEmbaucheFmt) : '') + '</div>' : '') +
+          '</div>' +
+        '</div>' +
+        // Bloc bas : à gauche infos AEGIA en jaune, à droite stamp circulaire
+        '<div style="display: flex; justify-content: space-between; align-items: flex-end;">' +
+          '<div style="color: #FFEB5A; font-size: 9pt; line-height: 1.7; font-family: \'Barlow Condensed\', sans-serif; font-weight: 500;">' +
+            '<div style="font-weight: 800; text-transform: uppercase; letter-spacing: 2px; font-size: 9pt; margin-bottom: 2mm;">Édité le ' + esc(todayFr()) + '</div>' +
+            '<div style="font-weight: 700; font-size: 11pt;">SAS AEGIA FOOD</div>' +
+            '<div>3 rue Vavin — 75006 Paris</div>' +
+            '<div>RCS Paris 904 639 531 — TVA FR31904639531</div>' +
+            '<div>CCN Restauration Rapide IDCC 1501</div>' +
+          '</div>' +
+          '<div style="width: 42mm; height: 42mm; flex-shrink: 0;">' + stampSvg + '</div>' +
         '</div>' +
       '</div>' +
     '</div>'
@@ -264,11 +293,11 @@ export function buildWelcomePack(emp, contract, logoUri) {
 
         '<h3 class="bc pink" style="margin-top: 6mm;">Situation familiale <span style="font-weight: 400; font-size: 8.5pt; text-transform: none; letter-spacing: 0; opacity: 0.6; font-family: Barlow, sans-serif; margin-left: 6px;">(non obligatoire — bonne pratique RH)</span></h3>' +
         '<div style="margin-top: 4mm;">' +
-          '<span class="cb"><span class="box ' + checked(msCheck.celibataire) + '"></span>Célibataire</span>' +
-          '<span class="cb"><span class="box ' + checked(msCheck.marie) + '"></span>Marié(e)</span>' +
-          '<span class="cb"><span class="box ' + checked(msCheck.pacs) + '"></span>Pacsé(e)</span>' +
-          '<span class="cb"><span class="box ' + checked(msCheck.divorce) + '"></span>Divorcé(e)</span>' +
-          '<span class="cb"><span class="box ' + checked(msCheck.veuf) + '"></span>Veuf(ve)</span>' +
+          '<span class="cb">' + checkBox(msCheck.celibataire) + 'Célibataire</span>' +
+          '<span class="cb">' + checkBox(msCheck.marie) + 'Marié(e)</span>' +
+          '<span class="cb">' + checkBox(msCheck.pacs) + 'Pacsé(e)</span>' +
+          '<span class="cb">' + checkBox(msCheck.divorce) + 'Divorcé(e)</span>' +
+          '<span class="cb">' + checkBox(msCheck.veuf) + 'Veuf(ve)</span>' +
         '</div>' +
 
         '<h3 class="bc pink" style="margin-top: 6mm;">Personne à prévenir en cas d\'urgence <span style="font-weight: 400; font-size: 8.5pt; text-transform: none; letter-spacing: 0; opacity: 0.6; font-family: Barlow, sans-serif; margin-left: 6px;">(non obligatoire — fortement recommandé)</span></h3>' +
@@ -284,8 +313,8 @@ export function buildWelcomePack(emp, contract, logoUri) {
   // ===== PAGE 3 — INFOS PROFESSIONNELLES + RÈGLES D'HYGIÈNE =====
   var haccpHtml =
     '<div style="margin-top: 4mm;">' +
-      '<span class="cb"><span class="box ' + checked(emp.haccp_done) + '"></span>' + esc(haccpDoneText || "Formation HACCP suivie") + '</span>' +
-      '<span class="cb" style="margin-left: 14px;"><span class="box ' + checked(!emp.haccp_done) + '"></span>' + esc(haccpTodoText || "À planifier auprès de CNFSE") + '</span>' +
+      '<span class="cb">' + checkBox(emp.haccp_done) + esc(haccpDoneText || "Formation HACCP suivie") + '</span>' +
+      '<span class="cb" style="margin-left: 14px;">' + checkBox(!emp.haccp_done) + esc(haccpTodoText || "À planifier auprès de CNFSE") + '</span>' +
     '</div>'
 
   var page3 =
@@ -297,10 +326,10 @@ export function buildWelcomePack(emp, contract, logoUri) {
           '<h2 class="yt">Ton poste & l\'hygiène</h2>' +
           '<div class="pill">Page 2 / 3 administratif</div>' +
         '</div>' +
-        '<div class="rule"></div>' +
+        '<div class="rule" style="margin: 4mm 0;"></div>' +
 
-        '<h3 class="bc pink">Tes informations professionnelles</h3>' +
-        '<div class="grid2" style="margin-top: 4mm;">' +
+        '<h3 class="bc pink" style="font-size: 13pt;">Tes informations professionnelles</h3>' +
+        '<div class="grid2" style="margin-top: 2mm; gap: 1mm 8mm;">' +
           fld("Type de contrat", typeLabel) +
           fld("Date d\'embauche / début", dateEmbaucheFmt) +
           fld("Fonction", contract.fonction) +
@@ -309,26 +338,26 @@ export function buildWelcomePack(emp, contract, logoUri) {
           fld("Temps de travail", heuresLine || (contract.type === "extra" ? "Vacations selon planning" : "")) +
         '</div>' +
 
-        '<h3 class="bc pink" style="margin-top: 5mm;">Formation hygiène alimentaire</h3>' +
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 13pt;">Formation hygiène alimentaire</h3>' +
         haccpHtml +
-        '<p style="font-size: 9.5pt; opacity: 0.7; margin-top: 3mm; font-style: italic;">' +
-          'La formation HACCP (Hazard Analysis Critical Control Point) est obligatoire pour au moins une personne par établissement de restauration commerciale (décret du 24 juin 2011).' +
+        '<p style="font-size: 8.5pt; opacity: 0.7; margin-top: 2mm; font-style: italic; line-height: 1.4;">' +
+          'La formation HACCP est obligatoire pour au moins une personne par établissement de restauration commerciale (décret du 24 juin 2011).' +
         '</p>' +
 
-        '<h3 class="bc pink" style="margin-top: 6mm;">Règles d\'hygiène à respecter en cuisine</h3>' +
-        '<div class="legal-box">' +
-          '<div class="ref">Article L4122-1 du Code du travail</div>' +
-          'Conformément aux instructions qui te sont données, il t\'incombe de prendre soin, en fonction de ta formation et selon tes possibilités, de ta santé et de ta sécurité ainsi que de celles des autres personnes concernées par tes actes ou tes omissions au travail.' +
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 13pt;">Règles d\'hygiène à respecter en cuisine</h3>' +
+        '<div class="legal-box" style="padding: 6px 10px; margin: 2mm 0; font-size: 9pt;">' +
+          '<div class="ref" style="font-size: 8.5pt; margin-bottom: 2px;">Article L4122-1 du Code du travail</div>' +
+          'Il t\'incombe de prendre soin, selon ta formation et tes possibilités, de ta santé, de ta sécurité, et de celles des personnes concernées par tes actes ou omissions au travail.' +
         '</div>' +
-        '<ul class="tidy">' +
-          '<li><b>Lavage des mains</b> systématique à l\'arrivée, après chaque pause, après passage aux toilettes, après manipulation de produit cru ou de déchets — eau chaude + savon pro + essuie-mains à usage unique.</li>' +
-          '<li><b>Tenue complète</b> obligatoire en zone de production : uniforme propre, charlotte, gants nitrile pour la manipulation, chaussures de sécurité antidérapantes.</li>' +
-          '<li><b>Pas de bijoux</b> (bagues, montres, bracelets), pas d\'ongles longs ou vernis, pas de téléphone portable sur le plan de travail.</li>' +
-          '<li><b>Marche en avant</b> respectée : produits crus → préparation → cuisson → refroidissement → distribution. Aucun croisement entre flux propre et flux sale.</li>' +
-          '<li><b>Températures</b> contrôlées 2× par jour : froid positif ≤ 4 °C, congélateur ≤ −18 °C, plats chauds ≥ 63 °C. Relevés sur la fiche F1.</li>' +
-          '<li><b>Nettoyage et désinfection</b> selon le plan affiché en cuisine (vinaigre blanc plancha + friteuse 2×/j, Assainythol plan de travail 2×/j, Aspec vaisselle, Daily Klean\'Vitres). Relevés sur la fiche F6.</li>' +
-          '<li><b>Maladie ou blessure</b> à signaler immédiatement à l\'employeur — pansement bleu détectable obligatoire pour toute coupure.</li>' +
-          '<li><b>DLC / DLUO</b> à vérifier à chaque utilisation. Tout produit douteux est jeté et signalé.</li>' +
+        '<ul class="tidy" style="margin: 2mm 0;">' +
+          '<li><b>Lavage des mains</b> à l\'arrivée, après chaque pause, après passage aux toilettes, après manipulation de cru ou de déchets — eau chaude + savon pro + essuie-mains UU.</li>' +
+          '<li><b>Tenue complète</b> en zone de production : uniforme propre, charlotte, gants nitrile, chaussures de sécurité antidérapantes.</li>' +
+          '<li><b>Pas de bijoux</b> (bagues, montres, bracelets), pas d\'ongles longs ou vernis, pas de téléphone sur le plan de travail.</li>' +
+          '<li><b>Marche en avant</b> : crus → préparation → cuisson → refroidissement → distribution. Aucun croisement flux propre / flux sale.</li>' +
+          '<li><b>Températures</b> contrôlées 2× / jour : froid ≤ 4 °C, congélateur ≤ −18 °C, plats chauds ≥ 63 °C — relevés fiche F1.</li>' +
+          '<li><b>Nettoyage</b> selon plan affiché : vinaigre blanc plancha+friteuse 2×/j, Assainythol plan travail 2×/j, Aspec vaisselle — relevés fiche F6.</li>' +
+          '<li><b>Maladie ou blessure</b> signalée immédiatement — pansement bleu détectable obligatoire pour toute coupure.</li>' +
+          '<li><b>DLC / DLUO</b> vérifiées à chaque utilisation. Tout produit douteux est jeté et signalé.</li>' +
         '</ul>' +
 
       '</div>' +
@@ -345,48 +374,52 @@ export function buildWelcomePack(emp, contract, logoUri) {
           '<h2 class="yt">Engagement de lecture</h2>' +
           '<div class="pill">Page 3 / 3 administratif</div>' +
         '</div>' +
-        '<div class="rule"></div>' +
+        '<div class="rule" style="margin: 3mm 0;"></div>' +
 
-        '<p class="lead" style="margin-top: 4mm;">' +
+        '<p style="margin-top: 2mm; font-size: 10.5pt; line-height: 1.5;">' +
           'En tant que nouveau membre de l\'équipe Meshuga, tu reconnais avoir reçu et lu attentivement le présent dossier de bienvenue, comprenant tes informations administratives, les règles d\'hygiène alimentaire et les obligations de sécurité au travail.' +
         '</p>' +
 
-        '<div class="legal-box" style="margin-top: 5mm;">' +
-          '<div class="ref">Article L1331-1 du Code du travail</div>' +
-          'Constitue une sanction toute mesure, autre que les observations verbales, prise par l\'employeur à la suite d\'un agissement du salarié considéré par lui comme fautif, que cette mesure soit de nature à affecter immédiatement ou non la présence du salarié dans l\'entreprise, sa fonction, sa carrière ou sa rémunération. La connaissance préalable des règles internes par le salarié conditionne leur opposabilité.' +
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 12pt;">Sanctions en cas de non-respect des règles</h3>' +
+        '<div class="legal-box" style="padding: 6px 10px; margin: 2mm 0; font-size: 9pt;">' +
+          '<div class="ref" style="font-size: 8.5pt; margin-bottom: 2px;">Articles L1331-1 et L1332-1 à L1332-5 du Code du travail</div>' +
+          'Tout manquement aux règles d\'hygiène, de sécurité ou aux consignes de l\'employeur est susceptible de constituer une faute ouvrant droit à sanction disciplinaire. Toute sanction est précédée d\'un entretien préalable et notifiée par lettre motivée. La prescription des faits fautifs est de 2 mois (L.1332-4).' +
         '</div>' +
-
-        '<div class="legal-box">' +
-          '<div class="ref">Article L4122-1 du Code du travail</div>' +
-          'Conformément aux instructions qui lui sont données par l\'employeur, il incombe à chaque travailleur de prendre soin, en fonction de sa formation et selon ses possibilités, de sa santé et de sa sécurité ainsi que de celles des autres personnes concernées par ses actes ou ses omissions au travail.' +
+        '<div class="legal-box" style="padding: 6px 10px; margin: 2mm 0; font-size: 9pt;">' +
+          '<div class="ref" style="font-size: 8.5pt; margin-bottom: 2px;">Article R4741-1 du Code du travail</div>' +
+          'Le manquement aux règles d\'hygiène et de sécurité par le salarié peut être sanctionné, indépendamment de la responsabilité pénale de l\'employeur en cas d\'infraction constatée par les services de contrôle (DDPP, Inspection du travail).' +
         '</div>' +
+        '<p style="font-size: 9.5pt; margin-top: 2mm; line-height: 1.5;">' +
+          'Selon la gravité du manquement constaté, l\'employeur peut prononcer&nbsp;: <b>avertissement écrit</b>, <b>blâme</b>, <b>mise à pied disciplinaire</b>, <b>mutation</b> ou <b>rétrogradation</b>, et jusqu\'au <b>licenciement pour faute simple, grave ou lourde</b> en cas de manquement caractérisé mettant en péril la santé publique, la sécurité de l\'équipe ou la réputation de l\'établissement.' +
+        '</p>' +
 
-        '<p style="margin-top: 5mm; font-size: 10.5pt;">' +
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 12pt;">Mes engagements</h3>' +
+        '<p style="margin-top: 1mm; font-size: 10pt;">' +
           '<b>Je soussigné(e) ' + esc(nomComplet) + '</b>, reconnais&nbsp;:' +
         '</p>' +
-        '<ul class="tidy" style="margin-top: 2mm;">' +
-          '<li>avoir reçu en main propre le présent dossier de bienvenue Meshuga (3 pages administratives + cette page d\'engagement)&nbsp;;</li>' +
-          '<li>avoir lu et compris les règles d\'hygiène alimentaire et les consignes de sécurité au travail qui y figurent&nbsp;;</li>' +
-          '<li>m\'engager à les respecter dans l\'exercice de mes fonctions, et à signaler immédiatement à l\'employeur tout manquement ou risque que je viendrais à constater.</li>' +
+        '<ul class="tidy" style="margin: 1mm 0;">' +
+          '<li>avoir reçu en main propre le présent dossier de bienvenue Meshuga&nbsp;;</li>' +
+          '<li>avoir lu et compris les règles d\'hygiène alimentaire, les consignes de sécurité au travail et les sanctions encourues qui y figurent&nbsp;;</li>' +
+          '<li>m\'engager à les respecter rigoureusement dans l\'exercice de mes fonctions, et à signaler immédiatement à l\'employeur tout manquement ou risque que je viendrais à constater.</li>' +
         '</ul>' +
 
-        '<div class="sig-box">' +
-          '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; font-size: 10pt;">' +
+        '<div class="sig-box" style="margin-top: 4mm; padding: 6mm;">' +
+          '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; font-size: 9.5pt;">' +
             'Mention manuscrite obligatoire avant signature : <span style="color: #FF82D7;">«&nbsp;Lu et approuvé&nbsp;»</span>' +
           '</div>' +
-          '<div class="sig-grid">' +
+          '<div class="sig-grid" style="margin-top: 4mm; gap: 6mm;">' +
             '<div>' +
-              '<div class="sig-line"></div>' +
+              '<div class="sig-line" style="min-height: 14mm;"></div>' +
               '<div class="sig-cap">Le salarié — date + « Lu et approuvé » + signature</div>' +
             '</div>' +
             '<div>' +
-              '<div class="sig-line"></div>' +
+              '<div class="sig-line" style="min-height: 14mm;"></div>' +
               '<div class="sig-cap">L\'employeur — Edward TOURET, Président SAS AEGIA</div>' +
             '</div>' +
           '</div>' +
         '</div>' +
 
-        '<p style="margin-top: 6mm; font-size: 9.5pt; opacity: 0.6; font-style: italic;">' +
+        '<p style="margin-top: 4mm; font-size: 8.5pt; opacity: 0.55; font-style: italic; line-height: 1.4;">' +
           'Document conservé dans le dossier RH du salarié pendant toute la durée du contrat et 5 ans après sa sortie effective (article D.1221-24 du Code du travail).' +
         '</p>' +
 
