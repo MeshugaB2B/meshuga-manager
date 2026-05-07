@@ -677,19 +677,32 @@ export function buildWelcomePack(emp, contract, logoUri) {
     "@page { size: A4; margin: 0; }" +
     "html, body { background: #EDEDED; }" +
     "body { font-family: 'Barlow', sans-serif; color: #191923; font-size: 11pt; line-height: 1.5; }" +
+    // .page = page LOGIQUE (chapitre thématique). Pas de hauteur max : le contenu peut s'étendre,
+    // et le navigateur ajoute automatiquement des pages physiques A4 si besoin (page-break-after: always).
+    // overflow: visible empêche tout crop. Les sections atomiques (.legal-box, .sig-block, .section)
+    // utilisent page-break-inside: avoid pour ne jamais être coupées entre deux pages physiques.
     ".page {" +
-    "  width: 210mm; min-height: 297mm; max-height: 297mm; height: 297mm;" +
-    "  padding: 18mm 18mm 18mm 18mm;" +
+    "  width: 210mm; min-height: 297mm;" +
+    "  padding: 18mm 18mm 14mm 18mm;" +
     "  margin: 0 auto 8mm auto;" +
     "  background: #FFFFFF;" +
     "  position: relative;" +
-    "  overflow: hidden;" +
+    "  overflow: visible;" +
     "  page-break-after: always;" +
+    "  display: flex; flex-direction: column;" +
     "}" +
     ".page:last-of-type { page-break-after: auto; margin-bottom: 0; }" +
-    ".page.cover { background: #FF82D7; padding: 22mm 22mm 22mm 22mm; }" +
+    // La couverture seule conserve une taille FIXE (artistique, pas de contenu fluctuant).
+    ".page.cover { background: #FF82D7; height: 297mm; min-height: 297mm; max-height: 297mm; padding: 22mm 22mm 22mm 22mm; overflow: hidden; }" +
     ".bg-circle { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; }" +
-    ".content { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; }" +
+    // .content : flex-grow pour pousser le footer en bas via margin-top: auto
+    ".content { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; }" +
+    // Sections atomiques : ne jamais couper un h3+contenu entre 2 pages physiques.
+    // Le wrapper .section regroupe titre + contenu pour préserver la cohérence à l'impression.
+    ".section { page-break-inside: avoid; break-inside: avoid; margin-bottom: 3mm; }" +
+    "h3.bc { page-break-after: avoid; break-after: avoid; }" +
+    ".legal-box { page-break-inside: avoid; break-inside: avoid; }" +
+    ".sig-block { page-break-inside: avoid; break-inside: avoid; }" +
     "h1.yt { font-family: 'Yellowtail', cursive; color: #FF82D7; font-weight: 400; font-size: 64pt; line-height: 1.05; }" +
     "h2.yt { font-family: 'Yellowtail', cursive; color: #FF82D7; font-weight: 400; font-size: 32pt; line-height: 1.4; padding-bottom: 2mm; }" +
     "h3.bc { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 16pt; text-transform: uppercase; letter-spacing: 1.5px; color: #191923; }" +
@@ -718,7 +731,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
     ".sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; margin-top: 6mm; }" +
     ".sig-line { border-bottom: 1px solid #191923; min-height: 18mm; padding-bottom: 4px; }" +
     ".sig-cap { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; margin-top: 4px; }" +
-    ".footer { position: absolute; bottom: 8mm; left: 18mm; right: 18mm; font-family: 'Barlow Condensed', sans-serif; font-size: 8pt; color: #999; text-align: center; letter-spacing: 1px; text-transform: uppercase; }" +
+    ".footer { margin-top: auto; padding-top: 6mm; font-family: 'Barlow Condensed', sans-serif; font-size: 8pt; color: #999; text-align: center; letter-spacing: 1px; text-transform: uppercase; }" +
     // Force le rendu fidèle des couleurs et fonds à l'écran ET à l'impression.
     // Sans ces propriétés, Chrome/Safari/Firefox suppriment les fonds colorés à l'impression
     // pour économiser l'encre — la couverture rose et tous les accents Meshuga disparaîtraient.
@@ -744,11 +757,12 @@ export function buildWelcomePack(emp, contract, logoUri) {
     "@media print {" +
     "  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
     "  html, body { background: #FFFFFF !important; }" +
-    "  .page { margin: 0 !important; box-shadow: none !important; page-break-after: always; width: 210mm !important; min-height: 297mm !important; max-height: 297mm !important; height: 297mm !important; padding: 18mm !important; overflow: hidden !important; }" +
-    "  .page.cover { background: #FF82D7 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; padding: 22mm !important; }" +
+    "  .page { margin: 0 !important; box-shadow: none !important; page-break-after: always; }" +
+    "  .page.cover { background: #FF82D7 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; height: 297mm !important; }" +
     "  .page:last-of-type { page-break-after: auto; }" +
-    "  .footer { position: absolute !important; bottom: 8mm !important; left: 18mm !important; right: 18mm !important; }" +
     "  .bg-circle { display: block !important; }" +
+    "  .section, .legal-box, .sig-block { page-break-inside: avoid !important; break-inside: avoid !important; }" +
+    "  h3.bc { page-break-after: avoid !important; break-after: avoid !important; }" +
     "}"
 
   // ===== PAGE 1 — COUVERTURE (style Affiches cuisine : fond rose plein) =====
@@ -920,21 +934,6 @@ export function buildWelcomePack(emp, contract, logoUri) {
           '<b>' + g('Tu es tenu', 'Tu es tenue') + ' de connaître la composition de chaque produit servi</b> et de répondre précisément à toute question client sur les allergènes. La fiche allergènes complète est affichée en cuisine et consultable dans le classeur récapitulatif.' +
         '</p>' +
 
-        '<h3 class="bc pink" style="margin-top: 3mm; font-size: 12pt;">Règles d\'hygiène à respecter en cuisine</h3>' +
-        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
-          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Article L4122-1 du Code du travail</div>' +
-          'Il t\'incombe de prendre soin, selon ta formation et tes possibilités, de ta santé, de ta sécurité et de celles des personnes concernées par tes actes ou omissions.' +
-        '</div>' +
-        '<ul class="tidy" style="margin: 1mm 0; font-size: 8.5pt;">' +
-          '<li><b>Lavage des mains</b> : arrivée, après chaque pause, après toilettes, après cru/déchets — eau chaude + savon pro + essuie-mains UU.</li>' +
-          '<li><b>Tenue complète</b> : uniforme, charlotte, gants nitrile, chaussures de sécurité antidérapantes. Pas de bijoux, pas d\'ongles longs/vernis, pas de téléphone sur le plan de travail.</li>' +
-          '<li><b>Marche en avant</b> : crus → préparation → cuisson → refroidissement → distribution. Aucun croisement flux propre / flux sale.</li>' +
-          '<li><b>Températures</b> 2× / jour : froid ≤ 4 °C, congélateur ≤ −18 °C, plats chauds ≥ 63 °C — relevés fiche F1.</li>' +
-          '<li><b>Nettoyage</b> selon plan affiché : vinaigre blanc plancha+friteuse 2×/j, Assainythol plan travail 2×/j, Aspec vaisselle — relevés fiche F6.</li>' +
-          '<li><b>Maladie / blessure</b> signalée immédiatement — pansement bleu détectable obligatoire pour toute coupure.</li>' +
-          '<li><b>DLC / DLUO</b> vérifiées à chaque utilisation. Tout produit douteux est jeté et signalé.</li>' +
-        '</ul>' +
-
       '</div>' +
       '<div class="footer">SAS AEGIA FOOD — Dossier de bienvenue Meshuga — ' + esc(nomComplet) + '</div>' +
     '</div>'
@@ -991,6 +990,21 @@ export function buildWelcomePack(emp, contract, logoUri) {
           '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Articles L4131-1 à L4131-3 du Code du travail</div>' +
           'En cas de <b>danger grave et imminent</b> pour ta vie ou ta santé, tu as le droit&nbsp;: <b>(1)</b> d\'alerter immédiatement l\'employeur (oralement puis par écrit), <b>(2)</b> de te retirer de la situation dangereuse. <b>Aucune sanction ni retenue de salaire ne peut être prise contre ' + g('un salarié', 'une salariée') + ' ayant exercé ce droit de bonne foi.</b> L\'employeur ne peut imposer la reprise du travail tant que la situation de danger persiste.' +
         '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 12pt;">Règles d\'hygiène à respecter en cuisine</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Article L4122-1 du Code du travail</div>' +
+          'Il t\'incombe de prendre soin, selon ta formation et tes possibilités, de ta santé, de ta sécurité et de celles des personnes concernées par tes actes ou omissions.' +
+        '</div>' +
+        '<ul class="tidy" style="margin: 1mm 0; font-size: 8.5pt;">' +
+          '<li><b>Lavage des mains</b> : arrivée, après chaque pause, après toilettes, après cru/déchets — eau chaude + savon pro + essuie-mains UU.</li>' +
+          '<li><b>Tenue complète</b> : uniforme, charlotte, gants nitrile, chaussures de sécurité antidérapantes. Pas de bijoux, pas d\'ongles longs/vernis, pas de téléphone sur le plan de travail.</li>' +
+          '<li><b>Marche en avant</b> : crus → préparation → cuisson → refroidissement → distribution. Aucun croisement flux propre / flux sale.</li>' +
+          '<li><b>Températures</b> 2× / jour : froid ≤ 4 °C, congélateur ≤ −18 °C, plats chauds ≥ 63 °C — relevés fiche F1.</li>' +
+          '<li><b>Nettoyage</b> selon plan affiché : vinaigre blanc plancha+friteuse 2×/j, Assainythol plan travail 2×/j, Aspec vaisselle — relevés fiche F6.</li>' +
+          '<li><b>Maladie / blessure</b> signalée immédiatement — pansement bleu détectable obligatoire pour toute coupure.</li>' +
+          '<li><b>DLC / DLUO</b> vérifiées à chaque utilisation. Tout produit douteux est jeté et signalé.</li>' +
+        '</ul>' +
 
       '</div>' +
       '<div class="footer">SAS AEGIA FOOD — Dossier de bienvenue Meshuga — ' + esc(nomComplet) + '</div>' +
@@ -1149,7 +1163,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '</ol>' +
 
         // ===== 2 BEAUX BLOCS SIGNATURES =====
-        '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin-top: 3mm;">' +
+        '<div class="sig-block" style="display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin-top: 10mm;">' +
           // Bloc gauche : Le/La salarié·e (rose Meshuga)
           '<div style="border: 2.5px solid #FF82D7; border-radius: 6px; padding: 4mm; background: rgba(255,130,215,0.04); position: relative;">' +
             '<div style="position: absolute; top: -3mm; left: 4mm; background: #FFFFFF; padding: 0 5px; font-family: Yellowtail, cursive; color: #FF82D7; font-size: 16pt; line-height: 1;">' + g("Le salarié", "La salariée") + '</div>' +
