@@ -5,6 +5,7 @@ import { LOGO_PINK } from "./logos"
 import RhWizard from "./rh/RhWizard"
 import EmployeeDetail from "./rh/EmployeeDetail"
 import { buildContract } from "./rh/contractBuilders"
+import { buildWelcomePack } from "./rh/welcomePackBuilder"
 import { getContractTypeMeta } from "./rh/rhConstants"
 
 // ============================================================
@@ -31,6 +32,7 @@ export default function RhTab() {
   var [wizardForEmployee, setWizardForEmployee] = useState(null)
   var [viewingEmployeeId, setViewingEmployeeId] = useState(null)
   var [previewContract, setPreviewContract] = useState(null)
+  var [welcomePackEmpId, setWelcomePackEmpId] = useState(null)
   var [search, setSearch] = useState("")
   var [toast, setToast] = useState("")
 
@@ -290,6 +292,7 @@ export default function RhTab() {
             setShowWizard(true)
             setViewingEmployeeId(null)
           }}
+          onWelcomePackPreview={function (empId) { setWelcomePackEmpId(empId) }}
         />
       )}
 
@@ -298,6 +301,14 @@ export default function RhTab() {
         <ContractPreview
           contract={previewContract}
           onClose={function () { setPreviewContract(null) }}
+        />
+      )}
+
+      {/* === PREVIEW DOSSIER DE BIENVENUE === */}
+      {welcomePackEmpId && (
+        <WelcomePackPreview
+          employeeId={welcomePackEmpId}
+          onClose={function () { setWelcomePackEmpId(null) }}
         />
       )}
 
@@ -360,6 +371,80 @@ function ContractPreview(props) {
           ref={iframeRef}
           style={{ flex: 1, width: "100%", border: "none", background: "#EDEDED" }}
           title="Contrat preview"
+        />
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// WELCOME PACK PREVIEW (modal aperçu Dossier de bienvenue)
+// ============================================================
+// Charge l'employé + son contrat le plus récent (non-archivé prioritaire)
+// puis génère le HTML 4 pages via buildWelcomePack et l'injecte dans iframe.
+// ============================================================
+function WelcomePackPreview(props) {
+  var [emp, setEmp] = useState(null)
+  var [contract, setContract] = useState(null)
+  var [loaded, setLoaded] = useState(false)
+  var iframeRef = useRef(null)
+
+  useEffect(function () {
+    var run = async function () {
+      var resE = await supabase.from("hr_employees").select("*").eq("id", props.employeeId).single()
+      var resC = await supabase
+        .from("hr_contracts")
+        .select("*")
+        .eq("employee_id", props.employeeId)
+        .order("created_at", { ascending: false })
+      // Priorité : non-archivé le plus récent, sinon le tout dernier
+      var contractsArr = resC.data || []
+      var active = contractsArr.filter(function (c) { return c.status !== "archived" })
+      var pick = active.length > 0 ? active[0] : (contractsArr[0] || null)
+      setEmp(resE.data || {})
+      setContract(pick)
+      setLoaded(true)
+    }
+    run()
+  }, [])
+
+  useEffect(function () {
+    if (!loaded || !iframeRef.current) return
+    var doc = iframeRef.current.contentDocument
+    if (!doc) return
+    var html = buildWelcomePack(emp || {}, contract || {}, LOGO_PINK)
+    doc.open()
+    doc.write(html)
+    doc.close()
+  }, [loaded])
+
+  function printNow() {
+    if (!iframeRef.current) return
+    iframeRef.current.contentWindow.focus()
+    iframeRef.current.contentWindow.print()
+  }
+
+  var titleName = emp ? ((emp.prenom || "") + " " + ((emp.nom || "").toUpperCase())).trim() : ""
+
+  return (
+    <div className="overlay" onClick={function (e) { if (e.target === e.currentTarget) props.onClose() }}>
+      <div className="modal modal-xl" style={{ maxWidth: 920, height: "92vh", display: "flex", flexDirection: "column" }}>
+        <div className="mh" style={{ position: "sticky", top: 0, zIndex: 10, background: "#FFFFFF" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div className="mt" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 22 }}>📋</span>
+              <span>Dossier de bienvenue{titleName ? " — " + titleName : ""}</span>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button className="btn btn-y" onClick={printNow}>↓ Imprimer en PDF</button>
+              <button className="btn" onClick={props.onClose}>Fermer</button>
+            </div>
+          </div>
+        </div>
+        <iframe
+          ref={iframeRef}
+          style={{ flex: 1, width: "100%", border: "none", background: "#EDEDED" }}
+          title="Dossier de bienvenue preview"
         />
       </div>
     </div>
