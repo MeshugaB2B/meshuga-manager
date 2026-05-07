@@ -82,45 +82,82 @@ export async function POST(req: Request) {
 
     var slug = slugify(label || doc_type)
 
-    // 1. Upload chaque page individuellement
+    // Détection mode mono-PDF : un seul fichier qui est un PDF.
+    // Dans ce cas, pas d'assemblage — le PDF est directement le doc final.
+    var isPdfMode = false
+    if (files.length === 1) {
+      var firstMime = (files[0].type || '').toLowerCase()
+      if (firstMime === 'application/pdf') isPdfMode = true
+    }
+    // Validation : pas de mix images+PDFs
+    if (!isPdfMode) {
+      for (var fi = 0; fi < files.length; fi++) {
+        if ((files[fi].type || '').toLowerCase() === 'application/pdf') {
+          return NextResponse.json(
+            { error: 'Mix PDF + images non supporté. Envoyez soit UN PDF, soit des images.' },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
+    // 1. Upload chaque page individuellement (sauf en mode PDF où on uploade direct comme assembled)
     var pages: Array<{ path: string; page_number: number; mime_type: string; size_bytes: number }> = []
     var pageBuffers: Array<{ buffer: Buffer; mimeType: string }> = []
+    var assembledPdfPath: string | null = null
 
-    for (var p = 0; p < files.length; p++) {
-      var file = files[p]
-      var arrayBuf = await file.arrayBuffer()
-      var buffer = Buffer.from(arrayBuf)
-      var mime = file.type || 'application/octet-stream'
-      var ext = extFromMime(mime, file.name)
-
-      var path = buildPagePath({
+    if (isPdfMode) {
+      // Mode PDF mono : on stocke directement comme assembled (pas de pages individuelles)
+      var pdfFile = files[0]
+      var pdfArrayBuf = await pdfFile.arrayBuffer()
+      var pdfBuffer = Buffer.from(pdfArrayBuf)
+      assembledPdfPath = buildAssembledPath({
         employeeId: contract.employee_id,
         cycleId: contract.cycle_id,
         contractId: contract_id,
+        docType: doc_type,
         slug,
-        pageNumber: p + 1,
-        ext,
       })
+      await uploadToHrBucket(admin, assembledPdfPath, pdfBuffer, 'application/pdf')
+      uploadedPaths.push(assembledPdfPath)
+      // pages[] reste vide pour signaler qu'il n'y a pas de pages images individuelles
+    } else {
+      // Mode photos classique
+      for (var p = 0; p < files.length; p++) {
+        var file = files[p]
+        var arrayBuf = await file.arrayBuffer()
+        var buffer = Buffer.from(arrayBuf)
+        var mime = file.type || 'application/octet-stream'
+        var ext = extFromMime(mime, file.name)
 
-      await uploadToHrBucket(admin, path, buffer, mime)
-      uploadedPaths.push(path)
+        var path = buildPagePath({
+          employeeId: contract.employee_id,
+          cycleId: contract.cycle_id,
+          contractId: contract_id,
+          slug,
+          pageNumber: p + 1,
+          ext,
+        })
 
-      pages.push({
-        path,
-        page_number: p + 1,
-        mime_type: mime,
-        size_bytes: buffer.length,
-      })
-      pageBuffers.push({ buffer, mimeType: mime })
+        await uploadToHrBucket(admin, path, buffer, mime)
+        uploadedPaths.push(path)
+
+        pages.push({
+          path,
+          page_number: p + 1,
+          mime_type: mime,
+          size_bytes: buffer.length,
+        })
+        pageBuffers.push({ buffer, mimeType: mime })
+      }
     }
 
-    // 2. Optionnel : assembler un PDF
-    var assembledPdfPath: string | null = null
+    // 2. Optionnel : assembler un PDF (uniquement en mode photos)
     var totalSize = pages.reduce(function (acc, pg) {
       return acc + pg.size_bytes
     }, 0)
 
-    if (assemble_pdf_flag) {
+    if (!isPdfMode && assemble_pdf_flag && pages.length > 0) {
       try {
         var pdfBytes = await assemblePdfFromImages(pageBuffers)
         var pdfBuf = Buffer.from(pdfBytes)
@@ -141,6 +178,19 @@ export async function POST(req: Request) {
     }
 
     // 3. Créer la row hr_contract_documents
+    var docFilePath: string
+    var docMime: string
+    var docSize: number | null
+    if (isPdfMode) {
+      docFilePath = assembledPdfPath as string
+      docMime = 'application/pdf'
+      docSize = files[0].size
+    } else {
+      docFilePath = assembledPdfPath || pages[0].path
+      docMime = assembledPdfPath ? 'application/pdf' : pages[0].mime_type
+      docSize = assembledPdfPath ? null : totalSize
+    }
+
     var { data: doc, error: docErr } = await admin
       .from('hr_contract_documents')
       .insert({
@@ -148,11 +198,10 @@ export async function POST(req: Request) {
         doc_type,
         label,
         period_month,
-        // file_path = path principal (PDF assemblé si dispo, sinon 1ère page)
-        file_path: assembledPdfPath || pages[0].path,
-        mime_type: assembledPdfPath ? 'application/pdf' : pages[0].mime_type,
-        size_bytes: assembledPdfPath ? null : totalSize,
-        pages: pages,
+        file_path: docFilePath,
+        mime_type: docMime,
+        size_bytes: docSize,
+        pages: pages, // [] en mode PDF, peuplé en mode photos
         assembled_pdf_path: assembledPdfPath,
       })
       .select('*')
@@ -169,6 +218,7 @@ export async function POST(req: Request) {
       pages_paths: pages.map(function (pg) { return pg.path }),
       assembled_pdf_path: assembledPdfPath,
       bucket: HR_BUCKET,
+      mode: isPdfMode ? 'pdf' : 'photos',
     })
   } catch (e: any) {
     // Rollback storage en cas d'erreur partielle
