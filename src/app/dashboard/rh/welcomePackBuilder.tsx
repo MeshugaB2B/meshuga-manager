@@ -679,9 +679,16 @@ export function buildWelcomePack(emp, contract, logoUri) {
     ".sig-line { border-bottom: 1px solid #191923; min-height: 18mm; padding-bottom: 4px; }" +
     ".sig-cap { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; margin-top: 4px; }" +
     ".footer { position: absolute; bottom: 8mm; left: 18mm; right: 18mm; font-family: 'Barlow Condensed', sans-serif; font-size: 8pt; color: #999; text-align: center; letter-spacing: 1px; text-transform: uppercase; }" +
+    // Force le rendu fidèle des couleurs et fonds à l'écran ET à l'impression.
+    // Sans ces propriétés, Chrome/Safari/Firefox suppriment les fonds colorés à l'impression
+    // pour économiser l'encre — la couverture rose et tous les accents Meshuga disparaîtraient.
+    "* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
+    "html, body, .page, .page.cover, .bg-circle, .legal-box, .pill, .sig-box, .cb .box, .cb .box.checked { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }" +
     "@media print {" +
+    "  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
     "  html, body { background: #FFFFFF !important; }" +
     "  .page { margin: 0 !important; box-shadow: none !important; page-break-after: always; }" +
+    "  .page.cover { background: #FF82D7 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }" +
     "  .page:last-of-type { page-break-after: auto; }" +
     "}"
 
