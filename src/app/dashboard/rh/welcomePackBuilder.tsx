@@ -601,6 +601,22 @@ export function buildWelcomePack(emp, contract, logoUri) {
     heuresLine = contract.heures_hebdo + " h / semaine"
   }
 
+  // Période d'essai selon type de contrat (CCN 1501 + L1221-19/22 du Code du travail)
+  // CCN Restauration Rapide IDCC 1501 :
+  //   - Niveaux I à III (employés) : 1 mois renouvelable 1×, max 2 mois
+  //   - Niveaux IV (agents de maîtrise) : 2 mois renouvelable 1×, max 4 mois
+  //   - Niveau V (cadres) : 3 mois renouvelable 1×, max 6 mois (limite légale L1221-19)
+  // CDD d'usage : durée maximale 1 jour par semaine de contrat, plafonné à 1 mois (L1242-10)
+  var periodeEssaiLine = ""
+  if (contract.type === "extra") {
+    periodeEssaiLine = "Sans objet pour CDD d'usage de courte durée — relation contractuelle à durée déterminée encadrée par les articles L1242-1 et suivants."
+  } else if (contract.type === "cdi_cadre") {
+    periodeEssaiLine = "3 mois, renouvelable une fois pour 3 mois (durée max 6 mois, art. L1221-19 et L1221-21 + CCN 1501). Délais de prévenance : L1221-25."
+  } else {
+    // cdi_cuisinier ou cdi_caissier (employé non-cadre)
+    periodeEssaiLine = "1 mois, renouvelable une fois pour 1 mois (durée max 2 mois, CCN 1501 art. 6). Délais de prévenance : L1221-25."
+  }
+
   // Situation familiale
   var ms = (emp.marital_status || "").toLowerCase()
   var msCheck = {
@@ -651,7 +667,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
     ".bg-circle { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; }" +
     ".content { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; }" +
     "h1.yt { font-family: 'Yellowtail', cursive; color: #FF82D7; font-weight: 400; font-size: 64pt; line-height: 1.05; }" +
-    "h2.yt { font-family: 'Yellowtail', cursive; color: #FF82D7; font-weight: 400; font-size: 36pt; line-height: 1.1; }" +
+    "h2.yt { font-family: 'Yellowtail', cursive; color: #FF82D7; font-weight: 400; font-size: 32pt; line-height: 1.4; padding-bottom: 2mm; }" +
     "h3.bc { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 16pt; text-transform: uppercase; letter-spacing: 1.5px; color: #191923; }" +
     "h3.bc.pink { color: #FF82D7; }" +
     ".rule { height: 3px; background: #FF82D7; width: 64px; margin: 6mm 0; border-radius: 2px; }" +
@@ -711,7 +727,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '<div>' +
           '<h1 style="font-family: Yellowtail, cursive; color: #FFEB5A; font-weight: 400; font-size: 80pt; line-height: 1; margin-bottom: 6mm;">Dossier de<br/>bienvenue</h1>' +
           '<div style="font-family: \'Barlow Condensed\', sans-serif; color: #FFEB5A; font-size: 12pt; font-weight: 600; text-transform: uppercase; letter-spacing: 2.5px; line-height: 1.6;">' +
-            '1 fiche ' + g('salarié', 'salariée') + ' · 1 rappel hygiène · 1 engagement signé' +
+            'Identité · Poste · Sécurité · Cadre social · Engagement signé' +
           '</div>' +
           '<div style="margin-top: 14mm; padding: 6mm 8mm; background: rgba(255,235,90,0.18); border-left: 4px solid #FFEB5A;">' +
             '<div style="font-family: \'Barlow Condensed\', sans-serif; color: #FFEB5A; font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 3mm;">' + g('Salarié', 'Salariée') + '</div>' +
@@ -758,7 +774,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
       '<div class="content">' +
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
           '<h2 class="yt">' + g("Fiche du salarié", "Fiche de la salariée") + '</h2>' +
-          '<div class="pill">Page 1 / 3 administratif</div>' +
+          '<div class="pill">Page 1 / 6 · Identité</div>' +
         '</div>' +
         '<div class="rule"></div>' +
         '<p style="font-size: 10.5pt; opacity: 0.8; margin-bottom: 6mm;">' +
@@ -818,12 +834,12 @@ export function buildWelcomePack(emp, contract, logoUri) {
       '<div class="content">' +
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
           '<h2 class="yt">Ton poste & l\'hygiène</h2>' +
-          '<div class="pill">Page 2 / 3 administratif</div>' +
+          '<div class="pill">Page 2 / 6 · Poste</div>' +
         '</div>' +
-        '<div class="rule" style="margin: 4mm 0;"></div>' +
+        '<div class="rule" style="margin: 3mm 0;"></div>' +
 
-        '<h3 class="bc pink" style="font-size: 13pt;">Tes informations professionnelles</h3>' +
-        '<div class="grid2" style="margin-top: 2mm; gap: 1mm 8mm;">' +
+        '<h3 class="bc pink" style="font-size: 12pt;">Tes informations professionnelles</h3>' +
+        '<div class="grid2" style="margin-top: 1mm; gap: 0 8mm;">' +
           fld("Type de contrat", typeLabel) +
           fld("Date d\'embauche / début", dateEmbaucheFmt) +
           fld("Fonction", contract.fonction) +
@@ -832,25 +848,39 @@ export function buildWelcomePack(emp, contract, logoUri) {
           fld("Temps de travail", heuresLine || (contract.type === "extra" ? "Vacations selon planning" : "")) +
         '</div>' +
 
-        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 13pt;">Formation hygiène alimentaire</h3>' +
+        '<h3 class="bc pink" style="margin-top: 3mm; font-size: 12pt;">Période d\'essai</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 9pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Articles L1221-19 à L1221-26 du Code du travail · CCN 1501 art. 6</div>' +
+          esc(periodeEssaiLine) +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 3mm; font-size: 12pt;">Formation hygiène alimentaire (HACCP)</h3>' +
         haccpHtml +
-        '<p style="font-size: 8.5pt; opacity: 0.7; margin-top: 2mm; font-style: italic; line-height: 1.4;">' +
-          'La formation HACCP est obligatoire pour au moins une personne par établissement de restauration commerciale (décret du 24 juin 2011).' +
+        '<p style="font-size: 8pt; opacity: 0.7; margin-top: 1mm; font-style: italic; line-height: 1.4;">' +
+          'Décret n° 2011-731 du 24 juin 2011 — au moins une personne formée HACCP par établissement de restauration commerciale.' +
         '</p>' +
 
-        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 13pt;">Règles d\'hygiène à respecter en cuisine</h3>' +
-        '<div class="legal-box" style="padding: 6px 10px; margin: 2mm 0; font-size: 9pt;">' +
-          '<div class="ref" style="font-size: 8.5pt; margin-bottom: 2px;">Article L4122-1 du Code du travail</div>' +
-          'Il t\'incombe de prendre soin, selon ta formation et tes possibilités, de ta santé, de ta sécurité, et de celles des personnes concernées par tes actes ou omissions au travail.' +
+        '<h3 class="bc pink" style="margin-top: 3mm; font-size: 12pt;">Allergènes alimentaires (14 obligatoires)</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Règlement (UE) n° 1169/2011 (INCO), annexe II · Décret n° 2015-447</div>' +
+          '<b>1.</b> Céréales avec gluten · <b>2.</b> Crustacés · <b>3.</b> Œufs · <b>4.</b> Poissons · <b>5.</b> Arachides · <b>6.</b> Soja · <b>7.</b> Lait/lactose · <b>8.</b> Fruits à coque · <b>9.</b> Céleri · <b>10.</b> Moutarde · <b>11.</b> Sésame · <b>12.</b> Sulfites (>10 mg/kg) · <b>13.</b> Lupin · <b>14.</b> Mollusques.' +
         '</div>' +
-        '<ul class="tidy" style="margin: 2mm 0;">' +
-          '<li><b>Lavage des mains</b> à l\'arrivée, après chaque pause, après passage aux toilettes, après manipulation de cru ou de déchets — eau chaude + savon pro + essuie-mains UU.</li>' +
-          '<li><b>Tenue complète</b> en zone de production : uniforme propre, charlotte, gants nitrile, chaussures de sécurité antidérapantes.</li>' +
-          '<li><b>Pas de bijoux</b> (bagues, montres, bracelets), pas d\'ongles longs ou vernis, pas de téléphone sur le plan de travail.</li>' +
+        '<p style="font-size: 8.5pt; margin-top: 1mm; line-height: 1.4;">' +
+          '<b>' + g('Tu es tenu', 'Tu es tenue') + ' de connaître la composition de chaque produit servi</b> et de répondre précisément à toute question client sur les allergènes. La fiche allergènes complète est affichée en cuisine et consultable dans le classeur récapitulatif.' +
+        '</p>' +
+
+        '<h3 class="bc pink" style="margin-top: 3mm; font-size: 12pt;">Règles d\'hygiène à respecter en cuisine</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Article L4122-1 du Code du travail</div>' +
+          'Il t\'incombe de prendre soin, selon ta formation et tes possibilités, de ta santé, de ta sécurité et de celles des personnes concernées par tes actes ou omissions.' +
+        '</div>' +
+        '<ul class="tidy" style="margin: 1mm 0; font-size: 8.5pt;">' +
+          '<li><b>Lavage des mains</b> : arrivée, après chaque pause, après toilettes, après cru/déchets — eau chaude + savon pro + essuie-mains UU.</li>' +
+          '<li><b>Tenue complète</b> : uniforme, charlotte, gants nitrile, chaussures de sécurité antidérapantes. Pas de bijoux, pas d\'ongles longs/vernis, pas de téléphone sur le plan de travail.</li>' +
           '<li><b>Marche en avant</b> : crus → préparation → cuisson → refroidissement → distribution. Aucun croisement flux propre / flux sale.</li>' +
-          '<li><b>Températures</b> contrôlées 2× / jour : froid ≤ 4 °C, congélateur ≤ −18 °C, plats chauds ≥ 63 °C — relevés fiche F1.</li>' +
+          '<li><b>Températures</b> 2× / jour : froid ≤ 4 °C, congélateur ≤ −18 °C, plats chauds ≥ 63 °C — relevés fiche F1.</li>' +
           '<li><b>Nettoyage</b> selon plan affiché : vinaigre blanc plancha+friteuse 2×/j, Assainythol plan travail 2×/j, Aspec vaisselle — relevés fiche F6.</li>' +
-          '<li><b>Maladie ou blessure</b> signalée immédiatement — pansement bleu détectable obligatoire pour toute coupure.</li>' +
+          '<li><b>Maladie / blessure</b> signalée immédiatement — pansement bleu détectable obligatoire pour toute coupure.</li>' +
           '<li><b>DLC / DLUO</b> vérifiées à chaque utilisation. Tout produit douteux est jeté et signalé.</li>' +
         '</ul>' +
 
@@ -858,67 +888,268 @@ export function buildWelcomePack(emp, contract, logoUri) {
       '<div class="footer">SAS AEGIA FOOD — Dossier de bienvenue Meshuga — ' + esc(nomComplet) + '</div>' +
     '</div>'
 
-  // ===== PAGE 4 — ENGAGEMENT DE LECTURE & SIGNATURE =====
+  // ===== PAGE 4 — SÉCURITÉ AU TRAVAIL =====
   var page4 =
     '<div class="page">' +
-      '<div class="bg-circle" style="width: 130mm; height: 130mm; background: #FF82D7; opacity: 0.08; top: -50mm; right: -40mm;"></div>' +
-      '<div class="bg-circle" style="width: 60mm; height: 60mm; background: #FFEB5A; opacity: 0.55; bottom: 60mm; left: -20mm;"></div>' +
+      '<div class="bg-circle" style="width: 90mm; height: 90mm; background: #FFEB5A; opacity: 0.20; top: -30mm; left: -30mm;"></div>' +
+      '<div class="bg-circle" style="width: 70mm; height: 70mm; background: #FF82D7; opacity: 0.10; bottom: -20mm; right: -25mm;"></div>' +
       '<div class="content">' +
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
-          '<h2 class="yt">Engagement de lecture</h2>' +
-          '<div class="pill">Page 3 / 3 administratif</div>' +
+          '<h2 class="yt">Sécurité au travail</h2>' +
+          '<div class="pill">Page 3 / 6 · Sécurité</div>' +
         '</div>' +
         '<div class="rule" style="margin: 3mm 0;"></div>' +
 
-        '<p style="margin-top: 2mm; font-size: 10.5pt; line-height: 1.5;">' +
-          'En tant que ' + g("nouveau", "nouvelle") + ' membre de l\'équipe Meshuga, tu reconnais avoir reçu et lu attentivement le présent dossier de bienvenue, comprenant tes informations administratives, les règles d\'hygiène alimentaire et les obligations de sécurité au travail.' +
+        '<h3 class="bc pink" style="font-size: 12pt;">Équipements de protection individuelle (EPI)</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Articles R4321-4 et R4323-95 du Code du travail</div>' +
+          'L\'employeur fournit gratuitement les EPI nécessaires et veille à leur utilisation effective. ' + g('Le salarié', 'La salariée') + ' est ' + g('tenu', 'tenue') + ' d\'utiliser correctement ces équipements et de les maintenir en bon état.' +
+        '</div>' +
+        '<p style="font-size: 9pt; margin: 1mm 0 0 0;"><b>Liste des EPI remis ' + g('au salarié', 'à la salariée') + ' à l\'embauche</b> (à cocher en présence de l\'employeur)&nbsp;:</p>' +
+        '<div style="margin-top: 2mm; display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 6mm; font-size: 9pt;">' +
+          '<span class="cb">' + checkBox(false) + 'Uniforme Meshuga (haut + bas)</span>' +
+          '<span class="cb">' + checkBox(false) + 'Charlotte / coiffe</span>' +
+          '<span class="cb">' + checkBox(false) + 'Gants nitrile (jetables)</span>' +
+          '<span class="cb">' + checkBox(false) + 'Chaussures de sécurité antidérapantes</span>' +
+          '<span class="cb">' + checkBox(false) + 'Tablier de service' + '</span>' +
+          '<span class="cb">' + checkBox(false) + 'Information / formation au port' + '</span>' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 12pt;">Sécurité incendie & numéros d\'urgence</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Articles R4227-37 à R4227-41 et R4141-2 du Code du travail</div>' +
+          'L\'employeur informe ' + g('le salarié', 'la salariée') + ' des consignes de sécurité incendie et des dispositifs de premiers secours dès l\'embauche. Les issues de secours, extincteurs et plans d\'évacuation sont affichés en cuisine et en salle.' +
+        '</div>' +
+        '<div style="margin-top: 2mm; display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 6mm; font-size: 9pt;">' +
+          '<div><b>Pompiers</b>&nbsp;: 18</div>' +
+          '<div><b>SAMU</b>&nbsp;: 15</div>' +
+          '<div><b>Police</b>&nbsp;: 17</div>' +
+          '<div><b>Urgences UE</b>&nbsp;: 112</div>' +
+          '<div><b>Sourds / muets (SMS)</b>&nbsp;: 114</div>' +
+          '<div><b>Centre antipoison</b>&nbsp;: 01 40 05 48 48</div>' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 12pt;">Document Unique d\'Évaluation des Risques Professionnels (DUERP)</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Articles R4121-1 à R4121-4 du Code du travail</div>' +
+          'L\'employeur tient à jour un DUERP listant les risques professionnels identifiés et les mesures de prévention mises en œuvre. Mise à jour annuelle obligatoire. <b>Le DUERP de Meshuga est consultable à tout moment dans le classeur récapitulatif présent au restaurant, sur simple demande.</b>' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 12pt;">Droit d\'alerte et droit de retrait</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Articles L4131-1 à L4131-3 du Code du travail</div>' +
+          'En cas de <b>danger grave et imminent</b> pour ta vie ou ta santé, tu as le droit&nbsp;: <b>(1)</b> d\'alerter immédiatement l\'employeur (oralement puis par écrit), <b>(2)</b> de te retirer de la situation dangereuse. <b>Aucune sanction ni retenue de salaire ne peut être prise contre ' + g('un salarié', 'une salariée') + ' ayant exercé ce droit de bonne foi.</b> L\'employeur ne peut imposer la reprise du travail tant que la situation de danger persiste.' +
+        '</div>' +
+
+      '</div>' +
+      '<div class="footer">SAS AEGIA FOOD — Dossier de bienvenue Meshuga — ' + esc(nomComplet) + '</div>' +
+    '</div>'
+
+  // ===== PAGE 5 — CADRE SOCIAL & OBLIGATIONS LÉGALES =====
+  var page5 =
+    '<div class="page">' +
+      '<div class="bg-circle" style="width: 80mm; height: 80mm; background: #FF82D7; opacity: 0.08; top: -25mm; right: -25mm;"></div>' +
+      '<div class="bg-circle" style="width: 50mm; height: 50mm; background: #FFEB5A; opacity: 0.25; bottom: -10mm; left: -15mm;"></div>' +
+      '<div class="content">' +
+        '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
+          '<h2 class="yt">Cadre social & légal</h2>' +
+          '<div class="pill">Page 4 / 6 · Cadre social</div>' +
+        '</div>' +
+        '<div class="rule" style="margin: 3mm 0;"></div>' +
+
+        '<h3 class="bc pink" style="font-size: 12pt;">Harcèlement moral et sexuel · Référent</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Articles L1152-1 à L1152-6 (moral) · L1153-1 à L1153-6 (sexuel) · L1153-5-1 (information) du Code du travail · 222-33-2 du Code pénal</div>' +
+          'Aucun salarié ne doit subir d\'agissements répétés de harcèlement moral ni de propos ou comportements à connotation sexuelle. <b>Sanctions civiles et pénales</b>&nbsp;: jusqu\'à 2 ans (moral) ou 3 ans (sexuel) de prison + 30 000 € à 45 000 € d\'amende. ' + g('Le salarié', 'La salariée') + ' qui dénonce, témoigne ou refuse de subir un harcèlement bénéficie d\'une <b>protection contre le licenciement</b>.' +
+        '</div>' +
+        '<p style="font-size: 9pt; margin: 1mm 0; line-height: 1.4;">' +
+          '<b>Référent harcèlement Meshuga</b>&nbsp;: Edward TOURET, Président SAS AEGIA FOOD — edward@meshuga.fr — 06 58 58 58 01.<br/>' +
+          '<b>Autres canaux d\'alerte</b>&nbsp;: Inspection du travail (DREETS Île-de-France) · Médecin du travail (EFFICIENCE Vaugirard) · Défenseur des droits (defenseurdesdroits.fr) · Procureur de la République.' +
         '</p>' +
 
-        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 12pt;">Sanctions en cas de non-respect des règles</h3>' +
-        '<div class="legal-box" style="padding: 6px 10px; margin: 2mm 0; font-size: 9pt;">' +
-          '<div class="ref" style="font-size: 8.5pt; margin-bottom: 2px;">Articles L1331-1 et L1332-1 à L1332-5 du Code du travail</div>' +
-          'Tout manquement aux règles d\'hygiène, de sécurité ou aux consignes de l\'employeur est susceptible de constituer une faute ouvrant droit à sanction disciplinaire. Toute sanction est précédée d\'un entretien préalable et notifiée par lettre motivée. La prescription des faits fautifs est de 2 mois (L.1332-4).' +
+        '<h3 class="bc pink" style="margin-top: 3mm; font-size: 12pt;">Égalité et non-discrimination</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Articles L1132-1 (25 critères prohibés) et L1142-1 (égalité H/F) du Code du travail · 225-1 Code pénal</div>' +
+          'Aucune décision (embauche, rémunération, sanction, licenciement…) ne peut être fondée sur l\'origine, le sexe, les mœurs, l\'orientation sexuelle, l\'identité de genre, l\'âge, la situation de famille, la grossesse, l\'état de santé, le handicap, l\'apparence physique, le nom, le lieu de résidence, les opinions politiques ou religieuses, l\'activité syndicale ou tout autre critère prohibé. <b>Sanctions</b>&nbsp;: 3 ans de prison + 45 000 € d\'amende.' +
         '</div>' +
-        '<div class="legal-box" style="padding: 6px 10px; margin: 2mm 0; font-size: 9pt;">' +
-          '<div class="ref" style="font-size: 8.5pt; margin-bottom: 2px;">Article R4741-1 du Code du travail</div>' +
-          'Le manquement aux règles d\'hygiène et de sécurité par ' + g("le salarié", "la salariée") + ' peut être ' + g("sanctionné", "sanctionnée") + ', indépendamment de la responsabilité pénale de l\'employeur en cas d\'infraction constatée par les services de contrôle (DDPP, Inspection du travail).' +
+
+        '<h3 class="bc pink" style="margin-top: 3mm; font-size: 12pt;">Convention Collective applicable</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Article R2262-1 du Code du travail</div>' +
+          '<b>CCN nationale de la Restauration Rapide — IDCC 1501.</b> Texte intégral consultable à tout moment dans le classeur récapitulatif au restaurant et sur Légifrance (legifrance.gouv.fr). Tout salarié peut en demander une copie à l\'employeur.' +
         '</div>' +
-        '<p style="font-size: 9.5pt; margin-top: 2mm; line-height: 1.5;">' +
-          'Selon la gravité du manquement constaté, l\'employeur peut prononcer&nbsp;: <b>avertissement écrit</b>, <b>blâme</b>, <b>mise à pied disciplinaire</b>, <b>mutation</b> ou <b>rétrogradation</b>, et jusqu\'au <b>licenciement pour faute simple, grave ou lourde</b> en cas de manquement caractérisé mettant en péril la santé publique, la sécurité de l\'équipe ou la réputation de l\'établissement.' +
+
+        '<h3 class="bc pink" style="margin-top: 3mm; font-size: 12pt;">Médecine du travail · Mutuelle · Prévoyance</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Articles R4624-10 (VIP) du Code du travail · L911-8 du Code de la Sécurité sociale (notice mutuelle)</div>' +
+          '<b>Médecine du travail</b>&nbsp;: EFFICIENCE — Centre Vaugirard, 64 rue de Vaugirard, 75006 Paris. <b>Visite d\'Information et de Prévention (VIP)</b> dans les 3 mois suivant l\'embauche, RDV pris par l\'employeur.<br/>' +
+          '<b>Prévoyance</b>&nbsp;: Gan Eurocourtage Vie. Notice d\'information à venir sous 30 jours, l\'employeur s\'engage à la remettre dès réception (récépissé en page 6).' +
+        '</div>' +
+
+      '</div>' +
+      '<div class="footer">SAS AEGIA FOOD — Dossier de bienvenue Meshuga — ' + esc(nomComplet) + '</div>' +
+    '</div>'
+
+  // ===== PAGE 5b — VIDÉOSURVEILLANCE & RGPD =====
+  var page5b =
+    '<div class="page">' +
+      '<div class="bg-circle" style="width: 90mm; height: 90mm; background: #FF82D7; opacity: 0.10; top: -30mm; left: -30mm;"></div>' +
+      '<div class="bg-circle" style="width: 70mm; height: 70mm; background: #FFEB5A; opacity: 0.20; bottom: -20mm; right: -25mm;"></div>' +
+      '<div class="content">' +
+        '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
+          '<h2 class="yt">Vidéosurveillance & RGPD</h2>' +
+          '<div class="pill">Page 5 / 6 · Données</div>' +
+        '</div>' +
+        '<div class="rule" style="margin: 3mm 0;"></div>' +
+
+        '<p style="font-size: 9pt; margin: 1mm 0 3mm 0; line-height: 1.45;">' +
+          '<b>Cette page constitue ton information préalable individuelle</b> sur les traitements de données personnelles te concernant, conformément à l\'<b>article 13 du RGPD</b> et à l\'<b>article L1222-4 du Code du travail</b>. Elle est essentielle pour rendre opposables les images de vidéosurveillance et les traitements RH en cas de procédure.' +
         '</p>' +
 
-        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 12pt;">Mes engagements</h3>' +
-        '<p style="margin-top: 1mm; font-size: 10pt;">' +
-          '<b>Je ' + g("soussigné", "soussignée") + ' ' + esc(nomComplet) + '</b>, reconnais&nbsp;:' +
+        '<h3 class="bc pink" style="font-size: 13pt;">Vidéosurveillance de l\'établissement</h3>' +
+        '<div class="legal-box" style="padding: 6px 12px; margin: 2mm 0; font-size: 9pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 2px;">Articles L1121-1, L1222-4 du Code du travail · RGPD art. 5, 6, 13, 30 · articles 226-1 et R625-10 du Code pénal · règlements (CE) 178/2002 et 852/2004 · recommandations CNIL · Cass. Soc. 23 juin 2010 n° 09-66.355</div>' +
+          '<b>L\'établissement Meshuga (3 rue Vavin, 75006 Paris) est placé sous vidéosurveillance.</b> Tu en es ' + g('informé', 'informée') + ' personnellement et préalablement à ta prise de poste, conformément à l\'obligation d\'information individuelle de l\'employeur (L1222-4) et au principe de loyauté (L1121-1).' +
+        '</div>' +
+
+        '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 6mm; font-size: 9pt; margin-top: 2mm;">' +
+          '<div><b>Caméras installées</b>&nbsp;: 2 (marque REOSU)</div>' +
+          '<div><b>Durée de conservation</b>&nbsp;: 30 jours maximum</div>' +
+          '<div style="grid-column: 1 / 3;"><b>Emplacement</b>&nbsp;: <b>(1)</b> comptoir / caisse · <b>(2)</b> au-dessus du poste de cuisson (axée sur l\'équipement, friteuse + plancha)</div>' +
+          '<div style="grid-column: 1 / 3;"><b>Stockage</b>&nbsp;: enregistreur (NVR) avec disque dur dédié, <b>strictement local sur site</b>, accès physique sécurisé. <b>Aucun transfert vers un service cloud externe</b>, aucun envoi de données hors UE.</div>' +
+          '<div style="grid-column: 1 / 3;"><b>Mode d\'exploitation</b>&nbsp;: pas de visionnage en temps réel — <b>consultation a posteriori uniquement</b>, en cas d\'incident avéré, de contrôle DDPP, ou de réquisition judiciaire.</div>' +
+          '<div style="grid-column: 1 / 3;"><b>Accès aux images</b>&nbsp;: réservé à Edward TOURET, Président, seul. Aucune diffusion ni transmission à des tiers en dehors des cas légaux (force publique, judiciaire).</div>' +
+        '</div>' +
+
+        '<p style="font-size: 9pt; margin-top: 2mm; line-height: 1.5;">' +
+          '<b>Finalités déclarées</b> (RGPD art. 6.1.f — intérêt légitime de l\'employeur, test de proportionnalité L1121-1)&nbsp;:' +
         '</p>' +
-        '<ul class="tidy" style="margin: 1mm 0;">' +
-          '<li>avoir reçu en main propre le présent dossier de bienvenue Meshuga&nbsp;;</li>' +
-          '<li>avoir lu et compris les règles d\'hygiène alimentaire, les consignes de sécurité au travail et les sanctions encourues qui y figurent&nbsp;;</li>' +
-          '<li>m\'engager à les respecter rigoureusement dans l\'exercice de mes fonctions, et à signaler immédiatement à l\'employeur tout manquement ou risque que je viendrais à constater.</li>' +
+        '<ul class="tidy" style="margin: 1mm 0; font-size: 8.5pt;">' +
+          '<li><b>Sécurité des biens et des personnes</b> (caméra comptoir / caisse) — protection contre les agressions, malaises, accidents, sécurité du personnel face au public.</li>' +
+          '<li><b>Lutte contre le vol et les cambriolages</b> (caméra comptoir / caisse) — protection du fonds, de la caisse, des stocks.</li>' +
+          '<li><b>Sécurité incendie & traçabilité HACCP</b> (caméra cuisson, justification renforcée ci-dessous).</li>' +
         '</ul>' +
 
-        '<div class="sig-box" style="margin-top: 4mm; padding: 6mm;">' +
-          '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; font-size: 9.5pt;">' +
-            'Mention manuscrite obligatoire avant signature : <span style="color: #FF82D7;">«&nbsp;' + g('Lu et approuvé', 'Lue et approuvée') + '&nbsp;»</span>' +
+        // Encart spécifique caméra cuisson — bordage juridique
+        '<div style="margin-top: 3mm; padding: 6px 10px; background: rgba(255,235,90,0.18); border-left: 3px solid #FFEB5A; font-size: 8.5pt; line-height: 1.5;">' +
+          '<div style="font-family: \'Barlow Condensed\', sans-serif; font-weight: 700; font-size: 9pt; text-transform: uppercase; letter-spacing: 1px; color: #191923; margin-bottom: 2px;">⚖ Justification proportionnée de la caméra du poste de cuisson</div>' +
+          'La caméra installée au-dessus du poste de cuisson <b>n\'a pas pour objet la surveillance continue ' + g('du salarié', 'de la salariée') + '</b>. Elle est positionnée en plafond, axée sur <b>l\'équipement à risque</b> (friteuse, plancha, source de feu et d\'huile chaude) et répond à <b>trois finalités cumulatives proportionnées</b>&nbsp;:' +
+          '<br/><b>(a) Sécurité incendie</b> — surveillance d\'un point chaud à risque élevé d\'incendie, conformément à l\'obligation générale de sécurité de l\'employeur (L4121-1) et aux articles R4227-37 à R4227-41 du Code du travail.' +
+          '<br/><b>(b) Traçabilité HACCP</b> — preuve documentée du respect des protocoles d\'hygiène et des températures de cuisson en cas de contrôle DDPP, conformément aux <b>règlements (CE) 178/2002 et 852/2004</b> dits « paquet hygiène » qui imposent la traçabilité des points critiques.' +
+          '<br/><b>(c) Sécurité des personnes</b> — détection rapide de brûlures, malaises, chutes ou accidents pour intervention immédiate.' +
+          '<br/><br/><b>Garanties spécifiques</b> apportées par l\'employeur en compensation&nbsp;: visionnage strictement <b>a posteriori</b> (jamais en direct), accès limité au seul Président, conservation 30 jours maximum, suppression automatique au-delà, pas d\'audio, pas de captation des conversations privées (recommandation CNIL).' +
+          '<br/><b>Référence jurisprudentielle</b>&nbsp;: la Cour de cassation (Cass. Soc. 23 juin 2010 n° 09-66.355) admet la licéité de la vidéosurveillance d\'un poste de travail dès lors que le salarié est ' + g('informé', 'informée') + ' préalablement et que la finalité est légitime et proportionnée — ce qui est le cas ici.' +
+        '</div>' +
+
+        '<p style="font-size: 9pt; margin-top: 2mm;">' +
+          '<b>Zones strictement non filmées</b>&nbsp;: sanitaires, vestiaire, espace de pause, voie publique. <b>Aucune caméra ne filme ' + g('un salarié', 'une salariée') + ' sur un poste de travail en surveillance continue à des fins de contrôle d\'activité.</b>' +
+        '</p>' +
+
+        '<p style="font-size: 9pt; margin-top: 2mm;">' +
+          '<b>Tes droits</b> (RGPD art. 15 à 22)&nbsp;: <b>accès</b> aux images te concernant, <b>rectification</b>, <b>effacement</b>, <b>limitation</b>, <b>opposition</b>. Demande motivée à edward@meshuga.fr — réponse sous 1 mois maximum (RGPD art. 12).<br/>' +
+          '<b>Réclamation</b>&nbsp;: tu peux à tout moment saisir la <b>CNIL</b> (Commission Nationale de l\'Informatique et des Libertés) — cnil.fr — 3 place de Fontenoy, 75007 Paris.<br/>' +
+          '<b>Affichage</b>&nbsp;: pictogramme caméra + mention informative présente à l\'entrée et en cuisine.' +
+        '</p>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 13pt;">Autres traitements de données personnelles</h3>' +
+        '<div class="legal-box" style="padding: 6px 12px; margin: 2mm 0; font-size: 9pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 2px;">RGPD UE 2016/679 art. 13 · Code du travail D.1221-24</div>' +
+          '<b>Responsable du traitement</b>&nbsp;: SAS AEGIA FOOD, représentée par Edward TOURET, Président — edward@meshuga.fr.<br/>' +
+          '<b>Finalités</b>&nbsp;: exécution du contrat de travail, paie, DPAE, déclarations sociales URSSAF, suivi RH, médecine du travail, prévoyance.<br/>' +
+          '<b>Base légale</b>&nbsp;: exécution du contrat (art. 6.1.b RGPD) + obligations légales (art. 6.1.c RGPD).<br/>' +
+          '<b>Destinataires</b>&nbsp;: URSSAF, médecine du travail (EFFICIENCE), prévoyance (Gan), expert-comptable.<br/>' +
+          '<b>Durée de conservation</b>&nbsp;: pendant la durée du contrat + 5 ans après sortie (D.1221-24).<br/>' +
+          '<b>Tes droits</b>&nbsp;: accès, rectification, effacement, limitation, portabilité, opposition — edward@meshuga.fr · Réclamation : CNIL (cnil.fr).' +
+        '</div>' +
+
+      '</div>' +
+      '<div class="footer">SAS AEGIA FOOD — Dossier de bienvenue Meshuga — ' + esc(nomComplet) + '</div>' +
+    '</div>'
+
+  // ===== PAGE 6 — ENGAGEMENT DE LECTURE & SIGNATURE =====
+  var page6 =
+    '<div class="page">' +
+      '<div class="bg-circle" style="width: 100mm; height: 100mm; background: #FF82D7; opacity: 0.08; top: -35mm; right: -35mm;"></div>' +
+      '<div class="bg-circle" style="width: 60mm; height: 60mm; background: #FFEB5A; opacity: 0.30; top: 90mm; left: -25mm;"></div>' +
+      '<div class="content">' +
+        '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
+          '<h2 class="yt">Engagement & signatures</h2>' +
+          '<div class="pill">Page 6 / 6 · Engagement</div>' +
+        '</div>' +
+        '<div class="rule" style="margin: 2mm 0;"></div>' +
+
+        '<h3 class="bc pink" style="font-size: 11pt;">Récépissé de remise des documents</h3>' +
+        '<p style="font-size: 8.5pt; margin: 1mm 0;">' +
+          'Je ' + g("soussigné", "soussignée") + ' <b>' + esc(nomComplet) + '</b> reconnais avoir reçu en main propre, à la date de signature ci-dessous&nbsp;:' +
+        '</p>' +
+        '<div style="margin-top: 1mm; font-size: 8.5pt; line-height: 1.5;">' +
+          '<div><span class="cb">' + checkBox(false) + '</span>Le présent <b>dossier de bienvenue Meshuga</b> (6 pages dont engagement signé)</div>' +
+          '<div><span class="cb">' + checkBox(false) + '</span>Mon <b>contrat de travail</b> signé en double exemplaire</div>' +
+          '<div><span class="cb">' + checkBox(false) + '</span>Information sur la <b>convention collective</b> CCN 1501 et son lieu de consultation</div>' +
+          '<div><span class="cb">' + checkBox(false) + '</span>Information sur la <b>vidéosurveillance</b> et mes droits RGPD</div>' +
+          '<div><span class="cb">' + checkBox(false) + '</span>Information sur la <b>médecine du travail</b> (EFFICIENCE Vaugirard) et la VIP à venir</div>' +
+          '<div style="opacity: 0.75;"><span class="cb">' + checkBox(false) + '</span><i>Notice <b>mutuelle / prévoyance Gan</b> — à remettre sous 30 jours, l\'employeur s\'y engage</i></div>' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 2mm; font-size: 11pt;">Sanctions disciplinaires</h3>' +
+        '<div class="legal-box" style="padding: 4px 10px; margin: 1mm 0; font-size: 8pt;">' +
+          '<div class="ref" style="font-size: 7.5pt; margin-bottom: 1px;">L1331-1, L1332-1 à L1332-5 et R4741-1 du Code du travail</div>' +
+          'Tout manquement constitue une <b>faute</b> disciplinaire (entretien préalable + lettre motivée, prescription 2 mois). Selon la gravité&nbsp;: <b>avertissement</b>, <b>blâme</b>, <b>mise à pied</b>, <b>mutation/rétrogradation</b>, jusqu\'au <b>licenciement pour faute simple, grave ou lourde</b>.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 2mm; font-size: 11pt;">Engagement de lecture</h3>' +
+        '<p style="font-size: 8.5pt; margin: 0;">' +
+          'Je ' + g("soussigné", "soussignée") + ' <b>' + esc(nomComplet) + '</b>, en signant ce document, reconnais&nbsp;:' +
+        '</p>' +
+        '<ol style="margin: 1mm 0 1mm 16px; padding: 0; font-size: 8pt; line-height: 1.4;">' +
+          '<li><b>avoir lu attentivement</b> le présent dossier dans son intégralité&nbsp;;</li>' +
+          '<li><b>avoir compris</b> les règles d\'hygiène (HACCP, allergènes, marche en avant), les consignes de sécurité (EPI, incendie, droit de retrait), le cadre social (CCN 1501, harcèlement, non-discrimination, vidéosurveillance, RGPD) et le régime disciplinaire&nbsp;;</li>' +
+          '<li>avoir été ' + g("informé", "informée") + ' des canaux d\'alerte (référent harcèlement, inspection, médecine, défenseur des droits) et de mes <b>droits</b> (DUERP, CCN, CNIL, retrait, RGPD)&nbsp;;</li>' +
+          '<li><b>m\'engager</b> à respecter rigoureusement ces règles et à signaler immédiatement à l\'employeur tout manquement, danger ou situation problématique&nbsp;;</li>' +
+          '<li>accepter sans réserve la <b>mise sous vidéosurveillance</b> de l\'établissement aux finalités déclarées (sécurité, lutte contre le vol, traçabilité HACCP) et reconnaître avoir été ' + g("informé", "informée") + ' préalablement (L1222-4 Code du travail · art. 13 RGPD).</li>' +
+        '</ol>' +
+
+        // ===== 2 BEAUX BLOCS SIGNATURES =====
+        '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin-top: 3mm;">' +
+          // Bloc gauche : Le/La salarié·e (rose Meshuga)
+          '<div style="border: 2.5px solid #FF82D7; border-radius: 6px; padding: 4mm; background: rgba(255,130,215,0.04); position: relative;">' +
+            '<div style="position: absolute; top: -3mm; left: 4mm; background: #FFFFFF; padding: 0 5px; font-family: Yellowtail, cursive; color: #FF82D7; font-size: 16pt; line-height: 1;">' + g("Le salarié", "La salariée") + '</div>' +
+            '<div style="display: grid; grid-template-columns: auto 1fr; gap: 1mm 4mm; font-size: 8pt; margin-top: 1mm;">' +
+              '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Date</div>' +
+              '<div style="border-bottom: 1px solid #191923; min-height: 4mm;"></div>' +
+              '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Lieu</div>' +
+              '<div style="border-bottom: 1px solid #191923; min-height: 4mm;">Paris</div>' +
+              '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm; grid-column: 1 / 3; font-size: 7.5pt;">Mention manuscrite&nbsp;: «&nbsp;<span style="color: #FF82D7;">' + g('Lu et approuvé', 'Lue et approuvée') + '</span>&nbsp;»</div>' +
+              '<div style="border-bottom: 1px solid #191923; min-height: 5mm; grid-column: 1 / 3;"></div>' +
+              '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm; grid-column: 1 / 3;">Signature ' + g('du salarié', 'de la salariée') + '</div>' +
+              '<div style="border-bottom: 1px solid #191923; min-height: 14mm; grid-column: 1 / 3;"></div>' +
+            '</div>' +
+            '<div style="margin-top: 2mm; font-family: Barlow Condensed, sans-serif; font-weight: 700; font-size: 8.5pt; text-align: center;">' + esc(nomComplet) + '</div>' +
           '</div>' +
-          '<div class="sig-grid" style="margin-top: 4mm; gap: 6mm;">' +
-            '<div>' +
-              '<div class="sig-line" style="min-height: 14mm;"></div>' +
-              '<div class="sig-cap">' + g("Le salarié", "La salariée") + ' — date + «&nbsp;' + g('Lu et approuvé', 'Lue et approuvée') + '&nbsp;» + signature</div>' +
+          // Bloc droit : L'employeur (noir charbon)
+          '<div style="border: 2.5px solid #191923; border-radius: 6px; padding: 4mm; background: rgba(25,25,35,0.025); position: relative;">' +
+            '<div style="position: absolute; top: -3mm; left: 4mm; background: #FFFFFF; padding: 0 5px; font-family: Yellowtail, cursive; color: #191923; font-size: 16pt; line-height: 1;">L\'employeur</div>' +
+            '<div style="display: grid; grid-template-columns: auto 1fr; gap: 1mm 4mm; font-size: 8pt; margin-top: 1mm;">' +
+              '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Date</div>' +
+              '<div style="border-bottom: 1px solid #191923; min-height: 4mm;">' + esc(todayFr()) + '</div>' +
+              '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Lieu</div>' +
+              '<div style="border-bottom: 1px solid #191923; min-height: 4mm;">Paris</div>' +
+              '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm; grid-column: 1 / 3; font-size: 7.5pt;">Mention manuscrite&nbsp;: «&nbsp;<span style="color: #191923;">Lu et approuvé</span>&nbsp;»</div>' +
+              '<div style="border-bottom: 1px solid #191923; min-height: 5mm; grid-column: 1 / 3;"></div>' +
+              '<div style="font-family: Barlow Condensed, sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm; grid-column: 1 / 3;">Signature & cachet</div>' +
+              '<div style="border-bottom: 1px solid #191923; min-height: 14mm; grid-column: 1 / 3;"></div>' +
             '</div>' +
-            '<div>' +
-              '<div class="sig-line" style="min-height: 14mm;"></div>' +
-              '<div class="sig-cap">L\'employeur — Edward TOURET, Président SAS AEGIA</div>' +
-            '</div>' +
+            '<div style="margin-top: 2mm; font-family: Barlow Condensed, sans-serif; font-weight: 700; font-size: 8.5pt; text-align: center;">Edward TOURET</div>' +
+            '<div style="font-family: Barlow Condensed, sans-serif; font-size: 7pt; text-align: center; opacity: 0.7; letter-spacing: 0.5px;">Président · SAS AEGIA FOOD</div>' +
           '</div>' +
         '</div>' +
 
-        '<p style="margin-top: 4mm; font-size: 8.5pt; opacity: 0.55; font-style: italic; line-height: 1.4;">' +
-          'Document conservé dans le dossier RH ' + g("du salarié", "de la salariée") + ' pendant toute la durée du contrat et 5 ans après sa sortie effective (article D.1221-24 du Code du travail).' +
+        '<p style="margin-top: 2mm; font-size: 7pt; opacity: 0.55; font-style: italic; line-height: 1.3; text-align: center;">' +
+          'Document signé en double exemplaire, dont un remis ' + g("au salarié", "à la salariée") + '. Conservé dans le dossier RH pendant toute la durée du contrat et 5 ans après sortie effective (article D.1221-24 du Code du travail).' +
         '</p>' +
 
       '</div>' +
-      '<div class="footer">SAS AEGIA FOOD — 3 rue Vavin 75006 Paris — RCS Paris 904 639 531</div>' +
+      '<div class="footer">SAS AEGIA FOOD — 3 rue Vavin 75006 Paris — RCS Paris 904 639 531 — TVA FR31904639531</div>' +
     '</div>'
 
   // ===== ASSEMBLAGE FINAL =====
@@ -935,6 +1166,9 @@ export function buildWelcomePack(emp, contract, logoUri) {
       page2 +
       page3 +
       page4 +
+      page5 +
+      page5b +
+      page6 +
     '</body>' +
     '</html>'
 
