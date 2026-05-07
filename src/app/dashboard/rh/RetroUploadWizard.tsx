@@ -564,6 +564,11 @@ export default function RetroUploadWizard() {
     )
   })
 
+  // Découper les cycles en ouverts / clôturés (utile pour Step 2)
+  var openCycles = cycles.filter(function (c: any) { return !c.date_sortie })
+  var closedCycles = cycles.filter(function (c: any) { return !!c.date_sortie })
+  var hasOpenCycle = openCycles.length > 0
+
   return (
     <div style={{ maxWidth: 920, margin: "0 auto", padding: 16, fontFamily: "Arial Narrow, sans-serif", color: DARK }}>
       {/* Header */}
@@ -732,76 +737,134 @@ export default function RetroUploadWizard() {
           STEP 2 : Sélection / création cycle
           ============================================================ */}
       {step === 2 && selectedEmployee ? (
-        <div>
-          <button type="button" onClick={function () { setStep(1); setSelectedEmployee(null) }}
-            style={btnBack}>← Changer de salarié</button>
-          <h2 style={{ fontFamily: "Yellowtail, cursive", color: DARK, fontSize: 24, marginBottom: 4 }}>
-            Cycle d'emploi de {selectedEmployee.prenom} {selectedEmployee.nom}
-          </h2>
-          <div style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>
-            Un cycle = une période entrée → sortie. Si la personne a été ré-embauchée, elle a plusieurs cycles.
-          </div>
-
-          {cycles.length === 0 ? (
-            <div style={{ padding: 16, background: "#FFF8E1", borderRadius: 8, marginBottom: 16, fontSize: 14 }}>
-              Aucun cycle d'emploi enregistré. Crée le premier ci-dessous.
+          <div>
+            <button type="button" onClick={function () { setStep(1); setSelectedEmployee(null); setCycles([]) }}
+              style={btnBack}>← Changer de salarié</button>
+            <h2 style={{ fontFamily: "Yellowtail, cursive", color: DARK, fontSize: 24, marginBottom: 4 }}>
+              Cycle d'emploi de {selectedEmployee.prenom} {selectedEmployee.nom}
+            </h2>
+            <div style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>
+              Un cycle = une période entrée → sortie. Si la personne a été ré-embauchée, elle a plusieurs cycles.
             </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-              {cycles.map(function (cy: any) {
-                var isOpen = !cy.date_sortie
-                var nbContracts = (cy.contracts || []).length
-                return (
-                  <button
-                    key={cy.id}
-                    type="button"
-                    onClick={function () { handleSelectCycle(cy) }}
-                    style={{
-                      padding: 12, textAlign: "left", cursor: "pointer",
-                      background: "#fff", border: "2px solid " + (isOpen ? PINK : "#eee"), borderRadius: 8,
-                      fontSize: 14,
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <strong>
-                        Cycle {formatDateFr(cy.date_entree)} → {cy.date_sortie ? formatDateFr(cy.date_sortie) : "en cours"}
-                      </strong>
-                      <span style={{ color: PINK }}>→</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-                      {nbContracts} contrat{nbContracts > 1 ? "s" : ""}
-                      {cy.motif_sortie ? " • Motif sortie : " + cy.motif_sortie : ""}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          )}
 
-          {!creatingCycle ? (
-            <button type="button" onClick={function () { setCreatingCycle(true) }}
-              style={{
-                width: "100%", padding: 14, borderRadius: 8,
-                background: YELLOW, border: "none",
-                fontFamily: "Arial Narrow, sans-serif", fontWeight: "bold", fontSize: 14,
-                color: DARK, cursor: "pointer",
-              }}>
-              ＋ {cycles.length === 0 ? "Créer le premier cycle" : "Nouveau cycle (ré-embauche)"}
-            </button>
-          ) : (
-            <div style={{ padding: 16, background: "#fff", border: "1px solid #eee", borderRadius: 8 }}>
-              <TextField type="date" label="Date d'entrée *" value={newCycleDate} onChange={setNewCycleDate} />
-              <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
-                <button type="button" onClick={function () { setCreatingCycle(false); setNewCycleDate("") }}
-                  style={btnSecondary}>Annuler</button>
-                <button type="button" onClick={handleCreateCycle} disabled={savingCycle}
-                  style={Object.assign({}, btnPrimary, { opacity: savingCycle ? 0.6 : 1 })}>
-                  {savingCycle ? "Création..." : "Créer le cycle"}
-                </button>
+            {/* Cycle en cours — gros call-to-action */}
+            {hasOpenCycle ? (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: "bold", color: PINK, marginBottom: 8, letterSpacing: 1 }}>
+                  CYCLE EN COURS — clique pour ajouter un contrat ou avenant
+                </div>
+                {openCycles.map(function (cy: any) {
+                  var nbContracts = (cy.contracts || []).length
+                  return (
+                    <button
+                      key={cy.id}
+                      type="button"
+                      onClick={function () { handleSelectCycle(cy) }}
+                      style={{
+                        width: "100%", padding: 16, textAlign: "left", cursor: "pointer",
+                        background: "#FFF5FB", border: "2px solid " + PINK, borderRadius: 12,
+                        fontSize: 14, marginBottom: 8,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontWeight: "bold", fontSize: 16, color: DARK }}>
+                            Depuis le {formatDateFr(cy.date_entree)} — en cours
+                          </div>
+                          <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
+                            {nbContracts} contrat{nbContracts > 1 ? "s" : ""} enregistré{nbContracts > 1 ? "s" : ""}
+                          </div>
+                        </div>
+                        <span style={{ color: PINK, fontSize: 24 }}>→</span>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
-            </div>
-          )}
-        </div>
+            ) : null}
+
+            {/* Cycles passés (s'il y en a) */}
+            {closedCycles.length > 0 ? (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: "bold", color: "#888", marginBottom: 8, letterSpacing: 1 }}>
+                  CYCLES PASSÉS
+                </div>
+                {closedCycles.map(function (cy: any) {
+                  var nbContracts = (cy.contracts || []).length
+                  return (
+                    <button
+                      key={cy.id}
+                      type="button"
+                      onClick={function () { handleSelectCycle(cy) }}
+                      style={{
+                        width: "100%", padding: 12, textAlign: "left", cursor: "pointer",
+                        background: "#fff", border: "1px solid #eee", borderRadius: 8,
+                        fontSize: 14, marginBottom: 8,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <strong>
+                            {formatDateFr(cy.date_entree)} → {formatDateFr(cy.date_sortie)}
+                          </strong>
+                          <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+                            {nbContracts} contrat{nbContracts > 1 ? "s" : ""}
+                            {cy.motif_sortie ? " • " + cy.motif_sortie : ""}
+                          </div>
+                        </div>
+                        <span style={{ color: "#999" }}>→</span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : null}
+
+            {/* Aucun cycle du tout */}
+            {cycles.length === 0 ? (
+              <div style={{ padding: 16, background: "#FFF8E1", borderRadius: 8, marginBottom: 16, fontSize: 14 }}>
+                Aucun cycle d'emploi enregistré. Crée le premier ci-dessous.
+              </div>
+            ) : null}
+
+            {/* Bouton créer cycle — UNIQUEMENT si pas de cycle ouvert */}
+            {!hasOpenCycle && !creatingCycle ? (
+              <button type="button" onClick={function () { setCreatingCycle(true) }}
+                style={{
+                  width: "100%", padding: 14, borderRadius: 8,
+                  background: YELLOW, border: "none",
+                  fontFamily: "Arial Narrow, sans-serif", fontWeight: "bold", fontSize: 14,
+                  color: DARK, cursor: "pointer",
+                }}>
+                ＋ {cycles.length === 0 ? "Créer le premier cycle d'emploi" : "Nouveau cycle (ré-embauche)"}
+              </button>
+            ) : null}
+
+            {!hasOpenCycle && creatingCycle ? (
+              <div style={{ padding: 16, background: "#fff", border: "1px solid #eee", borderRadius: 8 }}>
+                <TextField type="date" label="Date d'entrée *" value={newCycleDate} onChange={setNewCycleDate} />
+                <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+                  <button type="button" onClick={function () { setCreatingCycle(false); setNewCycleDate("") }}
+                    style={btnSecondary}>Annuler</button>
+                  <button type="button" onClick={handleCreateCycle} disabled={savingCycle}
+                    style={Object.assign({}, btnPrimary, { opacity: savingCycle ? 0.6 : 1 })}>
+                    {savingCycle ? "Création..." : "Créer le cycle"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Hint si cycle ouvert : pour ré-embauche, il faut clôturer */}
+            {hasOpenCycle ? (
+              <div style={{
+                padding: 12, marginTop: 8, fontSize: 12, color: "#666",
+                background: "#FAFAFA", borderRadius: 8, fontStyle: "italic",
+              }}>
+                💡 Pour enregistrer une <strong>ré-embauche</strong> de cette personne, il faut d'abord clôturer le cycle en cours
+                (date de sortie + motif). Tu pourras le faire au step 5 après avoir enregistré son dernier contrat.
+              </div>
+            ) : null}
+          </div>
       ) : null}
 
       {/* ============================================================
