@@ -151,6 +151,14 @@ export default function RhWizard(props) {
   // ===== Vacations (Extra uniquement) =====
   var [vacations, setVacations] = useState([])
 
+  // ===== Tracking des IDs créés en mode "new" (évite doublons sur saves multiples) =====
+  // Une fois qu'on a sauvegardé une première fois en mode création, on bascule en UPDATE.
+  var [createdEmpId, setCreatedEmpId] = useState(null)
+  var [createdContractId, setCreatedContractId] = useState(null)
+
+  // ===== Flash de confirmation pour les saves intermédiaires =====
+  var [savedFlash, setSavedFlash] = useState("")
+
   // ===== Charger les employés disponibles =====
   useEffect(function () {
     supabase.from("hr_employees").select("*").order("nom").then(function (r) {
@@ -335,16 +343,43 @@ export default function RhWizard(props) {
   }
 
   // ===== Sauvegarde =====
-  async function saveDraft() {
+  // intermediate=true → ne ferme pas le wizard, juste flash de confirmation
+  async function saveDraft(intermediate) {
     setSaving(true)
     try {
       var empId = selectedEmpId
       if (empMode === "new") {
-        var insE = await supabase.from("hr_employees").insert([emp]).select().single()
-        if (insE.error) throw insE.error
-        empId = insE.data.id
-      } else if (empMode === "existing" && existing && existing.employee_id) {
-        await supabase.from("hr_employees").update(emp).eq("id", existing.employee_id)
+        if (createdEmpId) {
+          // Déjà créé via une sauvegarde précédente → UPDATE
+          await supabase.from("hr_employees").update(emp).eq("id", createdEmpId)
+          empId = createdEmpId
+        } else {
+          var insE = await supabase.from("hr_employees").insert([emp]).select().single()
+          if (insE.error) throw insE.error
+          empId = insE.data.id
+          setCreatedEmpId(empId)
+        }
+      } else if (empMode === "existing" && selectedEmpId) {
+        // Mode "existing" : on met à jour le salarié sélectionné quoi qu'il arrive
+        await supabase.from("hr_employees").update(emp).eq("id", selectedEmpId)
+      }
+
+      // Sauvegarde intermédiaire : si on est encore à l'étape Salarié/HACCP
+      // (avant que contract.type/fonction/dates soient renseignés), on s'arrête là.
+      // Pas de création de contrat partiel — on évite les rows draft incomplètes.
+      var canSaveContract = !!contract.type && (
+        // Pour Extra : motif + au moins date_debut
+        (contract.type === "extra" && (contract.motif || contract.fonction || contract.date_debut)) ||
+        // Pour CDI : fonction OU salaire OU date_embauche
+        (contract.type !== "extra" && (contract.fonction || contract.date_embauche || contract.salaire_brut_mensuel))
+      )
+
+      if (intermediate && !canSaveContract) {
+        // Step Salarié ou HACCP en mode intermediate : on a fait l'essentiel (emp save).
+        setSaving(false)
+        setSavedFlash("Salarié enregistré ✓")
+        setTimeout(function () { setSavedFlash("") }, 2500)
+        return
       }
 
       // Construire l'objet à sauvegarder selon le type
@@ -398,10 +433,17 @@ export default function RhWizard(props) {
         if (upd.error) throw upd.error
         contractId = existing.id
         await supabase.from("hr_contract_vacations").delete().eq("contract_id", contractId)
+      } else if (createdContractId) {
+        // Déjà créé via une sauvegarde précédente → UPDATE
+        var upd2 = await supabase.from("hr_contracts").update(contractData).eq("id", createdContractId).select().single()
+        if (upd2.error) throw upd2.error
+        contractId = createdContractId
+        await supabase.from("hr_contract_vacations").delete().eq("contract_id", contractId)
       } else {
         var ins = await supabase.from("hr_contracts").insert([contractData]).select().single()
         if (ins.error) throw ins.error
         contractId = ins.data.id
+        setCreatedContractId(contractId)
       }
 
       // Vacations (Extra uniquement)
@@ -421,6 +463,13 @@ export default function RhWizard(props) {
         if (vacRows.length) {
           await supabase.from("hr_contract_vacations").insert(vacRows)
         }
+      }
+
+      if (intermediate) {
+        setSaving(false)
+        setSavedFlash("Enregistré ✓")
+        setTimeout(function () { setSavedFlash("") }, 2500)
+        return
       }
 
       props.onSaved("Brouillon enregistré ✓")
@@ -568,15 +617,39 @@ export default function RhWizard(props) {
         </div>
 
         {/* FOOTER */}
-        <div className="mf">
+        <div className="mf" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
           {step > 1 && (
             <button className="btn" onClick={function () { setStep(step - 1) }}>← Précédent</button>
           )}
+          {/* Bouton Enregistrer disponible à chaque étape ≥ 1 (mode édition + sauvegardes intermédiaires) */}
+          {step >= 1 && contract.type && (
+            <button
+              className="btn"
+              onClick={function () { saveDraft(true) }}
+              disabled={saving}
+              style={{ background: "#FFEB5A", border: "2px solid #191923", color: "#191923", fontWeight: 700 }}
+              title="Enregistre les modifications de cette étape sans fermer le wizard"
+            >
+              {saving ? "Enregistrement..." : "💾 Enregistrer"}
+            </button>
+          )}
+          {savedFlash && (
+            <span style={{
+              color: "#0a7c2e",
+              fontWeight: 700,
+              fontSize: "13px",
+              padding: "4px 10px",
+              background: "#e6f7ec",
+              border: "1px solid #0a7c2e",
+              borderRadius: "999px"
+            }}>{savedFlash}</span>
+          )}
+          <div style={{ flex: 1 }}></div>
           {step >= 1 && step < maxStep && contract.type && (
             <button className="btn btn-p" onClick={function () { setStep(step + 1) }}>Suivant →</button>
           )}
           {step === maxStep && (
-            <button className="btn btn-p" onClick={saveDraft} disabled={saving}>
+            <button className="btn btn-p" onClick={function () { saveDraft(false) }} disabled={saving}>
               {saving ? "Enregistrement..." : "💾 Enregistrer le brouillon"}
             </button>
           )}
