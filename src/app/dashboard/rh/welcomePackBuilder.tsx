@@ -1007,7 +1007,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '</div>' +
         '<div class="rule" style="margin: 3mm 0;"></div>' +
 
-        '<p style="font-size: 11pt; margin: 3mm 0 3mm 0; line-height: 1.55;">' +
+        '<p style="font-size: 11pt; margin: 4mm 0 6mm 0; line-height: 1.55;">' +
           '<b>Cette page constitue ton information préalable individuelle</b> sur les traitements de données personnelles te concernant, conformément à l\'<b>article 13 du RGPD</b> et à l\'<b>article L1222-4 du Code du travail</b>. Elle est essentielle pour rendre opposables les images de vidéosurveillance et les traitements RH en cas de procédure.' +
         '</p>' +
 
@@ -1017,7 +1017,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
           '<b>L\'établissement Meshuga (3 rue Vavin, 75006 Paris) est placé sous vidéosurveillance.</b> Tu en es ' + g('informé', 'informée') + ' personnellement et préalablement à ta prise de poste, conformément à l\'obligation d\'information individuelle de l\'employeur (L1222-4) et au principe de loyauté (L1121-1).' +
         '</div>' +
 
-        '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5mm 6mm; font-size: 11pt; margin-top: 1.5mm;">' +
+        '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5mm 6mm; font-size: 11pt; margin-top: 4mm;">' +
           '<div><b>Caméras installées</b>&nbsp;: 2 (marque REOSU)</div>' +
           '<div><b>Durée de conservation</b>&nbsp;: 30 jours maximum</div>' +
           '<div style="grid-column: 1 / 3;"><b>Emplacement</b>&nbsp;: <b>(1)</b> comptoir / caisse · <b>(2)</b> au-dessus du poste de cuisson (axée sur l\'équipement, friteuse + plancha)</div>' +
@@ -1026,13 +1026,13 @@ export function buildWelcomePack(emp, contract, logoUri) {
           '<div style="grid-column: 1 / 3;"><b>Accès aux images</b>&nbsp;: réservé à Edward TOURET, Président, seul. Aucune diffusion ni transmission à des tiers en dehors des cas légaux (force publique, judiciaire).</div>' +
         '</div>' +
 
-        '<p style="font-size: 11pt; margin-top: 1.5mm;">' +
+        '<p style="font-size: 11pt; margin-top: 4mm; line-height: 1.55;">' +
           '<b>Finalités déclarées</b> (RGPD art. 6.1.f — intérêt légitime, test de proportionnalité L1121-1)&nbsp;: <b>(1)</b> Sécurité des biens et des personnes (caméra comptoir/caisse) · <b>(2)</b> Lutte contre le vol et les cambriolages · <b>(3)</b> Sécurité incendie & traçabilité HACCP (caméra cuisson — justification renforcée ci-dessous).' +
         '</p>' +
 
         // Encart spécifique caméra cuisson — bordage juridique
-        '<div style="margin-top: 2mm; padding: 5px 9px; background: rgba(255,235,90,0.18); border-left: 3px solid #FFEB5A; font-size: 11pt; line-height: 1.55;">' +
-          '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; color: #191923; margin-bottom: 1px;">⚖ Justification proportionnée de la caméra du poste de cuisson</div>' +
+        '<div style="margin-top: 5mm; padding: 12px 16px; background: rgba(255,235,90,0.18); border-left: 4px solid #FFEB5A; font-size: 11pt; line-height: 1.55; break-inside: avoid; page-break-inside: avoid;">' +
+          '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; color: #191923; margin-bottom: 3mm;">⚖ Justification proportionnée de la caméra du poste de cuisson</div>' +
           'La caméra installée au-dessus du poste de cuisson <b>n\'a pas pour objet la surveillance continue ' + g('du salarié', 'de la salariée') + '</b>. Elle est positionnée en plafond, axée sur <b>l\'équipement à risque</b> (friteuse, plancha, source de feu et d\'huile chaude) et répond à <b>trois finalités cumulatives proportionnées</b>&nbsp;:' +
           '<br/><b>(a) Sécurité incendie</b> — surveillance d\'un point chaud à risque élevé d\'incendie, conformément à l\'obligation générale de sécurité de l\'employeur (L4121-1) et aux articles R4227-37 à R4227-41 du Code du travail.' +
           '<br/><b>(b) Traçabilité HACCP</b> — preuve documentée du respect des protocoles d\'hygiène et des températures de cuisson en cas de contrôle DDPP, conformément aux <b>règlements (CE) 178/2002 et 852/2004</b> dits « paquet hygiène » qui imposent la traçabilité des points critiques.' +
@@ -1041,15 +1041,15 @@ export function buildWelcomePack(emp, contract, logoUri) {
           '<br/><b>Référence jurisprudentielle</b>&nbsp;: la Cour de cassation (Cass. Soc. 23 juin 2010 n° 09-66.355) admet la licéité de la vidéosurveillance d\'un poste de travail dès lors que ' + g('le salarié', 'la salariée') + ' est ' + g('informé', 'informée') + ' préalablement et que la finalité est légitime et proportionnée — ce qui est le cas ici.' +
         '</div>' +
 
-        '<p style="font-size: 11pt; margin-top: 2mm;">' +
+        '<p style="font-size: 11pt; margin-top: 5mm; line-height: 1.55;">' +
           '<b>Zones strictement non filmées</b>&nbsp;: sanitaires, vestiaire, espace de pause, voie publique. <b>Aucune caméra ne filme ' + g('un salarié', 'une salariée') + ' sur un poste de travail en surveillance continue à des fins de contrôle d\'activité.</b>' +
         '</p>' +
 
-        '<p style="font-size: 11pt; margin-top: 1.5mm; line-height: 1.55;">' +
+        '<p style="font-size: 11pt; margin-top: 5mm; line-height: 1.55;">' +
           '<b>Tes droits</b> (RGPD art. 15 à 22)&nbsp;: <b>accès</b> aux images te concernant, <b>rectification</b>, <b>effacement</b>, <b>limitation</b>, <b>opposition</b>. Demande motivée à edward@meshuga.fr — réponse sous 1 mois maximum (RGPD art. 12). <b>Réclamation</b>&nbsp;: <b>CNIL</b>, cnil.fr, 3 place de Fontenoy, 75007 Paris. <b>Affichage</b>&nbsp;: pictogramme caméra + mention informative à l\'entrée et en cuisine.' +
         '</p>' +
 
-        '<h3 class="bc pink" style="margin-top: 2mm; font-size: 11pt;">Autres traitements de données personnelles</h3>' +
+        '<h3 class="bc pink" style="font-size: 11pt;">Autres traitements de données personnelles</h3>' +
         '<div class="legal-box">' +
           '<div class="ref">RGPD UE 2016/679 art. 13 · Code du travail D.1221-24</div>' +
           '<b>Responsable</b>&nbsp;: SAS AEGIA FOOD, représentée par Edward TOURET, Président — edward@meshuga.fr. <b>Finalités</b>&nbsp;: contrat de travail, paie, DPAE, déclarations URSSAF, suivi RH, médecine du travail, prévoyance. <b>Base légale</b>&nbsp;: contrat (art. 6.1.b RGPD) + obligations légales (art. 6.1.c). <b>Destinataires</b>&nbsp;: URSSAF, EFFICIENCE, Gan, expert-comptable. <b>Durée</b>&nbsp;: contrat + 5 ans après sortie (D.1221-24). <b>Tes droits</b>&nbsp;: accès, rectification, effacement, limitation, portabilité, opposition — edward@meshuga.fr · Réclamation CNIL.' +
