@@ -2679,7 +2679,8 @@ function DashboardImpl() {
           <div className={page === "chasse" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("chasse"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔍"}</div><div className="mms-tile-lbl">Chasse</div></div>
           <div className={page === "reporting" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("reporting"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📊"}</div><div className="mms-tile-lbl">Reporting</div></div>
           <div className={page === "vault" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("vault"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔐"}</div><div className="mms-tile-lbl">Coffre</div></div>
-       <div className={page === "rh" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("rh"); setMenuOpen(false) }}><div className="mms-tile-ico">{"👥"}</div><div className="mms-tile-lbl">RH</div></div>
+          <div className={page === "rh" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("rh"); setMenuOpen(false) }}><div className="mms-tile-ico">{"👥"}</div><div className="mms-tile-lbl">RH</div></div>
+          <div className={page === "legal" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("legal"); setMenuOpen(false) }}><div className="mms-tile-ico">{"⚖️"}</div><div className="mms-tile-lbl">Légal</div></div>
         </div>
         <div className="mms-sec">Outils</div>
         <div className="mms-grid">
