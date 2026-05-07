@@ -128,6 +128,11 @@ export default function RhTab() {
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
+            className="btn btn-y"
+            onClick={function () { window.location.href = "/dashboard/rh/import" }}
+            title="Digitaliser les anciens contrats par photos ou PDF"
+          >📥 Importer historique</button>
+          <button
             className="btn btn-p"
             onClick={function () {
               setEditingContract(null)
