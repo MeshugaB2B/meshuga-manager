@@ -76,7 +76,16 @@ function emptyEmp() {
     ville: "",
     num_secu: "",
     email: "",
-    telephone: ""
+    telephone: "",
+    // Bonne pratique RH (non obligatoire DPAE)
+    marital_status: "",
+    emergency_contact_name: "",
+    emergency_contact_phone: "",
+    emergency_contact_relation: "",
+    // Formation HACCP (1 personne formée minimum par établissement — décret 24/06/2011)
+    haccp_done: false,
+    haccp_date: "",
+    haccp_certificate_doc_id: null
   }
 }
 
@@ -112,10 +121,10 @@ function emptyContract() {
     interessement_periodicite: "mensuelle ou trimestrielle, au choix de l'Employeur",
     missions_blocks: [],
     contract_label: "",
-    // Communs
-    service_sante_travail: "",
-    prevoyance_organisme: "",
-    prevoyance_adresse: "",
+    // Communs — préremplis avec les organismes Meshuga (overridables au cas par cas)
+    service_sante_travail: "EFFICIENCE — Centre Vaugirard, 64 rue de Vaugirard, 75006 Paris",
+    prevoyance_organisme: "Gan Eurocourtage Vie",
+    prevoyance_adresse: "8-10 rue d'Astorg, 75008 Paris",
     ville_signature: "Paris",
     date_signature: ""
   }
@@ -422,8 +431,11 @@ export default function RhWizard(props) {
   }
 
   // ===== Détermination du nombre d'étapes selon le type =====
+  // Étapes (après ajout HACCP) :
+  //   0: type | 1: Salarié | 2: HACCP | 3: Mission/Poste
+  //   4: Planning/Salaire | 5: Récap-Extra ou Missions-CDI | 6: Récap-CDI
   var isExtra = (contract.type === "extra")
-  var maxStep = isExtra ? 4 : 5
+  var maxStep = isExtra ? 5 : 6
 
   // ===== RENDER =====
   return (
@@ -444,7 +456,7 @@ export default function RhWizard(props) {
           {/* Stepper - n'affiche que les étapes utiles */}
           {contract.type && (
             <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-              {[1, 2, 3, 4].concat(isExtra ? [] : [5]).map(function (n) {
+              {[1, 2, 3, 4, 5].concat(isExtra ? [] : [6]).map(function (n) {
                 return (
                   <button
                     key={n}
@@ -492,39 +504,48 @@ export default function RhWizard(props) {
             />
           )}
 
-          {/* === ÉTAPE 2 : Mission (Extra) ou Poste (CDI) === */}
-          {step === 2 && isExtra && (
+          {/* === ÉTAPE 2 : Formation HACCP (NOUVELLE) === */}
+          {step === 2 && contract.type && (
+            <Step2Haccp
+              emp={emp} setEmp={setEmp}
+              empMode={empMode}
+              selectedEmpId={selectedEmpId}
+            />
+          )}
+
+          {/* === ÉTAPE 3 : Mission (Extra) ou Poste (CDI) === */}
+          {step === 3 && isExtra && (
             <Step2ExtraMission contract={contract} setContract={setContract} />
           )}
-          {step === 2 && !isExtra && contract.type && (
+          {step === 3 && !isExtra && contract.type && (
             <Step2CdiPosition
               contract={contract} setContract={setContract}
               niveauKey={niveauKey} peCheck={peCheck}
             />
           )}
 
-          {/* === ÉTAPE 3 : Planning (Extra) ou Rémunération (CDI) === */}
-          {step === 3 && isExtra && (
+          {/* === ÉTAPE 4 : Planning (Extra) ou Rémunération (CDI) === */}
+          {step === 4 && isExtra && (
             <Step3ExtraPlanning
               vacations={vacations} addVac={addVac} delVac={delVac} updVac={updVac}
             />
           )}
-          {step === 3 && !isExtra && contract.type && (
+          {step === 4 && !isExtra && contract.type && (
             <Step3CdiSalary
               contract={contract} setContract={setContract}
               calc={calc} smicCheck={smicCheck} ccnCheck={ccnCheck} niveauKey={niveauKey}
             />
           )}
 
-          {/* === ÉTAPE 4 : Récap (Extra) ou Missions (CDI) === */}
-          {step === 4 && isExtra && (
+          {/* === ÉTAPE 5 : Récap (Extra) ou Missions (CDI) === */}
+          {step === 5 && isExtra && (
             <Step4Recap
               contract={contract} setContract={setContract} emp={emp}
               previewHtml={previewHtml} generatePreview={generatePreview}
               existingContractId={existing ? existing.id : null}
             />
           )}
-          {step === 4 && !isExtra && contract.type && (
+          {step === 5 && !isExtra && contract.type && (
             <Step4CdiMissions
               contract={contract} setContract={setContract}
               updateMissionItem={updateMissionItem}
@@ -536,8 +557,8 @@ export default function RhWizard(props) {
             />
           )}
 
-          {/* === ÉTAPE 5 : Récap CDI === */}
-          {step === 5 && !isExtra && contract.type && (
+          {/* === ÉTAPE 6 : Récap CDI === */}
+          {step === 6 && !isExtra && contract.type && (
             <Step4Recap
               contract={contract} setContract={setContract} emp={emp}
               previewHtml={previewHtml} generatePreview={generatePreview}
@@ -569,15 +590,17 @@ export default function RhWizard(props) {
 function labelForStep(n, isExtra) {
   if (isExtra) {
     if (n === 1) return "Salarié"
-    if (n === 2) return "Mission"
-    if (n === 3) return "Planning"
-    if (n === 4) return "Récap"
+    if (n === 2) return "HACCP"
+    if (n === 3) return "Mission"
+    if (n === 4) return "Planning"
+    if (n === 5) return "Récap"
   } else {
     if (n === 1) return "Salarié"
-    if (n === 2) return "Poste"
-    if (n === 3) return "Salaire"
-    if (n === 4) return "Missions"
-    if (n === 5) return "Récap"
+    if (n === 2) return "HACCP"
+    if (n === 3) return "Poste"
+    if (n === 4) return "Salaire"
+    if (n === 5) return "Missions"
+    if (n === 6) return "Récap"
   }
   return ""
 }
@@ -754,6 +777,146 @@ function Step1Employee(props) {
           <input className="inp" value={emp.telephone}
             onChange={function (e) { setEmp(Object.assign({}, emp, { telephone: e.target.value })) }} />
         </div>
+      </div>
+
+      {/* === Situation familiale (optionnel — bonne pratique RH) === */}
+      <div className="ct" style={{ marginTop: 16 }}>
+        Situation familiale
+        <span style={{ fontSize: 10, fontWeight: 400, fontStyle: "italic", opacity: 0.6, marginLeft: 8, textTransform: "none", letterSpacing: 0 }}>
+          non obligatoire DPAE — bonne pratique RH
+        </span>
+      </div>
+      <div className="fg">
+        <label className="lbl">Situation</label>
+        <select
+          className="inp"
+          value={emp.marital_status || ""}
+          onChange={function (e) { setEmp(Object.assign({}, emp, { marital_status: e.target.value })) }}
+        >
+          <option value="">— Non renseigné —</option>
+          <option value="celibataire">Célibataire</option>
+          <option value="marie">Marié(e)</option>
+          <option value="pacs">Pacsé(e)</option>
+          <option value="divorce">Divorcé(e)</option>
+          <option value="veuf">Veuf(ve)</option>
+        </select>
+      </div>
+
+      {/* === Personne à prévenir en cas d'urgence === */}
+      <div className="ct" style={{ marginTop: 16 }}>
+        Personne à prévenir en cas d'urgence
+        <span style={{ fontSize: 10, fontWeight: 400, fontStyle: "italic", opacity: 0.6, marginLeft: 8, textTransform: "none", letterSpacing: 0 }}>
+          non obligatoire — fortement recommandé
+        </span>
+      </div>
+      <div className="fg2">
+        <div className="fg">
+          <label className="lbl">Nom complet</label>
+          <input className="inp" value={emp.emergency_contact_name || ""}
+            onChange={function (e) { setEmp(Object.assign({}, emp, { emergency_contact_name: e.target.value })) }}
+            placeholder="Ex: Jeanne DUPONT" />
+        </div>
+        <div className="fg">
+          <label className="lbl">Lien de parenté</label>
+          <input className="inp" value={emp.emergency_contact_relation || ""}
+            onChange={function (e) { setEmp(Object.assign({}, emp, { emergency_contact_relation: e.target.value })) }}
+            placeholder="Mère, Père, Conjoint, Ami(e)..." />
+        </div>
+      </div>
+      <div className="fg">
+        <label className="lbl">Téléphone</label>
+        <input className="inp" value={emp.emergency_contact_phone || ""}
+          onChange={function (e) { setEmp(Object.assign({}, emp, { emergency_contact_phone: e.target.value })) }}
+          placeholder="06 XX XX XX XX" />
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// STEP 2 (NOUVEAU) : Formation HACCP
+// ============================================================
+// Hygiène alimentaire — décret du 24 juin 2011 : au moins une personne
+// formée HACCP par établissement de restauration commerciale.
+// Le certificat (PDF/JPG) sera uploadé après création du salarié,
+// depuis sa fiche personnelle dans la section Documents (catégorie HACCP).
+// ============================================================
+function Step2Haccp(props) {
+  var emp = props.emp
+  var setEmp = props.setEmp
+  return (
+    <div>
+      <div className="ct">Formation HACCP</div>
+
+      <div style={{ background: "#FFF8E1", borderLeft: "3px solid #FF82D7", padding: "10px 14px", marginBottom: 14, fontSize: 11.5, lineHeight: 1.5 }}>
+        🥗 <b>Hygiène alimentaire</b> — Le décret du 24 juin 2011 impose qu'au moins une personne formée HACCP soit présente dans tout établissement de restauration commerciale.
+        <br />
+        <span style={{ fontSize: 10.5, opacity: 0.75, fontStyle: "italic" }}>
+          Edward TOURET est formé (CNFSE — 14h, du 06/12/2020 au 09/01/2021). Tu peux indiquer ici si ce salarié est également formé.
+        </span>
+      </div>
+
+      <div className="fg">
+        <label className="lbl">Ce salarié a-t-il suivi une formation HACCP ?</label>
+        <div style={{ display: "flex", gap: 18, marginTop: 4 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input
+              type="radio"
+              name="haccp_done"
+              checked={emp.haccp_done === true}
+              onChange={function () { setEmp(Object.assign({}, emp, { haccp_done: true })) }}
+            />
+            <span>✓ Oui, formation suivie</span>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input
+              type="radio"
+              name="haccp_done"
+              checked={emp.haccp_done !== true}
+              onChange={function () { setEmp(Object.assign({}, emp, { haccp_done: false, haccp_date: "" })) }}
+            />
+            <span>✗ Non / À planifier</span>
+          </label>
+        </div>
+      </div>
+
+      {emp.haccp_done === true ? (
+        <div>
+          <div className="fg" style={{ marginTop: 14 }}>
+            <label className="lbl">Date de la formation</label>
+            <input
+              type="date"
+              className="inp"
+              value={emp.haccp_date || ""}
+              onChange={function (e) { setEmp(Object.assign({}, emp, { haccp_date: e.target.value })) }}
+            />
+            <div style={{ fontSize: 10, opacity: 0.6, marginTop: 4 }}>
+              Date de fin de stage indiquée sur le certificat.
+            </div>
+          </div>
+
+          <div style={{ background: "#FAFAFA", border: "1px dashed #BBBBBB", borderRadius: 6, padding: 12, marginTop: 12, fontSize: 11.5, lineHeight: 1.55 }}>
+            📎 <b>Certificat HACCP</b> — Le PDF du certificat se charge depuis la fiche personnelle du salarié,
+            dans la section <i>Documents</i>, catégorie <b>HACCP</b>.
+            {props.empMode === "new" ? (
+              <span><br /><span style={{ color: "#C2185B", fontWeight: 700 }}>→ Enregistre d'abord ce brouillon, puis rouvre la fiche du salarié pour uploader le certificat.</span></span>
+            ) : (
+              <span><br />→ Tu peux l'uploader maintenant en fermant ce wizard, ou plus tard.</span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div style={{ background: "#FFF8E1", borderLeft: "3px solid #FFEB5A", padding: "10px 14px", marginTop: 14, fontSize: 11.5, lineHeight: 1.55 }}>
+          📅 <b>Formation à planifier</b> auprès de l'organisme <b>CNFSE</b> (Centre National de la Formation, de la Sécurité et de l'Emploi) ou équivalent agréé.
+          <br />
+          <span style={{ fontSize: 10.5, opacity: 0.75, fontStyle: "italic" }}>
+            Une note sera ajoutée au dossier de bienvenue : « Formation HACCP à planifier auprès de CNFSE ».
+          </span>
+        </div>
+      )}
+
+      <div style={{ marginTop: 18, fontSize: 10.5, opacity: 0.6, fontStyle: "italic" }}>
+        Source légale : <b>arrêté du 5 octobre 2011</b> relatif au cahier des charges de la formation spécifique en matière d'hygiène alimentaire (CCN 1501 — Restauration Rapide).
       </div>
     </div>
   )
