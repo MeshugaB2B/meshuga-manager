@@ -36,11 +36,14 @@ export default function EmployeeDetail(props) {
   var [emp, setEmp] = useState(null)
   var [empOriginal, setEmpOriginal] = useState(null)
   var [contracts, setContracts] = useState([])
+  var [welcomePackDocs, setWelcomePackDocs] = useState([])
   var [loading, setLoading] = useState(true)
   var [saving, setSaving] = useState(false)
   var [editing, setEditing] = useState(false)
   var [uploadingSignedFor, setUploadingSignedFor] = useState(null)
+  var [uploadingWelcomePack, setUploadingWelcomePack] = useState(false)
   var signedFileInputRef = useRef(null)
+  var welcomePackFileInputRef = useRef(null)
 
   // === Charge l'employé + ses contrats ===
   async function load() {
@@ -57,7 +60,22 @@ export default function EmployeeDetail(props) {
       .order("created_at", { ascending: false })
     setEmp(resE.data || null)
     setEmpOriginal(resE.data || null)
-    setContracts(resC.data || [])
+    var contractsList = resC.data || []
+    setContracts(contractsList)
+
+    // Charge les dossiers de bienvenue signés (rattachés aux contrats du salarié)
+    var contractIds = contractsList.map(function (c) { return c.id })
+    if (contractIds.length > 0) {
+      var resWP = await supabase
+        .from("hr_contract_documents")
+        .select("*")
+        .in("contract_id", contractIds)
+        .eq("doc_type", "dossier_bienvenue_signe")
+        .order("uploaded_at", { ascending: false })
+      setWelcomePackDocs(resWP.data || [])
+    } else {
+      setWelcomePackDocs([])
+    }
     setLoading(false)
   }
 
@@ -201,6 +219,62 @@ export default function EmployeeDetail(props) {
     }
   }
 
+  // === Génération / aperçu du dossier de bienvenue ===
+  function previewWelcomePack() {
+    if (props.onWelcomePackPreview) props.onWelcomePackPreview(emp.id)
+  }
+
+  // === Trigger upload du dossier signé "Lu et approuvé" ===
+  function triggerWelcomePackUpload() {
+    var activeContract = contracts.filter(function (c) { return c.status !== "archived" })[0]
+    if (!activeContract) {
+      alert(
+        "Pas de contrat actif pour rattacher le dossier signé.\n\n" +
+        "Le dossier de bienvenue signé doit être rattaché à un contrat de travail. " +
+        "Crée d'abord un contrat (ou réactive un contrat archivé) puis recommence."
+      )
+      return
+    }
+    setUploadingWelcomePack(true)
+    setTimeout(function () {
+      if (welcomePackFileInputRef.current) welcomePackFileInputRef.current.click()
+    }, 50)
+  }
+
+  async function handleWelcomePackFile(file) {
+    if (!file) { setUploadingWelcomePack(false); return }
+    var activeContract = contracts.filter(function (c) { return c.status !== "archived" })[0]
+    if (!activeContract) {
+      alert("Pas de contrat actif. Annulé.")
+      setUploadingWelcomePack(false)
+      return
+    }
+    try {
+      var ext = (file.name.split(".").pop() || "pdf").toLowerCase()
+      var path = activeContract.id + "/dossier_bienvenue/" + Date.now() + "-signed." + ext
+      var up = await supabase.storage.from("hr-contract-docs").upload(path, file, {
+        cacheControl: "3600", upsert: false, contentType: file.type || undefined
+      })
+      if (up.error) throw up.error
+      var ins = await supabase.from("hr_contract_documents").insert([{
+        contract_id: activeContract.id,
+        doc_type: "dossier_bienvenue_signe",
+        label: "Dossier de bienvenue signé (Lu et approuvé)",
+        file_path: path,
+        mime_type: file.type || null,
+        size_bytes: file.size || null
+      }])
+      if (ins.error) throw ins.error
+      if (props.onSaved) props.onSaved("Dossier de bienvenue signé uploadé ✓")
+      setUploadingWelcomePack(false)
+      if (welcomePackFileInputRef.current) welcomePackFileInputRef.current.value = ""
+      load()
+    } catch (err) {
+      alert("Erreur upload : " + (err.message || err))
+      setUploadingWelcomePack(false)
+    }
+  }
+
   // === Demander les congés (envoie un email automatique) ===
   async function requestLeave() {
     if (!emp.email) {
@@ -271,6 +345,18 @@ export default function EmployeeDetail(props) {
           }}
         />
 
+        {/* Hidden file input pour le dossier de bienvenue signé */}
+        <input
+          ref={welcomePackFileInputRef}
+          type="file"
+          accept="application/pdf,image/jpeg,image/png"
+          style={{ display: "none" }}
+          onChange={function (e) {
+            var f = e.target.files && e.target.files[0]
+            if (f) handleWelcomePackFile(f)
+          }}
+        />
+
         {/* === HEADER === */}
         <div className="mh" style={{ position: "sticky", top: 0, zIndex: 10, background: "#FFFFFF" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
@@ -293,6 +379,11 @@ export default function EmployeeDetail(props) {
                 else alert("Pas de contrat actif pour uploader le signé. Crée d'abord un contrat.")
               }}
             >📥 Uploader contrat signé</button>
+            <button
+              className="btn"
+              onClick={previewWelcomePack}
+              title="Générer / voir le dossier de bienvenue (4 pages)"
+            >📋 Dossier de bienvenue</button>
             <button
               className="btn"
               onClick={requestLeave}
@@ -531,6 +622,47 @@ export default function EmployeeDetail(props) {
               })}
             </div>
           )}
+        </div>
+
+        {/* === BLOC DOSSIER DE BIENVENUE === */}
+        <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
+          <div className="ct">📋 Dossier de bienvenue</div>
+          <div style={{ background: "#FFF8E1", borderLeft: "3px solid #FF82D7", padding: "10px 14px", marginBottom: 12, fontSize: 11, lineHeight: 1.5 }}>
+            🥪 4 pages signables : couverture, fiche salarié pré-remplie, règles d'hygiène (L4122-1) et engagement de lecture (L1331-1) avec mention « Lu et approuvé ».
+          </div>
+
+          {welcomePackDocs.length > 0 ? (
+            <div style={{ background: "#FFFFFF", border: "2px solid #FF82D7", borderRadius: 6, padding: 12, marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ background: "#FF82D7", color: "#FFFFFF", padding: "3px 8px", borderRadius: 4, fontSize: 9, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".5px" }}>
+                  ✓ Signé
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>
+                  Dossier signé téléversé le {fmtDate(welcomePackDocs[0].uploaded_at)}
+                </span>
+              </div>
+              <div style={{ fontSize: 11, opacity: 0.7 }}>
+                {welcomePackDocs.length} fichier{welcomePackDocs.length > 1 ? "s" : ""} archivé{welcomePackDocs.length > 1 ? "s" : ""} · catégorie « dossier_bienvenue_signe »
+              </div>
+            </div>
+          ) : (
+            <div style={{ background: "#FAFAFA", border: "1px dashed #BBBBBB", borderRadius: 6, padding: 12, marginBottom: 10, fontSize: 11.5, color: "#666" }}>
+              ✗ Aucun dossier signé n'a encore été téléversé pour ce salarié.
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <button
+              className="btn btn-y btn-sm"
+              onClick={previewWelcomePack}
+            >👁 Générer / Voir le dossier</button>
+            <button
+              className="btn btn-sm"
+              onClick={triggerWelcomePackUpload}
+              disabled={uploadingWelcomePack}
+              title="Uploader le PDF signé « Lu et approuvé »"
+            >{uploadingWelcomePack ? "Upload..." : "📎 Uploader le signé"}</button>
+          </div>
         </div>
 
         {/* === BLOC DOCUMENTS (perso + contractuels fusionnés) === */}
