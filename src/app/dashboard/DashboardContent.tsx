@@ -12,6 +12,7 @@ import QuotesTab from './catering/QuotesTab'
 import QuoteEditor from './catering/QuoteEditor'
 import QuoteWizard from './catering/QuoteWizard'
 import RhTab from './RhTab'
+import LegalTab from './LegalTab'
 import { G } from './styles'
 import { LOGO_PINK, LOGO_YELLOW, STAMP_YELLOW, STAMP_PINK } from './logos'
 import {
@@ -852,9 +853,10 @@ function DashboardImpl() {
     {id: 'foodcost', label: 'Food Cost', icon: '🥩'},
     {id: 'fournisseurs', label: 'Fournisseurs', icon: '📦'},
     {id: 'rh', label: 'Ressources Humaines', icon: '👥'},
+    {id: 'legal', label: 'Légal & Conformité', icon: '⚖️'},
     {id: 'messagerie', label: 'Messagerie', icon: '💬'},
   ]
-
+  
   if (!mounted) return null
 
   return (
@@ -899,8 +901,7 @@ function DashboardImpl() {
               )
             })}
             <div className="sb-sec">Gestion</div>
-            {NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['chasse','foodcost','fournisseurs','rh','annuaire','reporting','vault'].indexOf(n.id) > -1 }).map(function(n) {
-              return (
+            {NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['chasse','foodcost','fournisseurs','rh','legal','annuaire','reporting','vault'].indexOf(n.id) > -1 }).map(function(n) {              return (
                 <div key={n.id} className={page === n.id ? 'ni active' : 'ni'} onClick={function() { nav(n.id) }}>
                   <span style={{fontSize:14}}>{n.icon}</span>{n.label}
                 </div>
@@ -2507,7 +2508,8 @@ function DashboardImpl() {
               </div>
             )}
 
-          {page === 'rh' && <RhTab />}
+         {page === 'rh' && <RhTab />}
+          {page === 'legal' && <LegalTab />}
             {page === 'foodcost' && (
             <FoodCostTab
               fcRecipes={fcRecipes}
