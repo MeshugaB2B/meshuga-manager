@@ -568,9 +568,13 @@ export function buildWelcomePack(emp, contract, logoUri) {
   addressLine = addressLine.trim() || "—"
 
   // Type de contrat (accordé au genre)
+  // Note : `type` est l'identifiant interne (cdi_cadre, cdi_caissier, cdi_cuisinier, extra).
+  // La vérité sur le statut cadre/non-cadre est dans `statut_cadre`.
+  var statutCadre = (contract.statut_cadre || "").toLowerCase().trim()
+  var isCadreReel = statutCadre === "cadre"
   var typeLabels = {
     "extra": "CDD d'usage (Extra)",
-    "cdi_cadre": "CDI Cadre",
+    "cdi_cadre": isCadreReel ? "CDI Cadre" : "CDI " + g("Agent de maîtrise", "Agent de maîtrise"),
     "cdi_cuisinier": "CDI " + g("Cuisinier", "Cuisinière"),
     "cdi_caissier": "CDI " + g("Caissier", "Caissière")
   }
@@ -610,33 +614,31 @@ export function buildWelcomePack(emp, contract, logoUri) {
     heuresLine = fmtNum(contract.heures_hebdo) + " h / semaine"
   }
 
-  // Période d'essai (CCN 1501 art. 9 + L1221-19 à L1221-26)
-  // Sources : Légifrance KALISCTA000005716546
-  //   Cadres (Niveau V)            : 4 mois max, renouvelable 1× moitié → 6 mois max total
-  //   Agents de maîtrise (Niv. IV) : 3 mois max, NON renouvelable selon CCN 1501
-  //   Employés Niveau III          : 2 mois max, NON renouvelable
-  //   Niveaux I-II                 : 1 mois max, NON renouvelable
-  // Le renouvellement n'est prévu par la CCN 1501 QUE pour les cadres.
-  // Priorité : (1) periode_essai_mois en base → (2) niveau CCN → (3) type
+  // Période d'essai — RECOPIE FIDÈLE du contrat (champs Supabase) :
+  //   * periode_essai_mois         : durée initiale (integer)
+  //   * periode_essai_renouvelable : si TRUE, renouvelable une fois pour la même durée
+  //   * statut_cadre               : "cadre" ou "non-cadre"
+  // Référentiel juridique cité : CCN 1501 art. 9 + L1221-19, L1221-21, L1221-25, L1221-26
   var periodeEssaiLine = ""
   if (contract.type === "extra") {
     periodeEssaiLine = "Sans objet pour CDD d'usage de courte durée — relation contractuelle à durée déterminée encadrée par les articles L1242-1 et suivants du Code du travail."
   } else {
-    var niv = (contract.niveau_ccn || "").toString().toUpperCase().trim()
-    // isCadre prend le niveau CCN comme source de vérité ; fallback sur type seulement si niveau absent
-    var isCadre = niv === "V" || (niv === "" && contract.type === "cdi_cadre")
-    // Détermination de la durée : base > défaut par niveau
     var dureeMois = contract.periode_essai_mois
     if (!dureeMois || dureeMois <= 0) {
-      if (isCadre) dureeMois = 4
+      // fallback si la base n'a rien : on ne fait pas de zèle, on prend la valeur min CCN 1501 selon niveau
+      var niv = (contract.niveau_ccn || "").toString().toUpperCase().trim()
+      if (isCadreReel) dureeMois = 4
       else if (niv === "IV") dureeMois = 3
       else if (niv === "III") dureeMois = 2
       else dureeMois = 1
     }
-    var renouvText = isCadre
-      ? ", renouvelable une fois pour la moitié de sa durée initiale (durée totale plafonnée à 6 mois)"
-      : ", non renouvelable (la CCN 1501 ne prévoit le renouvellement que pour les cadres)"
-    periodeEssaiLine = dureeMois + " mois" + renouvText + ". Références : CCN 1501 art. 9 · articles L1221-19, L1221-21 et L1221-25 (délais de prévenance) du Code du travail."
+    var renouv = contract.periode_essai_renouvelable === true
+    if (renouv) {
+      var dureeTotale = dureeMois * 2
+      periodeEssaiLine = dureeMois + " mois, renouvelable une fois pour " + dureeMois + " mois supplémentaires (durée maximale totale : " + dureeTotale + " mois), sous réserve d'un accord écrit " + g('du salarié', 'de la salariée') + " intervenant avant le terme de la période initiale. Références : CCN 1501 art. 9 · articles L1221-19, L1221-21 et L1221-25 (délais de prévenance) du Code du travail."
+    } else {
+      periodeEssaiLine = dureeMois + " mois, non renouvelable. Références : CCN 1501 art. 9 · articles L1221-19 et L1221-25 (délais de prévenance) du Code du travail."
+    }
   }
 
   // Situation familiale
@@ -722,12 +724,31 @@ export function buildWelcomePack(emp, contract, logoUri) {
     // pour économiser l'encre — la couverture rose et tous les accents Meshuga disparaîtraient.
     "* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
     "html, body, .page, .page.cover, .bg-circle, .legal-box, .pill, .sig-box, .cb .box, .cb .box.checked { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }" +
+    "@media screen and (max-width: 820px) {" +
+    "  html, body { background: #FFFFFF; }" +
+    "  body { font-size: 14px; line-height: 1.5; }" +
+    "  .page { width: 100% !important; min-height: auto !important; max-height: none !important; height: auto !important; padding: 5vw 4vw 18vw 4vw !important; margin: 0 0 4vw 0 !important; overflow: visible !important; box-shadow: none !important; page-break-after: auto; }" +
+    "  .page.cover { padding: 10vw 6vw !important; min-height: 70vh; }" +
+    "  .footer { position: static !important; left: auto !important; right: auto !important; bottom: auto !important; margin-top: 6mm !important; padding: 0 4vw !important; font-size: 8pt !important; }" +
+    "  h1.yt { font-size: 44pt !important; line-height: 1.1 !important; }" +
+    "  h2.yt { font-size: 28pt !important; }" +
+    "  .grid2 { grid-template-columns: 1fr !important; gap: 1mm 0 !important; }" +
+    "  .sig-grid { grid-template-columns: 1fr !important; gap: 4mm !important; }" +
+    "  div[style*='grid-template-columns: 1fr 1fr'] { grid-template-columns: 1fr !important; gap: 4mm !important; }" +
+    "  div[style*='grid-template-columns: auto 1fr'] { grid-template-columns: 1fr !important; }" +
+    "  .bg-circle { display: none !important; }" +
+    "  .legal-box { font-size: 9pt !important; padding: 8px 12px !important; }" +
+    "  ul.tidy li { font-size: 9pt !important; }" +
+    "  .pill { font-size: 8pt !important; }" +
+    "}" +
     "@media print {" +
     "  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
     "  html, body { background: #FFFFFF !important; }" +
-    "  .page { margin: 0 !important; box-shadow: none !important; page-break-after: always; }" +
-    "  .page.cover { background: #FF82D7 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }" +
+    "  .page { margin: 0 !important; box-shadow: none !important; page-break-after: always; width: 210mm !important; min-height: 297mm !important; max-height: 297mm !important; height: 297mm !important; padding: 18mm !important; overflow: hidden !important; }" +
+    "  .page.cover { background: #FF82D7 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; padding: 22mm !important; }" +
     "  .page:last-of-type { page-break-after: auto; }" +
+    "  .footer { position: absolute !important; bottom: 8mm !important; left: 18mm !important; right: 18mm !important; }" +
+    "  .bg-circle { display: block !important; }" +
     "}"
 
   // ===== PAGE 1 — COUVERTURE (style Affiches cuisine : fond rose plein) =====
@@ -876,6 +897,14 @@ export function buildWelcomePack(emp, contract, logoUri) {
           esc(periodeEssaiLine) +
         '</div>' +
 
+        // Clause de mobilité (si activée dans le contrat)
+        (contract.clause_mobilite === true ? (
+          '<h3 class="bc pink" style="margin-top: 3mm; font-size: 12pt;">Clause de mobilité</h3>' +
+          '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 9pt;">' +
+            '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Article L1222-6 du Code du travail · jurisprudence Cass. Soc. (zone géographique précise)</div>' +
+            'Conformément à ton contrat de travail, tu acceptes que ton lieu de travail puisse être modifié à l\'intérieur de la zone suivante&nbsp;: <b>' + esc(contract.clause_mobilite_zone || "—") + '</b>. Toute mutation dans cette zone constitue une simple modification des conditions de travail (et non du contrat) et ne nécessite pas d\'avenant. Hors de cette zone, ton accord écrit reste requis.' +
+          '</div>'
+        ) : "") +
         '<h3 class="bc pink" style="margin-top: 3mm; font-size: 12pt;">Formation hygiène alimentaire (HACCP)</h3>' +
         haccpHtml +
         '<p style="font-size: 8pt; opacity: 0.7; margin-top: 1mm; font-style: italic; line-height: 1.4;">' +
@@ -1168,6 +1197,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
     '<html lang="fr">' +
     '<head>' +
       '<meta charset="utf-8" />' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />' +
       '<title>Dossier de bienvenue Meshuga — ' + esc(nomComplet) + '</title>' +
       '<style>' + styles + '</style>' +
     '</head>' +
