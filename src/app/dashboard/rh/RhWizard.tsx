@@ -343,25 +343,52 @@ export default function RhWizard(props) {
   }
 
   // ===== Sauvegarde =====
+  // Sanitize : transforme les chaînes vides en null pour les colonnes typées
+  // (DATE, UUID, etc.) qui refusent "" — sinon Postgres rejette TOUT le update silencieusement.
+  function sanitizeEmp(e) {
+    var clean = Object.assign({}, e)
+    var dateFields = ["date_naissance", "haccp_date"]
+    var uuidFields = ["haccp_certificate_doc_id"]
+    var nullableTextFields = [
+      "marital_status", "emergency_contact_name", "emergency_contact_phone",
+      "emergency_contact_relation", "lieu_naissance", "num_secu", "email",
+      "telephone", "code_postal", "ville", "adresse"
+    ]
+    var i
+    for (i = 0; i < dateFields.length; i++) {
+      if (clean[dateFields[i]] === "" || clean[dateFields[i]] === undefined) clean[dateFields[i]] = null
+    }
+    for (i = 0; i < uuidFields.length; i++) {
+      if (clean[uuidFields[i]] === "" || clean[uuidFields[i]] === undefined) clean[uuidFields[i]] = null
+    }
+    for (i = 0; i < nullableTextFields.length; i++) {
+      if (clean[nullableTextFields[i]] === "" || clean[nullableTextFields[i]] === undefined) clean[nullableTextFields[i]] = null
+    }
+    return clean
+  }
+
   // intermediate=true → ne ferme pas le wizard, juste flash de confirmation
   async function saveDraft(intermediate) {
     setSaving(true)
     try {
       var empId = selectedEmpId
+      var empPayload = sanitizeEmp(emp)
       if (empMode === "new") {
         if (createdEmpId) {
           // Déjà créé via une sauvegarde précédente → UPDATE
-          await supabase.from("hr_employees").update(emp).eq("id", createdEmpId)
+          var u1 = await supabase.from("hr_employees").update(empPayload).eq("id", createdEmpId)
+          if (u1.error) throw new Error("Mise à jour salarié : " + u1.error.message)
           empId = createdEmpId
         } else {
-          var insE = await supabase.from("hr_employees").insert([emp]).select().single()
-          if (insE.error) throw insE.error
+          var insE = await supabase.from("hr_employees").insert([empPayload]).select().single()
+          if (insE.error) throw new Error("Création salarié : " + insE.error.message)
           empId = insE.data.id
           setCreatedEmpId(empId)
         }
       } else if (empMode === "existing" && selectedEmpId) {
         // Mode "existing" : on met à jour le salarié sélectionné quoi qu'il arrive
-        await supabase.from("hr_employees").update(emp).eq("id", selectedEmpId)
+        var u2 = await supabase.from("hr_employees").update(empPayload).eq("id", selectedEmpId)
+        if (u2.error) throw new Error("Mise à jour salarié : " + u2.error.message)
       }
 
       // Sauvegarde intermédiaire : si on est encore à l'étape Salarié/HACCP
