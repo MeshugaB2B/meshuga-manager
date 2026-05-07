@@ -19,17 +19,20 @@ function makePageFromFile(file: any) {
   var sizeMb = file.size / (1024 * 1024)
   var mime = (file.type || "").toLowerCase()
   // HEIC/HEIF : pas de preview navigateur (Chrome/Firefox), Safari oui
+  // PDF : icône fallback 📄 (pas de preview inline)
   // On affichera une icône fallback dans ces cas
   var preview = null
   if (mime === "image/jpeg" || mime === "image/jpg" || mime === "image/png" || mime === "image/webp") {
     preview = URL.createObjectURL(file)
   }
+  var isPdf = mime === "application/pdf"
   return {
     id: Math.random().toString(36).slice(2),
     file: file,
     preview: preview,
     sizeMb: sizeMb,
     mime: mime,
+    isPdf: isPdf,
   }
 }
 
@@ -60,19 +63,41 @@ export default function PhotoUploader(props: any) {
     if (disabled) return
     var newPages = []
     var rejected = []
+    var hasPdf = pages.some(function (p: any) { return p.isPdf })
+    var hasImage = pages.some(function (p: any) { return !p.isPdf })
+
     for (var i = 0; i < fileList.length; i++) {
       var f = fileList[i]
       if (!f) continue
       var mime = (f.type || "").toLowerCase()
       var isImage = mime.indexOf("image/") === 0
-      if (!isImage) {
-        rejected.push(f.name + " (pas une image)")
+      var isPdf = mime === "application/pdf"
+      if (!isImage && !isPdf) {
+        rejected.push(f.name + " (ni image ni PDF)")
         continue
       }
       var sizeMb = f.size / (1024 * 1024)
       if (sizeMb > MAX_FILE_MB) {
         rejected.push(f.name + " (" + sizeMb.toFixed(1) + " MB > " + MAX_FILE_MB + " MB)")
         continue
+      }
+      // Règle : on n'accepte qu'UN PDF (qui sera le document complet)
+      // ET on ne mixe pas PDF + images
+      if (isPdf) {
+        if (hasPdf || newPages.some(function (p: any) { return p.isPdf })) {
+          rejected.push(f.name + " (un seul PDF par document)")
+          continue
+        }
+        if (hasImage) {
+          rejected.push(f.name + " (impossible de mélanger PDF et photos — choisis l'un OU l'autre)")
+          continue
+        }
+      } else {
+        // c'est une image
+        if (hasPdf || newPages.some(function (p: any) { return p.isPdf })) {
+          rejected.push(f.name + " (impossible d'ajouter une photo après un PDF — vide d'abord la liste)")
+          continue
+        }
       }
       newPages.push(makePageFromFile(f))
     }
@@ -164,17 +189,19 @@ export default function PhotoUploader(props: any) {
           opacity: disabled ? 0.5 : 1,
         }}
       >
-        <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>📷📄</div>
         <div style={{ fontFamily: "Arial Narrow, sans-serif", fontSize: 14, color: MESHUGA_DARK }}>
-          {pages.length === 0 ? "Glissez vos photos ici, ou cliquez pour en ajouter" : "Ajouter d'autres pages"}
+          {pages.length === 0
+            ? "Glissez vos photos OU votre PDF ici, ou cliquez pour ajouter"
+            : "Ajouter d'autres pages"}
         </div>
         <div style={{ fontFamily: "Arial Narrow, sans-serif", fontSize: 11, color: "#888", marginTop: 4 }}>
-          JPEG, PNG, HEIC (iPhone), WEBP — max {MAX_FILE_MB} MB par photo
+          Photos JPEG / PNG / HEIC iPhone / WEBP — ou un seul PDF — max {MAX_FILE_MB} MB par fichier
         </div>
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,application/pdf"
           multiple
           onChange={handleInputChange}
           disabled={disabled}
@@ -239,7 +266,7 @@ export default function PhotoUploader(props: any) {
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />
                   ) : (
-                    <div style={{ fontSize: 24 }}>🖼️</div>
+                    <div style={{ fontSize: 24 }}>{page.isPdf ? "📄" : "🖼️"}</div>
                   )}
                 </div>
 
