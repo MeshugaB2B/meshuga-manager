@@ -49,26 +49,16 @@ export async function POST(req: Request) {
         }
       }
     } else if (doc.file_path) {
-      pageList.push({ path: doc.file_path, mime_type: doc.mime_type || 'image/jpeg' })
+      // Cas mono-PDF : pages[] est vide mais file_path pointe sur le PDF
+      pageList.push({ path: doc.file_path, mime_type: doc.mime_type || 'application/pdf' })
     }
 
     if (pageList.length === 0) {
       return NextResponse.json({ error: 'aucune page à analyser' }, { status: 400 })
     }
 
-    // Vision API ne lit pas les PDFs en input image. Si la "page" est un PDF,
-    // on stoppe : il faut OCRiser sur les images individuelles.
-    for (var k = 0; k < pageList.length; k++) {
-      if (pageList[k].mime_type === 'application/pdf') {
-        return NextResponse.json(
-          {
-            error: 'PDF non supporté en OCR direct — utilisez les pages images individuelles',
-            hint: 'Le doc doit avoir un tableau pages[] avec des images',
-          },
-          { status: 400 }
-        )
-      }
-    }
+    // Note : Anthropic API supporte les PDFs nativement via type:'document'.
+    // Le wrapper extractContractFromImages gère les deux cas (images + PDF mono).
 
     // Télécharger chaque page depuis Storage
     var imageBuffers: Array<{ buffer: Buffer; mimeType: string }> = []
