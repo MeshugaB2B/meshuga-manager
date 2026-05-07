@@ -580,12 +580,21 @@ export function buildWelcomePack(emp, contract, logoUri) {
   var dateEmbauche = contract.date_embauche || contract.date_debut || ""
   var dateEmbaucheFmt = fmtDate(dateEmbauche)
 
+  // Helper format décimal FR : "39.00" -> "39" / "39.50" -> "39,5" / "3006.00" -> "3006"
+  var fmtNum = function(v) {
+    if (v === null || v === undefined || v === "") return ""
+    var n = parseFloat(String(v).replace(",", "."))
+    if (isNaN(n)) return String(v)
+    if (n % 1 === 0) return String(n)
+    return String(n).replace(".", ",")
+  }
+
   // Salaire
   var salaireLine = ""
   if (contract.type && contract.type !== "extra") {
-    if (contract.salaire_brut_mensuel) salaireLine = contract.salaire_brut_mensuel + " € brut / mois"
+    if (contract.salaire_brut_mensuel) salaireLine = fmtNum(contract.salaire_brut_mensuel) + " € brut / mois"
   } else if (contract.taux_horaire_brut) {
-    salaireLine = contract.taux_horaire_brut + " € brut / heure"
+    salaireLine = fmtNum(contract.taux_horaire_brut) + " € brut / heure"
   }
 
   // Niveau CCN combiné
@@ -598,23 +607,36 @@ export function buildWelcomePack(emp, contract, logoUri) {
   // Heures hebdo (CDI)
   var heuresLine = ""
   if (contract.type && contract.type !== "extra" && contract.heures_hebdo) {
-    heuresLine = contract.heures_hebdo + " h / semaine"
+    heuresLine = fmtNum(contract.heures_hebdo) + " h / semaine"
   }
 
-  // Période d'essai selon type de contrat (CCN 1501 + L1221-19/22 du Code du travail)
-  // CCN Restauration Rapide IDCC 1501 :
-  //   - Niveaux I à III (employés) : 1 mois renouvelable 1×, max 2 mois
-  //   - Niveaux IV (agents de maîtrise) : 2 mois renouvelable 1×, max 4 mois
-  //   - Niveau V (cadres) : 3 mois renouvelable 1×, max 6 mois (limite légale L1221-19)
-  // CDD d'usage : durée maximale 1 jour par semaine de contrat, plafonné à 1 mois (L1242-10)
+  // Période d'essai (CCN 1501 art. 9 + L1221-19 à L1221-26)
+  // Sources : Légifrance KALISCTA000005716546
+  //   Cadres (Niveau V)            : 4 mois max, renouvelable 1× moitié → 6 mois max total
+  //   Agents de maîtrise (Niv. IV) : 3 mois max, NON renouvelable selon CCN 1501
+  //   Employés Niveau III          : 2 mois max, NON renouvelable
+  //   Niveaux I-II                 : 1 mois max, NON renouvelable
+  // Le renouvellement n'est prévu par la CCN 1501 QUE pour les cadres.
+  // Priorité : (1) periode_essai_mois en base → (2) niveau CCN → (3) type
   var periodeEssaiLine = ""
   if (contract.type === "extra") {
-    periodeEssaiLine = "Sans objet pour CDD d'usage de courte durée — relation contractuelle à durée déterminée encadrée par les articles L1242-1 et suivants."
-  } else if (contract.type === "cdi_cadre") {
-    periodeEssaiLine = "3 mois, renouvelable une fois pour 3 mois (durée max 6 mois, art. L1221-19 et L1221-21 + CCN 1501). Délais de prévenance : L1221-25."
+    periodeEssaiLine = "Sans objet pour CDD d'usage de courte durée — relation contractuelle à durée déterminée encadrée par les articles L1242-1 et suivants du Code du travail."
   } else {
-    // cdi_cuisinier ou cdi_caissier (employé non-cadre)
-    periodeEssaiLine = "1 mois, renouvelable une fois pour 1 mois (durée max 2 mois, CCN 1501 art. 6). Délais de prévenance : L1221-25."
+    var niv = (contract.niveau_ccn || "").toString().toUpperCase().trim()
+    // isCadre prend le niveau CCN comme source de vérité ; fallback sur type seulement si niveau absent
+    var isCadre = niv === "V" || (niv === "" && contract.type === "cdi_cadre")
+    // Détermination de la durée : base > défaut par niveau
+    var dureeMois = contract.periode_essai_mois
+    if (!dureeMois || dureeMois <= 0) {
+      if (isCadre) dureeMois = 4
+      else if (niv === "IV") dureeMois = 3
+      else if (niv === "III") dureeMois = 2
+      else dureeMois = 1
+    }
+    var renouvText = isCadre
+      ? ", renouvelable une fois pour la moitié de sa durée initiale (durée totale plafonnée à 6 mois)"
+      : ", non renouvelable (la CCN 1501 ne prévoit le renouvellement que pour les cadres)"
+    periodeEssaiLine = dureeMois + " mois" + renouvText + ". Références : CCN 1501 art. 9 · articles L1221-19, L1221-21 et L1221-25 (délais de prévenance) du Code du travail."
   }
 
   // Situation familiale
@@ -850,7 +872,7 @@ export function buildWelcomePack(emp, contract, logoUri) {
 
         '<h3 class="bc pink" style="margin-top: 3mm; font-size: 12pt;">Période d\'essai</h3>' +
         '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 9pt;">' +
-          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Articles L1221-19 à L1221-26 du Code du travail · CCN 1501 art. 6</div>' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Articles L1221-19 à L1221-26 du Code du travail · CCN 1501 art. 9</div>' +
           esc(periodeEssaiLine) +
         '</div>' +
 
@@ -1002,17 +1024,17 @@ export function buildWelcomePack(emp, contract, logoUri) {
         '</div>' +
         '<div class="rule" style="margin: 3mm 0;"></div>' +
 
-        '<p style="font-size: 9pt; margin: 1mm 0 3mm 0; line-height: 1.45;">' +
+        '<p style="font-size: 8.5pt; margin: 1mm 0 2mm 0; line-height: 1.4;">' +
           '<b>Cette page constitue ton information préalable individuelle</b> sur les traitements de données personnelles te concernant, conformément à l\'<b>article 13 du RGPD</b> et à l\'<b>article L1222-4 du Code du travail</b>. Elle est essentielle pour rendre opposables les images de vidéosurveillance et les traitements RH en cas de procédure.' +
         '</p>' +
 
-        '<h3 class="bc pink" style="font-size: 13pt;">Vidéosurveillance de l\'établissement</h3>' +
-        '<div class="legal-box" style="padding: 6px 12px; margin: 2mm 0; font-size: 9pt;">' +
-          '<div class="ref" style="font-size: 8pt; margin-bottom: 2px;">Articles L1121-1, L1222-4 du Code du travail · RGPD art. 5, 6, 13, 30 · articles 226-1 et R625-10 du Code pénal · règlements (CE) 178/2002 et 852/2004 · recommandations CNIL · Cass. Soc. 23 juin 2010 n° 09-66.355</div>' +
+        '<h3 class="bc pink" style="font-size: 12pt;">Vidéosurveillance de l\'établissement</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8.5pt;">' +
+          '<div class="ref" style="font-size: 8pt; margin-bottom: 1px;">Articles L1121-1, L1222-4 du Code du travail · RGPD art. 5, 6, 13, 30 · articles 226-1 et R625-10 du Code pénal · règlements (CE) 178/2002 et 852/2004 · recommandations CNIL · Cass. Soc. 23 juin 2010 n° 09-66.355</div>' +
           '<b>L\'établissement Meshuga (3 rue Vavin, 75006 Paris) est placé sous vidéosurveillance.</b> Tu en es ' + g('informé', 'informée') + ' personnellement et préalablement à ta prise de poste, conformément à l\'obligation d\'information individuelle de l\'employeur (L1222-4) et au principe de loyauté (L1121-1).' +
         '</div>' +
 
-        '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 6mm; font-size: 9pt; margin-top: 2mm;">' +
+        '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5mm 6mm; font-size: 8.5pt; margin-top: 1.5mm;">' +
           '<div><b>Caméras installées</b>&nbsp;: 2 (marque REOSU)</div>' +
           '<div><b>Durée de conservation</b>&nbsp;: 30 jours maximum</div>' +
           '<div style="grid-column: 1 / 3;"><b>Emplacement</b>&nbsp;: <b>(1)</b> comptoir / caisse · <b>(2)</b> au-dessus du poste de cuisson (axée sur l\'équipement, friteuse + plancha)</div>' +
@@ -1021,45 +1043,33 @@ export function buildWelcomePack(emp, contract, logoUri) {
           '<div style="grid-column: 1 / 3;"><b>Accès aux images</b>&nbsp;: réservé à Edward TOURET, Président, seul. Aucune diffusion ni transmission à des tiers en dehors des cas légaux (force publique, judiciaire).</div>' +
         '</div>' +
 
-        '<p style="font-size: 9pt; margin-top: 2mm; line-height: 1.5;">' +
-          '<b>Finalités déclarées</b> (RGPD art. 6.1.f — intérêt légitime de l\'employeur, test de proportionnalité L1121-1)&nbsp;:' +
+        '<p style="font-size: 8.5pt; margin-top: 1.5mm;">' +
+          '<b>Finalités déclarées</b> (RGPD art. 6.1.f — intérêt légitime, test de proportionnalité L1121-1)&nbsp;: <b>(1)</b> Sécurité des biens et des personnes (caméra comptoir/caisse) · <b>(2)</b> Lutte contre le vol et les cambriolages · <b>(3)</b> Sécurité incendie & traçabilité HACCP (caméra cuisson — justification renforcée ci-dessous).' +
         '</p>' +
-        '<ul class="tidy" style="margin: 1mm 0; font-size: 8.5pt;">' +
-          '<li><b>Sécurité des biens et des personnes</b> (caméra comptoir / caisse) — protection contre les agressions, malaises, accidents, sécurité du personnel face au public.</li>' +
-          '<li><b>Lutte contre le vol et les cambriolages</b> (caméra comptoir / caisse) — protection du fonds, de la caisse, des stocks.</li>' +
-          '<li><b>Sécurité incendie & traçabilité HACCP</b> (caméra cuisson, justification renforcée ci-dessous).</li>' +
-        '</ul>' +
 
         // Encart spécifique caméra cuisson — bordage juridique
-        '<div style="margin-top: 3mm; padding: 6px 10px; background: rgba(255,235,90,0.18); border-left: 3px solid #FFEB5A; font-size: 8.5pt; line-height: 1.5;">' +
-          '<div style="font-family: \'Barlow Condensed\', sans-serif; font-weight: 700; font-size: 9pt; text-transform: uppercase; letter-spacing: 1px; color: #191923; margin-bottom: 2px;">⚖ Justification proportionnée de la caméra du poste de cuisson</div>' +
+        '<div style="margin-top: 2mm; padding: 5px 9px; background: rgba(255,235,90,0.18); border-left: 3px solid #FFEB5A; font-size: 8pt; line-height: 1.4;">' +
+          '<div style="font-family: \'Barlow Condensed\', sans-serif; font-weight: 700; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 1px; color: #191923; margin-bottom: 1px;">⚖ Justification proportionnée de la caméra du poste de cuisson</div>' +
           'La caméra installée au-dessus du poste de cuisson <b>n\'a pas pour objet la surveillance continue ' + g('du salarié', 'de la salariée') + '</b>. Elle est positionnée en plafond, axée sur <b>l\'équipement à risque</b> (friteuse, plancha, source de feu et d\'huile chaude) et répond à <b>trois finalités cumulatives proportionnées</b>&nbsp;:' +
           '<br/><b>(a) Sécurité incendie</b> — surveillance d\'un point chaud à risque élevé d\'incendie, conformément à l\'obligation générale de sécurité de l\'employeur (L4121-1) et aux articles R4227-37 à R4227-41 du Code du travail.' +
           '<br/><b>(b) Traçabilité HACCP</b> — preuve documentée du respect des protocoles d\'hygiène et des températures de cuisson en cas de contrôle DDPP, conformément aux <b>règlements (CE) 178/2002 et 852/2004</b> dits « paquet hygiène » qui imposent la traçabilité des points critiques.' +
           '<br/><b>(c) Sécurité des personnes</b> — détection rapide de brûlures, malaises, chutes ou accidents pour intervention immédiate.' +
-          '<br/><br/><b>Garanties spécifiques</b> apportées par l\'employeur en compensation&nbsp;: visionnage strictement <b>a posteriori</b> (jamais en direct), accès limité au seul Président, conservation 30 jours maximum, suppression automatique au-delà, pas d\'audio, pas de captation des conversations privées (recommandation CNIL).' +
-          '<br/><b>Référence jurisprudentielle</b>&nbsp;: la Cour de cassation (Cass. Soc. 23 juin 2010 n° 09-66.355) admet la licéité de la vidéosurveillance d\'un poste de travail dès lors que le salarié est ' + g('informé', 'informée') + ' préalablement et que la finalité est légitime et proportionnée — ce qui est le cas ici.' +
+          '<br/><b>Garanties spécifiques</b>&nbsp;: visionnage strictement <b>a posteriori</b> (jamais en direct), accès limité au seul Président, conservation 30 jours maximum, suppression automatique au-delà, pas d\'audio, pas de captation des conversations privées (recommandation CNIL).' +
+          '<br/><b>Référence jurisprudentielle</b>&nbsp;: la Cour de cassation (Cass. Soc. 23 juin 2010 n° 09-66.355) admet la licéité de la vidéosurveillance d\'un poste de travail dès lors que ' + g('le salarié', 'la salariée') + ' est ' + g('informé', 'informée') + ' préalablement et que la finalité est légitime et proportionnée — ce qui est le cas ici.' +
         '</div>' +
 
-        '<p style="font-size: 9pt; margin-top: 2mm;">' +
+        '<p style="font-size: 8.5pt; margin-top: 2mm;">' +
           '<b>Zones strictement non filmées</b>&nbsp;: sanitaires, vestiaire, espace de pause, voie publique. <b>Aucune caméra ne filme ' + g('un salarié', 'une salariée') + ' sur un poste de travail en surveillance continue à des fins de contrôle d\'activité.</b>' +
         '</p>' +
 
-        '<p style="font-size: 9pt; margin-top: 2mm;">' +
-          '<b>Tes droits</b> (RGPD art. 15 à 22)&nbsp;: <b>accès</b> aux images te concernant, <b>rectification</b>, <b>effacement</b>, <b>limitation</b>, <b>opposition</b>. Demande motivée à edward@meshuga.fr — réponse sous 1 mois maximum (RGPD art. 12).<br/>' +
-          '<b>Réclamation</b>&nbsp;: tu peux à tout moment saisir la <b>CNIL</b> (Commission Nationale de l\'Informatique et des Libertés) — cnil.fr — 3 place de Fontenoy, 75007 Paris.<br/>' +
-          '<b>Affichage</b>&nbsp;: pictogramme caméra + mention informative présente à l\'entrée et en cuisine.' +
+        '<p style="font-size: 8.5pt; margin-top: 1.5mm; line-height: 1.4;">' +
+          '<b>Tes droits</b> (RGPD art. 15 à 22)&nbsp;: <b>accès</b> aux images te concernant, <b>rectification</b>, <b>effacement</b>, <b>limitation</b>, <b>opposition</b>. Demande motivée à edward@meshuga.fr — réponse sous 1 mois maximum (RGPD art. 12). <b>Réclamation</b>&nbsp;: <b>CNIL</b>, cnil.fr, 3 place de Fontenoy, 75007 Paris. <b>Affichage</b>&nbsp;: pictogramme caméra + mention informative à l\'entrée et en cuisine.' +
         '</p>' +
 
-        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 13pt;">Autres traitements de données personnelles</h3>' +
-        '<div class="legal-box" style="padding: 6px 12px; margin: 2mm 0; font-size: 9pt;">' +
-          '<div class="ref" style="font-size: 8pt; margin-bottom: 2px;">RGPD UE 2016/679 art. 13 · Code du travail D.1221-24</div>' +
-          '<b>Responsable du traitement</b>&nbsp;: SAS AEGIA FOOD, représentée par Edward TOURET, Président — edward@meshuga.fr.<br/>' +
-          '<b>Finalités</b>&nbsp;: exécution du contrat de travail, paie, DPAE, déclarations sociales URSSAF, suivi RH, médecine du travail, prévoyance.<br/>' +
-          '<b>Base légale</b>&nbsp;: exécution du contrat (art. 6.1.b RGPD) + obligations légales (art. 6.1.c RGPD).<br/>' +
-          '<b>Destinataires</b>&nbsp;: URSSAF, médecine du travail (EFFICIENCE), prévoyance (Gan), expert-comptable.<br/>' +
-          '<b>Durée de conservation</b>&nbsp;: pendant la durée du contrat + 5 ans après sortie (D.1221-24).<br/>' +
-          '<b>Tes droits</b>&nbsp;: accès, rectification, effacement, limitation, portabilité, opposition — edward@meshuga.fr · Réclamation : CNIL (cnil.fr).' +
+        '<h3 class="bc pink" style="margin-top: 2mm; font-size: 12pt;">Autres traitements de données personnelles</h3>' +
+        '<div class="legal-box" style="padding: 5px 10px; margin: 1mm 0; font-size: 8pt;">' +
+          '<div class="ref" style="font-size: 7.5pt; margin-bottom: 1px;">RGPD UE 2016/679 art. 13 · Code du travail D.1221-24</div>' +
+          '<b>Responsable</b>&nbsp;: SAS AEGIA FOOD, représentée par Edward TOURET, Président — edward@meshuga.fr. <b>Finalités</b>&nbsp;: contrat de travail, paie, DPAE, déclarations URSSAF, suivi RH, médecine du travail, prévoyance. <b>Base légale</b>&nbsp;: contrat (art. 6.1.b RGPD) + obligations légales (art. 6.1.c). <b>Destinataires</b>&nbsp;: URSSAF, EFFICIENCE, Gan, expert-comptable. <b>Durée</b>&nbsp;: contrat + 5 ans après sortie (D.1221-24). <b>Tes droits</b>&nbsp;: accès, rectification, effacement, limitation, portabilité, opposition — edward@meshuga.fr · Réclamation CNIL.' +
         '</div>' +
 
       '</div>' +
