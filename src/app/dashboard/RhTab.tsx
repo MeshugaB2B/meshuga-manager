@@ -5,6 +5,7 @@ import { LOGO_PINK } from "./logos"
 import RhWizard from "./rh/RhWizard"
 import EmployeeDetail from "./rh/EmployeeDetail"
 import RetroUploadWizard from "./rh/RetroUploadWizard"
+import OffboardingWizard from "./rh/OffboardingWizard"
 import { buildContract } from "./rh/contractBuilders"
 import { buildWelcomePack } from "./rh/welcomePackBuilder"
 import { getContractTypeMeta } from "./rh/rhConstants"
@@ -30,6 +31,7 @@ export default function RhTab() {
   var [loading, setLoading] = useState(true)
   var [showWizard, setShowWizard] = useState(false)
   var [showRetroImport, setShowRetroImport] = useState(false)
+  var [offboardingEmployee, setOffboardingEmployee] = useState(null)
   var [editingContract, setEditingContract] = useState(null)
   var [wizardForEmployee, setWizardForEmployee] = useState(null)
   var [viewingEmployeeId, setViewingEmployeeId] = useState(null)
@@ -223,6 +225,20 @@ export default function RhTab() {
                           {meta.icon} {meta.label.replace("CDI ", "")}
                         </span>
                       )}
+                      {e.date_sortie ? (
+                        <span style={{
+                          background: "#191923",
+                          color: "#FFEB5A",
+                          padding: "3px 8px",
+                          borderRadius: 4,
+                          fontSize: 9,
+                          fontWeight: 900,
+                          textTransform: "uppercase",
+                          letterSpacing: ".5px",
+                        }}>
+                          PARTI {new Date(e.date_sortie).toLocaleDateString("fr-FR")}
+                        </span>
+                      ) : null}
                     </div>
                     {(mainC && (mainC.fonction || mainC.salaire_brut_mensuel || mainC.taux_horaire_brut)) ? (
                       <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>
@@ -242,10 +258,20 @@ export default function RhTab() {
                   </div>
 
                   {/* Bouton */}
-                  <div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
                     <button className="btn btn-y" style={{ pointerEvents: "none" }}>
                       Ouvrir →
                     </button>
+                    {!e.date_sortie ? (
+                      <button
+                        className="btn btn-sm"
+                        onClick={function (ev) {
+                          ev.stopPropagation()
+                          setOffboardingEmployee(e)
+                        }}
+                        title="Marquer ce salarié comme parti"
+                      >📤 Parti</button>
+                    ) : null}
                   </div>
                 </div>
               )
@@ -261,6 +287,19 @@ export default function RhTab() {
           onSaved={function () {
             setShowRetroImport(false)
             showToast("Historique importé")
+            loadAll()
+          }}
+        />
+      )}
+
+      {/* === OFFBOARDING WIZARD (marquer comme parti) === */}
+      {offboardingEmployee && (
+        <OffboardingWizard
+          employee={offboardingEmployee}
+          onClose={function () { setOffboardingEmployee(null) }}
+          onSaved={function (msg) {
+            setOffboardingEmployee(null)
+            showToast(msg || "Salarié marqué comme parti")
             loadAll()
           }}
         />
