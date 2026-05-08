@@ -192,16 +192,32 @@ export default function RetroUploadWizard(props: any) {
   var [sessionDocs, setSessionDocs] = useState([] as any[])
 
   // ====== FERMETURE ======
-  function handleCloseRequest() {
-    // Ne pas demander confirmation si rien n'a été fait
+  async function handleCloseRequest() {
+    // Cas 1 : rien n'a été fait, on ferme direct
     if (sessionDocs.length === 0 && phase === "drop" && !activeEmployee) {
       onClose()
       return
     }
-    if (window.confirm("Fermer le wizard ? Les documents enregistrés ne seront pas perdus.")) {
-      onSaved()
-      onClose()
+    // Cas 2 : il y a un draft pending non sauvegardé (en review ou analyzing)
+    var hasPendingDraft = pendingContractId !== "" || pendingDocId !== ""
+    var msg = hasPendingDraft && phase === "review"
+      ? "Le document analysé n'a pas été enregistré. Si tu fermes maintenant, il sera supprimé. Continuer ?"
+      : "Fermer le wizard ? Les documents enregistrés ne seront pas perdus."
+    if (!window.confirm(msg)) return
+
+    // Si en review : nettoyer le draft non validé pour ne pas laisser d'orphelin
+    if (hasPendingDraft && phase === "review") {
+      await cleanupPendingDraft()
+      // Si l'employé est encore un stub (pas validé), le supprimer aussi
+      if (activeEmployee && activeEmployee.prenom === "(à compléter)" && sessionDocs.length === 0) {
+        try {
+          if (activeCycle) await supabase.from("hr_employment_cycles").delete().eq("id", activeCycle.id)
+          await supabase.from("hr_employees").delete().eq("id", activeEmployee.id)
+        } catch (e) { /* non-fatal */ }
+      }
     }
+    onSaved()
+    onClose()
   }
 
   function showToast(msg: string) {
@@ -305,11 +321,35 @@ export default function RetroUploadWizard(props: any) {
   }
 
   // ============================================================
+  // CLEANUP — supprimer un draft orphelin (suite à retry / retour)
+  // ============================================================
+  async function cleanupPendingDraft() {
+    if (!pendingDocId && !pendingContractId) return
+    try {
+      // 1) Supprimer le doc d'abord (Storage cleanup côté Supabase via cascade orphelins, sinon DB only)
+      if (pendingDocId) {
+        await supabase.from("hr_contract_documents").delete().eq("id", pendingDocId)
+      }
+      // 2) Supprimer le contrat draft seulement s'il est vraiment en draft (sécurité)
+      if (pendingContractId) {
+        await supabase.from("hr_contracts").delete().eq("id", pendingContractId).eq("status", "draft")
+      }
+    } catch (e) {
+      // non-fatal — on continue
+    }
+    setPendingContractId("")
+    setPendingDocId("")
+  }
+
+  // ============================================================
   // ANALYSE — flux complet upload + extract
   // ============================================================
   async function handleAnalyze() {
     setError("")
     if (files.length === 0) { setError("Ajoute au moins un document"); return }
+
+    // Cleanup du draft précédent si existant (cas retry après retour)
+    await cleanupPendingDraft()
 
     setPhase("analyzing")
     var contractIdLocal = ""
@@ -1012,7 +1052,11 @@ export default function RetroUploadWizard(props: any) {
           ) : null}
           {phase === "review" ? (
             <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
-              <button className="btn" onClick={function () { setPhase("drop") }}>← Retour</button>
+              <button className="btn" onClick={async function () {
+                await cleanupPendingDraft()
+                setExtraction(null)
+                setPhase("drop")
+              }}>← Retour</button>
               <button className="btn btn-p" onClick={handleSave} disabled={saving}>
                 {saving ? "Sauvegarde..." : "💾 Enregistrer"}
               </button>
