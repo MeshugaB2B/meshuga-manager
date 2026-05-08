@@ -410,7 +410,7 @@ function ContractPreview(props) {
         .select("*")
         .eq("contract_id", c.id)
         .in("doc_type", ["contrat_signe", "avenant"])
-        .order("created_at", { ascending: false })
+        .order("uploaded_at", { ascending: false })
         .limit(1)
         .maybeSingle()
 
@@ -485,7 +485,7 @@ function ContractPreview(props) {
           </div>
           {mode === "archived" && archivedDoc ? (
             <div className="yt" style={{ fontSize: 12, marginTop: 4, color: "#191923" }}>
-              Document archivé · uploadé le {new Date(archivedDoc.created_at).toLocaleDateString("fr-FR")}
+              Document archivé · uploadé le {new Date(archivedDoc.uploaded_at).toLocaleDateString("fr-FR")}
               {archivedDoc.assembled_pdf_path ? " · PDF assemblé depuis photos" : ""}
             </div>
           ) : null}
