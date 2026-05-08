@@ -21,6 +21,7 @@
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@supabase/supabase-js"
 import DocumentsManager from "./DocumentsManager"
+import OffboardingWizard from "./OffboardingWizard"
 import {
   NATIONALITES,
   getContractTypeMeta,
@@ -42,6 +43,8 @@ export default function EmployeeDetail(props) {
   var [editing, setEditing] = useState(false)
   var [uploadingSignedFor, setUploadingSignedFor] = useState(null)
   var [uploadingWelcomePack, setUploadingWelcomePack] = useState(false)
+  var [showOffboarding, setShowOffboarding] = useState(false)
+  var [unmarkingExit, setUnmarkingExit] = useState(false)
   var signedFileInputRef = useRef(null)
   var welcomePackFileInputRef = useRef(null)
 
@@ -313,6 +316,56 @@ export default function EmployeeDetail(props) {
     setSaving(false)
   }
 
+  // === Annuler le départ : rouvre le cycle clôturé le plus récent ===
+  async function handleUnmarkExit() {
+    if (!emp.date_sortie) return
+    if (!window.confirm("Annuler le départ de " + emp.prenom + " ? Le cycle d'emploi sera rouvert et les dates de sortie effacées.")) return
+    setUnmarkingExit(true)
+    try {
+      // 1) Trouver le cycle le plus récent (le dernier clôturé)
+      var resCyc = await fetch("/api/hr/cycles?employee_id=" + emp.id)
+      var data = await resCyc.json()
+      if (!resCyc.ok) throw new Error(data.error || "Chargement cycles")
+      var cycles = data.cycles || []
+      // Le plus récent par date_entree
+      cycles.sort(function (a, b) {
+        return (b.date_entree || "").localeCompare(a.date_entree || "")
+      })
+      var lastCycle = cycles[0]
+      if (!lastCycle) throw new Error("Aucun cycle trouvé")
+      if (!lastCycle.date_sortie) {
+        // Déjà ouvert — juste effacer la date_sortie sur l'employé
+        await supabase.from("hr_employees").update({ date_sortie: null, motif_sortie: null }).eq("id", emp.id)
+      } else {
+        // 2) Rouvrir le cycle (PATCH avec date_sortie null)
+        var resPatch = await fetch("/api/hr/cycles", {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cycle_id: lastCycle.id, date_sortie: null, motif_sortie: null }),
+        })
+        var dataPatch = await resPatch.json()
+        if (!resPatch.ok) throw new Error(dataPatch.error || "Réouverture cycle")
+
+        // 3) Remettre is_current=true sur le contrat le plus récent du cycle, et effacer son effective_to
+        var contractsInCycle = (lastCycle.contracts || []).slice().sort(function (a: any, b: any) {
+          return (b.date_debut || "").localeCompare(a.date_debut || "")
+        })
+        var lastContract = contractsInCycle[0]
+        if (lastContract) {
+          await supabase.from("hr_contracts").update({ effective_to: null, is_current: true }).eq("id", lastContract.id)
+        }
+
+        // 4) Effacer date_sortie sur hr_employees
+        await supabase.from("hr_employees").update({ date_sortie: null, motif_sortie: null }).eq("id", emp.id)
+      }
+      if (props.onSaved) props.onSaved("Départ annulé — cycle rouvert")
+      load()
+    } catch (e: any) {
+      alert("Erreur : " + e.message)
+    } finally {
+      setUnmarkingExit(false)
+    }
+  }
+
   // === Render ===
   if (loading || !emp) {
     return (
@@ -362,6 +415,14 @@ export default function EmployeeDetail(props) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
             <div className="mt" style={{ fontFamily: "Yellowtail, cursive", fontSize: 28, color: "#FF82D7", lineHeight: 1.1 }}>
               👤 {emp.prenom} {(emp.nom || "").toUpperCase()}
+              {emp.date_sortie ? (
+                <span className="badge" style={{
+                  marginLeft: 10, background: "#191923", color: "#FFEB5A", fontFamily: "'Arial Narrow', Arial",
+                  fontSize: 10, padding: "3px 8px", verticalAlign: "middle",
+                }}>
+                  PARTI {fmtDate(emp.date_sortie)}
+                </span>
+              ) : null}
             </div>
             <button className="btn" onClick={props.onClose}>Fermer ×</button>
           </div>
@@ -390,6 +451,20 @@ export default function EmployeeDetail(props) {
               disabled={!emp.email}
               title={emp.email ? "Envoyer la demande de planification des congés" : "Le salarié doit avoir une adresse email"}
             >📅 Demander les congés</button>
+            {!emp.date_sortie ? (
+              <button
+                className="btn"
+                onClick={function () { setShowOffboarding(true) }}
+                title="Marquer le salarié comme parti (date de sortie + motif)"
+              >📤 Marquer comme parti</button>
+            ) : (
+              <button
+                className="btn btn-red"
+                onClick={handleUnmarkExit}
+                disabled={unmarkingExit}
+                title="Annuler le départ et rouvrir le cycle d'emploi"
+              >{unmarkingExit ? "..." : "↩ Annuler le départ"}</button>
+            )}
           </div>
         </div>
 
@@ -689,6 +764,19 @@ export default function EmployeeDetail(props) {
           >🗑 Supprimer définitivement ce salarié</button>
         </div>
       </div>
+
+      {/* === MODAL OFFBOARDING === */}
+      {showOffboarding && emp ? (
+        <OffboardingWizard
+          employee={emp}
+          onClose={function () { setShowOffboarding(false) }}
+          onSaved={function (msg) {
+            setShowOffboarding(false)
+            if (props.onSaved) props.onSaved(msg || "Salarié marqué comme parti")
+            load()
+          }}
+        />
+      ) : null}
     </div>
   )
 }
