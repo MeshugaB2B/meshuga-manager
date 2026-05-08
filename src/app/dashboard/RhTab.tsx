@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js"
 import { LOGO_PINK } from "./logos"
 import RhWizard from "./rh/RhWizard"
 import EmployeeDetail from "./rh/EmployeeDetail"
+import RetroUploadWizard from "./rh/RetroUploadWizard"
 import { buildContract } from "./rh/contractBuilders"
 import { buildWelcomePack } from "./rh/welcomePackBuilder"
 import { getContractTypeMeta } from "./rh/rhConstants"
@@ -28,6 +29,7 @@ export default function RhTab() {
   var [contractDocCounts, setContractDocCounts] = useState({}) // { employeeId: nb_docs_contrat }
   var [loading, setLoading] = useState(true)
   var [showWizard, setShowWizard] = useState(false)
+  var [showRetroImport, setShowRetroImport] = useState(false)
   var [editingContract, setEditingContract] = useState(null)
   var [wizardForEmployee, setWizardForEmployee] = useState(null)
   var [viewingEmployeeId, setViewingEmployeeId] = useState(null)
@@ -129,7 +131,7 @@ export default function RhTab() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             className="btn btn-y"
-            onClick={function () { window.location.href = "/dashboard/rh/import" }}
+            onClick={function () { setShowRetroImport(true) }}
             title="Digitaliser les anciens contrats par photos ou PDF"
           >📥 Importer historique</button>
           <button
@@ -251,6 +253,18 @@ export default function RhTab() {
           </div>
         )}
       </div>
+
+      {/* === RETRO UPLOAD WIZARD (import historique) === */}
+      {showRetroImport && (
+        <RetroUploadWizard
+          onClose={function () { setShowRetroImport(false) }}
+          onSaved={function () {
+            setShowRetroImport(false)
+            showToast("Historique importé")
+            loadAll()
+          }}
+        />
+      )}
 
       {/* === WIZARD === */}
       {showWizard && (
