@@ -340,57 +340,151 @@ export default function RhTab() {
 // ============================================================
 // CONTRACT PREVIEW (modal aperçu PDF)
 // ============================================================
+// Logique :
+//   1) On cherche d'abord un document archivé (contrat_signe ou avenant)
+//      lié à ce contrat dans hr_contract_documents → on affiche le PDF/image
+//      d'origine (preuve fidèle, immuable)
+//   2) Sinon (cas contrat généré nativement dans l'app, pas encore signé)
+//      → fallback : on génère le HTML via buildContract
+// ============================================================
 function ContractPreview(props) {
   var c = props.contract
   var [emp, setEmp] = useState(null)
   var [vacs, setVacs] = useState([])
-  var [loaded, setLoaded] = useState(false)
+  var [archivedUrl, setArchivedUrl] = useState("")
+  var [archivedMime, setArchivedMime] = useState("")
+  var [archivedDoc, setArchivedDoc] = useState(null)
+  var [mode, setMode] = useState("loading") // loading | archived | generated
   var iframeRef = useRef(null)
 
   useEffect(function () {
     var run = async function () {
+      // 1) Charger employé + vacations (toujours utile)
       var resE = await supabase.from("hr_employees").select("*").eq("id", c.employee_id).single()
       var resV = await supabase.from("hr_contract_vacations").select("*").eq("contract_id", c.id).order("ordre")
       setEmp(resE.data || {})
       setVacs(resV.data || [])
-      setLoaded(true)
+
+      // 2) Chercher un doc archivé (contrat_signe / avenant) pour ce contrat
+      var resDoc = await supabase
+        .from("hr_contract_documents")
+        .select("*")
+        .eq("contract_id", c.id)
+        .in("doc_type", ["contrat_signe", "avenant"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      var doc = resDoc.data
+      if (doc && doc.file_path) {
+        // 3) Generer une signed URL pour l'afficher
+        var path = doc.assembled_pdf_path || doc.file_path
+        var resUrl = await supabase.storage
+          .from("hr-contract-docs")
+          .createSignedUrl(path, 3600)
+        if (resUrl.data && resUrl.data.signedUrl) {
+          setArchivedUrl(resUrl.data.signedUrl)
+          setArchivedMime(doc.mime_type || (path.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg"))
+          setArchivedDoc(doc)
+          setMode("archived")
+          return
+        }
+      }
+
+      // 4) Pas de doc archivé → fallback génération HTML
+      setMode("generated")
     }
     run()
   }, [])
 
+  // Génération HTML uniquement en mode "generated"
   useEffect(function () {
-    if (!loaded || !iframeRef.current) return
+    if (mode !== "generated" || !iframeRef.current || !emp) return
     var doc = iframeRef.current.contentDocument
     if (!doc) return
     var html = buildContract(c, emp, vacs, LOGO_PINK)
     doc.open()
     doc.write(html)
     doc.close()
-  }, [loaded])
+  }, [mode, emp])
 
   function printNow() {
+    if (mode === "archived" && archivedUrl) {
+      // Pour PDF archivé : ouvrir dans un nouvel onglet (l'utilisateur fait Cmd+P)
+      window.open(archivedUrl, "_blank")
+      return
+    }
     if (!iframeRef.current) return
     iframeRef.current.contentWindow.focus()
     iframeRef.current.contentWindow.print()
   }
+
+  function downloadArchived() {
+    if (archivedUrl) window.open(archivedUrl, "_blank")
+  }
+
+  // Titre dynamique selon mode
+  var title = mode === "archived"
+    ? "📎 Document signé d'origine"
+    : (mode === "generated" ? "Aperçu du contrat (généré)" : "Chargement…")
 
   return (
     <div className="overlay" onClick={function (e) { if (e.target === e.currentTarget) props.onClose() }}>
       <div className="modal modal-xl" style={{ maxWidth: 920, height: "92vh", display: "flex", flexDirection: "column" }}>
         <div className="mh">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <div className="mt">Aperçu du contrat</div>
+            <div className="mt">{title}</div>
             <div style={{ display: "flex", gap: 6 }}>
-              <button className="btn btn-y" onClick={printNow}>↓ Imprimer en PDF</button>
+              {mode === "archived" ? (
+                <button className="btn btn-y" onClick={downloadArchived}>↗ Ouvrir / Télécharger</button>
+              ) : null}
+              {mode === "generated" ? (
+                <button className="btn btn-y" onClick={printNow}>↓ Imprimer en PDF</button>
+              ) : null}
               <button className="btn" onClick={props.onClose}>Fermer</button>
             </div>
           </div>
+          {mode === "archived" && archivedDoc ? (
+            <div className="yt" style={{ fontSize: 12, marginTop: 4, color: "#191923" }}>
+              Document archivé · uploadé le {new Date(archivedDoc.created_at).toLocaleDateString("fr-FR")}
+              {archivedDoc.assembled_pdf_path ? " · PDF assemblé depuis photos" : ""}
+            </div>
+          ) : null}
+          {mode === "generated" ? (
+            <div className="yt" style={{ fontSize: 12, marginTop: 4, color: "#191923" }}>
+              Aucun document signé archivé · génération depuis les données saisies
+            </div>
+          ) : null}
         </div>
-        <iframe
-          ref={iframeRef}
-          style={{ flex: 1, width: "100%", border: "none", background: "#EDEDED" }}
-          title="Contrat preview"
-        />
+
+        {/* Zone d'affichage : différent selon mode */}
+        {mode === "loading" ? (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "#EDEDED" }}>
+            <div className="yt" style={{ fontSize: 22, color: "#FF82D7" }}>Chargement…</div>
+          </div>
+        ) : null}
+
+        {mode === "archived" && archivedMime === "application/pdf" ? (
+          <iframe
+            src={archivedUrl}
+            style={{ flex: 1, width: "100%", border: "none", background: "#EDEDED" }}
+            title="Document archivé"
+          />
+        ) : null}
+
+        {mode === "archived" && archivedMime !== "application/pdf" ? (
+          <div style={{ flex: 1, overflow: "auto", background: "#EDEDED", padding: 14, textAlign: "center" }}>
+            <img src={archivedUrl} alt="Document archivé" style={{ maxWidth: "100%", height: "auto", boxShadow: "3px 3px 0 #191923", border: "2px solid #191923" }} />
+          </div>
+        ) : null}
+
+        {mode === "generated" ? (
+          <iframe
+            ref={iframeRef}
+            style={{ flex: 1, width: "100%", border: "none", background: "#EDEDED" }}
+            title="Contrat preview"
+          />
+        ) : null}
       </div>
     </div>
   )
