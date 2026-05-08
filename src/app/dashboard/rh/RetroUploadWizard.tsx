@@ -1,24 +1,23 @@
 // src/app/dashboard/rh/RetroUploadWizard.tsx
 // Wizard de digitalisation rétroactive de l'historique salariés.
-// 5 steps : Employé → Cycle → Photos+OCR → Validation champs → Confirmation
+// Modal Meshuga avec DA respectée (classes d'Edward).
+// Flow simplifié : drop docs → IA extrait tout (type doc, salarié, contrat) → tu valides → c'est créé.
 // SWC-safe : var dans JSX, pas de generics, function() {}, pas de fragments.
 
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { createClient } from "@supabase/supabase-js"
-import PhotoUploader from "./PhotoUploader"
 
 var supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 )
 
-// Charte
-var PINK = "#FF82D7"
-var YELLOW = "#FFEB5A"
-var DARK = "#191923"
-
-// Listes constantes
+// ============================================================
+// CONSTANTES
+// ============================================================
+var MAX_FILE_MB = 20
+var MAX_PAGES = 30
 var CIVILITES = ["Madame", "Monsieur", "Mademoiselle"]
 var CONTRACT_TYPES = [
   { value: "extra", label: "CDD d'usage / Extra" },
@@ -42,7 +41,23 @@ var MOTIFS_SORTIE = [
   { value: "deces", label: "Décès" },
   { value: "autre", label: "Autre" },
 ]
+var DOC_TYPE_LABELS: any = {
+  contrat_initial: "Contrat initial",
+  avenant: "Avenant",
+  fiche_paie: "Fiche de paie",
+  solde_tout_compte: "Solde de tout compte",
+  certificat_travail: "Certificat de travail",
+  attestation_france_travail: "Attestation France Travail",
+  lettre_demission: "Lettre de démission",
+  lettre_licenciement: "Lettre de licenciement",
+  rupture_conv: "Rupture conventionnelle",
+  dossier_bienvenue: "Dossier de bienvenue",
+  autre: "Autre document",
+}
 
+// ============================================================
+// HELPERS
+// ============================================================
 function formatDateFr(iso: any) {
   if (!iso) return ""
   var s = String(iso).slice(0, 10)
@@ -51,7 +66,7 @@ function formatDateFr(iso: any) {
   return parts[2] + "/" + parts[1] + "/" + parts[0]
 }
 
-function emptyNewEmployee() {
+function emptyEmployee() {
   return {
     civilite: "Monsieur",
     prenom: "",
@@ -68,10 +83,9 @@ function emptyNewEmployee() {
   }
 }
 
-function emptyExtractedFields() {
+function emptyContractFields() {
   return {
     type: "extra",
-    type_brut: "",
     motif: "",
     date_debut: "",
     date_fin: "",
@@ -86,1003 +100,942 @@ function emptyExtractedFields() {
     heures_hebdo: "",
     heures_mensuelles: "",
     periode_essai_mois: "",
-    periode_essai_renouvelable: false,
-    clause_mobilite: false,
-    clause_mobilite_zone: "",
     ville_signature: "Paris",
     date_signature: "",
   }
 }
 
+function makeFileEntry(file: any) {
+  var sizeMb = file.size / (1024 * 1024)
+  var mime = (file.type || "").toLowerCase()
+  var preview = null
+  if (mime === "image/jpeg" || mime === "image/jpg" || mime === "image/png" || mime === "image/webp") {
+    preview = URL.createObjectURL(file)
+  }
+  var isPdf = mime === "application/pdf"
+  return {
+    id: Math.random().toString(36).slice(2),
+    file: file,
+    preview: preview,
+    sizeMb: sizeMb,
+    mime: mime,
+    isPdf: isPdf,
+  }
+}
+
+// Mapping infos employé extraites → formulaire
+function fillEmployeeFromExtraction(current: any, extracted: any) {
+  if (!extracted) return current
+  var copy = Object.assign({}, current)
+  var keys = ["civilite", "prenom", "nom", "date_naissance", "lieu_naissance",
+    "nationalite", "adresse", "code_postal", "ville", "num_secu", "email", "telephone"]
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i]
+    if (extracted[k]) copy[k] = extracted[k]
+  }
+  return copy
+}
+
+// Mapping infos contrat extraites → formulaire
+function fillContractFromExtraction(current: any, extracted: any) {
+  if (!extracted) return current
+  var copy = Object.assign({}, current)
+  Object.keys(copy).forEach(function (k) {
+    if (extracted[k] !== undefined && extracted[k] !== null && extracted[k] !== "") {
+      copy[k] = extracted[k]
+    }
+  })
+  if (!copy.type) copy.type = "extra"
+  if (!copy.statut_cadre) copy.statut_cadre = "non-cadre"
+  return copy
+}
+
 // ============================================================
-// COMPOSANT PRINCIPAL
+// COMPOSANT PRINCIPAL — MODAL
 // ============================================================
-export default function RetroUploadWizard() {
-  var [step, setStep] = useState(1)
+export default function RetroUploadWizard(props: any) {
+  // props : { onClose: function, onSaved?: function }
+  var onClose = props.onClose || function () {}
+  var onSaved = props.onSaved || function () {}
+
+  // ====== STATE GÉNÉRAL ======
+  var [phase, setPhase] = useState("drop")  // drop | analyzing | review | saved | manual
   var [error, setError] = useState("")
   var [toast, setToast] = useState("")
 
-  // Step 1 : employé
-  var [employees, setEmployees] = useState([] as any[])
-  var [selectedEmployee, setSelectedEmployee] = useState(null as any)
-  var [employeeSearch, setEmployeeSearch] = useState("")
-  var [creatingEmployee, setCreatingEmployee] = useState(false)
-  var [newEmployee, setNewEmployee] = useState(emptyNewEmployee())
-  var [savingEmployee, setSavingEmployee] = useState(false)
+  // ====== EMPLOYÉ EN COURS DE SESSION ======
+  // Si null : on est sur le 1er doc, l'employé sera créé après extraction
+  // Si objet : on a déjà créé/sélectionné un employé (docs suivants pour cette personne)
+  var [activeEmployee, setActiveEmployee] = useState(null as any)
+  var [activeCycle, setActiveCycle] = useState(null as any)
+  var [activeLastContractId, setActiveLastContractId] = useState("")
 
-  // Step 2 : cycle
-  var [cycles, setCycles] = useState([] as any[])
-  var [selectedCycle, setSelectedCycle] = useState(null as any)
-  var [creatingCycle, setCreatingCycle] = useState(false)
-  var [newCycleDate, setNewCycleDate] = useState("")
-  var [savingCycle, setSavingCycle] = useState(false)
+  // ====== UPLOAD ======
+  var [files, setFiles] = useState([] as any[])
+  var fileInputRef = useRef<any>(null)
+  var [dragOver, setDragOver] = useState(false)
 
-  // Step 3 : photos + analyse
-  var [docMode, setDocMode] = useState("contrat_signe") // 'contrat_signe' | 'avenant'
-  var [supersedeContractId, setSupersedeContractId] = useState("")
-  var [pages, setPages] = useState([] as any[])
-  var [analyzing, setAnalyzing] = useState(false)
+  // ====== ANALYSE & RÉSULTAT ======
   var [analysisProgress, setAnalysisProgress] = useState("")
+  var [extraction, setExtraction] = useState(null as any)
   var [pendingContractId, setPendingContractId] = useState("")
-  var [pendingContractDocId, setPendingContractDocId] = useState("")
-
-  // Step 4 : extraction + validation
-  var [extraction, setExtraction] = useState(null as any) // raw IA result
-  var [editedFields, setEditedFields] = useState(emptyExtractedFields())
-  var [savingContract, setSavingContract] = useState(false)
-
-  // Step 5 : confirmation + actions
-  var [createdContract, setCreatedContract] = useState(null as any)
-
-  // Mini-modal clôture cycle
-  var [closingCycle, setClosingCycle] = useState(false)
+  var [pendingDocId, setPendingDocId] = useState("")
+  var [docType, setDocType] = useState("contrat_initial")  // détecté ou choisi par Edward
+  var [employeeFields, setEmployeeFields] = useState(emptyEmployee())
+  var [contractFields, setContractFields] = useState(emptyContractFields())
   var [exitDate, setExitDate] = useState("")
-  var [exitReason, setExitReason] = useState("demission")
-  var [savingExit, setSavingExit] = useState(false)
+  var [exitMotif, setExitMotif] = useState("")
+  var [periodMonth, setPeriodMonth] = useState("")
+  var [saving, setSaving] = useState(false)
+
+  // ====== HISTORIQUE DOCS DE LA SESSION (pour récap fin) ======
+  var [sessionDocs, setSessionDocs] = useState([] as any[])
+
+  // ====== FERMETURE ======
+  function handleCloseRequest() {
+    // Ne pas demander confirmation si rien n'a été fait
+    if (sessionDocs.length === 0 && phase === "drop" && !activeEmployee) {
+      onClose()
+      return
+    }
+    if (window.confirm("Fermer le wizard ? Les documents enregistrés ne seront pas perdus.")) {
+      onSaved()
+      onClose()
+    }
+  }
 
   function showToast(msg: string) {
     setToast(msg)
-    setTimeout(function () { setToast("") }, 3000)
+    setTimeout(function () { setToast("") }, 2800)
   }
 
-  // Charge les employés au montage
-  useEffect(function () {
-    loadEmployees()
-  }, [])
+  // ============================================================
+  // UPLOAD HANDLERS
+  // ============================================================
+  function addFiles(fileList: any) {
+    var newFiles = []
+    var rejected = []
+    var hasPdf = files.some(function (p: any) { return p.isPdf })
+    var hasImage = files.some(function (p: any) { return !p.isPdf })
 
-  async function loadEmployees() {
-    var res = await supabase
-      .from("hr_employees")
-      .select("id, civilite, prenom, nom, date_naissance, date_sortie")
-      .order("nom", { ascending: true })
-    setEmployees(res.data || [])
-  }
-
-  async function loadCyclesForEmployee(employeeId: string) {
-    try {
-      var res = await fetch("/api/hr/cycles?employee_id=" + employeeId)
-      var data = await res.json()
-      if (!res.ok) {
-        setError(data.error || "Erreur chargement cycles")
-        return []
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i]
+      if (!f) continue
+      var mime = (f.type || "").toLowerCase()
+      var isImage = mime.indexOf("image/") === 0
+      var isPdf = mime === "application/pdf"
+      if (!isImage && !isPdf) { rejected.push(f.name + " (ni image ni PDF)"); continue }
+      var sizeMb = f.size / (1024 * 1024)
+      if (sizeMb > MAX_FILE_MB) { rejected.push(f.name + " (" + sizeMb.toFixed(1) + " MB)"); continue }
+      if (isPdf) {
+        if (hasPdf || newFiles.some(function (p: any) { return p.isPdf })) {
+          rejected.push(f.name + " (un seul PDF par doc)"); continue
+        }
+        if (hasImage) { rejected.push(f.name + " (pas de mix PDF+photos)"); continue }
+      } else {
+        if (hasPdf || newFiles.some(function (p: any) { return p.isPdf })) {
+          rejected.push(f.name + " (vide d'abord la liste)"); continue
+        }
       }
-      return data.cycles || []
-    } catch (e: any) {
-      setError(e.message)
-      return []
+      newFiles.push(makeFileEntry(f))
     }
+    if (rejected.length > 0) window.alert("Fichiers ignorés :\n" + rejected.join("\n"))
+    setFiles(files.concat(newFiles).slice(0, MAX_PAGES))
+  }
+
+  function handleInputChange(e: any) {
+    var fl = e.target && e.target.files ? e.target.files : []
+    if (fl.length > 0) addFiles(fl)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  function handleDrop(e: any) {
+    e.preventDefault(); e.stopPropagation()
+    setDragOver(false)
+    var dt = e.dataTransfer
+    if (dt && dt.files && dt.files.length > 0) addFiles(dt.files)
+  }
+
+  function moveFile(idx: number, dir: number) {
+    var ni = idx + dir
+    if (ni < 0 || ni >= files.length) return
+    var copy = files.slice()
+    var tmp = copy[idx]; copy[idx] = copy[ni]; copy[ni] = tmp
+    setFiles(copy)
+  }
+
+  function removeFile(idx: number) {
+    var f = files[idx]
+    if (f && f.preview) { try { URL.revokeObjectURL(f.preview) } catch (e) {} }
+    var copy = files.slice()
+    copy.splice(idx, 1)
+    setFiles(copy)
+  }
+
+  function clearFiles() {
+    files.forEach(function (f: any) { if (f.preview) { try { URL.revokeObjectURL(f.preview) } catch (e) {} } })
+    setFiles([])
   }
 
   // ============================================================
-  // STEP 1 ACTIONS
+  // CRÉATION EMPLOYÉ + CYCLE (à partir de l'extraction ou manuel)
   // ============================================================
-  async function handleSelectEmployee(emp: any) {
-    setError("")
-    setSelectedEmployee(emp)
-    var cyc = await loadCyclesForEmployee(emp.id)
-    setCycles(cyc)
-    // Si cycle ouvert existe, on le pré-sélectionne
-    var openCycle = cyc.find(function (c: any) { return !c.date_sortie })
-    if (openCycle) setSelectedCycle(openCycle)
-    setStep(2)
-  }
+  async function ensureEmployeeAndCycle(empData: any, dateEntreeIso: string) {
+    // 1) Créer l'employé en base
+    var insertEmp: any = {}
+    var keys = ["civilite", "prenom", "nom", "date_naissance", "lieu_naissance",
+      "nationalite", "adresse", "code_postal", "ville", "num_secu", "email", "telephone"]
+    keys.forEach(function (k) { if (empData[k]) insertEmp[k] = empData[k] })
 
-  async function handleCreateEmployee() {
-    setError("")
-    if (!newEmployee.prenom || !newEmployee.nom) {
-      setError("Prénom et nom requis")
-      return
-    }
-    setSavingEmployee(true)
-    try {
-      var res = await supabase
-        .from("hr_employees")
-        .insert(newEmployee)
-        .select("*")
-        .single()
-      if (res.error) throw new Error(res.error.message)
-      var created = res.data
-      setEmployees([created].concat(employees))
-      setSelectedEmployee(created)
-      setCreatingEmployee(false)
-      setNewEmployee(emptyNewEmployee())
-      setCycles([])
-      showToast("Salarié créé")
-      setStep(2)
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setSavingEmployee(false)
-    }
+    var resE = await supabase.from("hr_employees").insert(insertEmp).select("*").single()
+    if (resE.error) throw new Error("Création employé : " + resE.error.message)
+    var newEmp = resE.data
+
+    // 2) Créer le cycle
+    var resC = await fetch("/api/hr/cycles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ employee_id: newEmp.id, date_entree: dateEntreeIso }),
+    })
+    var dataC = await resC.json()
+    if (!resC.ok) throw new Error("Création cycle : " + (dataC.error || resC.statusText))
+    var newCycle = dataC.cycle
+
+    return { employee: newEmp, cycle: newCycle }
   }
 
   // ============================================================
-  // STEP 2 ACTIONS
-  // ============================================================
-  async function handleCreateCycle() {
-    setError("")
-    if (!newCycleDate) {
-      setError("Date d'entrée requise")
-      return
-    }
-    if (!selectedEmployee) return
-    setSavingCycle(true)
-    try {
-      var res = await fetch("/api/hr/cycles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employee_id: selectedEmployee.id,
-          date_entree: newCycleDate,
-        }),
-      })
-      var data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Erreur création cycle")
-      var newCycle = Object.assign({}, data.cycle, { contracts: [] })
-      setCycles([newCycle].concat(cycles))
-      setSelectedCycle(newCycle)
-      setCreatingCycle(false)
-      setNewCycleDate("")
-      showToast("Cycle créé")
-      // Premier contrat → forcément contrat initial
-      setDocMode("contrat_signe")
-      setSupersedeContractId("")
-      setStep(3)
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setSavingCycle(false)
-    }
-  }
-
-  function handleSelectCycle(cycle: any) {
-    setSelectedCycle(cycle)
-    // Si cycle déjà a des contrats → mode avenant par défaut
-    if (cycle.contracts && cycle.contracts.length > 0) {
-      setDocMode("avenant")
-      var current = cycle.contracts.find(function (c: any) { return c.is_current })
-      if (current) setSupersedeContractId(current.id)
-      else setSupersedeContractId(cycle.contracts[cycle.contracts.length - 1].id)
-    } else {
-      setDocMode("contrat_signe")
-      setSupersedeContractId("")
-    }
-    setStep(3)
-  }
-
-  // ============================================================
-  // STEP 3 ACTIONS — analyse IA
+  // ANALYSE — flux complet upload + extract
   // ============================================================
   async function handleAnalyze() {
     setError("")
-    if (pages.length === 0) {
-      setError("Ajoutez au moins une photo")
-      return
-    }
-    if (!selectedCycle) return
+    if (files.length === 0) { setError("Ajoute au moins un document"); return }
 
-    setAnalyzing(true)
+    setPhase("analyzing")
+    var contractIdLocal = ""
+
     try {
-      // a) Créer contrat draft minimal
-      setAnalysisProgress("1/3 — Création du contrat (brouillon)...")
-      var draftPayload: any = {
-        cycle_id: selectedCycle.id,
-        employee_id: selectedEmployee.id,
+      // Étape A : si pas d'employé actif, on fait juste l'analyse SANS créer d'employé/cycle
+      // L'employé sera créé après que Edward valide les champs extraits.
+      if (!activeEmployee) {
+        // Analyse pure (pas de contract row pour l'instant)
+        // On a besoin d'un endpoint d'analyse standalone, mais on n'en a pas.
+        // Solution : créer un contrat "draft" temporaire orphelin (sans cycle), uploader, analyser, puis nettoyer si Edward annule.
+        // Plus propre : créer employé+cycle PROVISOIRES et nettoyer si annulation.
+        // Pour aller vite : on appelle directement l'API d'extraction sur les fichiers en envoyant le buffer.
+        // Mais notre API actuelle prend un contract_doc_id, donc il faut un contrat existant.
+        // → On crée un cycle et un contrat "draft" attachés à un employé temporaire,
+        //    et on les remplacera par les vrais à la sauvegarde.
+        // Plus simple encore : créer un employé "stub" auto-intitulé "(à analyser)",
+        //    on fera la mise à jour avec les vraies données après extraction.
+        setAnalysisProgress("1/4 — Préparation...")
+        var stubInsert: any = {
+          civilite: "Monsieur",
+          prenom: "(à compléter)",
+          nom: "(à compléter)",
+          nationalite: "française",
+        }
+        var resStub = await supabase.from("hr_employees").insert(stubInsert).select("*").single()
+        if (resStub.error) throw new Error("Préparation : " + resStub.error.message)
+        var stubEmp = resStub.data
+
+        var todayIso = new Date().toISOString().slice(0, 10)
+        var resStubCycle = await fetch("/api/hr/cycles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ employee_id: stubEmp.id, date_entree: todayIso }),
+        })
+        var dataStubCycle = await resStubCycle.json()
+        if (!resStubCycle.ok) throw new Error("Préparation cycle : " + (dataStubCycle.error || ""))
+
+        setActiveEmployee(stubEmp)
+        setActiveCycle(dataStubCycle.cycle)
+        // continue ci-dessous avec activeEmployee + activeCycle
+        var workingEmployee = stubEmp
+        var workingCycle = dataStubCycle.cycle
+      } else {
+        var workingEmployee = activeEmployee
+        var workingCycle = activeCycle
+      }
+
+      // Étape B : créer un contrat draft
+      setAnalysisProgress("2/4 — Création contrat (brouillon)...")
+      var draftBody: any = {
+        cycle_id: workingCycle.id,
+        employee_id: workingEmployee.id,
         status: "draft",
       }
-      if (docMode === "avenant" && supersedeContractId) {
-        draftPayload.supersedes_contract_id = supersedeContractId
-      }
+      if (activeLastContractId) draftBody.supersedes_contract_id = activeLastContractId
+
       var resCtr = await fetch("/api/hr/contracts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draftPayload),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draftBody),
       })
       var dataCtr = await resCtr.json()
-      if (!resCtr.ok) throw new Error(dataCtr.error || "Création contrat échouée")
-      var contractId = dataCtr.contract.id
-      setPendingContractId(contractId)
+      if (!resCtr.ok) throw new Error("Contrat draft : " + (dataCtr.error || ""))
+      contractIdLocal = dataCtr.contract.id
+      setPendingContractId(contractIdLocal)
 
-      // b) Upload pages
-      setAnalysisProgress("2/3 — Upload des photos vers Storage...")
+      // Étape C : upload pages
+      setAnalysisProgress("3/4 — Upload des documents...")
       var fd = new FormData()
-      fd.append("contract_id", contractId)
-      fd.append("doc_type", docMode)
+      fd.append("contract_id", contractIdLocal)
+      fd.append("doc_type", "contrat_signe") // type provisoire — sera mis à jour après détection
       fd.append("assemble_pdf", "1")
-      for (var i = 0; i < pages.length; i++) {
-        fd.append("file_" + String(i).padStart(3, "0"), pages[i].file)
+      for (var i = 0; i < files.length; i++) {
+        fd.append("file_" + String(i).padStart(3, "0"), files[i].file)
       }
       var resUp = await fetch("/api/hr/upload-pages", { method: "POST", body: fd })
       var dataUp = await resUp.json()
-      if (!resUp.ok) throw new Error(dataUp.error || "Upload échoué")
+      if (!resUp.ok) throw new Error("Upload : " + (dataUp.error || ""))
       var docId = dataUp.document.id
-      setPendingContractDocId(docId)
+      setPendingDocId(docId)
 
-      // c) OCR Claude Vision
-      setAnalysisProgress("3/3 — Analyse IA en cours (~10-30s)...")
+      // Étape D : OCR
+      setAnalysisProgress("4/4 — Analyse IA en cours (~10-30s)...")
       var resEx = await fetch("/api/hr/extract-contract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contract_doc_id: docId }),
       })
       var dataEx = await resEx.json()
-      if (!resEx.ok) throw new Error(dataEx.error || "Extraction échouée")
+      if (!resEx.ok) throw new Error("Analyse IA : " + (dataEx.error || ""))
 
       var ext = dataEx.extraction || {}
       setExtraction(ext)
 
-      // Pré-remplir editedFields à partir de l'extraction
-      var contractFields = ext.contract || {}
-      var employeeFields = ext.employee || {}
-      var ed = emptyExtractedFields()
-      // mapper les champs contract
-      Object.keys(ed).forEach(function (k) {
-        if (contractFields[k] !== undefined && contractFields[k] !== null) {
-          ed[k] = contractFields[k]
-        }
-      })
-      // Si type non détecté, garder le mode courant comme valeur par défaut
-      if (!ed.type) ed.type = "extra"
-      if (!ed.statut_cadre) ed.statut_cadre = "non-cadre"
-      // Si on est en avenant, on supersede une row existante avec date_debut = effective_to
-      // donc date_debut doit être présente
-      setEditedFields(ed)
+      // Auto-fill des formulaires
+      var detectedDocType = ext.doc_type || "contrat_initial"
+      setDocType(detectedDocType)
 
-      // Mettre à jour les infos employé si elles ont été extraites et que ce sont des nouveautés
-      // (uniquement si l'employé existant n'avait pas l'info)
-      if (selectedEmployee && employeeFields) {
-        var empPatch: any = {}
-        var fieldsToCopy = ["date_naissance", "lieu_naissance", "nationalite", "adresse", "code_postal", "ville", "num_secu"]
-        fieldsToCopy.forEach(function (k) {
-          if (!selectedEmployee[k] && employeeFields[k]) empPatch[k] = employeeFields[k]
-        })
-        if (Object.keys(empPatch).length > 0) {
-          await supabase.from("hr_employees").update(empPatch).eq("id", selectedEmployee.id)
-          setSelectedEmployee(Object.assign({}, selectedEmployee, empPatch))
-        }
+      // Pré-remplir l'employé (uniquement si on est en stub ou si champs manquants)
+      var newEmpFields = fillEmployeeFromExtraction(employeeFields, ext.employee)
+      setEmployeeFields(newEmpFields)
+
+      // Pré-remplir le contrat (si applicable)
+      if (detectedDocType === "contrat_initial" || detectedDocType === "avenant") {
+        var newContractFields = fillContractFromExtraction(emptyContractFields(), ext.contract)
+        setContractFields(newContractFields)
       }
 
-      setStep(4)
-      showToast("Analyse IA terminée — vérifiez les champs")
+      // Pré-remplir exit_info / period_month si applicable
+      if (ext.exit_info) {
+        if (ext.exit_info.date_sortie) setExitDate(ext.exit_info.date_sortie)
+        if (ext.exit_info.motif_sortie) setExitMotif(ext.exit_info.motif_sortie)
+      }
+      if (ext.period_month) setPeriodMonth(ext.period_month)
+
+      setPhase("review")
     } catch (e: any) {
-      setError("Erreur analyse : " + e.message)
+      setError(e.message || "Erreur analyse")
+      setPhase("drop")
     } finally {
-      setAnalyzing(false)
       setAnalysisProgress("")
     }
   }
 
-  // Permet de skip l'IA (saisie 100% manuelle)
-  function handleSkipAnalysis() {
-    setExtraction(null)
-    setEditedFields(emptyExtractedFields())
-    setStep(4)
-  }
-
   // ============================================================
-  // STEP 4 ACTIONS — sauver le contrat
+  // SAUVEGARDE — finalise tout après que Edward a validé
   // ============================================================
-  function setField(key: string, value: any) {
-    var copy = Object.assign({}, editedFields)
-    copy[key] = value
-    setEditedFields(copy)
-  }
-
-  async function handleSaveContract() {
+  async function handleSave() {
     setError("")
-    if (!editedFields.date_debut) {
-      setError("Date de début requise")
-      return
-    }
-    if (!editedFields.fonction) {
-      setError("Fonction requise")
-      return
-    }
+    setSaving(true)
 
-    setSavingContract(true)
     try {
-      var payload: any = {}
-      // copier les champs édités
-      Object.keys(editedFields).forEach(function (k) {
-        var v = editedFields[k]
-        if (v === "" || v === null || v === undefined) return
-        // Convertir les nombres
-        if (k === "taux_horaire_brut" || k === "salaire_brut_mensuel" || k === "heures_hebdo" || k === "heures_mensuelles" || k === "periode_essai_mois") {
-          var n = parseFloat(String(v).replace(",", "."))
-          if (!isNaN(n)) payload[k] = n
-          return
+      // 1) Si on est en stub, on met à jour les vraies infos employé
+      if (activeEmployee && (activeEmployee.prenom === "(à compléter)" || activeEmployee.nom === "(à compléter)")) {
+        if (!employeeFields.prenom || !employeeFields.nom) {
+          throw new Error("Prénom et nom du salarié obligatoires")
         }
-        payload[k] = v
-      })
-      payload.status = "archived" // contrat rétroactif → directement archivé
-      payload.contract_label = (docMode === "avenant" ? "Avenant — " : "Contrat — ") + (editedFields.fonction || "")
-
-      // Si on a déjà un pendingContractId (cas IA), on PATCH
-      // Sinon (cas skip IA), on crée un draft puis on PATCH
-      var contractId = pendingContractId
-
-      if (!contractId) {
-        // Skip IA : créer le contrat from scratch
-        var draftPayload: any = {
-          cycle_id: selectedCycle.id,
-          employee_id: selectedEmployee.id,
-          status: "draft",
-        }
-        if (docMode === "avenant" && supersedeContractId) {
-          draftPayload.supersedes_contract_id = supersedeContractId
-        }
-        var resCtr = await fetch("/api/hr/contracts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(draftPayload),
+        var updatePayload: any = {}
+        Object.keys(employeeFields).forEach(function (k: any) {
+          if (employeeFields[k]) updatePayload[k] = employeeFields[k]
         })
-        var dataCtr = await resCtr.json()
-        if (!resCtr.ok) throw new Error(dataCtr.error || "Création contrat échouée")
-        contractId = dataCtr.contract.id
-        setPendingContractId(contractId)
+        var resUpd = await supabase.from("hr_employees").update(updatePayload).eq("id", activeEmployee.id).select("*").single()
+        if (resUpd.error) throw new Error("MAJ employé : " + resUpd.error.message)
+        setActiveEmployee(resUpd.data)
+      } else if (activeEmployee) {
+        // Compléter les champs manquants si l'IA a trouvé du nouveau
+        var patch: any = {}
+        Object.keys(employeeFields).forEach(function (k: any) {
+          if (!activeEmployee[k] && employeeFields[k]) patch[k] = employeeFields[k]
+        })
+        if (Object.keys(patch).length > 0) {
+          await supabase.from("hr_employees").update(patch).eq("id", activeEmployee.id)
+          setActiveEmployee(Object.assign({}, activeEmployee, patch))
+        }
       }
 
-      // PATCH du contrat avec tous les champs validés
-      payload.contract_id = contractId
-      var resPatch = await fetch("/api/hr/contracts", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-      var dataPatch = await resPatch.json()
-      if (!resPatch.ok) throw new Error(dataPatch.error || "Sauvegarde échouée")
-
-      // Marquer le doc OCR comme validé (si on en a un)
-      if (pendingContractDocId) {
-        await supabase
-          .from("hr_contract_documents")
-          .update({ validated_by_user: true })
-          .eq("id", pendingContractDocId)
+      // 2) Recaler la date_entree du cycle si on est en stub et c'est le 1er doc contractuel
+      if (activeCycle && (docType === "contrat_initial") && contractFields.date_debut) {
+        await supabase.from("hr_employment_cycles").update({ date_entree: contractFields.date_debut }).eq("id", activeCycle.id)
+        var refreshedCycle = Object.assign({}, activeCycle, { date_entree: contractFields.date_debut })
+        setActiveCycle(refreshedCycle)
       }
 
-      setCreatedContract(dataPatch.contract)
-      // Recharger les cycles pour avoir le nouveau contrat
-      var cyc = await loadCyclesForEmployee(selectedEmployee.id)
-      setCycles(cyc)
-      var refreshedCycle = cyc.find(function (c: any) { return c.id === selectedCycle.id })
-      if (refreshedCycle) setSelectedCycle(refreshedCycle)
-      setStep(5)
-      showToast(docMode === "avenant" ? "Avenant enregistré" : "Contrat enregistré")
+      // 3) Selon le type de doc, on finalise différemment
+      if (docType === "contrat_initial" || docType === "avenant") {
+        if (!contractFields.fonction) throw new Error("Fonction obligatoire")
+        if (!contractFields.date_debut) throw new Error("Date de début obligatoire")
+
+        // Builder le payload PATCH contrat
+        var ctrPayload: any = { contract_id: pendingContractId }
+        Object.keys(contractFields).forEach(function (k: any) {
+          var v = contractFields[k]
+          if (v === "" || v === null || v === undefined) return
+          if (k === "taux_horaire_brut" || k === "salaire_brut_mensuel" || k === "heures_hebdo" || k === "heures_mensuelles" || k === "periode_essai_mois") {
+            var n = parseFloat(String(v).replace(",", "."))
+            if (!isNaN(n)) ctrPayload[k] = n
+            return
+          }
+          ctrPayload[k] = v
+        })
+        ctrPayload.status = "archived"
+        ctrPayload.contract_label = (docType === "avenant" ? "Avenant — " : "Contrat — ") + (contractFields.fonction || "")
+
+        var resPatch = await fetch("/api/hr/contracts", {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(ctrPayload),
+        })
+        var dataPatch = await resPatch.json()
+        if (!resPatch.ok) throw new Error("Sauvegarde contrat : " + (dataPatch.error || ""))
+
+        // Marquer le doc OCR comme validé
+        var newLabel = DOC_TYPE_LABELS[docType] || "Document"
+        var dbDocType = docType === "contrat_initial" ? "contrat_signe" : "avenant"
+        await supabase.from("hr_contract_documents").update({
+          validated_by_user: true,
+          doc_type: dbDocType,
+          label: newLabel + " — " + (contractFields.fonction || ""),
+        }).eq("id", pendingDocId)
+
+        setActiveLastContractId(pendingContractId)
+        setSessionDocs(sessionDocs.concat([{ doc_type: docType, label: newLabel + " — " + contractFields.fonction, contract_id: pendingContractId }]))
+      } else {
+        // Doc non-contractuel (fiche paie, solde, certificat, etc.)
+        // On a déjà une row hr_contract_documents créée à l'upload. On met à jour son doc_type.
+        var dbDocType2 = mapDocTypeToDb(docType)
+        var label2 = DOC_TYPE_LABELS[docType] || "Document"
+        var updates: any = {
+          validated_by_user: true,
+          doc_type: dbDocType2,
+          label: label2,
+        }
+        if (periodMonth) updates.period_month = periodMonth
+
+        await supabase.from("hr_contract_documents").update(updates).eq("id", pendingDocId)
+
+        // Le contrat draft créé à l'upload n'est pas un vrai contrat — on le supprime
+        // (sauf si c'est rattaché au last contract de la session — cas où Edward upload une fiche de paie après le contrat initial)
+        if (activeLastContractId && pendingContractId !== activeLastContractId) {
+          // Réattacher le doc au vrai dernier contrat de la session
+          await supabase.from("hr_contract_documents").update({ contract_id: activeLastContractId }).eq("id", pendingDocId)
+          // Supprimer le contrat draft orphelin
+          await supabase.from("hr_contracts").delete().eq("id", pendingContractId)
+        }
+        // Sinon, on garde le contrat draft minimal (Edward devra ajouter un vrai contrat plus tard)
+
+        // Si c'est un solde de tout compte / certificat / lettre démission/licenciement → proposer clôture cycle
+        if ((docType === "solde_tout_compte" || docType === "certificat_travail" || docType === "lettre_demission" || docType === "lettre_licenciement" || docType === "rupture_conv") && exitDate) {
+          await fetch("/api/hr/cycles", {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              cycle_id: activeCycle.id,
+              date_sortie: exitDate,
+              motif_sortie: exitMotif || "autre",
+            }),
+          })
+          await supabase.from("hr_employees").update({
+            date_sortie: exitDate,
+            motif_sortie: exitMotif || "autre",
+          }).eq("id", activeEmployee.id)
+        }
+
+        setSessionDocs(sessionDocs.concat([{ doc_type: docType, label: label2, doc_id: pendingDocId }]))
+      }
+
+      showToast("Document enregistré ✓")
+      setPhase("saved")
     } catch (e: any) {
-      setError("Erreur sauvegarde : " + e.message)
+      setError(e.message || "Erreur sauvegarde")
     } finally {
-      setSavingContract(false)
+      setSaving(false)
     }
   }
 
-  // ============================================================
-  // STEP 5 ACTIONS
-  // ============================================================
-  function handleAddAvenant() {
-    // Reset des states de step 3/4 pour un nouvel upload
-    setPages([])
-    setExtraction(null)
-    setEditedFields(emptyExtractedFields())
-    setPendingContractId("")
-    setPendingContractDocId("")
-    setCreatedContract(null)
-    setDocMode("avenant")
-    // Le supersede pointe sur le contrat qu'on vient de créer
-    if (createdContract) setSupersedeContractId(createdContract.id)
-    setStep(3)
+  function mapDocTypeToDb(t: string): string {
+    var map: any = {
+      contrat_initial: "contrat_signe",
+      avenant: "avenant",
+      fiche_paie: "fiche_paie",
+      solde_tout_compte: "solde_tout_compte",
+      certificat_travail: "certificat_travail",
+      attestation_france_travail: "attestation_france_travail",
+      lettre_demission: "lettre_demission",
+      lettre_licenciement: "lettre_licenciement",
+      rupture_conv: "rupture_conv",
+      dossier_bienvenue: "dossier_bienvenue",
+      autre: "autre",
+    }
+    return map[t] || "autre"
   }
 
-  async function handleCloseCycle() {
+  // ============================================================
+  // ÉTAPE SAVED — proposer un autre doc ou terminer
+  // ============================================================
+  function handleAddAnotherDoc() {
+    clearFiles()
+    setExtraction(null)
+    setContractFields(emptyContractFields())
+    setExitDate("")
+    setExitMotif("")
+    setPeriodMonth("")
+    setPendingContractId("")
+    setPendingDocId("")
     setError("")
-    if (!exitDate) { setError("Date de sortie requise"); return }
-    if (!selectedCycle) return
+    setPhase("drop")
+  }
 
-    setSavingExit(true)
+  function handleFinish() {
+    onSaved()
+    onClose()
+  }
+
+  // ============================================================
+  // MODE MANUEL — créer juste l'employé sans aucun document
+  // ============================================================
+  async function handleCreateEmptyEmployee() {
+    setError("")
+    if (!employeeFields.prenom || !employeeFields.nom) {
+      setError("Prénom et nom obligatoires")
+      return
+    }
+    if (!contractFields.date_debut) {
+      setError("Date d'entrée obligatoire (date d'embauche réelle)")
+      return
+    }
+    setSaving(true)
     try {
-      var res = await fetch("/api/hr/cycles", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+      var insertEmp: any = {}
+      Object.keys(employeeFields).forEach(function (k: any) { if (employeeFields[k]) insertEmp[k] = employeeFields[k] })
+      var resE = await supabase.from("hr_employees").insert(insertEmp).select("*").single()
+      if (resE.error) throw new Error(resE.error.message)
+      var newEmp = resE.data
+
+      var resC = await fetch("/api/hr/cycles", {
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cycle_id: selectedCycle.id,
-          date_sortie: exitDate,
-          motif_sortie: exitReason,
+          employee_id: newEmp.id,
+          date_entree: contractFields.date_debut,
+          notes: "Créé sans document (mise en conformité à faire — avenant rétroactif)",
         }),
       })
-      var data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Erreur clôture cycle")
+      var dataC = await resC.json()
+      if (!resC.ok) throw new Error(dataC.error || "")
 
-      // Mettre à jour aussi hr_employees.date_sortie / motif_sortie pour cohérence cache
-      await supabase
-        .from("hr_employees")
-        .update({ date_sortie: exitDate, motif_sortie: exitReason })
-        .eq("id", selectedEmployee.id)
-
-      setClosingCycle(false)
-      showToast("Cycle clôturé — salarié marqué comme parti")
-      // Reset wizard pour un nouvel import
-      handleStartOver()
+      setActiveEmployee(newEmp)
+      setActiveCycle(dataC.cycle)
+      setSessionDocs([{ doc_type: "manual_employee", label: "Fiche créée sans document" }])
+      showToast("Salarié créé — pense à faire signer un avenant de mise en conformité")
+      setPhase("saved")
     } catch (e: any) {
-      setError("Erreur clôture : " + e.message)
+      setError("Création : " + e.message)
     } finally {
-      setSavingExit(false)
+      setSaving(false)
     }
   }
 
-  function handleStartOver() {
-    setStep(1)
-    setSelectedEmployee(null)
-    setEmployeeSearch("")
-    setCreatingEmployee(false)
-    setNewEmployee(emptyNewEmployee())
-    setCycles([])
-    setSelectedCycle(null)
-    setCreatingCycle(false)
-    setNewCycleDate("")
-    setDocMode("contrat_signe")
-    setSupersedeContractId("")
-    setPages([])
-    setExtraction(null)
-    setEditedFields(emptyExtractedFields())
-    setPendingContractId("")
-    setPendingContractDocId("")
-    setCreatedContract(null)
-    setError("")
-    loadEmployees()
-  }
-
   // ============================================================
-  // RENDER
+  // RENDER MODAL
   // ============================================================
-
-  // Filtrer les employés selon la recherche
-  var filteredEmployees = employees.filter(function (e: any) {
-    if (!employeeSearch) return true
-    var q = employeeSearch.toLowerCase()
-    return (
-      (e.nom || "").toLowerCase().indexOf(q) >= 0 ||
-      (e.prenom || "").toLowerCase().indexOf(q) >= 0
-    )
-  })
-
-  // Découper les cycles en ouverts / clôturés (utile pour Step 2)
-  var openCycles = cycles.filter(function (c: any) { return !c.date_sortie })
-  var closedCycles = cycles.filter(function (c: any) { return !!c.date_sortie })
-  var hasOpenCycle = openCycles.length > 0
+  var employeeName = activeEmployee
+    ? ((activeEmployee.prenom === "(à compléter)" ? employeeFields.prenom : activeEmployee.prenom) + " " +
+       (activeEmployee.nom === "(à compléter)" ? employeeFields.nom : activeEmployee.nom)).trim()
+    : ""
 
   return (
-    <div style={{ maxWidth: 920, margin: "0 auto", padding: 16, fontFamily: "Arial Narrow, sans-serif", color: DARK }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontFamily: "Yellowtail, cursive", color: PINK, fontSize: 36, margin: "0 0 4px 0" }}>
-          Import historique RH
-        </h1>
-        <div style={{ fontSize: 14, color: "#666" }}>
-          Digitalisation rétroactive des contrats existants
-        </div>
-      </div>
-
-      {/* Stepper */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 24, fontSize: 12 }}>
-        {[1, 2, 3, 4, 5].map(function (n: number) {
-          var labels = ["Salarié", "Cycle", "Photos", "Validation", "OK"]
-          var active = step === n
-          var done = step > n
-          return (
-            <div
-              key={n}
-              style={{
-                flex: 1,
-                padding: "8px 4px",
-                borderRadius: 8,
-                background: active ? PINK : (done ? "#FFE0F2" : "#F0F0F0"),
-                color: active ? "#fff" : (done ? PINK : "#999"),
-                textAlign: "center",
-                fontWeight: active ? "bold" : "normal",
-              }}
-            >
-              {n}. {labels[n - 1]}
+    <div className="overlay" onClick={function (e: any) { if (e.target === e.currentTarget) handleCloseRequest() }}>
+      <div className="modal modal-xl">
+        {/* HEADER */}
+        <div className="mh">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="mt">📥 Importer historique RH</div>
+            <button className="btn btn-sm" onClick={handleCloseRequest} style={{ background: "#FFFFFF" }}>×</button>
+          </div>
+          {activeEmployee ? (
+            <div className="yt" style={{ fontSize: 14, marginTop: 6, color: "#191923" }}>
+              {employeeName ? "Salarié en cours : " + employeeName : ""}
+              {sessionDocs.length > 0 ? " · " + sessionDocs.length + " doc" + (sessionDocs.length > 1 ? "s" : "") + " enregistré" + (sessionDocs.length > 1 ? "s" : "") : ""}
             </div>
-          )
-        })}
-      </div>
-
-      {/* Erreur */}
-      {error ? (
-        <div style={{
-          padding: 12, marginBottom: 16, borderRadius: 8,
-          background: "#FEE", border: "1px solid #FBB", color: "#900",
-        }}>
-          ⚠ {error}
+          ) : null}
         </div>
-      ) : null}
 
-      {/* Toast */}
-      {toast ? (
-        <div style={{
-          position: "fixed", bottom: 24, right: 24, zIndex: 1000,
-          padding: "12px 20px", borderRadius: 8,
-          background: DARK, color: "#fff", fontSize: 14,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-        }}>
-          {toast}
-        </div>
-      ) : null}
-
-      {/* ============================================================
-          STEP 1 : Sélection / création employé
-          ============================================================ */}
-      {step === 1 && !creatingEmployee ? (
-        <div>
-          <h2 style={{ fontFamily: "Yellowtail, cursive", color: DARK, fontSize: 24, marginBottom: 16 }}>
-            Quel salarié ?
-          </h2>
-          <input
-            type="text"
-            value={employeeSearch}
-            onChange={function (e: any) { setEmployeeSearch(e.target.value) }}
-            placeholder="Rechercher par nom ou prénom..."
-            style={{
-              width: "100%", padding: 12, borderRadius: 8,
-              border: "1px solid #ddd", fontSize: 14, marginBottom: 16,
-              fontFamily: "Arial Narrow, sans-serif",
-            }}
-          />
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-            {filteredEmployees.length === 0 ? (
-              <div style={{ padding: 16, textAlign: "center", color: "#888" }}>
-                {employeeSearch ? "Aucun salarié trouvé." : "Aucun salarié pour l'instant."}
-              </div>
-            ) : null}
-            {filteredEmployees.map(function (emp: any) {
-              return (
-                <button
-                  key={emp.id}
-                  type="button"
-                  onClick={function () { handleSelectEmployee(emp) }}
-                  style={{
-                    padding: 12, textAlign: "left", cursor: "pointer",
-                    background: "#fff", border: "1px solid #eee", borderRadius: 8,
-                    fontFamily: "Arial Narrow, sans-serif", fontSize: 14,
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                  }}
-                >
-                  <span>
-                    <strong>{(emp.civilite || "") + " " + (emp.prenom || "") + " " + (emp.nom || "")}</strong>
-                    {emp.date_sortie ? <span style={{ color: "#888", marginLeft: 8 }}>(parti le {formatDateFr(emp.date_sortie)})</span> : null}
-                  </span>
-                  <span style={{ color: PINK }}>→</span>
-                </button>
-              )
-            })}
-          </div>
-          <button
-            type="button"
-            onClick={function () { setCreatingEmployee(true) }}
-            style={{
-              width: "100%", padding: 14, borderRadius: 8,
-              background: YELLOW, border: "none",
-              fontFamily: "Arial Narrow, sans-serif", fontWeight: "bold", fontSize: 14,
-              color: DARK, cursor: "pointer",
-            }}
-          >
-            ＋ Créer un nouveau salarié
-          </button>
-        </div>
-      ) : null}
-
-      {step === 1 && creatingEmployee ? (
-        <div>
-          <h2 style={{ fontFamily: "Yellowtail, cursive", color: DARK, fontSize: 24, marginBottom: 16 }}>
-            Nouveau salarié
-          </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-            <SelectField label="Civilité" value={newEmployee.civilite}
-              onChange={function (v: any) { setNewEmployee(Object.assign({}, newEmployee, { civilite: v })) }}
-              options={CIVILITES.map(function (c: any) { return { value: c, label: c } })} />
-            <TextField label="Nationalité" value={newEmployee.nationalite}
-              onChange={function (v: any) { setNewEmployee(Object.assign({}, newEmployee, { nationalite: v })) }} />
-            <TextField label="Prénom *" value={newEmployee.prenom}
-              onChange={function (v: any) { setNewEmployee(Object.assign({}, newEmployee, { prenom: v })) }} />
-            <TextField label="Nom *" value={newEmployee.nom}
-              onChange={function (v: any) { setNewEmployee(Object.assign({}, newEmployee, { nom: v })) }} />
-            <TextField type="date" label="Date de naissance" value={newEmployee.date_naissance}
-              onChange={function (v: any) { setNewEmployee(Object.assign({}, newEmployee, { date_naissance: v })) }} />
-            <TextField label="Lieu de naissance" value={newEmployee.lieu_naissance}
-              onChange={function (v: any) { setNewEmployee(Object.assign({}, newEmployee, { lieu_naissance: v })) }} />
-            <TextField label="Adresse" value={newEmployee.adresse} colSpan={2}
-              onChange={function (v: any) { setNewEmployee(Object.assign({}, newEmployee, { adresse: v })) }} />
-            <TextField label="Code postal" value={newEmployee.code_postal}
-              onChange={function (v: any) { setNewEmployee(Object.assign({}, newEmployee, { code_postal: v })) }} />
-            <TextField label="Ville" value={newEmployee.ville}
-              onChange={function (v: any) { setNewEmployee(Object.assign({}, newEmployee, { ville: v })) }} />
-            <TextField label="N° Sécurité sociale" value={newEmployee.num_secu}
-              onChange={function (v: any) { setNewEmployee(Object.assign({}, newEmployee, { num_secu: v })) }} />
-            <TextField label="Téléphone" value={newEmployee.telephone}
-              onChange={function (v: any) { setNewEmployee(Object.assign({}, newEmployee, { telephone: v })) }} />
-            <TextField label="Email" value={newEmployee.email} colSpan={2}
-              onChange={function (v: any) { setNewEmployee(Object.assign({}, newEmployee, { email: v })) }} />
-          </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <button type="button" onClick={function () { setCreatingEmployee(false) }}
-              style={btnSecondary}>Annuler</button>
-            <button type="button" onClick={handleCreateEmployee} disabled={savingEmployee}
-              style={Object.assign({}, btnPrimary, { opacity: savingEmployee ? 0.6 : 1 })}>
-              {savingEmployee ? "Création..." : "Créer le salarié"}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {/* ============================================================
-          STEP 2 : Sélection / création cycle
-          ============================================================ */}
-      {step === 2 && selectedEmployee ? (
-          <div>
-            <button type="button" onClick={function () { setStep(1); setSelectedEmployee(null); setCycles([]) }}
-              style={btnBack}>← Changer de salarié</button>
-            <h2 style={{ fontFamily: "Yellowtail, cursive", color: DARK, fontSize: 24, marginBottom: 4 }}>
-              Cycle d'emploi de {selectedEmployee.prenom} {selectedEmployee.nom}
-            </h2>
-            <div style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>
-              Un cycle = une période entrée → sortie. Si la personne a été ré-embauchée, elle a plusieurs cycles.
+        {/* BODY */}
+        <div className="mb">
+          {/* Erreur */}
+          {error ? (
+            <div className="card-p" style={{ marginBottom: 14, padding: 10, color: "#191923", fontWeight: 900, fontSize: 12 }}>
+              ⚠ {error}
             </div>
+          ) : null}
 
-            {/* Cycle en cours — gros call-to-action */}
-            {hasOpenCycle ? (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: "bold", color: PINK, marginBottom: 8, letterSpacing: 1 }}>
-                  CYCLE EN COURS — clique pour ajouter un contrat ou avenant
+          {/* PHASE DROP — uploader documents */}
+          {phase === "drop" ? (
+            <div>
+              {!activeEmployee ? (
+                <div className="card-y" style={{ marginBottom: 14 }}>
+                  <div className="yt" style={{ fontSize: 18, marginBottom: 4 }}>Premier document</div>
+                  <div style={{ fontSize: 11 }}>
+                    Drop n'importe quel document RH (contrat, avenant, fiche de paie, solde de tout compte…).
+                    L'IA détecte le type, extrait les infos du salarié et crée tout en cascade.
+                  </div>
                 </div>
-                {openCycles.map(function (cy: any) {
-                  var nbContracts = (cy.contracts || []).length
-                  return (
-                    <button
-                      key={cy.id}
-                      type="button"
-                      onClick={function () { handleSelectCycle(cy) }}
-                      style={{
-                        width: "100%", padding: 16, textAlign: "left", cursor: "pointer",
-                        background: "#FFF5FB", border: "2px solid " + PINK, borderRadius: 12,
-                        fontSize: 14, marginBottom: 8,
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div>
-                          <div style={{ fontWeight: "bold", fontSize: 16, color: DARK }}>
-                            Depuis le {formatDateFr(cy.date_entree)} — en cours
-                          </div>
-                          <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
-                            {nbContracts} contrat{nbContracts > 1 ? "s" : ""} enregistré{nbContracts > 1 ? "s" : ""}
-                          </div>
-                        </div>
-                        <span style={{ color: PINK, fontSize: 24 }}>→</span>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            ) : null}
-
-            {/* Cycles passés (s'il y en a) */}
-            {closedCycles.length > 0 ? (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: "bold", color: "#888", marginBottom: 8, letterSpacing: 1 }}>
-                  CYCLES PASSÉS
+              ) : (
+                <div className="card-y" style={{ marginBottom: 14 }}>
+                  <div className="yt" style={{ fontSize: 18, marginBottom: 4 }}>Document suivant pour {employeeName}</div>
+                  <div style={{ fontSize: 11 }}>
+                    Avenant, fiche de paie, solde de tout compte… L'IA classe automatiquement.
+                  </div>
                 </div>
-                {closedCycles.map(function (cy: any) {
-                  var nbContracts = (cy.contracts || []).length
-                  return (
-                    <button
-                      key={cy.id}
-                      type="button"
-                      onClick={function () { handleSelectCycle(cy) }}
-                      style={{
-                        width: "100%", padding: 12, textAlign: "left", cursor: "pointer",
-                        background: "#fff", border: "1px solid #eee", borderRadius: 8,
-                        fontSize: 14, marginBottom: 8,
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div>
-                          <strong>
-                            {formatDateFr(cy.date_entree)} → {formatDateFr(cy.date_sortie)}
-                          </strong>
-                          <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-                            {nbContracts} contrat{nbContracts > 1 ? "s" : ""}
-                            {cy.motif_sortie ? " • " + cy.motif_sortie : ""}
-                          </div>
-                        </div>
-                        <span style={{ color: "#999" }}>→</span>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            ) : null}
+              )}
 
-            {/* Aucun cycle du tout */}
-            {cycles.length === 0 ? (
-              <div style={{ padding: 16, background: "#FFF8E1", borderRadius: 8, marginBottom: 16, fontSize: 14 }}>
-                Aucun cycle d'emploi enregistré. Crée le premier ci-dessous.
-              </div>
-            ) : null}
-
-            {/* Bouton créer cycle — UNIQUEMENT si pas de cycle ouvert */}
-            {!hasOpenCycle && !creatingCycle ? (
-              <button type="button" onClick={function () { setCreatingCycle(true) }}
+              {/* Zone drop */}
+              <div
+                onDrop={handleDrop}
+                onDragOver={function (e: any) { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={function (e: any) { e.preventDefault(); setDragOver(false) }}
+                onClick={function () { if (fileInputRef.current) fileInputRef.current.click() }}
                 style={{
-                  width: "100%", padding: 14, borderRadius: 8,
-                  background: YELLOW, border: "none",
-                  fontFamily: "Arial Narrow, sans-serif", fontWeight: "bold", fontSize: 14,
-                  color: DARK, cursor: "pointer",
-                }}>
-                ＋ {cycles.length === 0 ? "Créer le premier cycle d'emploi" : "Nouveau cycle (ré-embauche)"}
-              </button>
-            ) : null}
-
-            {!hasOpenCycle && creatingCycle ? (
-              <div style={{ padding: 16, background: "#fff", border: "1px solid #eee", borderRadius: 8 }}>
-                <TextField type="date" label="Date d'entrée *" value={newCycleDate} onChange={setNewCycleDate} />
-                <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
-                  <button type="button" onClick={function () { setCreatingCycle(false); setNewCycleDate("") }}
-                    style={btnSecondary}>Annuler</button>
-                  <button type="button" onClick={handleCreateCycle} disabled={savingCycle}
-                    style={Object.assign({}, btnPrimary, { opacity: savingCycle ? 0.6 : 1 })}>
-                    {savingCycle ? "Création..." : "Créer le cycle"}
-                  </button>
+                  border: "2px dashed " + (dragOver ? "#FF82D7" : "#191923"),
+                  borderRadius: 7,
+                  padding: 22,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  background: dragOver ? "#FFF5FB" : "#FFFFFF",
+                  boxShadow: "3px 3px 0 #191923",
+                }}
+              >
+                <div style={{ fontSize: 30, marginBottom: 4 }}>📷📄</div>
+                <div className="yt" style={{ fontSize: 16, marginBottom: 4 }}>
+                  {files.length === 0 ? "Drop un PDF OU des photos" : "Ajouter d'autres pages"}
                 </div>
+                <div style={{ fontSize: 10, opacity: 0.6 }}>
+                  JPEG / PNG / HEIC / WEBP — ou un PDF — max {MAX_FILE_MB} MB par fichier
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  multiple
+                  onChange={handleInputChange}
+                  style={{ display: "none" }}
+                />
               </div>
-            ) : null}
 
-            {/* Hint si cycle ouvert : pour ré-embauche, il faut clôturer */}
-            {hasOpenCycle ? (
-              <div style={{
-                padding: 12, marginTop: 8, fontSize: 12, color: "#666",
-                background: "#FAFAFA", borderRadius: 8, fontStyle: "italic",
-              }}>
-                💡 Pour enregistrer une <strong>ré-embauche</strong> de cette personne, il faut d'abord clôturer le cycle en cours
-                (date de sortie + motif). Tu pourras le faire au step 5 après avoir enregistré son dernier contrat.
-              </div>
-            ) : null}
-          </div>
-      ) : null}
+              {/* Liste fichiers */}
+              {files.length > 0 ? (
+                <div style={{ marginTop: 12 }}>
+                  {files.map(function (f: any, idx: number) {
+                    return (
+                      <div key={f.id} style={{
+                        display: "flex", alignItems: "center", gap: 8, padding: 6,
+                        background: "#FFFFFF", border: "2px solid #191923", borderRadius: 5,
+                        marginBottom: 5, boxShadow: "2px 2px 0 #191923",
+                      }}>
+                        <div style={{
+                          width: 24, height: 24, background: "#FF82D7", color: "#191923",
+                          borderRadius: 3, fontSize: 11, fontWeight: 900,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          border: "1.5px solid #191923",
+                        }}>{idx + 1}</div>
+                        <div style={{
+                          width: 40, height: 40, background: "#EBEBEB", borderRadius: 4,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          overflow: "hidden", flexShrink: 0,
+                        }}>
+                          {f.preview
+                            ? <img src={f.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            : <div style={{ fontSize: 18 }}>{f.isPdf ? "📄" : "🖼️"}</div>}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, fontSize: 11 }}>
+                          <div style={{ fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {f.file.name || "doc-" + (idx + 1)}
+                          </div>
+                          <div style={{ opacity: 0.6, fontSize: 10 }}>{f.sizeMb.toFixed(1)} MB · {f.mime}</div>
+                        </div>
+                        <button className="btn btn-sm" onClick={function () { moveFile(idx, -1) }} disabled={idx === 0}>↑</button>
+                        <button className="btn btn-sm" onClick={function () { moveFile(idx, 1) }} disabled={idx === files.length - 1}>↓</button>
+                        <button className="btn btn-sm btn-red" onClick={function () { removeFile(idx) }}>×</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : null}
 
-      {/* ============================================================
-          STEP 3 : Type de doc + photos + analyse
-          ============================================================ */}
-      {step === 3 && selectedCycle ? (
-        <div>
-          <button type="button" onClick={function () { setStep(2) }} style={btnBack}>← Changer de cycle</button>
-          <h2 style={{ fontFamily: "Yellowtail, cursive", color: DARK, fontSize: 24, marginBottom: 4 }}>
-            Photos du document
-          </h2>
-          <div style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>
-            Cycle du {formatDateFr(selectedCycle.date_entree)}
-            {selectedCycle.contracts && selectedCycle.contracts.length > 0
-              ? " • " + selectedCycle.contracts.length + " contrat(s) déjà enregistré(s)"
-              : " • premier contrat de ce cycle"}
-          </div>
-
-          {/* Choix du type de doc */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-            <button type="button"
-              onClick={function () { setDocMode("contrat_signe"); setSupersedeContractId("") }}
-              disabled={selectedCycle.contracts && selectedCycle.contracts.length > 0 && docMode !== "contrat_signe"}
-              style={tabBtn(docMode === "contrat_signe")}>
-              Contrat initial
-            </button>
-            <button type="button"
-              onClick={function () {
-                setDocMode("avenant")
-                if (selectedCycle.contracts && selectedCycle.contracts.length > 0) {
-                  var current = selectedCycle.contracts.find(function (c: any) { return c.is_current })
-                  if (current) setSupersedeContractId(current.id)
-                }
-              }}
-              disabled={!selectedCycle.contracts || selectedCycle.contracts.length === 0}
-              style={tabBtn(docMode === "avenant")}>
-              Avenant
-            </button>
-          </div>
-
-          {docMode === "avenant" && selectedCycle.contracts && selectedCycle.contracts.length > 0 ? (
-            <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Quel contrat est modifié par cet avenant ?</label>
-              <select value={supersedeContractId}
-                onChange={function (e: any) { setSupersedeContractId(e.target.value) }}
-                style={inputStyle}>
-                {selectedCycle.contracts.map(function (c: any) {
-                  return (
-                    <option key={c.id} value={c.id}>
-                      {c.contract_label || (c.fonction || "Contrat")} — {formatDateFr(c.date_debut)}
-                      {c.is_current ? " (actuel)" : ""}
-                    </option>
-                  )
-                })}
-              </select>
-            </div>
-          ) : null}
-
-          {/* Uploader photos */}
-          <PhotoUploader pages={pages} onChange={setPages} disabled={analyzing} />
-
-          {/* Boutons analyse */}
-          <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
-            <button type="button"
-              onClick={handleSkipAnalysis}
-              disabled={analyzing}
-              style={btnSecondary}>
-              Saisir manuellement (sans IA)
-            </button>
-            <button type="button"
-              onClick={handleAnalyze}
-              disabled={analyzing || pages.length === 0}
-              style={Object.assign({}, btnPrimary, { opacity: (analyzing || pages.length === 0) ? 0.5 : 1 })}>
-              {analyzing ? "Analyse en cours..." : "🤖 Analyser via IA"}
-            </button>
-          </div>
-          {analysisProgress ? (
-            <div style={{ marginTop: 12, padding: 12, background: "#FFF8E1", borderRadius: 8, fontSize: 13 }}>
-              ⏳ {analysisProgress}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* ============================================================
-          STEP 4 : Validation des champs extraits
-          ============================================================ */}
-      {step === 4 ? (
-        <div>
-          <button type="button" onClick={function () { setStep(3) }} style={btnBack}>← Retour photos</button>
-          <h2 style={{ fontFamily: "Yellowtail, cursive", color: DARK, fontSize: 24, marginBottom: 4 }}>
-            Vérifier les champs extraits
-          </h2>
-          {extraction && extraction.meta ? (
-            <div style={{
-              padding: 12, marginBottom: 16, borderRadius: 8,
-              background: extraction.meta.confidence === "high" ? "#E8F5E9" : (extraction.meta.confidence === "low" ? "#FFEBEE" : "#FFF8E1"),
-              fontSize: 13,
-            }}>
-              <strong>Confiance IA : {extraction.meta.confidence || "?"}</strong>
-              {extraction.meta.notes ? <div style={{ marginTop: 4 }}>📝 {extraction.meta.notes}</div> : null}
-              {extraction.meta.detected_avenant && docMode === "contrat_signe" ? (
-                <div style={{ marginTop: 4, color: "#c92a2a" }}>
-                  ⚠ L'IA pense que ce document est un AVENANT, pas un contrat initial. Reviens en arrière pour ajuster ?
+              {/* Mode manuel — pour anciens salariés sans aucun document */}
+              {!activeEmployee && files.length === 0 ? (
+                <div style={{ marginTop: 18, padding: 12, background: "#FAFAFA", borderRadius: 7, border: "1.5px dashed #999" }}>
+                  <div style={{ fontSize: 11, marginBottom: 6 }}>
+                    Aucun document existant pour ce salarié (cas du salarié 2022 sans contrat) ?
+                  </div>
+                  <button className="btn btn-n" onClick={function () { setPhase("manual") }}>
+                    Saisir manuellement (sans document)
+                  </button>
                 </div>
               ) : null}
             </div>
           ) : null}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
-            <SelectField label="Type de contrat" value={editedFields.type}
-              onChange={function (v: any) { setField("type", v) }}
-              options={CONTRACT_TYPES} />
-            <TextField label="Fonction *" value={editedFields.fonction}
-              onChange={function (v: any) { setField("fonction", v) }} />
-            <TextField type="date" label="Date début *" value={editedFields.date_debut}
-              onChange={function (v: any) { setField("date_debut", v) }} />
-            <TextField type="date" label="Date fin (si CDD)" value={editedFields.date_fin}
-              onChange={function (v: any) { setField("date_fin", v) }} />
-            <TextField type="date" label="Date d'embauche" value={editedFields.date_embauche}
-              onChange={function (v: any) { setField("date_embauche", v) }} />
-            <TextField label="Motif (CDD)" value={editedFields.motif}
-              onChange={function (v: any) { setField("motif", v) }} />
-            <TextField label="Niveau CCN" value={editedFields.niveau_ccn}
-              onChange={function (v: any) { setField("niveau_ccn", v) }} />
-            <TextField label="Échelon CCN" value={editedFields.echelon_ccn}
-              onChange={function (v: any) { setField("echelon_ccn", v) }} />
-            <TextField label="Classification (texte)" value={editedFields.classification} colSpan={2}
-              onChange={function (v: any) { setField("classification", v) }} />
-            <SelectField label="Statut" value={editedFields.statut_cadre}
-              onChange={function (v: any) { setField("statut_cadre", v) }}
-              options={STATUTS_CADRE} />
-            <TextField label="Salaire brut mensuel (€)" value={editedFields.salaire_brut_mensuel}
-              onChange={function (v: any) { setField("salaire_brut_mensuel", v) }} />
-            <TextField label="Taux horaire brut (€)" value={editedFields.taux_horaire_brut}
-              onChange={function (v: any) { setField("taux_horaire_brut", v) }} />
-            <TextField label="Heures hebdo" value={editedFields.heures_hebdo}
-              onChange={function (v: any) { setField("heures_hebdo", v) }} />
-            <TextField label="Heures mensuelles" value={editedFields.heures_mensuelles}
-              onChange={function (v: any) { setField("heures_mensuelles", v) }} />
-            <TextField label="Période d'essai (mois)" value={editedFields.periode_essai_mois}
-              onChange={function (v: any) { setField("periode_essai_mois", v) }} />
-            <TextField type="date" label="Date de signature" value={editedFields.date_signature}
-              onChange={function (v: any) { setField("date_signature", v) }} />
-            <TextField label="Ville signature" value={editedFields.ville_signature}
-              onChange={function (v: any) { setField("ville_signature", v) }} />
-          </div>
-
-          <div style={{ display: "flex", gap: 12 }}>
-            <button type="button" onClick={function () { setStep(3) }} style={btnSecondary}>
-              Retour
-            </button>
-            <button type="button" onClick={handleSaveContract} disabled={savingContract}
-              style={Object.assign({}, btnPrimary, { opacity: savingContract ? 0.6 : 1 })}>
-              {savingContract ? "Sauvegarde..." : "💾 Enregistrer le " + (docMode === "avenant" ? "avenant" : "contrat")}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {/* ============================================================
-          STEP 5 : Confirmation + actions suivantes
-          ============================================================ */}
-      {step === 5 && createdContract ? (
-        <div>
-          <div style={{
-            padding: 24, borderRadius: 12, background: "#E8F5E9",
-            textAlign: "center", marginBottom: 24,
-          }}>
-            <div style={{ fontSize: 48 }}>✅</div>
-            <h2 style={{ fontFamily: "Yellowtail, cursive", color: DARK, fontSize: 28, margin: "8px 0" }}>
-              {docMode === "avenant" ? "Avenant" : "Contrat"} enregistré !
-            </h2>
-            <div style={{ fontSize: 14, color: "#555" }}>
-              {selectedEmployee.prenom} {selectedEmployee.nom} • {createdContract.fonction || "Sans fonction"}
-              {createdContract.date_debut ? " • depuis le " + formatDateFr(createdContract.date_debut) : ""}
+          {/* PHASE ANALYZING — loading */}
+          {phase === "analyzing" ? (
+            <div style={{ padding: 30, textAlign: "center" }}>
+              <div className="yt" style={{ fontSize: 28, color: "#FF82D7", marginBottom: 8 }}>
+                🤖 Analyse en cours
+              </div>
+              <div style={{ fontSize: 12, marginBottom: 14 }}>{analysisProgress}</div>
+              <div className="prog-wrap"><div className="prog-fill" style={{ width: "70%" }}></div></div>
+              <div style={{ fontSize: 10, opacity: 0.6, marginTop: 10 }}>
+                Claude lit le document. Ça peut prendre 10 à 30 secondes selon la taille.
+              </div>
             </div>
-          </div>
+          ) : null}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <button type="button" onClick={handleAddAvenant}
-              style={Object.assign({}, btnPrimary, { background: PINK })}>
-              ＋ Ajouter un avenant à ce contrat
-            </button>
-            {!closingCycle ? (
-              <button type="button" onClick={function () {
-                setClosingCycle(true)
-                setExitDate("")
-                setExitReason("demission")
-              }} style={btnSecondary}>
-                ⚐ Clôturer ce cycle (sortie du salarié)
-              </button>
-            ) : (
-              <div style={{ padding: 16, background: "#fff", border: "1px solid #eee", borderRadius: 8 }}>
-                <h3 style={{ fontFamily: "Yellowtail, cursive", color: DARK, fontSize: 20, margin: "0 0 12px 0" }}>
-                  Clôture du cycle
-                </h3>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                  <TextField type="date" label="Date de sortie *" value={exitDate} onChange={setExitDate} />
-                  <SelectField label="Motif de sortie" value={exitReason} onChange={setExitReason} options={MOTIFS_SORTIE} />
+          {/* PHASE REVIEW — validation des champs extraits */}
+          {phase === "review" && extraction ? (
+            <div>
+              {/* Bannière confiance IA */}
+              <div className={
+                extraction.meta && extraction.meta.confidence === "high" ? "card-y" :
+                (extraction.meta && extraction.meta.confidence === "low" ? "card-p" : "card")
+              } style={{ marginBottom: 14, padding: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 2 }}>
+                  Type détecté : {DOC_TYPE_LABELS[docType] || docType}
+                  {extraction.meta ? " · Confiance IA : " + (extraction.meta.confidence || "?") : ""}
                 </div>
-                <div style={{ display: "flex", gap: 12 }}>
-                  <button type="button" onClick={function () { setClosingCycle(false) }} style={btnSecondary}>
-                    Annuler
-                  </button>
-                  <button type="button" onClick={handleCloseCycle} disabled={savingExit}
-                    style={Object.assign({}, btnPrimary, { opacity: savingExit ? 0.6 : 1 })}>
-                    {savingExit ? "Clôture..." : "Confirmer la clôture"}
-                  </button>
+                {extraction.meta && extraction.meta.notes
+                  ? <div style={{ fontSize: 10 }}>📝 {extraction.meta.notes}</div>
+                  : null}
+              </div>
+
+              {/* Choix du type de doc (override) */}
+              <div className="fg">
+                <label className="lbl">Type de document (corrige si besoin)</label>
+                <select className="inp sel" value={docType} onChange={function (e: any) { setDocType(e.target.value) }}>
+                  <option value="contrat_initial">Contrat initial</option>
+                  <option value="avenant">Avenant</option>
+                  <option value="fiche_paie">Fiche de paie</option>
+                  <option value="solde_tout_compte">Solde de tout compte</option>
+                  <option value="certificat_travail">Certificat de travail</option>
+                  <option value="attestation_france_travail">Attestation France Travail</option>
+                  <option value="lettre_demission">Lettre de démission</option>
+                  <option value="lettre_licenciement">Lettre de licenciement</option>
+                  <option value="rupture_conv">Rupture conventionnelle</option>
+                  <option value="dossier_bienvenue">Dossier de bienvenue</option>
+                  <option value="autre">Autre</option>
+                </select>
+              </div>
+
+              {/* Section EMPLOYÉ — uniquement si pas encore d'employé confirmé */}
+              {(activeEmployee && (activeEmployee.prenom === "(à compléter)" || !activeEmployee.prenom)) || !activeEmployee ? (
+                <div className="card" style={{ marginTop: 14 }}>
+                  <div className="ct">Identité du salarié</div>
+                  <div className="fg2">
+                    <SelectField label="Civilité" value={employeeFields.civilite} options={CIVILITES.map(function (c) { return { value: c, label: c } })}
+                      onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { civilite: v })) }} />
+                    <TextField label="Nationalité" value={employeeFields.nationalite}
+                      onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { nationalite: v })) }} />
+                    <TextField label="Prénom *" value={employeeFields.prenom}
+                      onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { prenom: v })) }} />
+                    <TextField label="Nom *" value={employeeFields.nom}
+                      onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { nom: v })) }} />
+                    <TextField type="date" label="Date de naissance" value={employeeFields.date_naissance}
+                      onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { date_naissance: v })) }} />
+                    <TextField label="Lieu de naissance" value={employeeFields.lieu_naissance}
+                      onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { lieu_naissance: v })) }} />
+                    <TextField label="N° Sécurité sociale" value={employeeFields.num_secu}
+                      onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { num_secu: v })) }} />
+                    <TextField label="Téléphone" value={employeeFields.telephone}
+                      onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { telephone: v })) }} />
+                  </div>
+                  <div className="fg">
+                    <TextField label="Adresse" value={employeeFields.adresse}
+                      onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { adresse: v })) }} />
+                  </div>
+                  <div className="fg2">
+                    <TextField label="Code postal" value={employeeFields.code_postal}
+                      onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { code_postal: v })) }} />
+                    <TextField label="Ville" value={employeeFields.ville}
+                      onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { ville: v })) }} />
+                    <TextField label="Email" value={employeeFields.email}
+                      onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { email: v })) }} />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Section CONTRAT — uniquement si type = contrat_initial ou avenant */}
+              {docType === "contrat_initial" || docType === "avenant" ? (
+                <div className="card" style={{ marginTop: 14 }}>
+                  <div className="ct">{docType === "avenant" ? "Avenant — termes contractuels" : "Contrat — termes"}</div>
+                  <div className="fg2">
+                    <SelectField label="Type" value={contractFields.type} options={CONTRACT_TYPES}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { type: v })) }} />
+                    <TextField label="Fonction *" value={contractFields.fonction}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { fonction: v })) }} />
+                    <TextField type="date" label="Date début *" value={contractFields.date_debut}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { date_debut: v })) }} />
+                    <TextField type="date" label="Date fin (CDD)" value={contractFields.date_fin}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { date_fin: v })) }} />
+                    <TextField label="Salaire brut mensuel (€)" value={contractFields.salaire_brut_mensuel}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { salaire_brut_mensuel: v })) }} />
+                    <TextField label="Taux horaire brut (€)" value={contractFields.taux_horaire_brut}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { taux_horaire_brut: v })) }} />
+                    <TextField label="Heures hebdo" value={contractFields.heures_hebdo}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { heures_hebdo: v })) }} />
+                    <TextField label="Heures mensuelles" value={contractFields.heures_mensuelles}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { heures_mensuelles: v })) }} />
+                    <TextField label="Niveau CCN" value={contractFields.niveau_ccn}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { niveau_ccn: v })) }} />
+                    <TextField label="Échelon CCN" value={contractFields.echelon_ccn}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { echelon_ccn: v })) }} />
+                    <SelectField label="Statut" value={contractFields.statut_cadre} options={STATUTS_CADRE}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { statut_cadre: v })) }} />
+                    <TextField label="Période d'essai (mois)" value={contractFields.periode_essai_mois}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { periode_essai_mois: v })) }} />
+                    <TextField type="date" label="Date de signature" value={contractFields.date_signature}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { date_signature: v })) }} />
+                    <TextField label="Ville signature" value={contractFields.ville_signature}
+                      onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { ville_signature: v })) }} />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Section FICHE PAIE — period_month */}
+              {docType === "fiche_paie" ? (
+                <div className="card" style={{ marginTop: 14 }}>
+                  <div className="ct">Fiche de paie</div>
+                  <div className="fg">
+                    <TextField label="Mois (YYYY-MM)" value={periodMonth} onChange={setPeriodMonth} />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Section SORTIE — solde / certif / lettres */}
+              {docType === "solde_tout_compte" || docType === "certificat_travail"
+                || docType === "lettre_demission" || docType === "lettre_licenciement"
+                || docType === "rupture_conv" ? (
+                <div className="card" style={{ marginTop: 14 }}>
+                  <div className="ct">Sortie du salarié</div>
+                  <div style={{ fontSize: 10, opacity: 0.6, marginBottom: 8 }}>
+                    Ces infos clôtureront automatiquement le cycle d'emploi.
+                  </div>
+                  <div className="fg2">
+                    <TextField type="date" label="Date de sortie" value={exitDate} onChange={setExitDate} />
+                    <SelectField label="Motif" value={exitMotif || "demission"} options={MOTIFS_SORTIE}
+                      onChange={setExitMotif} />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* PHASE MANUAL — créer juste l'employé sans aucun doc */}
+          {phase === "manual" ? (
+            <div>
+              <div className="card-y" style={{ marginBottom: 14 }}>
+                <div className="yt" style={{ fontSize: 16, marginBottom: 4 }}>Créer un salarié sans aucun document</div>
+                <div style={{ fontSize: 11 }}>
+                  Pour les vieux salariés dont tu n'as plus aucun papier. Ils existeront en base et tu pourras leur faire signer un avenant de mise en conformité plus tard.
                 </div>
               </div>
-            )}
-            <button type="button" onClick={handleStartOver} style={btnSecondary}>
-              📥 Importer un autre salarié / cycle
-            </button>
-          </div>
+              <div className="card">
+                <div className="ct">Identité du salarié</div>
+                <div className="fg2">
+                  <SelectField label="Civilité" value={employeeFields.civilite} options={CIVILITES.map(function (c) { return { value: c, label: c } })}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { civilite: v })) }} />
+                  <TextField label="Nationalité" value={employeeFields.nationalite}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { nationalite: v })) }} />
+                  <TextField label="Prénom *" value={employeeFields.prenom}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { prenom: v })) }} />
+                  <TextField label="Nom *" value={employeeFields.nom}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { nom: v })) }} />
+                  <TextField type="date" label="Date de naissance" value={employeeFields.date_naissance}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { date_naissance: v })) }} />
+                  <TextField label="N° Sécurité sociale" value={employeeFields.num_secu}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { num_secu: v })) }} />
+                  <TextField type="date" label="Date d'embauche réelle *" value={contractFields.date_debut}
+                    onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { date_debut: v })) }} />
+                  <TextField label="Téléphone" value={employeeFields.telephone}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { telephone: v })) }} />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* PHASE SAVED — boucle ou terminer */}
+          {phase === "saved" ? (
+            <div>
+              <div className="card-y" style={{ marginBottom: 14, textAlign: "center", padding: 22 }}>
+                <div style={{ fontSize: 38 }}>✅</div>
+                <div className="yt" style={{ fontSize: 26, marginTop: 4 }}>Enregistré !</div>
+                <div style={{ fontSize: 11, marginTop: 4 }}>
+                  {employeeName} · {sessionDocs.length} doc{sessionDocs.length > 1 ? "s" : ""} dans cette session
+                </div>
+              </div>
+
+              {sessionDocs.length > 0 ? (
+                <div className="card" style={{ marginBottom: 14 }}>
+                  <div className="ct">Documents enregistrés</div>
+                  {sessionDocs.map(function (d: any, i: number) {
+                    return (
+                      <div key={i} style={{ fontSize: 11, padding: "4px 0", borderBottom: i === sessionDocs.length - 1 ? "none" : "1px solid #EBEBEB" }}>
+                        <span className="badge" style={{ marginRight: 6, background: "#FFEB5A" }}>
+                          {DOC_TYPE_LABELS[d.doc_type] || d.doc_type}
+                        </span>
+                        {d.label}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-      ) : null}
+
+        {/* FOOTER */}
+        <div className="mf">
+          {phase === "drop" ? (
+            <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+              <button className="btn" onClick={handleCloseRequest}>Annuler</button>
+              <button className="btn btn-p" onClick={handleAnalyze} disabled={files.length === 0}>
+                🤖 Analyser via IA
+              </button>
+            </div>
+          ) : null}
+          {phase === "review" ? (
+            <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+              <button className="btn" onClick={function () { setPhase("drop") }}>← Retour</button>
+              <button className="btn btn-p" onClick={handleSave} disabled={saving}>
+                {saving ? "Sauvegarde..." : "💾 Enregistrer"}
+              </button>
+            </div>
+          ) : null}
+          {phase === "manual" ? (
+            <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+              <button className="btn" onClick={function () { setPhase("drop") }}>← Retour</button>
+              <button className="btn btn-p" onClick={handleCreateEmptyEmployee} disabled={saving}>
+                {saving ? "Création..." : "Créer la fiche salarié"}
+              </button>
+            </div>
+          ) : null}
+          {phase === "saved" ? (
+            <div style={{ display: "flex", gap: 8, marginLeft: "auto", flexWrap: "wrap" }}>
+              <button className="btn" onClick={handleFinish}>Terminer</button>
+              <button className="btn btn-y" onClick={handleAddAnotherDoc}>＋ Doc suivant pour {employeeName.split(" ")[0]}</button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {toast ? <div className="toast show">{toast}</div> : null}
     </div>
   )
 }
@@ -1090,99 +1043,28 @@ export default function RetroUploadWizard() {
 // ============================================================
 // SOUS-COMPOSANTS DE FORMULAIRE (top-level pour SWC safety)
 // ============================================================
-var labelStyle: any = {
-  display: "block",
-  fontSize: 12,
-  fontWeight: "bold",
-  color: "#666",
-  marginBottom: 4,
-  fontFamily: "Arial Narrow, sans-serif",
-}
-
-var inputStyle: any = {
-  width: "100%",
-  padding: 10,
-  borderRadius: 6,
-  border: "1px solid #ddd",
-  fontSize: 14,
-  fontFamily: "Arial Narrow, sans-serif",
-  boxSizing: "border-box",
-}
-
-var btnPrimary: any = {
-  flex: 1,
-  padding: "12px 16px",
-  borderRadius: 8,
-  background: "#191923",
-  color: "#fff",
-  border: "none",
-  fontFamily: "Arial Narrow, sans-serif",
-  fontWeight: "bold",
-  fontSize: 14,
-  cursor: "pointer",
-}
-
-var btnSecondary: any = {
-  flex: 1,
-  padding: "12px 16px",
-  borderRadius: 8,
-  background: "#fff",
-  color: "#191923",
-  border: "1px solid #ddd",
-  fontFamily: "Arial Narrow, sans-serif",
-  fontSize: 14,
-  cursor: "pointer",
-}
-
-var btnBack: any = {
-  background: "none",
-  border: "none",
-  color: "#FF82D7",
-  cursor: "pointer",
-  fontSize: 13,
-  padding: "0 0 12px 0",
-  fontFamily: "Arial Narrow, sans-serif",
-}
-
-function tabBtn(active: boolean): any {
-  return {
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
-    border: "1px solid " + (active ? "#FF82D7" : "#ddd"),
-    background: active ? "#FF82D7" : "#fff",
-    color: active ? "#fff" : "#191923",
-    fontFamily: "Arial Narrow, sans-serif",
-    fontWeight: active ? "bold" : "normal",
-    fontSize: 14,
-    cursor: "pointer",
-  }
-}
-
 function TextField(props: any) {
-  var span = props.colSpan === 2 ? "1 / -1" : "auto"
   return (
-    <div style={{ gridColumn: span }}>
-      <label style={labelStyle}>{props.label}</label>
+    <div className="fg">
+      <label className="lbl">{props.label}</label>
       <input
+        className="inp"
         type={props.type || "text"}
         value={props.value || ""}
         onChange={function (e: any) { props.onChange(e.target.value) }}
-        style={inputStyle}
       />
     </div>
   )
 }
 
 function SelectField(props: any) {
-  var span = props.colSpan === 2 ? "1 / -1" : "auto"
   return (
-    <div style={{ gridColumn: span }}>
-      <label style={labelStyle}>{props.label}</label>
+    <div className="fg">
+      <label className="lbl">{props.label}</label>
       <select
+        className="inp sel"
         value={props.value || ""}
         onChange={function (e: any) { props.onChange(e.target.value) }}
-        style={inputStyle}
       >
         {(props.options || []).map(function (opt: any) {
           return <option key={opt.value} value={opt.value}>{opt.label}</option>
