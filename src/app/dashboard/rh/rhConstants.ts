@@ -479,6 +479,7 @@ export var EMPLOYEE_DOC_TYPES = [
 export var CONTRACT_DOC_TYPES = [
   { key: "fiche_paie",            label: "Fiche de paie",                icon: "💰", needsPeriod: true },
   { key: "contrat_signe",         label: "Contrat signé",                icon: "✍️", needsPeriod: false },
+  { key: "contrat_genere",        label: "Contrat généré (à signer)",    icon: "📝", needsPeriod: false },
   { key: "avenant",               label: "Avenant au contrat",           icon: "📋", needsPeriod: false },
   { key: "lettre_demission",      label: "Lettre de démission",          icon: "🚪", needsPeriod: false },
   { key: "lettre_licenciement",   label: "Lettre de licenciement",       icon: "🚫", needsPeriod: false },
