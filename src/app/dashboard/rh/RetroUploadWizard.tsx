@@ -7,6 +7,7 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@supabase/supabase-js"
+import { compressFileList, totalSizeMb } from "@/lib/imageCompress"
 
 var supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -416,16 +417,28 @@ export default function RetroUploadWizard(props: any) {
       contractIdLocal = dataCtr.contract.id
       setPendingContractId(contractIdLocal)
 
-      // Étape C : upload pages
-      setAnalysisProgress("3/4 — Upload des documents...")
+      // Étape C : compresser les images (si > 1.5 MB) puis upload
+      setAnalysisProgress("3/4 — Optimisation des images...")
+      var rawFiles = files.map(function (f: any) { return f.file })
+      var compressedFiles = await compressFileList(rawFiles, function (cur: number, total: number) {
+        setAnalysisProgress("3/4 — Optimisation (" + (cur + 1) + "/" + total + ")...")
+      })
+      var sizeMb = totalSizeMb(compressedFiles)
+      setAnalysisProgress("3/4 — Upload des documents (" + sizeMb.toFixed(1) + " MB)...")
+
       var fd = new FormData()
       fd.append("contract_id", contractIdLocal)
       fd.append("doc_type", "contrat_signe") // type provisoire — sera mis à jour après détection
       fd.append("assemble_pdf", "1")
-      for (var i = 0; i < files.length; i++) {
-        fd.append("file_" + String(i).padStart(3, "0"), files[i].file)
+      for (var i = 0; i < compressedFiles.length; i++) {
+        fd.append("file_" + String(i).padStart(3, "0"), compressedFiles[i])
       }
       var resUp = await fetch("/api/hr/upload-pages", { method: "POST", body: fd })
+
+      // Détection 413 (Vercel renvoie du HTML, pas du JSON)
+      if (resUp.status === 413 || (!resUp.ok && resUp.headers.get("content-type")?.indexOf("text/html") === 0)) {
+        throw new Error("Documents trop volumineux malgré la compression (" + sizeMb.toFixed(1) + " MB). Réduis le nombre de photos ou prends-les en plus basse résolution.")
+      }
       var dataUp = await resUp.json()
       if (!resUp.ok) throw new Error("Upload : " + (dataUp.error || ""))
       var docId = dataUp.document.id
