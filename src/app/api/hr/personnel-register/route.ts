@@ -64,6 +64,7 @@ function buildRegisterHtml(rows: any[]): string {
 
   var rowsHtml = rows.map(function (r: any, idx: number) {
     var isParti = r.statut_actuel !== 'actif'
+    var needsReg = !!r.needs_regularization
     var typeLib = r.contract_type ? (TYPES_LABELS[r.contract_type] || r.contract_type) : '—'
     var motifLib = r.motif_sortie ? (MOTIFS_LABELS[r.motif_sortie] || r.motif_sortie) : ''
     var classification = ''
@@ -71,11 +72,14 @@ function buildRegisterHtml(rows: any[]): string {
       classification = 'Niv. ' + (r.niveau_ccn || '?') + (r.echelon_ccn ? ' Éch. ' + r.echelon_ccn : '')
     }
 
+    var rowClass = isParti ? 'parti' : (needsReg ? 'reg' : 'actif')
+
     return `
-      <tr class="${isParti ? 'parti' : 'actif'}">
+      <tr class="${rowClass}">
         <td class="num">${r.ordre_embauche}</td>
         <td class="nom">
           <strong>${escapeHtml((r.nom || '').toUpperCase())}</strong> ${escapeHtml(r.prenom || '')}
+          ${needsReg ? '<span class="reg-flag">⚠ régularisation en cours</span>' : ''}
           <div class="civ">${escapeHtml(r.civilite || '')}</div>
         </td>
         <td class="naissance">
@@ -87,7 +91,7 @@ function buildRegisterHtml(rows: any[]): string {
           ${escapeHtml(r.fonction || '—')}
           ${classification ? '<div class="ccn">' + classification + '</div>' : ''}
         </td>
-        <td class="type">${typeLib}</td>
+        <td class="type">${needsReg ? '<em>contrat en formalisation</em>' : typeLib}</td>
         <td class="entree">${fmtDate(r.date_entree)}</td>
         <td class="sortie">
           ${r.date_sortie ? fmtDate(r.date_sortie) : '<span class="en-poste">En poste</span>'}
@@ -250,11 +254,17 @@ function buildRegisterHtml(rows: any[]): string {
     background: #FAFAFA;
     color: #555555;
   }
+  tbody tr.reg td {
+    background: #FFF5FB;
+  }
   tbody tr:nth-child(even) td {
     background: #FFFEF5;
   }
   tbody tr.parti:nth-child(even) td {
     background: #F5F5F5;
+  }
+  tbody tr.reg:nth-child(even) td {
+    background: #FFEEF8;
   }
   td.num {
     text-align: center;
@@ -267,6 +277,25 @@ function buildRegisterHtml(rows: any[]): string {
   tbody tr.parti td.num {
     background: #BBBBBB !important;
     color: #FFFFFF;
+  }
+  /* Pour les régularisations on garde le numéro rose, mais on ajoute une bordure plus marquée */
+  tbody tr.reg td.num {
+    background: #FF82D7 !important;
+    color: #191923;
+    border-left: 3px solid #191923 !important;
+  }
+  td .reg-flag {
+    display: inline-block;
+    background: #FFEB5A;
+    border: 1px solid #191923;
+    padding: 0.3mm 1.5mm;
+    font-size: 7pt;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-left: 4px;
+    vertical-align: middle;
+    color: #191923;
   }
   td.nom strong { font-size: 10pt; font-weight: 900; }
   td .civ {
