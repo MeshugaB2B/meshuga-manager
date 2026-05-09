@@ -32,6 +32,7 @@ export default function RhTab() {
   var [showWizard, setShowWizard] = useState(false)
   var [showRetroImport, setShowRetroImport] = useState(false)
   var [offboardingEmployee, setOffboardingEmployee] = useState(null)
+  var [activeTab, setActiveTab] = useState("actifs")  // actifs | anciens | tous
   var [editingContract, setEditingContract] = useState(null)
   var [wizardForEmployee, setWizardForEmployee] = useState(null)
   var [viewingEmployeeId, setViewingEmployeeId] = useState(null)
@@ -99,15 +100,25 @@ export default function RhTab() {
     return empContracts[0]
   }
 
-  // Filtrage par recherche
+  // Filtrage par onglet (actifs / anciens / tous)
   var filtered = employees
+  if (activeTab === "actifs") {
+    filtered = employees.filter(function (e) { return !e.date_sortie })
+  } else if (activeTab === "anciens") {
+    filtered = employees.filter(function (e) { return !!e.date_sortie })
+  }
+  // Filtrage par recherche (s'applique après le filtre onglet)
   if (search.trim()) {
     var q = search.toLowerCase()
-    filtered = employees.filter(function (e) {
+    filtered = filtered.filter(function (e) {
       var hay = ((e.prenom || "") + " " + (e.nom || "") + " " + (e.email || "") + " " + (e.telephone || "")).toLowerCase()
       return hay.indexOf(q) >= 0
     })
   }
+
+  // Comptes par catégorie pour les badges des onglets
+  var nbActifsList = employees.filter(function (e) { return !e.date_sortie }).length
+  var nbAnciensList = employees.filter(function (e) { return !!e.date_sortie }).length
 
   // Stats header
   var nbCdi = contracts.filter(function (c) {
@@ -132,6 +143,11 @@ export default function RhTab() {
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
+            className="btn"
+            onClick={function () { window.open("/api/hr/personnel-register", "_blank") }}
+            title="Imprimer le registre du personnel (Article L.1221-13)"
+          >📄 Registre du personnel</button>
+          <button
             className="btn btn-y"
             onClick={function () { setShowRetroImport(true) }}
             title="Digitaliser les anciens contrats par photos ou PDF"
@@ -147,6 +163,72 @@ export default function RhTab() {
         </div>
       </div>
       <div className="strip"></div>
+
+      {/* === ONGLETS ACTIFS / ANCIENS / TOUS === */}
+      <div style={{ display: "flex", gap: 0, marginBottom: 0, borderBottom: "2.5px solid #191923", flexWrap: "wrap" }}>
+        <button
+          onClick={function () { setActiveTab("actifs") }}
+          style={{
+            background: activeTab === "actifs" ? "#FFEB5A" : "#FFFFFF",
+            color: "#191923",
+            border: "2.5px solid #191923",
+            borderBottom: activeTab === "actifs" ? "2.5px solid #FFEB5A" : "2.5px solid #191923",
+            marginBottom: "-2.5px",
+            padding: "8px 18px",
+            fontFamily: "'Arial Narrow', Arial, sans-serif",
+            fontWeight: 900,
+            textTransform: "uppercase",
+            letterSpacing: 1,
+            fontSize: 11,
+            cursor: "pointer",
+            boxShadow: activeTab === "actifs" ? "3px 3px 0 #191923" : "none",
+            position: "relative",
+            zIndex: activeTab === "actifs" ? 2 : 1,
+          }}
+        >👥 Actifs ({nbActifsList})</button>
+        <button
+          onClick={function () { setActiveTab("anciens") }}
+          style={{
+            background: activeTab === "anciens" ? "#FF82D7" : "#FFFFFF",
+            color: "#191923",
+            border: "2.5px solid #191923",
+            borderBottom: activeTab === "anciens" ? "2.5px solid #FF82D7" : "2.5px solid #191923",
+            marginBottom: "-2.5px",
+            marginLeft: 6,
+            padding: "8px 18px",
+            fontFamily: "'Arial Narrow', Arial, sans-serif",
+            fontWeight: 900,
+            textTransform: "uppercase",
+            letterSpacing: 1,
+            fontSize: 11,
+            cursor: "pointer",
+            boxShadow: activeTab === "anciens" ? "3px 3px 0 #191923" : "none",
+            position: "relative",
+            zIndex: activeTab === "anciens" ? 2 : 1,
+          }}
+        >📤 Anciens ({nbAnciensList})</button>
+        <button
+          onClick={function () { setActiveTab("tous") }}
+          style={{
+            background: activeTab === "tous" ? "#191923" : "#FFFFFF",
+            color: activeTab === "tous" ? "#FFEB5A" : "#191923",
+            border: "2.5px solid #191923",
+            borderBottom: activeTab === "tous" ? "2.5px solid #191923" : "2.5px solid #191923",
+            marginBottom: "-2.5px",
+            marginLeft: 6,
+            padding: "8px 18px",
+            fontFamily: "'Arial Narrow', Arial, sans-serif",
+            fontWeight: 900,
+            textTransform: "uppercase",
+            letterSpacing: 1,
+            fontSize: 11,
+            cursor: "pointer",
+            boxShadow: activeTab === "tous" ? "3px 3px 0 #191923" : "none",
+            position: "relative",
+            zIndex: activeTab === "tous" ? 2 : 1,
+          }}
+        >Tous ({employees.length})</button>
+      </div>
 
       {/* === RECHERCHE === */}
       <div className="card" style={{ padding: 10 }}>
@@ -166,10 +248,16 @@ export default function RhTab() {
         ) : filtered.length === 0 ? (
           <div style={{ padding: 40, textAlign: "center", opacity: 0.5 }}>
             <div style={{ fontFamily: "Yellowtail, cursive", fontSize: 28, marginBottom: 6, color: "#FF82D7" }}>
-              {search ? "Aucun salarié trouvé" : "Aucun salarié pour le moment"}
+              {search ? "Aucun salarié trouvé"
+                : (activeTab === "actifs" ? "Aucun salarié en poste"
+                : (activeTab === "anciens" ? "Aucun ancien salarié"
+                : "Aucun salarié pour le moment"))}
             </div>
             <div style={{ fontSize: 12 }}>
-              {search ? "Essaie un autre mot-clé." : "Clique sur \"+ Nouvelle embauche\" pour commencer."}
+              {search ? "Essaie un autre mot-clé."
+                : (activeTab === "actifs" ? "Clique sur \"+ Nouvelle embauche\" pour ajouter."
+                : (activeTab === "anciens" ? "Aucun salarié n'est marqué comme parti."
+                : "Clique sur \"+ Nouvelle embauche\" pour commencer."))}
             </div>
           </div>
         ) : (
@@ -377,15 +465,40 @@ export default function RhTab() {
 }
 
 // ============================================================
-// CONTRACT PREVIEW (modal aperçu PDF)
+// CONTRACT PREVIEW (modal aperçu PDF avec viewer PDF.js)
 // ============================================================
 // Logique :
 //   1) On cherche d'abord un document archivé (contrat_signe ou avenant)
-//      lié à ce contrat dans hr_contract_documents → on affiche le PDF/image
-//      d'origine (preuve fidèle, immuable)
-//   2) Sinon (cas contrat généré nativement dans l'app, pas encore signé)
-//      → fallback : on génère le HTML via buildContract
+//      → on l'affiche avec PDF.js (canvas, multi-pages, mobile-friendly)
+//   2) Sinon → fallback : on génère le HTML via buildContract dans une iframe
+//
+// Pourquoi PDF.js : iframe + PDF natif ne fonctionne pas sur Safari iOS
+// (affiche seulement la 1ère page) et Chrome Android. PDF.js rend chaque page
+// en canvas, marche partout, supporte zoom et toutes les pages.
 // ============================================================
+
+// Charge PDF.js depuis CDN une seule fois (cache global)
+function loadPdfJs() {
+  if (typeof window === "undefined") return Promise.resolve(null)
+  var w = window
+  if (w.pdfjsLib) return Promise.resolve(w.pdfjsLib)
+  if (w.__pdfJsLoading) return w.__pdfJsLoading
+  w.__pdfJsLoading = new Promise(function (resolve, reject) {
+    var script = document.createElement("script")
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+    script.onload = function () {
+      try {
+        w.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"
+        resolve(w.pdfjsLib)
+      } catch (e) { reject(e) }
+    }
+    script.onerror = function () { reject(new Error("Échec chargement PDF.js")) }
+    document.head.appendChild(script)
+  })
+  return w.__pdfJsLoading
+}
+
 function ContractPreview(props) {
   var c = props.contract
   var [emp, setEmp] = useState(null)
@@ -393,18 +506,20 @@ function ContractPreview(props) {
   var [archivedUrl, setArchivedUrl] = useState("")
   var [archivedMime, setArchivedMime] = useState("")
   var [archivedDoc, setArchivedDoc] = useState(null)
-  var [mode, setMode] = useState("loading") // loading | archived | generated
+  var [mode, setMode] = useState("loading") // loading | archived-pdf | archived-img | generated
+  var [pdfStatus, setPdfStatus] = useState("idle") // idle | loading | rendered | error
+  var [pdfError, setPdfError] = useState("")
+  var [pdfPageCount, setPdfPageCount] = useState(0)
   var iframeRef = useRef(null)
+  var pdfContainerRef = useRef(null)
 
   useEffect(function () {
     var run = async function () {
-      // 1) Charger employé + vacations (toujours utile)
       var resE = await supabase.from("hr_employees").select("*").eq("id", c.employee_id).single()
       var resV = await supabase.from("hr_contract_vacations").select("*").eq("contract_id", c.id).order("ordre")
       setEmp(resE.data || {})
       setVacs(resV.data || [])
 
-      // 2) Chercher un doc archivé (contrat_signe / avenant) pour ce contrat
       var resDoc = await supabase
         .from("hr_contract_documents")
         .select("*")
@@ -416,27 +531,27 @@ function ContractPreview(props) {
 
       var doc = resDoc.data
       if (doc && doc.file_path) {
-        // 3) Generer une signed URL pour l'afficher
         var path = doc.assembled_pdf_path || doc.file_path
         var resUrl = await supabase.storage
           .from("hr-contract-docs")
           .createSignedUrl(path, 3600)
         if (resUrl.data && resUrl.data.signedUrl) {
+          var pathLow = path.toLowerCase()
+          var isPdf = pathLow.endsWith(".pdf") || (doc.mime_type || "").indexOf("pdf") >= 0
           setArchivedUrl(resUrl.data.signedUrl)
-          setArchivedMime(doc.mime_type || (path.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg"))
+          setArchivedMime(doc.mime_type || (isPdf ? "application/pdf" : "image/jpeg"))
           setArchivedDoc(doc)
-          setMode("archived")
+          setMode(isPdf ? "archived-pdf" : "archived-img")
           return
         }
       }
 
-      // 4) Pas de doc archivé → fallback génération HTML
       setMode("generated")
     }
     run()
   }, [])
 
-  // Génération HTML uniquement en mode "generated"
+  // Mode "generated" : injecter le HTML dans l'iframe
   useEffect(function () {
     if (mode !== "generated" || !iframeRef.current || !emp) return
     var doc = iframeRef.current.contentDocument
@@ -447,10 +562,83 @@ function ContractPreview(props) {
     doc.close()
   }, [mode, emp])
 
+  // Mode "archived-pdf" : charger PDF.js et rendre toutes les pages dans le container
+  useEffect(function () {
+    if (mode !== "archived-pdf" || !archivedUrl || !pdfContainerRef.current) return
+    setPdfStatus("loading")
+    setPdfError("")
+
+    var cancelled = false
+    var run = async function () {
+      try {
+        var pdfjsLib = await loadPdfJs()
+        if (cancelled || !pdfjsLib) return
+
+        var loadingTask = pdfjsLib.getDocument({ url: archivedUrl })
+        var pdf = await loadingTask.promise
+        if (cancelled) return
+
+        var container = pdfContainerRef.current
+        if (!container) return
+        // Nettoyer (au cas où on rend une 2e fois)
+        container.innerHTML = ""
+
+        setPdfPageCount(pdf.numPages)
+
+        // Calcul scale : on veut que la page tienne en largeur du container
+        var containerWidth = container.clientWidth || 320
+        // Sur mobile petit, on garde une marge interne
+        var targetWidth = Math.max(280, containerWidth - 8)
+
+        for (var pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          if (cancelled) return
+          var page = await pdf.getPage(pageNum)
+          var viewport1 = page.getViewport({ scale: 1 })
+          var scale = targetWidth / viewport1.width
+          // Sur mobile haute résolution, on peut multiplier par devicePixelRatio pour la netteté
+          var dpr = (typeof window !== "undefined" && window.devicePixelRatio) ? Math.min(window.devicePixelRatio, 2) : 1
+          var viewport = page.getViewport({ scale: scale * dpr })
+
+          var canvas = document.createElement("canvas")
+          canvas.width = viewport.width
+          canvas.height = viewport.height
+          // Affichage en CSS à la taille logique (sans dpr)
+          canvas.style.width = (targetWidth) + "px"
+          canvas.style.height = ((targetWidth / viewport1.width) * viewport1.height) + "px"
+          canvas.style.display = "block"
+          canvas.style.margin = "0 auto 12px auto"
+          canvas.style.border = "2px solid #191923"
+          canvas.style.boxShadow = "3px 3px 0 #191923"
+          canvas.style.background = "#FFFFFF"
+          canvas.style.maxWidth = "100%"
+
+          var ctx = canvas.getContext("2d")
+          await page.render({ canvasContext: ctx, viewport: viewport }).promise
+          if (cancelled) return
+
+          // Numéro de page
+          var pageLabel = document.createElement("div")
+          pageLabel.style.cssText = "text-align:center;font-size:10px;color:#777;margin:-8px 0 12px;font-weight:900;text-transform:uppercase;letter-spacing:1px;"
+          pageLabel.textContent = "Page " + pageNum + " / " + pdf.numPages
+
+          container.appendChild(canvas)
+          container.appendChild(pageLabel)
+        }
+        if (!cancelled) setPdfStatus("rendered")
+      } catch (e) {
+        if (!cancelled) {
+          setPdfError(e?.message || "Erreur de rendu PDF")
+          setPdfStatus("error")
+        }
+      }
+    }
+    run()
+    return function () { cancelled = true }
+  }, [mode, archivedUrl])
+
   function printNow() {
-    if (mode === "archived" && archivedUrl) {
-      // Pour PDF archivé : ouvrir dans un nouvel onglet (l'utilisateur fait Cmd+P)
-      window.open(archivedUrl, "_blank")
+    if (mode === "archived-pdf" || mode === "archived-img") {
+      if (archivedUrl) window.open(archivedUrl, "_blank")
       return
     }
     if (!iframeRef.current) return
@@ -462,8 +650,7 @@ function ContractPreview(props) {
     if (archivedUrl) window.open(archivedUrl, "_blank")
   }
 
-  // Titre dynamique selon mode
-  var title = mode === "archived"
+  var title = (mode === "archived-pdf" || mode === "archived-img")
     ? "📎 Document signé d'origine"
     : (mode === "generated" ? "Aperçu du contrat (généré)" : "Chargement…")
 
@@ -473,8 +660,8 @@ function ContractPreview(props) {
         <div className="mh">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <div className="mt">{title}</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {mode === "archived" ? (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {(mode === "archived-pdf" || mode === "archived-img") ? (
                 <button className="btn btn-y" onClick={downloadArchived}>↗ Ouvrir / Télécharger</button>
               ) : null}
               {mode === "generated" ? (
@@ -483,10 +670,10 @@ function ContractPreview(props) {
               <button className="btn" onClick={props.onClose}>Fermer</button>
             </div>
           </div>
-          {mode === "archived" && archivedDoc ? (
+          {(mode === "archived-pdf" || mode === "archived-img") && archivedDoc ? (
             <div className="yt" style={{ fontSize: 12, marginTop: 4, color: "#191923" }}>
               Document archivé · uploadé le {new Date(archivedDoc.uploaded_at).toLocaleDateString("fr-FR")}
-              {archivedDoc.assembled_pdf_path ? " · PDF assemblé depuis photos" : ""}
+              {pdfPageCount > 0 ? " · " + pdfPageCount + " page" + (pdfPageCount > 1 ? "s" : "") : ""}
             </div>
           ) : null}
           {mode === "generated" ? (
@@ -496,27 +683,46 @@ function ContractPreview(props) {
           ) : null}
         </div>
 
-        {/* Zone d'affichage : différent selon mode */}
+        {/* Zone d'affichage */}
         {mode === "loading" ? (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "#EDEDED" }}>
             <div className="yt" style={{ fontSize: 22, color: "#FF82D7" }}>Chargement…</div>
           </div>
         ) : null}
 
-        {mode === "archived" && archivedMime === "application/pdf" ? (
-          <iframe
-            src={archivedUrl}
-            style={{ flex: 1, width: "100%", border: "none", background: "#EDEDED" }}
-            title="Document archivé"
-          />
-        ) : null}
-
-        {mode === "archived" && archivedMime !== "application/pdf" ? (
-          <div style={{ flex: 1, overflow: "auto", background: "#EDEDED", padding: 14, textAlign: "center" }}>
-            <img src={archivedUrl} alt="Document archivé" style={{ maxWidth: "100%", height: "auto", boxShadow: "3px 3px 0 #191923", border: "2px solid #191923" }} />
+        {/* PDF archivé via PDF.js (toutes les pages, mobile-friendly) */}
+        {mode === "archived-pdf" ? (
+          <div style={{ flex: 1, overflow: "auto", background: "#EDEDED", padding: 10 }}>
+            {pdfStatus === "loading" ? (
+              <div style={{ textAlign: "center", padding: 30, color: "#777" }}>
+                <div className="yt" style={{ fontSize: 22, color: "#FF82D7" }}>Rendu du PDF…</div>
+                <div style={{ fontSize: 11, marginTop: 6 }}>Chargement de PDF.js et des pages</div>
+              </div>
+            ) : null}
+            {pdfStatus === "error" ? (
+              <div style={{ textAlign: "center", padding: 20 }}>
+                <div className="card-p" style={{ padding: 12, fontSize: 12, marginBottom: 12 }}>
+                  ⚠ Impossible de rendre le PDF dans la modal : {pdfError}
+                </div>
+                <button className="btn btn-y" onClick={downloadArchived}>↗ Ouvrir le PDF dans un nouvel onglet</button>
+              </div>
+            ) : null}
+            <div ref={pdfContainerRef} style={{ width: "100%" }}></div>
           </div>
         ) : null}
 
+        {/* Image archivée (cas non-PDF) */}
+        {mode === "archived-img" ? (
+          <div style={{ flex: 1, overflow: "auto", background: "#EDEDED", padding: 14, textAlign: "center" }}>
+            <img
+              src={archivedUrl}
+              alt="Document archivé"
+              style={{ maxWidth: "100%", height: "auto", boxShadow: "3px 3px 0 #191923", border: "2px solid #191923" }}
+            />
+          </div>
+        ) : null}
+
+        {/* HTML généré (template contrat) */}
         {mode === "generated" ? (
           <iframe
             ref={iframeRef}
