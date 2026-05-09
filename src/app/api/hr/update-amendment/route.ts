@@ -163,7 +163,7 @@ export async function POST(req: Request) {
             doc_type: 'contrat_genere',
             file_path: storagePath,
             mime_type: 'text/html; charset=utf-8',
-            file_size: htmlBuffer.length,
+            size_bytes: htmlBuffer.length,
             label: 'Avenant de mise à jour — ' + fullName.trim() + ' (à signer)',
             validated_by_user: false,
             uploaded_at: new Date().toISOString(),
