@@ -145,8 +145,15 @@ export default function RegularizationWizard(props: any) {
   var onClose = props.onClose || function () {}
   var onSaved = props.onSaved || function () {}
 
-  var [phase, setPhase] = useState("choose")  // choose | drop | analyzing | review | done
-  var [mode, setMode] = useState("")  // "" | "fiches" | "contrat"
+  // Si initialMode est passé en prop ("contrat" ou "fiches"), on skip la
+  // phase "choose" et on démarre directement à la phase "drop" dans le mode
+  // demandé. Utilisé depuis EmployeeDetail pour le bouton "📄 Contrat originel".
+  var initialModeProp = (props.initialMode === "contrat" || props.initialMode === "fiches")
+    ? props.initialMode : ""
+  var initialPhase = initialModeProp ? "drop" : "choose"
+
+  var [phase, setPhase] = useState(initialPhase)  // choose | drop | analyzing | review | done
+  var [mode, setMode] = useState(initialModeProp)  // "" | "fiches" | "contrat"
   var [contractSaved, setContractSaved] = useState(false)
   var [error, setError] = useState("")
   var [progress, setProgress] = useState("")
@@ -590,7 +597,7 @@ export default function RegularizationWizard(props: any) {
         {/* HEADER */}
         <div className="mh">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div className="mt">📝 Régulariser le contrat</div>
+            <div className="mt">{initialModeProp === "contrat" ? "📄 Contrat originel + avenant" : "📝 Régulariser le contrat"}</div>
             <button className="btn btn-sm" onClick={handleCloseRequest} style={{ background: "#FFFFFF" }}>×</button>
           </div>
           <div className="yt" style={{ fontSize: 14, marginTop: 4, color: "#191923" }}>
@@ -968,7 +975,11 @@ export default function RegularizationWizard(props: any) {
           ) : null}
           {phase === "drop" ? (
             <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
-              <button className="btn" onClick={function () { setPhase("choose"); setFiles([]) }}>← Retour</button>
+              {initialModeProp ? (
+                <button className="btn" onClick={handleCloseRequest}>Annuler</button>
+              ) : (
+                <button className="btn" onClick={function () { setPhase("choose"); setFiles([]) }}>← Retour</button>
+              )}
               <button className="btn btn-p" onClick={handleAnalyze} disabled={files.length === 0}>
                 {mode === "contrat" ? "🤖 Analyser le contrat" : "🤖 Analyser les fiches"}
               </button>
