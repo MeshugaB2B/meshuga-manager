@@ -41,6 +41,7 @@ import {
   MISSIONS_CAISSIER
 } from "./rhConstants"
 import { buildContract } from "./contractBuilders"
+import { LOGO_PINK } from "../logos"
 import DocumentsManager from "./DocumentsManager"
 
 var supabase = createClient(
@@ -338,7 +339,7 @@ export default function RhWizard(props) {
 
   // ===== Génération preview =====
   function generatePreview() {
-    var html = buildContract(contract, emp, vacations, "")
+    var html = buildContract(contract, emp, vacations, LOGO_PINK)
     setPreviewHtml(html)
   }
 
