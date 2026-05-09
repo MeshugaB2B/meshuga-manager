@@ -26,7 +26,7 @@ import { assemblePdfFromImages } from '@/lib/hr/pdf-assembler'
 
 // Configuration Next.js : on traite du multipart, donc pas de body parser auto
 export var runtime = 'nodejs'
-export var maxDuration = 60 // secondes (Vercel Pro)
+export var maxDuration = 120 // secondes (Vercel Pro)
 
 export async function POST(req: Request) {
   var uploadedPaths: string[] = []
