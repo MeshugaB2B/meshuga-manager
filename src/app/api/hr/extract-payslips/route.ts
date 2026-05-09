@@ -35,6 +35,48 @@ function earliestIso(a: string | null, b: string | null): string | null {
   return a < b ? a : b
 }
 
+// Normalise une date en ISO yyyy-mm-dd. Corrige l'inversion jour/mois
+// faite parfois par l'IA OCR (ex: "1952-19-05" → "1952-05-19").
+function normalizeDateIso(v: any): string | null {
+  if (!v) return null
+  var s = String(v).trim()
+  if (!s) return null
+  var isoMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (isoMatch) {
+    var year = parseInt(isoMatch[1], 10)
+    var p2 = parseInt(isoMatch[2], 10)
+    var p3 = parseInt(isoMatch[3], 10)
+    var month: number, day: number
+    if (p2 >= 1 && p2 <= 12 && p3 >= 1 && p3 <= 31) {
+      month = p2; day = p3
+    } else if (p2 > 12 && p2 <= 31 && p3 >= 1 && p3 <= 12) {
+      month = p3; day = p2
+    } else {
+      return null
+    }
+    return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0')
+  }
+  var frMatch = s.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})$/)
+  if (frMatch) {
+    var d = parseInt(frMatch[1], 10)
+    var m = parseInt(frMatch[2], 10)
+    var y = parseInt(frMatch[3], 10)
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0')
+    }
+  }
+  return null
+}
+
+// Sanitize toutes les dates d'une extraction in-place
+function sanitizeExtractionDates(ex: PayslipExtraction): PayslipExtraction {
+  if (ex.period_start) ex.period_start = normalizeDateIso(ex.period_start)
+  if (ex.period_end) ex.period_end = normalizeDateIso(ex.period_end)
+  if (ex.employee?.date_naissance) ex.employee.date_naissance = normalizeDateIso(ex.employee.date_naissance)
+  if (ex.contract?.date_entree) ex.contract.date_entree = normalizeDateIso(ex.contract.date_entree)
+  return ex
+}
+
 // Consolide N extractions en un récap unique
 function consolidateExtractions(items: Array<{
   extraction: PayslipExtraction
@@ -186,8 +228,10 @@ export async function POST(req: Request) {
 
       // Extraction OCR
       var extracted = await extractPayslipFromImages([{ buffer: buffer, mimeType: mime }])
+      // Sanitize toutes les dates (corrige inversions jour/mois faites par l'IA)
+      var safeExtraction = sanitizeExtractionDates(extracted.extraction)
       items.push({
-        extraction: extracted.extraction,
+        extraction: safeExtraction,
         index: fi,
         filename: file.name,
         storage_path: path,
