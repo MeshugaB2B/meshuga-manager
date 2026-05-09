@@ -145,7 +145,8 @@ export default function RegularizationWizard(props: any) {
   var onClose = props.onClose || function () {}
   var onSaved = props.onSaved || function () {}
 
-  var [phase, setPhase] = useState("drop")  // drop | analyzing | review | done
+  var [phase, setPhase] = useState("choose")  // choose | drop | analyzing | review | done
+  var [mode, setMode] = useState("")  // "" | "fiches" | "contrat"
   var [contractSaved, setContractSaved] = useState(false)
   var [error, setError] = useState("")
   var [progress, setProgress] = useState("")
@@ -264,7 +265,10 @@ export default function RegularizationWizard(props: any) {
   // ========================================================================
   async function handleAnalyze() {
     setError("")
-    if (files.length === 0) { setError("Drop au moins une fiche de paie"); return }
+    if (files.length === 0) {
+      setError(mode === "contrat" ? "Drop le contrat originel" : "Drop au moins une fiche de paie")
+      return
+    }
     setPhase("analyzing")
     try {
       setProgress("Optimisation des images...")
@@ -274,21 +278,54 @@ export default function RegularizationWizard(props: any) {
         setProgress("Optimisation" + levelLabel + " (" + (cur + 1) + "/" + total + ")...")
       })
       var sizeMb = totalSizeMb(compressedFiles)
-      setProgress("Analyse IA des fiches (" + sizeMb.toFixed(1) + " MB) — peut prendre 30s à 2min...")
+      setProgress("Analyse IA — peut prendre 30s à 2min...")
 
-      var fd = new FormData()
-      fd.append("employee_id", emp.id)
-      for (var i = 0; i < compressedFiles.length; i++) {
-        fd.append("file_" + String(i).padStart(3, "0"), compressedFiles[i])
+      var consolidated: any
+      var notes: string[] = []
+
+      if (mode === "contrat") {
+        // ====== Mode contrat originel : appel /api/hr/extract-contract ======
+        // L'API extract-contract attend des "pages" du contrat. Toutes les
+        // pages d'un même contrat sont passées en file_001, file_002, etc.
+        var fd = new FormData()
+        fd.append("employee_id", emp.id)
+        for (var i = 0; i < compressedFiles.length; i++) {
+          fd.append("file_" + String(i + 1).padStart(3, "0"), compressedFiles[i])
+        }
+        var res = await fetch("/api/hr/extract-contract", { method: "POST", body: fd })
+        var p = await parseApiResponse(res)
+        if (!p.ok) throw new Error(p.errorText)
+        var data = p.data
+        // extract-contract renvoie { extraction, storage_path, ... }
+        var extraction = data.extraction || {}
+        // Normaliser au format attendu (consolidated.employee, consolidated.contract, etc.)
+        consolidated = {
+          date_embauche: extraction.contract?.date_debut || extraction.contract?.date_embauche || null,
+          date_embauche_extracted_explicitly: !!(extraction.contract?.date_debut || extraction.contract?.date_embauche),
+          employee: extraction.employee || {},
+          contract: extraction.contract || {},
+          notes: ["Contrat originel analysé"],
+        }
+        notes = ["Contrat originel analysé"]
+        // Mémoriser le storage path du contrat originel pour pouvoir le rattacher après
+        ;(window as any).__regul_originalContractPath = data.storage_path
+        ;(window as any).__regul_originalContractMime = data.mime_type
+        ;(window as any).__regul_originalContractSize = data.file_size
+      } else {
+        // ====== Mode fiches de paie : appel /api/hr/extract-payslips ======
+        var fd2 = new FormData()
+        fd2.append("employee_id", emp.id)
+        for (var j = 0; j < compressedFiles.length; j++) {
+          fd2.append("file_" + String(j).padStart(3, "0"), compressedFiles[j])
+        }
+        var res2 = await fetch("/api/hr/extract-payslips", { method: "POST", body: fd2 })
+        var p2 = await parseApiResponse(res2)
+        if (!p2.ok) throw new Error(p2.errorText)
+        consolidated = p2.data.consolidated
+        notes = consolidated.notes || []
       }
-      var res = await fetch("/api/hr/extract-payslips", { method: "POST", body: fd })
-      var p = await parseApiResponse(res)
-      if (!p.ok) throw new Error(p.errorText)
-      var data = p.data
-      var consolidated = data.consolidated
 
-      // Pré-remplir — TOUTES les dates passent par normalizeDateIso pour
-      // corriger les inversions jour/mois faites par l'IA
+      // Pré-remplir — TOUTES les dates passent par normalizeDateIso
       if (consolidated.date_embauche) {
         var normalizedEmbauche = normalizeDateIso(consolidated.date_embauche)
         setDateEmbauche(normalizedEmbauche || consolidated.date_embauche)
@@ -300,11 +337,9 @@ export default function RegularizationWizard(props: any) {
       keys.forEach(function (k: any) {
         var v = consolidated.employee?.[k]
         if (v && !newEmpFields[k]) {
-          // Normaliser les champs date
           if (k === "date_naissance") {
             var normalized = normalizeDateIso(v)
             if (normalized) newEmpFields[k] = normalized
-            // si pas normalisable, on laisse vide (Edward verra et corrigera)
           } else {
             newEmpFields[k] = v
           }
@@ -319,10 +354,14 @@ export default function RegularizationWizard(props: any) {
         var v = consolidated.contract?.[k]
         if (v !== null && v !== undefined && v !== "") newContractFields[k] = v
       })
-      // Déduire automatiquement le type de contrat depuis fonction + statut
-      newContractFields.type = deduceContractType(newContractFields.fonction, newContractFields.statut_cadre)
+      // Déduire le type si pas déjà fourni par extract-contract
+      if (consolidated.contract?.type) {
+        newContractFields.type = consolidated.contract.type
+      } else {
+        newContractFields.type = deduceContractType(newContractFields.fonction, newContractFields.statut_cadre)
+      }
       setContractFields(newContractFields)
-      setAiNotes(consolidated.notes || [])
+      setAiNotes(notes)
 
       setPhase("review")
     } catch (e: any) {
@@ -355,11 +394,9 @@ export default function RegularizationWizard(props: any) {
       var updateEmp: any = {}
       Object.keys(employeeFields).forEach(function (k: any) {
         if (employeeFields[k]) {
-          // Normaliser les champs date
           if (k === "date_naissance") {
             var normalized = normalizeDateIso(employeeFields[k])
             if (normalized) updateEmp[k] = normalized
-            // sinon on n'envoie pas le champ (DB acceptera NULL)
           } else {
             updateEmp[k] = employeeFields[k]
           }
@@ -368,7 +405,7 @@ export default function RegularizationWizard(props: any) {
       var resUpd = await supabase.from("hr_employees").update(updateEmp).eq("id", emp.id).select("*").single()
       if (resUpd.error) throw new Error("MAJ employé : " + resUpd.error.message)
 
-      // 2) Mettre à jour la date_entree du cycle ouvert (la "vraie" date d'embauche)
+      // 2) Mettre à jour la date_entree du cycle ouvert
       var openCycleId = null
       var resCyc = await fetch("/api/hr/cycles?employee_id=" + emp.id)
       var pCyc = await parseApiResponse(resCyc)
@@ -381,7 +418,6 @@ export default function RegularizationWizard(props: any) {
       }
 
       // 2bis) Mettre à jour le contrat existant avec le bon type + infos extraites.
-      // Le contrat draft "extra" créé par défaut devient le vrai CDI archivé.
       var savedContractId: any = null
       if (openCycleId) {
         var resContracts = await supabase
@@ -390,9 +426,11 @@ export default function RegularizationWizard(props: any) {
           .eq("cycle_id", openCycleId)
           .order("created_at", { ascending: false })
         var existingContracts = (resContracts.data || [])
-        // On cherche un contrat à mettre à jour (priorité : is_current, sinon le + récent)
         var ctrToUpdate: any = existingContracts.find(function (c: any) { return c.is_current })
           || existingContracts[0]
+        var labelPrefix = mode === "contrat"
+          ? "Contrat originel + avenant — "
+          : "Contrat de régularisation — "
         if (ctrToUpdate) {
           var ctrUpdate: any = {
             type: contractFields.type || "cdi_cuisinier",
@@ -407,44 +445,121 @@ export default function RegularizationWizard(props: any) {
             date_debut: dateEmbaucheClean,
             status: "archived",
             is_current: true,
-            contract_label: "Contrat de régularisation — " + (contractFields.fonction || "CDI"),
+            contract_label: labelPrefix + (contractFields.fonction || "CDI"),
           }
           var sb = parseFloat(String(contractFields.salaire_brut_mensuel || "").replace(",", "."))
           if (!isNaN(sb)) ctrUpdate.salaire_brut_mensuel = sb
           await supabase.from("hr_contracts").update(ctrUpdate).eq("id", ctrToUpdate.id)
           savedContractId = ctrToUpdate.id
+        } else {
+          // Pas de contrat → en créer un nouveau attaché au cycle
+          var insertCtr: any = {
+            cycle_id: openCycleId,
+            type: contractFields.type || "cdi_cuisinier",
+            fonction: contractFields.fonction,
+            statut_cadre: contractFields.statut_cadre,
+            niveau_ccn: contractFields.niveau_ccn || null,
+            echelon_ccn: contractFields.echelon_ccn || null,
+            classification: contractFields.classification || null,
+            heures_hebdo: parseFloat(String(contractFields.heures_hebdo || 35)),
+            heures_mensuelles: parseFloat(String(contractFields.heures_mensuelles || 151.67)),
+            date_debut: dateEmbaucheClean,
+            status: "archived",
+            is_current: true,
+            contract_label: labelPrefix + (contractFields.fonction || "CDI"),
+          }
+          var sb2 = parseFloat(String(contractFields.salaire_brut_mensuel || "").replace(",", "."))
+          if (!isNaN(sb2)) insertCtr.salaire_brut_mensuel = sb2
+          var resInsCtr = await supabase.from("hr_contracts").insert(insertCtr).select("id").single()
+          if (resInsCtr.error) throw new Error("Création contrat : " + resInsCtr.error.message)
+          savedContractId = resInsCtr.data.id
         }
       }
 
-      // 3) Générer le HTML du contrat (avec dates clean) ET le sauvegarder
-      // dans Storage pour qu'il apparaisse dans la liste des documents du contrat.
+      // 3) MODE CONTRAT : rattacher le PDF originel au contrat comme contrat_signe
+      if (mode === "contrat" && savedContractId) {
+        var origPath = (window as any).__regul_originalContractPath
+        var origMime = (window as any).__regul_originalContractMime || "application/pdf"
+        var origSize = (window as any).__regul_originalContractSize || 0
+        if (origPath) {
+          var fullName = (employeeFields.prenom || "") + " " + ((employeeFields.nom || "").toUpperCase())
+          // Insérer un row contrat_signe attaché au contrat (validated_by_user=true
+          // pour que le trigger SQL désactive le flag automatiquement)
+          var resInsDoc = await supabase
+            .from("hr_contract_documents")
+            .insert({
+              contract_id: savedContractId,
+              doc_type: "contrat_signe",
+              file_path: origPath,
+              mime_type: origMime,
+              file_size: origSize,
+              label: "Contrat originel — " + fullName.trim(),
+              validated_by_user: true,
+              uploaded_at: new Date().toISOString(),
+            })
+            .select("id")
+            .single()
+          if (resInsDoc.error) {
+            // Pas bloquant : on continue, Edward verra le warning
+            // eslint-disable-next-line no-console
+            console.warn("Création doc contrat originel :", resInsDoc.error.message)
+          }
+        }
+      }
+
+      // 4) Générer le HTML : avenant en mode "contrat", contrat de régul en mode "fiches"
       var employeePayload = Object.assign({}, employeeFields)
       if (employeePayload.date_naissance) {
         var dn = normalizeDateIso(employeePayload.date_naissance)
         employeePayload.date_naissance = dn || null
       }
-      var payload: any = {
-        employee_id: emp.id,
-        date_embauche: dateEmbaucheClean,
-        employee: employeePayload,
-        contract: contractFields,
-        save: true,  // demander à l'API de sauvegarder dans hr_contract_documents
-      }
-      if (savedContractId) payload.contract_id = savedContractId
 
-      var resGen = await fetch("/api/hr/regularization-contract", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
+      var resGen: Response
+      var endpoint: string
+      if (mode === "contrat") {
+        // En mode contrat originel : générer un avenant qui ajoute les 8 clauses modernes
+        endpoint = "/api/hr/update-amendment"
+        var payloadAv: any = {
+          employee_id: emp.id,
+          contract_id: savedContractId,
+          contract_label: "contrat de travail (" + (contractFields.fonction || "CDI") + ") du " + dateEmbaucheClean,
+          clauses: [
+            "confidentialite", "haccp", "tenue_hygiene", "rgpd",
+            "mobilite", "deconnexion", "regimes_actualises", "documents_annexes",
+          ],
+          date_effet: new Date().toISOString().slice(0, 10),
+          ville_signature: "Paris",
+          date_signature: new Date().toISOString().slice(0, 10),
+          save: true,  // sauvegarde l'avenant comme document attaché
+        }
+        resGen = await fetch(endpoint, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payloadAv),
+        })
+      } else {
+        // Mode fiches de paie : contrat de régularisation complet
+        endpoint = "/api/hr/regularization-contract"
+        var payload: any = {
+          employee_id: emp.id,
+          date_embauche: dateEmbaucheClean,
+          employee: employeePayload,
+          contract: contractFields,
+          save: true,
+        }
+        if (savedContractId) payload.contract_id = savedContractId
+        resGen = await fetch(endpoint, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+      }
+
       if (!resGen.ok) {
         var pGen = await parseApiResponse(resGen)
-        throw new Error("Génération PDF : " + (pGen.errorText || "erreur"))
+        throw new Error("Génération document : " + (pGen.errorText || "erreur"))
       }
 
-      // Vérifier si la sauvegarde a réussi (header X-Saved)
       var wasSaved = resGen.headers.get("X-Saved") === "true"
 
-      // 4) Ouvrir le HTML dans un nouvel onglet pour impression
       var html = await resGen.text()
       var newWin = window.open("", "_blank")
       if (newWin) {
@@ -452,7 +567,6 @@ export default function RegularizationWizard(props: any) {
         newWin.document.write(html)
         newWin.document.close()
       } else {
-        // Si popup bloqué, fallback : Blob + URL
         var blob = new Blob([html], { type: "text/html" })
         var url = URL.createObjectURL(blob)
         window.open(url, "_blank")
@@ -492,21 +606,102 @@ export default function RegularizationWizard(props: any) {
             </div>
           ) : null}
 
+          {/* PHASE CHOOSE — choix du mode */}
+          {phase === "choose" ? (
+            <div>
+              <div className="card-y" style={{ marginBottom: 14 }}>
+                <div className="yt" style={{ fontSize: 18, marginBottom: 4 }}>Comment veux-tu régulariser ce salarié ?</div>
+                <div style={{ fontSize: 11, lineHeight: 1.5 }}>
+                  Deux situations possibles. Choisis celle qui correspond à ce que tu as sous la main.
+                </div>
+              </div>
+
+              <div
+                onClick={function () { setMode("contrat"); setPhase("drop") }}
+                style={{
+                  background: "#FFFFFF",
+                  border: "2.5px solid #FF82D7",
+                  boxShadow: "4px 4px 0 #FF82D7",
+                  padding: 16,
+                  marginBottom: 14,
+                  cursor: "pointer",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={function (ev: any) { ev.currentTarget.style.background = "#FFF5FB" }}
+                onMouseLeave={function (ev: any) { ev.currentTarget.style.background = "#FFFFFF" }}
+              >
+                <div className="yt" style={{ fontSize: 22, color: "#FF82D7", lineHeight: 1, marginBottom: 6 }}>
+                  📄 J'ai retrouvé le contrat originel
+                </div>
+                <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+                  Tu as récupéré le contrat de travail signé d'origine (PDF ou photo). L'IA va lire toutes les
+                  infos (fonction, salaire, date d'embauche, classification…), <strong>sauvegarder le contrat originel</strong>
+                  dans la fiche, puis <strong>générer un avenant</strong> qui ajoute les 8 clauses modernes (HACCP, RGPD, etc.).
+                  <div style={{ marginTop: 6, fontSize: 10, opacity: 0.7, fontStyle: "italic" }}>
+                    Recommandé : continuité juridique préservée, plus simple à signer (1 page).
+                  </div>
+                </div>
+              </div>
+
+              <div
+                onClick={function () { setMode("fiches"); setPhase("drop") }}
+                style={{
+                  background: "#FFFFFF",
+                  border: "2px solid #191923",
+                  boxShadow: "3px 3px 0 #191923",
+                  padding: 16,
+                  marginBottom: 6,
+                  cursor: "pointer",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={function (ev: any) { ev.currentTarget.style.background = "#FFFEF5" }}
+                onMouseLeave={function (ev: any) { ev.currentTarget.style.background = "#FFFFFF" }}
+              >
+                <div className="yt" style={{ fontSize: 22, color: "#191923", lineHeight: 1, marginBottom: 6 }}>
+                  💰 Je n'ai pas le contrat originel
+                </div>
+                <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+                  Tu as seulement les <strong>fiches de paie</strong> du salarié. L'IA va lire la plus ancienne et la plus
+                  récente pour reconstituer la date d'embauche et les conditions, puis générer un
+                  <strong> contrat de régularisation CDI complet</strong> qui formalise la relation existante.
+                  <div style={{ marginTop: 6, fontSize: 10, opacity: 0.7, fontStyle: "italic" }}>
+                    À utiliser quand le contrat originel a été perdu ou n'a jamais été formalisé.
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {/* PHASE DROP */}
           {phase === "drop" ? (
             <div>
               <div className="card-y" style={{ marginBottom: 14 }}>
-                <div className="yt" style={{ fontSize: 18, marginBottom: 4 }}>Fiches de paie disponibles</div>
-                <div style={{ fontSize: 11, lineHeight: 1.5 }}>
-                  Drop <strong>1 ou plusieurs fiches de paie</strong> du salarié. Idéalement :
-                  <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
-                    <li>La <strong>plus ancienne</strong> disponible (pour récupérer la date d'embauche)</li>
-                    <li>La <strong>plus récente</strong> (pour le salaire et les conditions actuelles)</li>
-                  </ul>
-                  <div style={{ marginTop: 4, fontSize: 10, opacity: 0.7 }}>
-                    1 fichier = 1 fiche de paie (PDF mono ou photo). Plusieurs fiches améliorent la fiabilité.
+                {mode === "contrat" ? (
+                  <div>
+                    <div className="yt" style={{ fontSize: 18, marginBottom: 4 }}>Contrat originel à analyser</div>
+                    <div style={{ fontSize: 11, lineHeight: 1.5 }}>
+                      Drop <strong>le contrat originel</strong> du salarié (toutes les pages, dans l'ordre).
+                      L'IA va extraire toutes les conditions contractuelles.
+                      <div style={{ marginTop: 4, fontSize: 10, opacity: 0.7 }}>
+                        PDF multi-pages OU plusieurs photos (1 photo = 1 page). Inclus la page des signatures pour confirmer.
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <div className="yt" style={{ fontSize: 18, marginBottom: 4 }}>Fiches de paie disponibles</div>
+                    <div style={{ fontSize: 11, lineHeight: 1.5 }}>
+                      Drop <strong>1 ou plusieurs fiches de paie</strong> du salarié. Idéalement :
+                      <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
+                        <li>La <strong>plus ancienne</strong> disponible (pour récupérer la date d'embauche)</li>
+                        <li>La <strong>plus récente</strong> (pour le salaire et les conditions actuelles)</li>
+                      </ul>
+                      <div style={{ marginTop: 4, fontSize: 10, opacity: 0.7 }}>
+                        1 fichier = 1 fiche de paie (PDF mono ou photo). Plusieurs fiches améliorent la fiabilité.
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div
@@ -698,13 +893,27 @@ export default function RegularizationWizard(props: any) {
             <div>
               <div className="card-y" style={{ marginBottom: 14, textAlign: "center", padding: 22 }}>
                 <div style={{ fontSize: 38 }}>✅</div>
-                <div className="yt" style={{ fontSize: 26, marginTop: 4 }}>Contrat généré !</div>
+                <div className="yt" style={{ fontSize: 26, marginTop: 4 }}>
+                  {mode === "contrat" ? "Avenant généré !" : "Contrat généré !"}
+                </div>
                 <div style={{ fontSize: 12, marginTop: 6 }}>
-                  Le contrat de régularisation s'est ouvert dans un nouvel onglet.
+                  {mode === "contrat"
+                    ? "Le contrat originel est sauvegardé dans la fiche, et l'avenant s'est ouvert dans un nouvel onglet."
+                    : "Le contrat de régularisation s'est ouvert dans un nouvel onglet."}
                 </div>
               </div>
 
-              {contractSaved ? (
+              {mode === "contrat" ? (
+                <div className="card-p" style={{ padding: 12, marginBottom: 14, fontSize: 12 }}>
+                  <strong>📎 Contrat originel sauvegardé</strong>
+                  <div style={{ marginTop: 4, lineHeight: 1.5 }}>
+                    Le PDF originel est désormais visible dans la fiche du salarié comme
+                    <strong> "Contrat signé"</strong>, et l'avenant comme
+                    <strong> "Contrat généré (à signer)"</strong>. Le bandeau "À RÉGULARISER" a été désactivé
+                    car le contrat originel est validé.
+                  </div>
+                </div>
+              ) : (contractSaved ? (
                 <div className="card-p" style={{ padding: 12, marginBottom: 14, fontSize: 12 }}>
                   <strong>📎 Sauvegardé dans la fiche salarié</strong>
                   <div style={{ marginTop: 4, lineHeight: 1.5 }}>
@@ -718,18 +927,28 @@ export default function RegularizationWizard(props: any) {
                   ⚠ Le contrat n'a pas pu être sauvegardé automatiquement dans la fiche.
                   Pense à enregistrer le PDF localement avant de fermer le nouvel onglet.
                 </div>
-              )}
+              ))}
 
               <div className="card" style={{ marginBottom: 14 }}>
                 <div className="ct">📋 Étapes suivantes</div>
-                <ol style={{ paddingLeft: 18, fontSize: 11, lineHeight: 1.7 }}>
-                  <li><strong>Imprime</strong> le contrat en 2 exemplaires (bouton "↓ Imprimer / PDF" dans le nouvel onglet)</li>
-                  <li>Ou enregistre-le en PDF (Imprimer → "Enregistrer au format PDF")</li>
-                  <li><strong>Fais signer</strong> le salarié — fais-lui apposer la mention manuscrite "Lu et approuvé, bon pour accord"</li>
-                  <li>Signe ton exemplaire</li>
-                  <li>Reviens dans la fiche du salarié et clique <strong>"📥 Uploader contrat signé"</strong></li>
-                  <li>L'app désactivera automatiquement le bandeau "À RÉGULARISER" 🎉</li>
-                </ol>
+                {mode === "contrat" ? (
+                  <ol style={{ paddingLeft: 18, fontSize: 11, lineHeight: 1.7 }}>
+                    <li><strong>Imprime l'avenant</strong> en 2 exemplaires (bouton "↓ Imprimer / PDF" dans le nouvel onglet)</li>
+                    <li><strong>Fais signer</strong> le salarié — mention manuscrite "Lu et approuvé, bon pour accord"</li>
+                    <li>Signe ton exemplaire</li>
+                    <li>Reviens dans la fiche → bouton <strong>"📥 Uploader contrat signé"</strong> pour stocker l'avenant signé</li>
+                    <li>Le contrat originel est <strong>déjà</strong> dans la fiche, le bandeau de régularisation a disparu 🎉</li>
+                  </ol>
+                ) : (
+                  <ol style={{ paddingLeft: 18, fontSize: 11, lineHeight: 1.7 }}>
+                    <li><strong>Imprime</strong> le contrat en 2 exemplaires (bouton "↓ Imprimer / PDF" dans le nouvel onglet)</li>
+                    <li>Ou enregistre-le en PDF (Imprimer → "Enregistrer au format PDF")</li>
+                    <li><strong>Fais signer</strong> le salarié — mention manuscrite "Lu et approuvé, bon pour accord"</li>
+                    <li>Signe ton exemplaire</li>
+                    <li>Reviens dans la fiche du salarié et clique <strong>"📥 Uploader contrat signé"</strong></li>
+                    <li>L'app désactivera automatiquement le bandeau "À RÉGULARISER" 🎉</li>
+                  </ol>
+                )}
               </div>
               <div className="card-p" style={{ padding: 10, fontSize: 11 }}>
                 <strong>💡 À faire en parallèle :</strong> récupérer la DPAE du salarié sur
@@ -742,11 +961,16 @@ export default function RegularizationWizard(props: any) {
 
         {/* FOOTER */}
         <div className="mf">
-          {phase === "drop" ? (
+          {phase === "choose" ? (
             <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
               <button className="btn" onClick={handleCloseRequest}>Annuler</button>
+            </div>
+          ) : null}
+          {phase === "drop" ? (
+            <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+              <button className="btn" onClick={function () { setPhase("choose"); setFiles([]) }}>← Retour</button>
               <button className="btn btn-p" onClick={handleAnalyze} disabled={files.length === 0}>
-                🤖 Analyser les fiches
+                {mode === "contrat" ? "🤖 Analyser le contrat" : "🤖 Analyser les fiches"}
               </button>
             </div>
           ) : null}
@@ -754,14 +978,18 @@ export default function RegularizationWizard(props: any) {
             <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
               <button className="btn" onClick={function () { setPhase("drop") }}>← Retour</button>
               <button className="btn btn-p" onClick={handleGenerateContract} disabled={saving}>
-                {saving ? "Génération..." : "📝 Générer le contrat"}
+                {saving
+                  ? "Génération..."
+                  : (mode === "contrat" ? "📋 Générer l'avenant" : "📝 Générer le contrat")}
               </button>
             </div>
           ) : null}
           {phase === "done" ? (
             <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
               <button className="btn btn-y" onClick={function () {
-                onSaved("Contrat de régularisation généré — fais signer puis upload")
+                onSaved(mode === "contrat"
+                  ? "Avenant généré — fais signer puis upload via 'Uploader contrat signé'"
+                  : "Contrat de régularisation généré — fais signer puis upload")
                 onClose()
               }}>Terminer</button>
             </div>
