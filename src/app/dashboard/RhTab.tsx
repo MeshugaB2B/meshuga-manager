@@ -56,12 +56,31 @@ export default function RhTab() {
       .from("hr_contracts")
       .select("*, hr_contract_vacations(*)")
       .order("created_at", { ascending: false })
+    // Charger les cycles d'emploi pour pouvoir résoudre l'employee_id des contrats
+    // créés via régularisation rétroactive (qui ont seulement cycle_id)
+    var resCyc = await supabase
+      .from("hr_employment_cycles")
+      .select("id, employee_id")
     var resDocs = await supabase
       .from("hr_employee_documents")
       .select("employee_id")
     var resCDocs = await supabase
       .from("hr_contract_documents")
       .select("contract_id")
+
+    // Construire mapping cycleId → employeeId
+    var cycleToEmp = {}
+    ;(resCyc.data || []).forEach(function (cyc) {
+      cycleToEmp[cyc.id] = cyc.employee_id
+    })
+
+    // Enrichir chaque contrat avec _employee_id effectif (fusion des deux schémas)
+    var contracts_ = (resC.data || []).map(function (c) {
+      var effectiveEmpId = c.employee_id
+        || (c.cycle_id ? cycleToEmp[c.cycle_id] : null)
+        || null
+      return Object.assign({}, c, { _employee_id: effectiveEmpId })
+    })
 
     // Compteur docs perso par employé
     var counts = {}
@@ -70,10 +89,9 @@ export default function RhTab() {
         counts[d.employee_id] = (counts[d.employee_id] || 0) + 1
       })
     }
-    // Compteur docs contractuels par employé (via contrat)
-    var contracts_ = resC.data || []
+    // Compteur docs contractuels par employé (via contrat → _employee_id effectif)
     var contractIdToEmpId = {}
-    contracts_.forEach(function (c) { contractIdToEmpId[c.id] = c.employee_id })
+    contracts_.forEach(function (c) { contractIdToEmpId[c.id] = c._employee_id })
     var cCounts = {}
     if (resCDocs.data) {
       resCDocs.data.forEach(function (d) {
@@ -92,8 +110,9 @@ export default function RhTab() {
   useEffect(function () { loadAll() }, [])
 
   // Détermine le contrat principal d'un employé (CDI le plus récent, sinon dernier extra)
+  // Utilise _employee_id pour gérer aussi les contrats rattachés via cycle_id
   function getMainContract(empId) {
-    var empContracts = contracts.filter(function (c) { return c.employee_id === empId })
+    var empContracts = contracts.filter(function (c) { return c._employee_id === empId })
     if (empContracts.length === 0) return null
     var cdi = empContracts.filter(function (c) { return c.type !== "extra" })
     if (cdi.length > 0) return cdi[0]
@@ -263,7 +282,7 @@ export default function RhTab() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {filtered.map(function (e) {
-              var nbContracts = contracts.filter(function (c) { return c.employee_id === e.id }).length
+              var nbContracts = contracts.filter(function (c) { return c._employee_id === e.id }).length
               var nbDocs = docCounts[e.id] || 0
               var nbCDocs = contractDocCounts[e.id] || 0
               var totalDocs = nbDocs + nbCDocs
@@ -532,7 +551,19 @@ function ContractPreview(props) {
 
   useEffect(function () {
     var run = async function () {
-      var resE = await supabase.from("hr_employees").select("*").eq("id", c.employee_id).single()
+      // Résoudre l'employee_id : direct OU via cycle_id pour les contrats régularisés
+      var empId = c.employee_id || c._employee_id
+      if (!empId && c.cycle_id) {
+        var resCyc = await supabase
+          .from("hr_employment_cycles")
+          .select("employee_id")
+          .eq("id", c.cycle_id)
+          .single()
+        empId = resCyc.data && resCyc.data.employee_id
+      }
+      var resE = empId
+        ? await supabase.from("hr_employees").select("*").eq("id", empId).single()
+        : { data: {} }
       var resV = await supabase.from("hr_contract_vacations").select("*").eq("contract_id", c.id).order("ordre")
       setEmp(resE.data || {})
       setVacs(resV.data || [])
