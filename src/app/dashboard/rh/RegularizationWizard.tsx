@@ -170,6 +170,7 @@ export default function RegularizationWizard(props: any) {
     num_secu: emp.num_secu || "",
   } as any)
   var [contractFields, setContractFields] = useState({
+    type: "cdi_cuisinier",
     fonction: "",
     statut_cadre: "non-cadre",
     niveau_ccn: "",
@@ -182,6 +183,33 @@ export default function RegularizationWizard(props: any) {
   } as any)
   var [aiNotes, setAiNotes] = useState([] as string[])
   var [dateExtractedExplicitly, setDateExtractedExplicitly] = useState(false)
+
+  // Déduire le type de contrat (cdi_cuisinier | cdi_caissier | cdi_cadre)
+  // depuis la fonction et le statut cadre du salarié.
+  function deduceContractType(fonction: any, statutCadre: any): string {
+    if (statutCadre === "cadre") return "cdi_cadre"
+    var f = String(fonction || "").toLowerCase()
+    // Cuisine et préparation
+    if (f.indexOf("cuisin") >= 0 || f.indexOf("commis") >= 0
+        || f.indexOf("prépara") >= 0 || f.indexOf("prepara") >= 0
+        || f.indexOf("plonge") >= 0 || f.indexOf("aide de cuisine") >= 0) {
+      return "cdi_cuisinier"
+    }
+    // Vente, caisse, salle
+    if (f.indexOf("caiss") >= 0 || f.indexOf("vend") >= 0
+        || f.indexOf("serveur") >= 0 || f.indexOf("serveuse") >= 0
+        || f.indexOf("barista") >= 0 || f.indexOf("salle") >= 0
+        || f.indexOf("comptoir") >= 0) {
+      return "cdi_caissier"
+    }
+    // Encadrement (mais sans cadre stricto sensu = agent_maitrise)
+    if (f.indexOf("manager") >= 0 || f.indexOf("responsable") >= 0
+        || f.indexOf("chef") >= 0 || f.indexOf("directeur") >= 0) {
+      return statutCadre === "agent_maitrise" ? "cdi_caissier" : "cdi_cadre"
+    }
+    // Fallback : cuisinier (le plus courant chez Meshuga)
+    return "cdi_cuisinier"
+  }
 
   function handleCloseRequest() {
     if (saving) return
@@ -290,6 +318,8 @@ export default function RegularizationWizard(props: any) {
         var v = consolidated.contract?.[k]
         if (v !== null && v !== undefined && v !== "") newContractFields[k] = v
       })
+      // Déduire automatiquement le type de contrat depuis fonction + statut
+      newContractFields.type = deduceContractType(newContractFields.fonction, newContractFields.statut_cadre)
       setContractFields(newContractFields)
       setAiNotes(consolidated.notes || [])
 
@@ -338,12 +368,48 @@ export default function RegularizationWizard(props: any) {
       if (resUpd.error) throw new Error("MAJ employé : " + resUpd.error.message)
 
       // 2) Mettre à jour la date_entree du cycle ouvert (la "vraie" date d'embauche)
+      var openCycleId = null
       var resCyc = await fetch("/api/hr/cycles?employee_id=" + emp.id)
       var pCyc = await parseApiResponse(resCyc)
       if (pCyc.ok) {
         var openCycle = (pCyc.data.cycles || []).find(function (c: any) { return !c.date_sortie })
         if (openCycle) {
+          openCycleId = openCycle.id
           await supabase.from("hr_employment_cycles").update({ date_entree: dateEmbaucheClean }).eq("id", openCycle.id)
+        }
+      }
+
+      // 2bis) Mettre à jour le contrat existant avec le bon type + infos extraites.
+      // Le contrat draft "extra" créé par défaut devient le vrai CDI archivé.
+      if (openCycleId) {
+        var resContracts = await supabase
+          .from("hr_contracts")
+          .select("*")
+          .eq("cycle_id", openCycleId)
+          .order("created_at", { ascending: false })
+        var existingContracts = (resContracts.data || [])
+        // On cherche un contrat à mettre à jour (priorité : is_current, sinon le + récent)
+        var ctrToUpdate: any = existingContracts.find(function (c: any) { return c.is_current })
+          || existingContracts[0]
+        if (ctrToUpdate) {
+          var ctrUpdate: any = {
+            type: contractFields.type || "cdi_cuisinier",
+            fonction: contractFields.fonction,
+            statut_cadre: contractFields.statut_cadre,
+            niveau_ccn: contractFields.niveau_ccn || null,
+            echelon_ccn: contractFields.echelon_ccn || null,
+            coefficient_ccn: contractFields.coefficient_ccn || null,
+            classification: contractFields.classification || null,
+            heures_hebdo: parseFloat(String(contractFields.heures_hebdo || 35)),
+            heures_mensuelles: parseFloat(String(contractFields.heures_mensuelles || 151.67)),
+            date_debut: dateEmbaucheClean,
+            status: "archived",
+            is_current: true,
+            contract_label: "Contrat de régularisation — " + (contractFields.fonction || "CDI"),
+          }
+          var sb = parseFloat(String(contractFields.salaire_brut_mensuel || "").replace(",", "."))
+          if (!isNaN(sb)) ctrUpdate.salaire_brut_mensuel = sb
+          await supabase.from("hr_contracts").update(ctrUpdate).eq("id", ctrToUpdate.id)
         }
       }
 
@@ -587,6 +653,13 @@ export default function RegularizationWizard(props: any) {
               <div className="card">
                 <div className="ct">Conditions contractuelles (depuis la fiche la plus récente)</div>
                 <div className="fg2">
+                  <SelectField label="Type de contrat *" value={contractFields.type}
+                    options={[
+                      {value:"cdi_cuisinier",label:"CDI Cuisinier"},
+                      {value:"cdi_caissier",label:"CDI Caissier / Vendeur"},
+                      {value:"cdi_cadre",label:"CDI Cadre"},
+                    ]}
+                    onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { type: v })) }} />
                   <TextField label="Fonction *" value={contractFields.fonction}
                     onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { fonction: v })) }} />
                   <SelectField label="Statut" value={contractFields.statut_cadre}
