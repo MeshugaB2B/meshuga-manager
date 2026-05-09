@@ -47,6 +47,7 @@ export default function EmployeeDetail(props) {
   var [uploadingWelcomePack, setUploadingWelcomePack] = useState(false)
   var [showOffboarding, setShowOffboarding] = useState(false)
   var [showRegularization, setShowRegularization] = useState(false)
+  var [showOriginalContract, setShowOriginalContract] = useState(false)
   var [unmarkingExit, setUnmarkingExit] = useState(false)
   var [stoppages, setStoppages] = useState([])
   var [showStoppageWizard, setShowStoppageWizard] = useState(false)
@@ -564,6 +565,13 @@ export default function EmployeeDetail(props) {
               disabled={!emp.email}
               title={emp.email ? "Envoyer la demande de planification des congés" : "Le salarié doit avoir une adresse email"}
             >📅 Demander les congés</button>
+            {!emp.date_sortie && !emp.needs_regularization ? (
+              <button
+                className="btn btn-p"
+                onClick={function () { setShowOriginalContract(true) }}
+                title="Uploader le contrat originel signé + générer automatiquement un avenant qui ajoute les clauses modernes"
+              >📄 Contrat originel + avenant</button>
+            ) : null}
             {!emp.date_sortie ? (
               <button
                 className="btn"
@@ -1029,6 +1037,20 @@ export default function EmployeeDetail(props) {
           onSaved={function (msg) {
             setShowRegularization(false)
             if (props.onSaved) props.onSaved(msg || "Régularisation lancée")
+            load()
+          }}
+        />
+      ) : null}
+
+      {/* === MODAL CONTRAT ORIGINEL + AVENANT (mode contrat directement) === */}
+      {showOriginalContract && emp ? (
+        <RegularizationWizard
+          employee={emp}
+          initialMode="contrat"
+          onClose={function () { setShowOriginalContract(false) }}
+          onSaved={function (msg) {
+            setShowOriginalContract(false)
+            if (props.onSaved) props.onSaved(msg || "Contrat originel + avenant générés")
             load()
           }}
         />
