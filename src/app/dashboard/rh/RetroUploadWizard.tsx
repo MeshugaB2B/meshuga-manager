@@ -301,6 +301,8 @@ export default function RetroUploadWizard(props: any) {
   var [exitMotif, setExitMotif] = useState("")
   var [periodMonth, setPeriodMonth] = useState("")
   var [saving, setSaving] = useState(false)
+  // Mode manuel uniquement : flag de régularisation à faire
+  var [needsRegularization, setNeedsRegularization] = useState(false)
 
   // ====== HISTORIQUE DOCS DE LA SESSION (pour récap fin) ======
   var [sessionDocs, setSessionDocs] = useState([] as any[])
@@ -789,6 +791,11 @@ export default function RetroUploadWizard(props: any) {
     try {
       var insertEmp: any = {}
       Object.keys(employeeFields).forEach(function (k: any) { if (employeeFields[k]) insertEmp[k] = employeeFields[k] })
+      // Si Edward a coché "régularisation à faire", on pose le flag
+      if (needsRegularization) {
+        insertEmp.needs_regularization = true
+        insertEmp.regularization_notes = "Salarié héritage sans contrat formalisé. Régularisation à faire via fiches de paie."
+      }
       var resE = await supabase.from("hr_employees").insert(insertEmp).select("*").single()
       if (resE.error) throw new Error(resE.error.message)
       var newEmp = resE.data
@@ -798,7 +805,9 @@ export default function RetroUploadWizard(props: any) {
         body: JSON.stringify({
           employee_id: newEmp.id,
           date_entree: contractFields.date_debut,
-          notes: "Créé sans document (mise en conformité à faire — avenant rétroactif)",
+          notes: needsRegularization
+            ? "Créé sans document — RÉGULARISATION À FAIRE (fiches de paie disponibles)"
+            : "Créé sans document (mise en conformité à faire — avenant rétroactif)",
         }),
       })
       var dataC = await resC.json()
@@ -806,8 +815,10 @@ export default function RetroUploadWizard(props: any) {
 
       setActiveEmployee(newEmp)
       setActiveCycle(dataC.cycle)
-      setSessionDocs([{ doc_type: "manual_employee", label: "Fiche créée sans document" }])
-      showToast("Salarié créé — pense à faire signer un avenant de mise en conformité")
+      setSessionDocs([{ doc_type: "manual_employee", label: needsRegularization ? "Fiche créée — régularisation à faire" : "Fiche créée sans document" }])
+      showToast(needsRegularization
+        ? "Salarié créé — clique sur '📝 Régulariser' depuis sa fiche pour générer le contrat"
+        : "Salarié créé — pense à faire signer un avenant de mise en conformité")
       setPhase("saved")
     } catch (e: any) {
       setError("Création : " + errMsg(e))
@@ -1118,6 +1129,47 @@ export default function RetroUploadWizard(props: any) {
                   Pour les vieux salariés dont tu n'as plus aucun papier. Ils existeront en base et tu pourras leur faire signer un avenant de mise en conformité plus tard.
                 </div>
               </div>
+
+              {/* Checkbox régularisation — bien visible */}
+              <div
+                style={{
+                  background: needsRegularization ? "#FF82D7" : "#FFFFFF",
+                  border: "2.5px solid #191923",
+                  boxShadow: "3px 3px 0 #191923",
+                  padding: 12,
+                  marginBottom: 14,
+                  cursor: "pointer",
+                  transition: "background 0.15s",
+                }}
+                onClick={function () { setNeedsRegularization(!needsRegularization) }}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <div
+                    style={{
+                      width: 22, height: 22, flexShrink: 0,
+                      background: "#FFFFFF",
+                      border: "2.5px solid #191923",
+                      borderRadius: 4,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 16, fontWeight: 900, lineHeight: 1,
+                    }}
+                  >
+                    {needsRegularization ? "✓" : ""}
+                  </div>
+                  <div style={{ flex: 1, fontSize: 12 }}>
+                    <div style={{ fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 }}>
+                      ⚠ Régularisation à faire (contrat manquant)
+                    </div>
+                    <div style={{ lineHeight: 1.5 }}>
+                      Coche cette case si tu n'as <strong>aucun contrat formalisé</strong> pour ce salarié, mais que tu as ses <strong>fiches de paie</strong>.
+                      Un bandeau "À RÉGULARISER" apparaîtra sur sa fiche, et un bouton "📝 Régulariser" te permettra de
+                      générer un contrat de régularisation à partir des fiches de paie (l'IA reconstituera la date d'embauche
+                      et les conditions actuelles).
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="card">
                 <div className="ct">Identité du salarié</div>
                 <div className="fg2">
@@ -1133,7 +1185,7 @@ export default function RetroUploadWizard(props: any) {
                     onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { date_naissance: v })) }} />
                   <TextField label="N° Sécurité sociale" value={employeeFields.num_secu}
                     onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { num_secu: v })) }} />
-                  <TextField type="date" label="Date d'embauche réelle *" value={contractFields.date_debut}
+                  <TextField type="date" label={needsRegularization ? "Date d'embauche estimée (l'IA la précisera depuis les fiches)" : "Date d'embauche réelle *"} value={contractFields.date_debut}
                     onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { date_debut: v })) }} />
                   <TextField label="Téléphone" value={employeeFields.telephone}
                     onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { telephone: v })) }} />
