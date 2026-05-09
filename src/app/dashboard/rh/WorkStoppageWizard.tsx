@@ -52,6 +52,61 @@ function fmtFr(iso: string): string {
   return p[2] + "/" + p[1] + "/" + p[0]
 }
 
+// Convertit n'importe quelle erreur en message lisible (jamais "[object Object]").
+function errMsg(e: any): string {
+  if (!e) return "Erreur inconnue"
+  if (typeof e === "string") return e
+  if (e.message) return e.message
+  if (e.error) return typeof e.error === "string" ? e.error : JSON.stringify(e.error)
+  try {
+    var s = JSON.stringify(e)
+    if (s && s !== "{}") return s
+  } catch (_) {}
+  return "Erreur inconnue"
+}
+
+// Parse safely une réponse fetch (peut être JSON ou HTML d'erreur Vercel).
+async function parseApiResponse(res: any): Promise<any> {
+  var ct = (res.headers.get("content-type") || "").toLowerCase()
+  var isHtml = ct.indexOf("text/html") === 0
+  var isJson = ct.indexOf("application/json") === 0
+
+  if (res.status === 413) {
+    return { ok: false, status: 413, errorText: "Documents trop volumineux pour Vercel (limite 4.5 MB)" }
+  }
+  if (res.status === 504) {
+    return { ok: false, status: 504, errorText: "Timeout : l'analyse IA a dépassé le temps maximal. Réessaie ou réduis le nombre de pages." }
+  }
+  if (isHtml && !res.ok) {
+    var txt = ""
+    try { txt = await res.text() } catch (_) {}
+    var hint = ""
+    if (txt.indexOf("FUNCTION_PAYLOAD_TOO_LARGE") >= 0) hint = " (documents trop volumineux)"
+    else if (txt.indexOf("FUNCTION_INVOCATION_TIMEOUT") >= 0) hint = " (timeout : l'analyse a pris trop de temps — réessaie)"
+    else if (txt.indexOf("FUNCTION_INVOCATION_FAILED") >= 0) hint = " (erreur serveur — réessaie dans 30s)"
+    return { ok: false, status: res.status, errorText: "Erreur serveur " + res.status + hint }
+  }
+  if (isJson) {
+    try {
+      var data = await res.json()
+      return { ok: res.ok, status: res.status, data: data, errorText: data?.error || null }
+    } catch (e: any) {
+      return { ok: false, status: res.status, errorText: "Réponse invalide du serveur" }
+    }
+  }
+  try {
+    var rawText = await res.text()
+    try {
+      var parsedData = JSON.parse(rawText)
+      return { ok: res.ok, status: res.status, data: parsedData, errorText: parsedData?.error || null }
+    } catch (_) {
+      return { ok: res.ok, status: res.status, errorText: rawText.slice(0, 200) || "Réponse vide" }
+    }
+  } catch (e: any) {
+    return { ok: false, status: res.status, errorText: errMsg(e) }
+  }
+}
+
 export default function WorkStoppageWizard(props: any) {
   // props : { employee, existing?, onClose, onSaved }
   // existing = un objet hr_work_stoppages si on édite (sinon création)
@@ -161,13 +216,10 @@ export default function WorkStoppageWizard(props: any) {
         fd.append("file_" + String(i).padStart(3, "0"), compressedFiles[i])
       }
       var res = await fetch("/api/hr/extract-stoppage", { method: "POST", body: fd })
-
-      // Détection 413 (Vercel renvoie du HTML, pas du JSON)
-      if (res.status === 413 || (!res.ok && res.headers.get("content-type")?.indexOf("text/html") === 0)) {
-        throw new Error("Documents trop volumineux malgré la compression (" + sizeMb.toFixed(1) + " MB). Réduis le nombre de photos ou prends-les en plus basse résolution.")
-      }
-      var data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Extraction échouée")
+      var p = await parseApiResponse(res)
+      if (!p.ok) throw new Error(p.errorText)
+      var data = p.data
+      if (!data) throw new Error("Réponse vide du serveur")
 
       var ext = data.extraction || {}
       if (ext.stoppage_type) setStoppageType(ext.stoppage_type)
@@ -182,7 +234,7 @@ export default function WorkStoppageWizard(props: any) {
 
       setPhase("review")
     } catch (e: any) {
-      setError("Erreur analyse : " + e.message)
+      setError("Erreur analyse : " + errMsg(e))
       setPhase("upload")
     } finally {
       setAnalysisProgress("")
@@ -226,13 +278,13 @@ export default function WorkStoppageWizard(props: any) {
           body: JSON.stringify(payload),
         })
       }
-      var data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Sauvegarde échouée")
+      var pSave = await parseApiResponse(res)
+      if (!pSave.ok) throw new Error(pSave.errorText || "Sauvegarde échouée")
 
       onSaved(existing ? "Arrêt modifié" : "Arrêt enregistré")
       onClose()
     } catch (e: any) {
-      setError(e.message || "Erreur sauvegarde")
+      setError("Erreur sauvegarde : " + errMsg(e))
     } finally {
       setSaving(false)
     }
