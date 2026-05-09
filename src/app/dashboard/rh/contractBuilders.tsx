@@ -28,7 +28,7 @@ function safe(s) {
 }
 
 // === Helper : escape HTML pour éviter injection ===
-function esc(s) {
+export function esc(s) {
   if (s === null || s === undefined) return ""
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 }
@@ -75,7 +75,7 @@ function genderize(html, isFemale) {
 // ============================================================
 // CSS partagé entre tous les contrats
 // ============================================================
-function buildSharedCss(logoDataUri) {
+export function buildSharedCss(logoDataUri) {
   return ''
     + '*{box-sizing:border-box;margin:0;padding:0}'
     + 'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:13px;line-height:1.55;background:#fff}'
@@ -145,7 +145,7 @@ function buildSharedCss(logoDataUri) {
 // sousTitreCover: ligne discrète sous le titre
 // emp: l'employé(e) (objet hr_employees)
 // genre: "M" ou "F" pour adapter "né"/"née", "Madame"/"Monsieur"
-function buildSharedHeader(opts) {
+export function buildSharedHeader(opts) {
   var emp = opts.emp
   var titreCover = opts.titreCover
   var sousTitreCover = opts.sousTitreCover
@@ -199,7 +199,7 @@ function buildSharedHeader(opts) {
 // ============================================================
 // Bloc signatures partagé
 // ============================================================
-function buildSharedSignatures(c, emp, salarieRole) {
+export function buildSharedSignatures(c, emp, salarieRole) {
   var civilite = emp.civilite || "Madame"
   var feminin = (civilite === "Madame" || civilite === "Mademoiselle")
   var dateSig = c.date_signature
@@ -232,7 +232,7 @@ function buildSharedSignatures(c, emp, salarieRole) {
 // ============================================================
 // Wrapper HTML complet : <html><head>...</head><body>{header + corps + signatures}
 // ============================================================
-function wrapHtml(opts) {
+export function wrapHtml(opts) {
   var titre = opts.titre
   var css = opts.css
   var body = opts.body
