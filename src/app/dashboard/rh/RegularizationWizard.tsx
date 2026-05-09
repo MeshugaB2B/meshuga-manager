@@ -291,19 +291,19 @@ export default function RegularizationWizard(props: any) {
       var notes: string[] = []
 
       if (mode === "contrat") {
-        // ====== Mode contrat originel : appel /api/hr/extract-contract ======
-        // L'API extract-contract attend des "pages" du contrat. Toutes les
-        // pages d'un même contrat sont passées en file_001, file_002, etc.
+        // ====== Mode contrat originel : appel /api/hr/extract-contract-direct ======
+        // Cette route accepte FormData (multipart) — différente de /extract-contract
+        // qui attend { contract_doc_id } JSON.
         var fd = new FormData()
         fd.append("employee_id", emp.id)
         for (var i = 0; i < compressedFiles.length; i++) {
           fd.append("file_" + String(i + 1).padStart(3, "0"), compressedFiles[i])
         }
-        var res = await fetch("/api/hr/extract-contract", { method: "POST", body: fd })
+        var res = await fetch("/api/hr/extract-contract-direct", { method: "POST", body: fd })
         var p = await parseApiResponse(res)
         if (!p.ok) throw new Error(p.errorText)
         var data = p.data
-        // extract-contract renvoie { extraction, storage_path, ... }
+        // extract-contract-direct renvoie { extraction, storage_path, mime_type, file_size, ... }
         var extraction = data.extraction || {}
         // Normaliser au format attendu (consolidated.employee, consolidated.contract, etc.)
         consolidated = {
