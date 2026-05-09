@@ -105,8 +105,22 @@ function buildRegisterHtml(rows: any[]): string {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">
 <style>
+  /*
+    CRITICAL : forcer le navigateur à imprimer les fonds de couleur.
+    Sans ces directives, Chrome/Safari/Firefox enlèvent automatiquement
+    les couleurs de fond pour économiser l'encre lors de l'impression.
+    Les 3 propriétés ci-dessous couvrent tous les navigateurs modernes
+    (standard W3C + préfixes vendeurs anciens encore actifs).
+  */
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    -moz-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
   @page { size: A4 landscape; margin: 12mm 10mm 12mm 10mm; }
-  * { box-sizing: border-box; }
+
   html, body {
     margin: 0; padding: 0;
     font-family: 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
@@ -114,6 +128,8 @@ function buildRegisterHtml(rows: any[]): string {
     background: #FFFFFF;
     font-size: 10pt;
     line-height: 1.3;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   body { padding: 0; }
 
@@ -309,18 +325,47 @@ function buildRegisterHtml(rows: any[]): string {
     border-top: 1px dashed #BBB;
   }
 
-  /* PRINT */
+  /* PRINT - Forcer rendu fidèle des couleurs sur toutes les classes critiques */
   @media print {
-    body { background: #FFFFFF; }
+    /* Re-force pour les éléments qui ont des fonds colorés spécifiques */
+    body, .title-yellow, .legal-note, .kpi, .kpi.actif, .kpi.parti,
+    thead th, tbody td, td.num, td .en-poste, .signature-box {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    body { background: #FFFFFF !important; }
     .no-print { display: none !important; }
     table { page-break-inside: auto; }
     tr { page-break-inside: avoid; page-break-after: auto; }
     thead { display: table-header-group; }
     .header { page-break-after: avoid; }
     .footer { page-break-before: avoid; }
+    /* Bannière de tip n'apparaît PAS à l'impression */
+    .print-tip { display: none !important; }
   }
   @media screen {
     body { padding: 8mm; max-width: 297mm; margin: 0 auto; }
+  }
+
+  /* Bannière de conseil d'impression (visible à l'écran seulement) */
+  .print-tip {
+    background: #FFEB5A;
+    border: 2.5px solid #191923;
+    box-shadow: 4px 4px 0 #191923;
+    padding: 4mm 6mm;
+    margin-bottom: 6mm;
+    font-size: 10pt;
+    line-height: 1.4;
+  }
+  .print-tip strong { font-weight: 900; }
+  .print-tip code {
+    background: #FFFFFF;
+    padding: 1px 6px;
+    border: 1.5px solid #191923;
+    border-radius: 3px;
+    font-family: 'Arial Narrow', monospace;
+    font-weight: 900;
   }
   .print-button {
     position: fixed;
@@ -347,6 +392,13 @@ function buildRegisterHtml(rows: any[]): string {
 <body>
 
 <button class="no-print print-button" onclick="window.print()">↓ Imprimer / PDF</button>
+
+<div class="print-tip no-print">
+  <strong>💡 Pour imprimer en couleurs (charte Meshuga) :</strong>
+  dans la fenêtre d'impression, déroule <strong>Plus de paramètres</strong> et coche
+  <code>Graphismes d'arrière-plan</code> (Chrome / Edge) ou <code>Imprimer les arrière-plans</code> (Safari / Firefox).
+  Sans cette option, ton navigateur enlève les fonds rose et jaune pour économiser l'encre.
+</div>
 
 <div class="header">
   <div class="header-left">
