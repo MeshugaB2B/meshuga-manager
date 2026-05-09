@@ -1,500 +1,704 @@
-// src/app/api/hr/regularization-contract/route.ts
-// Génère le HTML imprimable du contrat de régularisation (CDI formalisant
-// une relation existante non écrite). Charte Meshuga respectée.
+// src/app/dashboard/rh/RegularizationWizard.tsx
+// Modal pour régulariser un salarié dont on n'a aucun contrat formalisé.
+// Workflow :
+//   Phase 1 (drop) : Edward upload 1+ fiches de paie (idéalement la +
+//     ancienne et la + récente)
+//   Phase 2 (analyzing) : IA extrait identité + conditions contractuelles +
+//     date d'embauche reconstituée
+//   Phase 3 (review) : Edward voit/édite les infos consolidées
+//   Phase 4 (preview) : génère le HTML du contrat de régularisation, ouvre
+//     dans un nouvel onglet pour impression
+//   Phase 5 (saved) : Edward fait signer, puis upload du contrat signé via
+//     le wizard standard (qui désactivera auto le flag needs_regularization)
 //
-// POST { employee_id, date_embauche, fonction, salaire_brut_mensuel, ... }
-// → renvoie HTML qui s'imprime/sauvegarde en PDF via window.print()
+// SWC-safe : var, function, pas de generics, pas de fragments.
 
-import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+"use client"
+import { useState, useRef } from "react"
+import { createClient } from "@supabase/supabase-js"
+import { compressFileList, totalSizeMb } from "@/lib/imageCompress"
 
-export var runtime = 'nodejs'
+var supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+)
 
-function escapeHtml(s: any): string {
-  if (s === null || s === undefined) return ''
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+var MAX_FILE_MB = 20
+
+function errMsg(e: any): string {
+  if (!e) return "Erreur inconnue"
+  if (typeof e === "string") return e
+  if (e.message) return e.message
+  if (e.error) return typeof e.error === "string" ? e.error : JSON.stringify(e.error)
+  try { var s = JSON.stringify(e); if (s && s !== "{}") return s } catch (_) {}
+  return "Erreur inconnue"
 }
 
-function fmtDateFr(iso: any): string {
-  if (!iso) return '—'
+async function parseApiResponse(res: any): Promise<any> {
+  var ct = (res.headers.get("content-type") || "").toLowerCase()
+  var isHtml = ct.indexOf("text/html") === 0
+  var isJson = ct.indexOf("application/json") === 0
+  if (res.status === 413) return { ok: false, status: 413, errorText: "Documents trop volumineux (limite 4.5 MB Vercel)" }
+  if (res.status === 504) return { ok: false, status: 504, errorText: "Timeout : réessaie ou réduis le nombre de pages." }
+  if (isHtml && !res.ok) {
+    var txt = ""
+    try { txt = await res.text() } catch (_) {}
+    var hint = ""
+    if (txt.indexOf("FUNCTION_PAYLOAD_TOO_LARGE") >= 0) hint = " (documents trop volumineux)"
+    else if (txt.indexOf("FUNCTION_INVOCATION_TIMEOUT") >= 0) hint = " (timeout — réessaie)"
+    return { ok: false, status: res.status, errorText: "Erreur serveur " + res.status + hint }
+  }
+  if (isJson) {
+    try {
+      var data = await res.json()
+      return { ok: res.ok, status: res.status, data: data, errorText: data?.error || null }
+    } catch (e: any) {
+      return { ok: false, status: res.status, errorText: "Réponse invalide du serveur" }
+    }
+  }
   try {
-    var s = String(iso).slice(0, 10)
-    var p = s.split('-')
-    if (p.length !== 3) return s
-    return p[2] + '/' + p[1] + '/' + p[0]
-  } catch (e) {
-    return String(iso)
-  }
-}
-
-function fmtCcyFr(n: any): string {
-  if (n === null || n === undefined || n === '') return '—'
-  var num = parseFloat(String(n).replace(',', '.'))
-  if (isNaN(num)) return '—'
-  return num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function buildHtml(data: any): string {
-  var todayFr = fmtDateFr(new Date().toISOString().slice(0, 10))
-  var emp = data.employee || {}
-  var ctr = data.contract || {}
-  var dateEmbaucheFr = fmtDateFr(data.date_embauche)
-  var villeSig = data.ville_signature || 'Paris'
-  var dateSig = fmtDateFr(data.date_signature || new Date().toISOString().slice(0, 10))
-  var fullName = (emp.civilite || '') + ' ' + (emp.prenom || '') + ' ' + ((emp.nom || '').toUpperCase())
-  var fullAddress = (emp.adresse ? emp.adresse + ', ' : '') + (emp.code_postal || '') + ' ' + (emp.ville || '')
-
-  var heuresMensuelles = ctr.heures_mensuelles || 151.67
-  var heuresHebdo = ctr.heures_hebdo || 35
-  var salaireMensuel = fmtCcyFr(ctr.salaire_brut_mensuel)
-  var statutLabel = ctr.statut_cadre === 'cadre' ? 'Cadre'
-    : (ctr.statut_cadre === 'agent_maitrise' ? 'Agent de maîtrise' : 'Non-cadre')
-
-  return `<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="utf-8" />
-<title>Contrat de régularisation — ${escapeHtml(fullName)}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">
-<style>
-  * {
-    box-sizing: border-box;
-    -webkit-print-color-adjust: exact !important;
-    -moz-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
-  }
-  @page { size: A4 portrait; margin: 18mm 16mm 18mm 16mm; }
-
-  html, body {
-    margin: 0; padding: 0;
-    font-family: 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
-    color: #191923;
-    background: #FFFFFF;
-    font-size: 11pt;
-    line-height: 1.5;
-  }
-  @media screen {
-    body { padding: 12mm; max-width: 210mm; margin: 0 auto; }
-  }
-
-  .header {
-    border-bottom: 3px solid #191923;
-    padding-bottom: 6mm;
-    margin-bottom: 8mm;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 8mm;
-  }
-  .title-yellow {
-    background: #FFEB5A;
-    border: 2.5px solid #191923;
-    box-shadow: 4px 4px 0 #191923;
-    padding: 5mm 7mm;
-    flex: 1;
-  }
-  .title-yellow .yellowtail {
-    font-family: 'Yellowtail', cursive;
-    font-size: 28pt;
-    color: #FF82D7;
-    line-height: 1;
-  }
-  .title-yellow .sub {
-    font-weight: 900;
-    text-transform: uppercase;
-    font-size: 10pt;
-    letter-spacing: 1.5px;
-    margin-top: 2mm;
-  }
-  .header-right {
-    text-align: right;
-    font-size: 8.5pt;
-  }
-  .header-right .label { font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #FF82D7; }
-
-  /* ENCART RÉGULARISATION en haut — visible immédiatement */
-  .reg-banner {
-    background: #FFF8E1;
-    border: 2.5px solid #FF82D7;
-    box-shadow: 4px 4px 0 #FF82D7;
-    padding: 5mm 6mm;
-    margin-bottom: 8mm;
-    font-size: 10pt;
-    line-height: 1.5;
-  }
-  .reg-banner .reg-title {
-    font-family: 'Yellowtail', cursive;
-    font-size: 16pt;
-    color: #FF82D7;
-    line-height: 1;
-    margin-bottom: 3mm;
-  }
-  .reg-banner strong { font-weight: 900; }
-
-  h2 {
-    font-family: 'Arial Narrow', Arial, sans-serif;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 11pt;
-    color: #191923;
-    background: #FFEB5A;
-    padding: 2mm 4mm;
-    margin: 6mm 0 3mm 0;
-    border: 1.5px solid #191923;
-    border-left: 5px solid #FF82D7;
-  }
-
-  p { margin: 2mm 0; }
-
-  .parties {
-    display: flex;
-    gap: 6mm;
-    margin: 4mm 0 8mm;
-  }
-  .partie {
-    flex: 1;
-    background: #FFFFFF;
-    border: 2px solid #191923;
-    box-shadow: 3px 3px 0 #191923;
-    padding: 4mm;
-    font-size: 10pt;
-  }
-  .partie .ptitre {
-    background: #FF82D7;
-    color: #191923;
-    font-weight: 900;
-    text-transform: uppercase;
-    font-size: 9pt;
-    letter-spacing: 1px;
-    padding: 1.5mm 3mm;
-    margin: -4mm -4mm 3mm -4mm;
-    border-bottom: 2px solid #191923;
-  }
-
-  table.conditions {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 3mm 0 5mm;
-  }
-  table.conditions th, table.conditions td {
-    border: 1px solid #191923;
-    padding: 2.5mm 3mm;
-    font-size: 10pt;
-    text-align: left;
-    vertical-align: top;
-  }
-  table.conditions th {
-    background: #191923;
-    color: #FFEB5A;
-    text-transform: uppercase;
-    font-weight: 900;
-    letter-spacing: 0.5px;
-    font-size: 9pt;
-    width: 38%;
-  }
-  table.conditions td {
-    background: #FFFFFF;
-  }
-
-  .signatures {
-    display: flex;
-    gap: 8mm;
-    margin-top: 12mm;
-    page-break-inside: avoid;
-  }
-  .sig-box {
-    flex: 1;
-    border: 2px solid #191923;
-    box-shadow: 3px 3px 0 #191923;
-    padding: 4mm;
-    background: #FFFFFF;
-  }
-  .sig-box .sig-label {
-    font-size: 8pt;
-    text-transform: uppercase;
-    font-weight: 900;
-    letter-spacing: 1px;
-    color: #FF82D7;
-  }
-  .sig-box .sig-name { font-weight: 900; margin-top: 1mm; font-size: 10pt; }
-  .sig-box .sig-zone {
-    height: 28mm;
-    margin-top: 3mm;
-    border-top: 1px dashed #BBB;
-  }
-  .sig-mention {
-    font-size: 8.5pt;
-    color: #555;
-    margin-top: 2mm;
-    font-style: italic;
-  }
-
-  .small {
-    font-size: 8.5pt;
-    color: #555;
-  }
-
-  ul { margin: 2mm 0; padding-left: 6mm; }
-  ul li { margin: 1mm 0; }
-
-  .print-button {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: #FF82D7;
-    color: #191923;
-    border: 2.5px solid #191923;
-    box-shadow: 4px 4px 0 #191923;
-    padding: 10px 20px;
-    font-family: 'Arial Narrow', Arial, sans-serif;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 11pt;
-    cursor: pointer;
-    z-index: 100;
-  }
-  .print-button:hover { background: #FFEB5A; }
-  @media print { .no-print { display: none !important; } }
-</style>
-</head>
-<body>
-
-<button class="no-print print-button" onclick="window.print()">↓ Imprimer / PDF</button>
-
-<div class="header">
-  <div class="title-yellow">
-    <div class="yellowtail">Contrat de régularisation</div>
-    <div class="sub">Contrat de travail à durée indéterminée — formalisation</div>
-  </div>
-  <div class="header-right">
-    <div class="label">Établissement</div>
-    <div>SAS Aegia Food</div>
-    <div>Meshuga Crazy Deli</div>
-    <div>3 rue Vavin, 75006 Paris</div>
-    <div class="label" style="margin-top:2mm;">SIRET</div>
-    <div>904 639 531 00014</div>
-    <div class="label" style="margin-top:2mm;">CCN</div>
-    <div>Restauration Rapide<br/>IDCC 1501</div>
-  </div>
-</div>
-
-<div class="reg-banner">
-  <div class="reg-title">📌 Objet du présent contrat</div>
-  <p>
-    Les parties signataires constatent qu'une <strong>relation de travail à durée indéterminée existe</strong>
-    entre elles depuis le <strong>${dateEmbaucheFr}</strong>, sans avoir fait l'objet jusqu'à ce jour
-    d'une formalisation par écrit. Le présent contrat a pour seul objet de <strong>formaliser par écrit</strong>
-    cette relation préexistante, conformément à l'article L.1221-1 du Code du travail.
-  </p>
-  <p>
-    L'<strong>ancienneté</strong> du salarié est expressément reconnue et conservée à compter du <strong>${dateEmbaucheFr}</strong>,
-    date d'entrée effective dans l'entreprise. Le présent écrit ne crée pas de nouvelle relation contractuelle
-    et ne saurait remettre en cause les droits acquis du salarié à cette date.
-  </p>
-</div>
-
-<h2>Article 1 — Parties au contrat</h2>
-
-<div class="parties">
-  <div class="partie">
-    <div class="ptitre">L'Employeur</div>
-    <strong>SASU AEGIA FOOD</strong><br/>
-    Représentée par M. Edward TOURET, en qualité de Président<br/>
-    Siège social : 3 rue Vavin, 75006 Paris<br/>
-    SIRET : 904 639 531 00014<br/>
-    APE : 56.10C<br/>
-    Convention collective applicable : Restauration Rapide (IDCC 1501)
-  </div>
-  <div class="partie">
-    <div class="ptitre">Le Salarié</div>
-    <strong>${escapeHtml(fullName)}</strong><br/>
-    ${emp.date_naissance ? 'Né(e) le ' + fmtDateFr(emp.date_naissance) + (emp.lieu_naissance ? ' à ' + escapeHtml(emp.lieu_naissance) : '') + '<br/>' : ''}
-    ${emp.nationalite ? 'Nationalité : ' + escapeHtml(emp.nationalite) + '<br/>' : ''}
-    ${fullAddress.trim() ? 'Demeurant : ' + escapeHtml(fullAddress.trim()) + '<br/>' : ''}
-    ${emp.num_secu ? 'N° de Sécurité sociale : ' + escapeHtml(emp.num_secu) : ''}
-  </div>
-</div>
-
-<h2>Article 2 — Nature et date d'effet du contrat</h2>
-<p>
-  Le présent <strong>contrat à durée indéterminée à temps complet</strong> formalise par écrit
-  la relation de travail à durée indéterminée existant entre les parties depuis le
-  <strong>${dateEmbaucheFr}</strong>.
-</p>
-<p>
-  Conformément à l'article L.1221-1 du Code du travail, l'absence d'écrit antérieur n'a jamais
-  remis en cause l'existence ni la nature du contrat, le salarié étant lié à l'employeur par un
-  CDI dès l'origine. La date d'embauche figurant dans tous les actes ultérieurs (déclarations sociales,
-  bulletins de paie, ancienneté, congés payés, calcul d'indemnités…) est et demeure le
-  <strong>${dateEmbaucheFr}</strong>.
-</p>
-
-<h2>Article 3 — Fonctions et qualification</h2>
-<p>
-  Le salarié est employé en qualité de <strong>${escapeHtml(ctr.fonction || 'Employé')}</strong>.
-</p>
-<p>
-  Sa classification au sein de la grille de la convention collective de la Restauration Rapide
-  (IDCC 1501) est la suivante :
-</p>
-<table class="conditions">
-  <tr><th>Statut</th><td>${escapeHtml(statutLabel)}</td></tr>
-  ${ctr.niveau_ccn ? '<tr><th>Niveau CCN</th><td>' + escapeHtml(ctr.niveau_ccn) + '</td></tr>' : ''}
-  ${ctr.echelon_ccn ? '<tr><th>Échelon CCN</th><td>' + escapeHtml(ctr.echelon_ccn) + '</td></tr>' : ''}
-  ${ctr.coefficient_ccn ? '<tr><th>Coefficient CCN</th><td>' + escapeHtml(ctr.coefficient_ccn) + '</td></tr>' : ''}
-  ${ctr.classification ? '<tr><th>Classification (libellé)</th><td>' + escapeHtml(ctr.classification) + '</td></tr>' : ''}
-</table>
-
-<h2>Article 4 — Lieu de travail</h2>
-<p>
-  Le lieu de travail principal est l'établissement Meshuga Crazy Deli, situé au 3 rue Vavin, 75006 Paris.
-  Le salarié pourra être amené à travailler ponctuellement sur d'autres lieux pour les besoins de l'activité
-  (événements, prestations traiteur, livraisons), dans la limite de la zone Île-de-France.
-</p>
-
-<h2>Article 5 — Durée et horaires de travail</h2>
-<p>
-  Le salarié est employé à temps complet selon une durée hebdomadaire de
-  <strong>${heuresHebdo} heures</strong>, soit <strong>${heuresMensuelles} heures mensuelles</strong>
-  conformément à la mensualisation prévue par la convention collective.
-</p>
-<p>
-  Les horaires sont organisés selon les besoins de l'établissement, communiqués au salarié par voie
-  d'affichage du planning. Compte tenu de l'activité de restauration, le salarié peut être amené à
-  travailler les soirs, week-ends et jours fériés, avec les majorations conventionnelles applicables.
-</p>
-
-<h2>Article 6 — Rémunération</h2>
-<p>
-  En contrepartie de son travail, le salarié perçoit une rémunération mensuelle brute de
-  <strong>${salaireMensuel} € bruts</strong>, payée en fin de mois.
-</p>
-<p class="small">
-  Cette rémunération inclut, le cas échéant, les majorations applicables aux heures supplémentaires
-  structurelles ainsi qu'à toute autre prime ou avantage prévu par la convention collective IDCC 1501.
-</p>
-
-<h2>Article 7 — Période d'essai</h2>
-<p>
-  En raison du caractère régularisateur du présent contrat formalisant une relation préexistant
-  depuis le ${dateEmbaucheFr}, <strong>aucune période d'essai n'est applicable</strong>. Le salarié
-  est confirmé dans ses fonctions au titre de l'ancienneté déjà acquise.
-</p>
-
-<h2>Article 8 — Congés payés</h2>
-<p>
-  Le salarié bénéficie des congés payés dans les conditions prévues par les articles L.3141-3 et
-  suivants du Code du travail, soit 2,5 jours ouvrables par mois de travail effectif. Les droits
-  acquis depuis l'entrée du salarié dans l'entreprise (${dateEmbaucheFr}) lui restent dus.
-</p>
-
-<h2>Article 9 — Régimes obligatoires</h2>
-<p>Le salarié bénéficie de :</p>
-<ul>
-  <li><strong>Couverture mutuelle santé</strong> via le contrat collectif de l'entreprise</li>
-  <li><strong>Régime de prévoyance</strong> Gan Eurocourtage Vie (au titre de la CCN 1501)</li>
-  <li><strong>Régime de retraite complémentaire</strong> KLESIA</li>
-  <li><strong>Médecine du travail</strong> assurée par EFFICIENCE — 64 rue de Vaugirard, 75006 Paris</li>
-</ul>
-
-<h2>Article 10 — Convention collective et règlement</h2>
-<p>
-  Pour tout ce qui n'est pas prévu au présent contrat, les parties se réfèrent aux dispositions
-  de la <strong>Convention Collective Nationale de la Restauration Rapide (IDCC 1501)</strong>
-  et au Code du travail.
-</p>
-
-<h2>Article 11 — Confidentialité et loyauté</h2>
-<p>
-  Le salarié s'engage à respecter une obligation de loyauté envers l'employeur et à ne pas divulguer
-  les informations confidentielles dont il aurait connaissance dans le cadre de ses fonctions
-  (recettes, fournisseurs, clientèle, méthodes commerciales…).
-</p>
-
-<h2>Article 12 — Dispositions finales</h2>
-<p>
-  Le présent contrat est établi en deux exemplaires originaux, dont un est remis à chaque partie.
-  Toute modification ultérieure devra faire l'objet d'un avenant écrit signé par les deux parties.
-</p>
-
-<div class="signatures">
-  <div class="sig-box">
-    <div class="sig-label">L'Employeur</div>
-    <div class="sig-name">M. Edward TOURET</div>
-    <div class="small">Président SASU AEGIA FOOD</div>
-    <div class="sig-zone"></div>
-    <div class="sig-mention">Cachet de l'entreprise + signature</div>
-  </div>
-  <div class="sig-box">
-    <div class="sig-label">Le Salarié</div>
-    <div class="sig-name">${escapeHtml(fullName)}</div>
-    <div class="sig-zone"></div>
-    <div class="sig-mention">Précédé de la mention manuscrite « Lu et approuvé, bon pour accord »</div>
-  </div>
-</div>
-
-<p style="margin-top: 8mm; text-align: center; font-size: 9pt; color: #555;">
-  Fait à <strong>${escapeHtml(villeSig)}</strong>, le <strong>${dateSig}</strong>, en deux exemplaires originaux.
-</p>
-
-</body>
-</html>`
-}
-
-export async function POST(req: Request) {
-  try {
-    var body = await req.json()
-    var employee_id = body.employee_id
-
-    if (!employee_id) {
-      return NextResponse.json({ error: 'employee_id requis' }, { status: 400 })
+    var rawText = await res.text()
+    try {
+      var parsedData = JSON.parse(rawText)
+      return { ok: res.ok, status: res.status, data: parsedData, errorText: parsedData?.error || null }
+    } catch (_) {
+      return { ok: res.ok, status: res.status, errorText: rawText.slice(0, 200) || "Réponse vide" }
     }
-    if (!body.date_embauche) {
-      return NextResponse.json({ error: 'date_embauche requise' }, { status: 400 })
-    }
-
-    // Vérifier que l'employé existe (et récupérer ses infos s'il manque des champs)
-    var admin = createAdminClient()
-    var { data: emp } = await admin
-      .from('hr_employees')
-      .select('*')
-      .eq('id', employee_id)
-      .single()
-
-    if (!emp) {
-      return NextResponse.json({ error: 'employé introuvable' }, { status: 404 })
-    }
-
-    // Merge données employé : on prend les infos passées dans body.employee
-    // (édition Edward) et on complète avec celles de la base
-    var employeeMerged = Object.assign({}, emp, body.employee || {})
-
-    var html = buildHtml({
-      date_embauche: body.date_embauche,
-      employee: employeeMerged,
-      contract: body.contract || {},
-      ville_signature: body.ville_signature,
-      date_signature: body.date_signature,
-    })
-
-    return new Response(html, {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-      },
-    })
   } catch (e: any) {
-    // eslint-disable-next-line no-console
-    console.error('POST /api/hr/regularization-contract error:', e)
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return { ok: false, status: res.status, errorText: errMsg(e) }
   }
+}
+
+function makeFileEntry(file: any) {
+  var sizeMb = file.size / (1024 * 1024)
+  var mime = (file.type || "").toLowerCase()
+  var preview: any = null
+  if (mime === "image/jpeg" || mime === "image/jpg" || mime === "image/png" || mime === "image/webp") {
+    preview = URL.createObjectURL(file)
+  }
+  var isPdf = mime === "application/pdf"
+  return {
+    id: Math.random().toString(36).slice(2),
+    file: file,
+    preview: preview,
+    sizeMb: sizeMb,
+    mime: mime,
+    isPdf: isPdf,
+  }
+}
+
+function fmtFr(iso: string): string {
+  if (!iso) return ""
+  var p = iso.split("-")
+  if (p.length !== 3) return iso
+  return p[2] + "/" + p[1] + "/" + p[0]
+}
+
+// Normalise une date en ISO yyyy-mm-dd. Gère :
+//  - "1952-05-19" déjà valide → garde
+//  - "1952-19-05" inversé (mois > 12) → corrige en "1952-05-19"
+//  - "19/05/1952" format FR → "1952-05-19"
+//  - "2022-10-16" valide → garde
+//  - vide / invalide → ""
+function normalizeDateIso(v: any): string {
+  if (!v) return ""
+  var s = String(v).trim()
+  if (!s) return ""
+
+  // Format ISO yyyy-mm-dd ou yyyy-dd-mm
+  var isoMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (isoMatch) {
+    var year = parseInt(isoMatch[1], 10)
+    var p2 = parseInt(isoMatch[2], 10)
+    var p3 = parseInt(isoMatch[3], 10)
+    var month: number
+    var day: number
+    if (p2 >= 1 && p2 <= 12 && p3 >= 1 && p3 <= 31) {
+      // yyyy-MM-dd valide
+      month = p2; day = p3
+    } else if (p2 > 12 && p2 <= 31 && p3 >= 1 && p3 <= 12) {
+      // yyyy-dd-MM (inversé) → corrige
+      month = p3; day = p2
+    } else {
+      return ""
+    }
+    return year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0")
+  }
+
+  // Format FR dd/mm/yyyy ou dd-mm-yyyy ou dd.mm.yyyy
+  var frMatch = s.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})$/)
+  if (frMatch) {
+    var d = parseInt(frMatch[1], 10)
+    var m = parseInt(frMatch[2], 10)
+    var y = parseInt(frMatch[3], 10)
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0")
+    }
+  }
+
+  return ""
+}
+
+export default function RegularizationWizard(props: any) {
+  // props : { employee, onClose, onSaved }
+  var emp = props.employee
+  var onClose = props.onClose || function () {}
+  var onSaved = props.onSaved || function () {}
+
+  var [phase, setPhase] = useState("drop")  // drop | analyzing | review | done
+  var [error, setError] = useState("")
+  var [progress, setProgress] = useState("")
+  var [saving, setSaving] = useState(false)
+
+  // Upload
+  var [files, setFiles] = useState([] as any[])
+  var [dragOver, setDragOver] = useState(false)
+  var fileInputRef = useRef<any>(null)
+
+  // Résultats consolidés (modifiables par Edward)
+  var [dateEmbauche, setDateEmbauche] = useState("")
+  var [employeeFields, setEmployeeFields] = useState({
+    civilite: emp.civilite || "Monsieur",
+    prenom: emp.prenom || "",
+    nom: emp.nom || "",
+    date_naissance: emp.date_naissance || "",
+    lieu_naissance: emp.lieu_naissance || "",
+    nationalite: emp.nationalite || "française",
+    adresse: emp.adresse || "",
+    code_postal: emp.code_postal || "",
+    ville: emp.ville || "",
+    num_secu: emp.num_secu || "",
+  } as any)
+  var [contractFields, setContractFields] = useState({
+    fonction: "",
+    statut_cadre: "non-cadre",
+    niveau_ccn: "",
+    echelon_ccn: "",
+    coefficient_ccn: "",
+    classification: "",
+    salaire_brut_mensuel: "",
+    heures_mensuelles: 151.67,
+    heures_hebdo: 35,
+  } as any)
+  var [aiNotes, setAiNotes] = useState([] as string[])
+  var [dateExtractedExplicitly, setDateExtractedExplicitly] = useState(false)
+
+  function handleCloseRequest() {
+    if (saving) return
+    if (files.length > 0 || dateEmbauche || phase !== "drop") {
+      if (!window.confirm("Fermer sans enregistrer ?")) return
+    }
+    onClose()
+  }
+
+  function addFiles(fileList: any) {
+    var newFiles = []
+    var rejected = []
+    for (var i = 0; i < fileList.length; i++) {
+      var f = fileList[i]
+      if (!f) continue
+      var mime = (f.type || "").toLowerCase()
+      var isImage = mime.indexOf("image/") === 0
+      var isPdf = mime === "application/pdf"
+      if (!isImage && !isPdf) { rejected.push(f.name + " (ni image ni PDF)"); continue }
+      var sizeMb = f.size / (1024 * 1024)
+      if (sizeMb > MAX_FILE_MB) { rejected.push(f.name + " (trop lourd)"); continue }
+      newFiles.push(makeFileEntry(f))
+    }
+    if (rejected.length > 0) window.alert("Fichiers ignorés :\n" + rejected.join("\n"))
+    setFiles(files.concat(newFiles).slice(0, 20))
+  }
+
+  function handleInputChange(e: any) {
+    var fl = e.target && e.target.files ? e.target.files : []
+    if (fl.length > 0) addFiles(fl)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  function handleDrop(e: any) {
+    e.preventDefault(); e.stopPropagation()
+    setDragOver(false)
+    var dt = e.dataTransfer
+    if (dt && dt.files && dt.files.length > 0) addFiles(dt.files)
+  }
+
+  function removeFile(idx: number) {
+    var f = files[idx]
+    if (f && f.preview) { try { URL.revokeObjectURL(f.preview) } catch (e) {} }
+    var copy = files.slice()
+    copy.splice(idx, 1)
+    setFiles(copy)
+  }
+
+  // ========================================================================
+  // ANALYSE — extract-payslips
+  // ========================================================================
+  async function handleAnalyze() {
+    setError("")
+    if (files.length === 0) { setError("Drop au moins une fiche de paie"); return }
+    setPhase("analyzing")
+    try {
+      setProgress("Optimisation des images...")
+      var rawFiles = files.map(function (f: any) { return f.file })
+      var compressedFiles = await compressFileList(rawFiles, function (cur: number, total: number, level: string) {
+        var levelLabel = level === "L1" ? "" : (level === "L2" ? " (qualité réduite)" : " (qualité minimale)")
+        setProgress("Optimisation" + levelLabel + " (" + (cur + 1) + "/" + total + ")...")
+      })
+      var sizeMb = totalSizeMb(compressedFiles)
+      setProgress("Analyse IA des fiches (" + sizeMb.toFixed(1) + " MB) — peut prendre 30s à 2min...")
+
+      var fd = new FormData()
+      fd.append("employee_id", emp.id)
+      for (var i = 0; i < compressedFiles.length; i++) {
+        fd.append("file_" + String(i).padStart(3, "0"), compressedFiles[i])
+      }
+      var res = await fetch("/api/hr/extract-payslips", { method: "POST", body: fd })
+      var p = await parseApiResponse(res)
+      if (!p.ok) throw new Error(p.errorText)
+      var data = p.data
+      var consolidated = data.consolidated
+
+      // Pré-remplir — TOUTES les dates passent par normalizeDateIso pour
+      // corriger les inversions jour/mois faites par l'IA
+      if (consolidated.date_embauche) {
+        var normalizedEmbauche = normalizeDateIso(consolidated.date_embauche)
+        setDateEmbauche(normalizedEmbauche || consolidated.date_embauche)
+      }
+      setDateExtractedExplicitly(!!consolidated.date_embauche_extracted_explicitly)
+      var newEmpFields: any = Object.assign({}, employeeFields)
+      var keys = ["civilite", "prenom", "nom", "date_naissance", "lieu_naissance",
+        "nationalite", "adresse", "code_postal", "ville", "num_secu"]
+      keys.forEach(function (k: any) {
+        var v = consolidated.employee?.[k]
+        if (v && !newEmpFields[k]) {
+          // Normaliser les champs date
+          if (k === "date_naissance") {
+            var normalized = normalizeDateIso(v)
+            if (normalized) newEmpFields[k] = normalized
+            // si pas normalisable, on laisse vide (Edward verra et corrigera)
+          } else {
+            newEmpFields[k] = v
+          }
+        }
+      })
+      setEmployeeFields(newEmpFields)
+
+      var newContractFields: any = Object.assign({}, contractFields)
+      var ckeys = ["fonction", "statut_cadre", "niveau_ccn", "echelon_ccn", "coefficient_ccn",
+        "classification", "salaire_brut_mensuel", "heures_mensuelles", "heures_hebdo"]
+      ckeys.forEach(function (k: any) {
+        var v = consolidated.contract?.[k]
+        if (v !== null && v !== undefined && v !== "") newContractFields[k] = v
+      })
+      setContractFields(newContractFields)
+      setAiNotes(consolidated.notes || [])
+
+      setPhase("review")
+    } catch (e: any) {
+      setError("Analyse : " + errMsg(e))
+      setPhase("drop")
+    } finally {
+      setProgress("")
+    }
+  }
+
+  // ========================================================================
+  // GÉNÉRATION du contrat de régularisation (HTML imprimable)
+  // ========================================================================
+  async function handleGenerateContract() {
+    setError("")
+    if (!dateEmbauche) { setError("Date d'embauche obligatoire"); return }
+    if (!employeeFields.prenom || !employeeFields.nom) { setError("Prénom et nom obligatoires"); return }
+    if (!contractFields.fonction) { setError("Fonction obligatoire"); return }
+    if (!contractFields.salaire_brut_mensuel) { setError("Salaire brut obligatoire"); return }
+
+    setSaving(true)
+    try {
+      // Normaliser TOUTES les dates avant l'envoi (sécurité finale)
+      var dateEmbaucheClean = normalizeDateIso(dateEmbauche)
+      if (!dateEmbaucheClean) {
+        throw new Error("Date d'embauche invalide : " + dateEmbauche + " — corrige-la dans le formulaire (format yyyy-mm-dd)")
+      }
+
+      // 1) Mettre à jour la fiche employé en base avec les infos validées
+      var updateEmp: any = {}
+      Object.keys(employeeFields).forEach(function (k: any) {
+        if (employeeFields[k]) {
+          // Normaliser les champs date
+          if (k === "date_naissance") {
+            var normalized = normalizeDateIso(employeeFields[k])
+            if (normalized) updateEmp[k] = normalized
+            // sinon on n'envoie pas le champ (DB acceptera NULL)
+          } else {
+            updateEmp[k] = employeeFields[k]
+          }
+        }
+      })
+      var resUpd = await supabase.from("hr_employees").update(updateEmp).eq("id", emp.id).select("*").single()
+      if (resUpd.error) throw new Error("MAJ employé : " + resUpd.error.message)
+
+      // 2) Mettre à jour la date_entree du cycle ouvert (la "vraie" date d'embauche)
+      var resCyc = await fetch("/api/hr/cycles?employee_id=" + emp.id)
+      var pCyc = await parseApiResponse(resCyc)
+      if (pCyc.ok) {
+        var openCycle = (pCyc.data.cycles || []).find(function (c: any) { return !c.date_sortie })
+        if (openCycle) {
+          await supabase.from("hr_employment_cycles").update({ date_entree: dateEmbaucheClean }).eq("id", openCycle.id)
+        }
+      }
+
+      // 3) Générer le HTML du contrat (avec dates clean)
+      var employeePayload = Object.assign({}, employeeFields)
+      if (employeePayload.date_naissance) {
+        var dn = normalizeDateIso(employeePayload.date_naissance)
+        employeePayload.date_naissance = dn || null
+      }
+      var payload = {
+        employee_id: emp.id,
+        date_embauche: dateEmbaucheClean,
+        employee: employeePayload,
+        contract: contractFields,
+      }
+      var resGen = await fetch("/api/hr/regularization-contract", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      if (!resGen.ok) {
+        var pGen = await parseApiResponse(resGen)
+        throw new Error("Génération PDF : " + (pGen.errorText || "erreur"))
+      }
+
+      // 4) Ouvrir le HTML dans un nouvel onglet pour impression
+      var html = await resGen.text()
+      var newWin = window.open("", "_blank")
+      if (newWin) {
+        newWin.document.open()
+        newWin.document.write(html)
+        newWin.document.close()
+      } else {
+        // Si popup bloqué, fallback : Blob + URL
+        var blob = new Blob([html], { type: "text/html" })
+        var url = URL.createObjectURL(blob)
+        window.open(url, "_blank")
+      }
+
+      setPhase("done")
+    } catch (e: any) {
+      setError(errMsg(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ========================================================================
+  // RENDER
+  // ========================================================================
+  return (
+    <div className="overlay" onClick={function (e: any) { if (e.target === e.currentTarget) handleCloseRequest() }}>
+      <div className="modal modal-xl">
+        {/* HEADER */}
+        <div className="mh">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="mt">📝 Régulariser le contrat</div>
+            <button className="btn btn-sm" onClick={handleCloseRequest} style={{ background: "#FFFFFF" }}>×</button>
+          </div>
+          <div className="yt" style={{ fontSize: 14, marginTop: 4, color: "#191923" }}>
+            {emp.prenom} {(emp.nom || "").toUpperCase()}
+          </div>
+        </div>
+
+        {/* BODY */}
+        <div className="mb">
+          {error ? (
+            <div className="card-p" style={{ marginBottom: 12, padding: 10, fontSize: 12, fontWeight: 900 }}>
+              ⚠ {error}
+            </div>
+          ) : null}
+
+          {/* PHASE DROP */}
+          {phase === "drop" ? (
+            <div>
+              <div className="card-y" style={{ marginBottom: 14 }}>
+                <div className="yt" style={{ fontSize: 18, marginBottom: 4 }}>Fiches de paie disponibles</div>
+                <div style={{ fontSize: 11, lineHeight: 1.5 }}>
+                  Drop <strong>1 ou plusieurs fiches de paie</strong> du salarié. Idéalement :
+                  <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
+                    <li>La <strong>plus ancienne</strong> disponible (pour récupérer la date d'embauche)</li>
+                    <li>La <strong>plus récente</strong> (pour le salaire et les conditions actuelles)</li>
+                  </ul>
+                  <div style={{ marginTop: 4, fontSize: 10, opacity: 0.7 }}>
+                    1 fichier = 1 fiche de paie (PDF mono ou photo). Plusieurs fiches améliorent la fiabilité.
+                  </div>
+                </div>
+              </div>
+
+              <div
+                onDrop={handleDrop}
+                onDragOver={function (e: any) { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={function (e: any) { e.preventDefault(); setDragOver(false) }}
+                onClick={function () { if (fileInputRef.current) fileInputRef.current.click() }}
+                style={{
+                  border: "2px dashed " + (dragOver ? "#FF82D7" : "#191923"),
+                  borderRadius: 7,
+                  padding: 22,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  background: dragOver ? "#FFF5FB" : "#FFFFFF",
+                  boxShadow: "3px 3px 0 #191923",
+                }}
+              >
+                <div style={{ fontSize: 30, marginBottom: 4 }}>📋💰</div>
+                <div className="yt" style={{ fontSize: 16, marginBottom: 4 }}>
+                  {files.length === 0 ? "Drop tes fiches de paie" : "Ajouter d'autres fiches"}
+                </div>
+                <div style={{ fontSize: 10, opacity: 0.6 }}>
+                  PDF ou JPEG/PNG/HEIC/WEBP — max {MAX_FILE_MB} MB par fichier
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  multiple
+                  onChange={handleInputChange}
+                  style={{ display: "none" }}
+                />
+              </div>
+
+              {files.length > 0 ? (
+                <div style={{ marginTop: 12 }}>
+                  {files.map(function (f: any, idx: number) {
+                    return (
+                      <div key={f.id} style={{
+                        display: "flex", alignItems: "center", gap: 8, padding: 6,
+                        background: "#FFFFFF", border: "1.5px solid #191923", borderRadius: 5,
+                        marginBottom: 5,
+                      }}>
+                        <div style={{
+                          width: 24, height: 24, background: "#FF82D7", color: "#191923",
+                          borderRadius: 3, fontSize: 11, fontWeight: 900,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          border: "1.5px solid #191923",
+                        }}>{idx + 1}</div>
+                        <div style={{
+                          width: 36, height: 36, background: "#EBEBEB", borderRadius: 4,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          overflow: "hidden", flexShrink: 0,
+                        }}>
+                          {f.preview
+                            ? <img src={f.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            : <div style={{ fontSize: 16 }}>{f.isPdf ? "📄" : "🖼️"}</div>}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0, fontSize: 11 }}>
+                          <div style={{ fontWeight: 900, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {f.file.name || "doc-" + (idx + 1)}
+                          </div>
+                          <div style={{ opacity: 0.6, fontSize: 9 }}>{f.sizeMb.toFixed(1)} MB</div>
+                        </div>
+                        <button className="btn btn-sm btn-red" onClick={function () { removeFile(idx) }}>×</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* PHASE ANALYZING */}
+          {phase === "analyzing" ? (
+            <div style={{ padding: 30, textAlign: "center" }}>
+              <div className="yt" style={{ fontSize: 28, color: "#FF82D7", marginBottom: 8 }}>
+                🤖 Analyse en cours
+              </div>
+              <div style={{ fontSize: 12, marginBottom: 14 }}>{progress}</div>
+              <div className="prog-wrap"><div className="prog-fill" style={{ width: "70%" }}></div></div>
+              <div style={{ fontSize: 10, opacity: 0.6, marginTop: 10 }}>
+                Claude lit chaque fiche de paie pour reconstituer les conditions contractuelles
+                et trouver la date d'embauche.
+              </div>
+            </div>
+          ) : null}
+
+          {/* PHASE REVIEW */}
+          {phase === "review" ? (
+            <div>
+              {/* Banner notes IA */}
+              <div className="card-y" style={{ marginBottom: 14 }}>
+                <div className="yt" style={{ fontSize: 16, marginBottom: 4 }}>📝 Récap IA</div>
+                {aiNotes.map(function (n: string, i: number) {
+                  return <div key={i} style={{ fontSize: 11, marginBottom: 2 }}>• {n}</div>
+                })}
+              </div>
+
+              {/* Date d'embauche — important */}
+              <div className={dateExtractedExplicitly ? "card-y" : "card-p"} style={{ marginBottom: 14, padding: 10 }}>
+                <div className="ct" style={{ marginBottom: 4 }}>
+                  📅 Date d'embauche reconstituée {dateExtractedExplicitly ? "✓" : "⚠"}
+                </div>
+                <div style={{ fontSize: 11, marginBottom: 8 }}>
+                  {dateExtractedExplicitly
+                    ? "Trouvée explicitement sur les fiches (champ \"Date d'entrée\" ou \"Ancienneté depuis\")."
+                    : "⚠ Pas trouvée explicitement. Estimée depuis le 1er du mois de la fiche la plus ancienne. Vérifie / corrige."}
+                </div>
+                <input
+                  className="inp"
+                  type="date"
+                  value={dateEmbauche}
+                  onChange={function (e: any) { setDateEmbauche(e.target.value) }}
+                  style={{ maxWidth: 240 }}
+                />
+                <div style={{ fontSize: 10, opacity: 0.6, marginTop: 4 }}>
+                  Pour vérifier : récupère la DPAE sur Net-Entreprises (déclaration préalable à l'embauche).
+                </div>
+              </div>
+
+              {/* Identité salarié */}
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div className="ct">Identité du salarié</div>
+                <div className="fg2">
+                  <SelectField label="Civilité" value={employeeFields.civilite}
+                    options={[{value:"Madame",label:"Madame"},{value:"Monsieur",label:"Monsieur"},{value:"Mademoiselle",label:"Mademoiselle"}]}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { civilite: v })) }} />
+                  <TextField label="Nationalité" value={employeeFields.nationalite}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { nationalite: v })) }} />
+                  <TextField label="Prénom *" value={employeeFields.prenom}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { prenom: v })) }} />
+                  <TextField label="Nom *" value={employeeFields.nom}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { nom: v })) }} />
+                  <TextField type="date" label="Date de naissance" value={employeeFields.date_naissance}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { date_naissance: v })) }} />
+                  <TextField label="Lieu de naissance" value={employeeFields.lieu_naissance}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { lieu_naissance: v })) }} />
+                  <TextField label="N° Sécurité sociale" value={employeeFields.num_secu}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { num_secu: v })) }} />
+                </div>
+                <div className="fg">
+                  <TextField label="Adresse" value={employeeFields.adresse}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { adresse: v })) }} />
+                </div>
+                <div className="fg2">
+                  <TextField label="Code postal" value={employeeFields.code_postal}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { code_postal: v })) }} />
+                  <TextField label="Ville" value={employeeFields.ville}
+                    onChange={function (v: any) { setEmployeeFields(Object.assign({}, employeeFields, { ville: v })) }} />
+                </div>
+              </div>
+
+              {/* Conditions contractuelles */}
+              <div className="card">
+                <div className="ct">Conditions contractuelles (depuis la fiche la plus récente)</div>
+                <div className="fg2">
+                  <TextField label="Fonction *" value={contractFields.fonction}
+                    onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { fonction: v })) }} />
+                  <SelectField label="Statut" value={contractFields.statut_cadre}
+                    options={[{value:"non-cadre",label:"Non-cadre"},{value:"agent_maitrise",label:"Agent de maîtrise"},{value:"cadre",label:"Cadre"}]}
+                    onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { statut_cadre: v })) }} />
+                  <TextField label="Salaire brut mensuel (€) *" value={contractFields.salaire_brut_mensuel}
+                    onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { salaire_brut_mensuel: v })) }} />
+                  <TextField label="Heures hebdo" value={contractFields.heures_hebdo}
+                    onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { heures_hebdo: v })) }} />
+                  <TextField label="Heures mensuelles" value={contractFields.heures_mensuelles}
+                    onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { heures_mensuelles: v })) }} />
+                  <TextField label="Niveau CCN" value={contractFields.niveau_ccn}
+                    onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { niveau_ccn: v })) }} />
+                  <TextField label="Échelon CCN" value={contractFields.echelon_ccn}
+                    onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { echelon_ccn: v })) }} />
+                  <TextField label="Coefficient CCN" value={contractFields.coefficient_ccn}
+                    onChange={function (v: any) { setContractFields(Object.assign({}, contractFields, { coefficient_ccn: v })) }} />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* PHASE DONE */}
+          {phase === "done" ? (
+            <div>
+              <div className="card-y" style={{ marginBottom: 14, textAlign: "center", padding: 22 }}>
+                <div style={{ fontSize: 38 }}>✅</div>
+                <div className="yt" style={{ fontSize: 26, marginTop: 4 }}>Contrat généré !</div>
+                <div style={{ fontSize: 12, marginTop: 6 }}>
+                  Le contrat de régularisation s'est ouvert dans un nouvel onglet.
+                </div>
+              </div>
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div className="ct">📋 Étapes suivantes</div>
+                <ol style={{ paddingLeft: 18, fontSize: 11, lineHeight: 1.7 }}>
+                  <li><strong>Imprime</strong> le contrat en 2 exemplaires (bouton "↓ Imprimer / PDF" dans le nouvel onglet)</li>
+                  <li>Ou enregistre-le en PDF (Imprimer → "Enregistrer au format PDF")</li>
+                  <li><strong>Fais signer</strong> le salarié — fais-lui apposer la mention manuscrite "Lu et approuvé, bon pour accord"</li>
+                  <li>Signe ton exemplaire</li>
+                  <li>Reviens dans la fiche du salarié et clique <strong>"📥 Uploader contrat signé"</strong></li>
+                  <li>L'app désactivera automatiquement le bandeau "À RÉGULARISER" 🎉</li>
+                </ol>
+              </div>
+              <div className="card-p" style={{ padding: 10, fontSize: 11 }}>
+                <strong>💡 À faire en parallèle :</strong> récupérer la DPAE du salarié sur
+                <a href="https://www.net-entreprises.fr" target="_blank" rel="noreferrer"> Net-Entreprises.fr </a>
+                pour confirmer la vraie date d'embauche déclarée à l'URSSAF.
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {/* FOOTER */}
+        <div className="mf">
+          {phase === "drop" ? (
+            <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+              <button className="btn" onClick={handleCloseRequest}>Annuler</button>
+              <button className="btn btn-p" onClick={handleAnalyze} disabled={files.length === 0}>
+                🤖 Analyser les fiches
+              </button>
+            </div>
+          ) : null}
+          {phase === "review" ? (
+            <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+              <button className="btn" onClick={function () { setPhase("drop") }}>← Retour</button>
+              <button className="btn btn-p" onClick={handleGenerateContract} disabled={saving}>
+                {saving ? "Génération..." : "📝 Générer le contrat"}
+              </button>
+            </div>
+          ) : null}
+          {phase === "done" ? (
+            <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+              <button className="btn btn-y" onClick={function () {
+                onSaved("Contrat de régularisation généré — fais signer puis upload")
+                onClose()
+              }}>Terminer</button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Sous-composants top-level (SWC)
+function TextField(props: any) {
+  return (
+    <div className="fg">
+      <label className="lbl">{props.label}</label>
+      <input
+        className="inp"
+        type={props.type || "text"}
+        value={props.value || ""}
+        onChange={function (e: any) { props.onChange(e.target.value) }}
+      />
+    </div>
+  )
+}
+
+function SelectField(props: any) {
+  return (
+    <div className="fg">
+      <label className="lbl">{props.label}</label>
+      <select
+        className="inp sel"
+        value={props.value || ""}
+        onChange={function (e: any) { props.onChange(e.target.value) }}
+      >
+        {(props.options || []).map(function (opt: any) {
+          return <option key={opt.value} value={opt.value}>{opt.label}</option>
+        })}
+      </select>
+    </div>
+  )
 }
