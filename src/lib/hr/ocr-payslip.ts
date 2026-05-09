@@ -110,7 +110,7 @@ INFORMATIONS À EXTRAIRE :
 4. **employer_name** : nom de l'employeur (vérification que c'est bien AEGIA FOOD)
 
 CONVENTIONS :
-- Toutes les dates en ISO yyyy-mm-dd
+- Toutes les dates en ISO yyyy-mm-dd. ATTENTION CRITIQUE : sur les fiches de paie françaises, les dates sont écrites au format jour/mois/année (ex: "19/05/1952" = 19 mai 1952). Tu DOIS convertir en yyyy-mm-dd avec mois en position centrale (ex: "1952-05-19", PAS "1952-19-05"). Le mois est TOUJOURS entre 01 et 12 ; le jour est entre 01 et 31. Si tu produis une date dont le 2ème segment dépasse 12, c'est que tu as fait une erreur d'inversion : refais-la.
 - Salaires/taux en numérique (pas de "€" ni espace, virgule → point)
 - meta.confidence : "high" si tout lisible, "medium" si quelques doutes, "low" si plusieurs champs indéterminables
 - meta.notes : signale en français ce qui est illisible ou douteux
