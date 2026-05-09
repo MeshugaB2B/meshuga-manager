@@ -12,6 +12,7 @@ import {
   wrapHtml,
   esc,
 } from '@/app/dashboard/rh/contractBuilders'
+import { LOGO_PINK } from '@/app/dashboard/logos'
 
 export var runtime = 'nodejs'
 
@@ -105,7 +106,7 @@ export async function POST(req: Request) {
       date_effet: body.date_effet,
       ville_signature: body.ville_signature,
       date_signature: body.date_signature,
-      logoUri: null,
+      logoUri: LOGO_PINK,
     })
 
     // Si save=true : sauvegarder l'avenant dans Storage + créer row hr_contract_documents
