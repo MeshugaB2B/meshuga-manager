@@ -64,14 +64,48 @@ export default function EmployeeDetail(props) {
       .select("*")
       .eq("id", props.employeeId)
       .single()
-    var resC = await supabase
+
+    // Charge les contrats par les deux chemins :
+    //   1. employee_id direct (RhWizard, embauche standard)
+    //   2. cycle_id (RegularizationWizard, régularisation rétroactive)
+    // Les contrats régularisés sont rattachés à un cycle d'emploi,
+    // pas directement au salarié — il faut donc passer par les cycles.
+    var resCDirect = await supabase
       .from("hr_contracts")
       .select("*")
       .eq("employee_id", props.employeeId)
       .order("created_at", { ascending: false })
+
+    var resCyc = await supabase
+      .from("hr_employment_cycles")
+      .select("id")
+      .eq("employee_id", props.employeeId)
+
+    var cycleIds = (resCyc.data || []).map(function (c) { return c.id })
+    var resCByCycle = { data: [] }
+    if (cycleIds.length > 0) {
+      resCByCycle = await supabase
+        .from("hr_contracts")
+        .select("*")
+        .in("cycle_id", cycleIds)
+        .order("created_at", { ascending: false })
+    }
+
+    // Fusion + dédoublonnage par id
+    var seen = {}
+    var merged = []
+    var allContracts = (resCDirect.data || []).concat(resCByCycle.data || [])
+    for (var i = 0; i < allContracts.length; i++) {
+      var c = allContracts[i]
+      if (!seen[c.id]) {
+        seen[c.id] = true
+        merged.push(c)
+      }
+    }
+
     setEmp(resE.data || null)
     setEmpOriginal(resE.data || null)
-    var contractsList = resC.data || []
+    var contractsList = merged
     setContracts(contractsList)
 
     // Charge les dossiers de bienvenue signés (rattachés aux contrats du salarié)
