@@ -39,11 +39,13 @@ export default function EmployeeDetail(props) {
   var [emp, setEmp] = useState(null)
   var [empOriginal, setEmpOriginal] = useState(null)
   var [contracts, setContracts] = useState([])
+  var [contractDocs, setContractDocs] = useState({})
   var [welcomePackDocs, setWelcomePackDocs] = useState([])
   var [loading, setLoading] = useState(true)
   var [saving, setSaving] = useState(false)
   var [editing, setEditing] = useState(false)
   var [uploadingSignedFor, setUploadingSignedFor] = useState(null)
+  var [uploadingAvenantFor, setUploadingAvenantFor] = useState(null)
   var [uploadingWelcomePack, setUploadingWelcomePack] = useState(false)
   var [showOffboarding, setShowOffboarding] = useState(false)
   var [showRegularization, setShowRegularization] = useState(false)
@@ -54,6 +56,7 @@ export default function EmployeeDetail(props) {
   var [editingStoppage, setEditingStoppage] = useState(null)
   var [reEmploying, setReEmploying] = useState(false)
   var signedFileInputRef = useRef(null)
+  var avenantSignedInputRef = useRef(null)
   var welcomePackFileInputRef = useRef(null)
 
   // === Charge l'employé + ses contrats ===
@@ -118,8 +121,28 @@ export default function EmployeeDetail(props) {
         .eq("doc_type", "dossier_bienvenue_signe")
         .order("uploaded_at", { ascending: false })
       setWelcomePackDocs(resWP.data || [])
+
+      // Charge tous les documents type contrat / avenant rattachés aux contrats
+      // (contrat_signe = originel uploadé OU contrat signé regénéré
+      //  contrat_genere = avenant brouillon non signé
+      //  avenant = avenant signé uploadé)
+      var resDocs = await supabase
+        .from("hr_contract_documents")
+        .select("*")
+        .in("contract_id", contractIds)
+        .in("doc_type", ["contrat_signe", "contrat_genere", "avenant"])
+        .order("uploaded_at", { ascending: false })
+      var docsByContract = {}
+      var allDocs = resDocs.data || []
+      for (var k = 0; k < allDocs.length; k++) {
+        var doc = allDocs[k]
+        if (!docsByContract[doc.contract_id]) docsByContract[doc.contract_id] = []
+        docsByContract[doc.contract_id].push(doc)
+      }
+      setContractDocs(docsByContract)
     } else {
       setWelcomePackDocs([])
+      setContractDocs({})
     }
 
     // Charge les arrêts de travail
@@ -271,6 +294,64 @@ export default function EmployeeDetail(props) {
     } catch (err) {
       alert("Erreur upload : " + (err.message || err))
       setUploadingSignedFor(null)
+    }
+  }
+
+  // === Ouvre un document de contrat dans un nouvel onglet via signed URL Supabase ===
+  async function openContractDoc(doc) {
+    if (!doc || !doc.file_path) {
+      alert("Fichier introuvable")
+      return
+    }
+    try {
+      var res = await supabase.storage
+        .from("hr-contract-docs")
+        .createSignedUrl(doc.file_path, 3600)
+      if (res.error || !res.data || !res.data.signedUrl) {
+        throw new Error((res.error && res.error.message) || "URL signée introuvable")
+      }
+      window.open(res.data.signedUrl, "_blank")
+    } catch (err) {
+      alert("Erreur ouverture : " + (err.message || err))
+    }
+  }
+
+  // === Upload de l'avenant SIGNÉ (différent du upload contrat signé) ===
+  function triggerAvenantSignedUpload(c) {
+    setUploadingAvenantFor(c)
+    setTimeout(function () {
+      if (avenantSignedInputRef.current) avenantSignedInputRef.current.click()
+    }, 50)
+  }
+
+  async function handleAvenantSignedFile(file) {
+    if (!file || !uploadingAvenantFor) return
+    var c = uploadingAvenantFor
+    try {
+      var ext = (file.name.split(".").pop() || "pdf").toLowerCase()
+      var path = c.id + "/avenant/" + Date.now() + "-avenant-signe." + ext
+      var up = await supabase.storage.from("hr-contract-docs").upload(path, file, {
+        cacheControl: "3600", upsert: false, contentType: file.type || undefined
+      })
+      if (up.error) throw up.error
+      var ins = await supabase.from("hr_contract_documents").insert([{
+        contract_id: c.id,
+        doc_type: "avenant",
+        label: "Avenant signé",
+        file_path: path,
+        mime_type: file.type || null,
+        size_bytes: file.size || null,
+        validated_by_user: true,
+        uploaded_at: new Date().toISOString()
+      }])
+      if (ins.error) throw ins.error
+      if (props.onSaved) props.onSaved("Avenant signé uploadé ✓")
+      setUploadingAvenantFor(null)
+      if (avenantSignedInputRef.current) avenantSignedInputRef.current.value = ""
+      load()
+    } catch (err) {
+      alert("Erreur upload : " + (err.message || err))
+      setUploadingAvenantFor(null)
     }
   }
 
@@ -555,6 +636,18 @@ export default function EmployeeDetail(props) {
           onChange={function (e) {
             var f = e.target.files && e.target.files[0]
             if (f) handleWelcomePackFile(f)
+          }}
+        />
+
+        {/* Hidden file input pour l'avenant signé */}
+        <input
+          ref={avenantSignedInputRef}
+          type="file"
+          accept="application/pdf,image/jpeg,image/png"
+          style={{ display: "none" }}
+          onChange={function (e) {
+            var f = e.target.files && e.target.files[0]
+            if (f) handleAvenantSignedFile(f)
           }}
         />
 
@@ -872,27 +965,118 @@ export default function EmployeeDetail(props) {
                         ? ("Du " + fmtDate(c.date_debut) + " au " + fmtDate(c.date_fin))
                         : ("Embauche : " + fmtDate(c.date_embauche || c.date_debut))}
                     </div>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                      <button
-                        className="btn btn-sm btn-y"
-                        onClick={function () { if (props.onContractPreview) props.onContractPreview(c) }}
-                      >👁 Voir / Imprimer</button>
-                      {c.status === "draft" || c.status === "finalized" ? (
-                        <button
-                          className="btn btn-sm"
-                          onClick={function () { if (props.onContractEdit) props.onContractEdit(c) }}
-                        >✏️ Éditer</button>
-                      ) : null}
-                      <button
-                        className="btn btn-sm"
-                        onClick={function () { triggerSignedUpload(c) }}
-                      >📥 Uploader signé</button>
-                      <button
-                        className="btn btn-sm btn-red"
-                        onClick={function () { deleteContract(c) }}
-                        title="Supprimer ce contrat"
-                      >×</button>
-                    </div>
+
+                    {/* === TIMELINE DOCUMENTS (du plus récent au plus ancien) === */}
+                    {(function () {
+                      var docs = contractDocs[c.id] || []
+                      var avenantSigne = docs.filter(function (d) { return d.doc_type === "avenant" })[0]
+                      var avenantBrouillon = docs.filter(function (d) {
+                        return d.doc_type === "contrat_genere" && (d.label || "").toLowerCase().indexOf("avenant") >= 0
+                      })[0]
+                      var contratOriginel = docs.filter(function (d) { return d.doc_type === "contrat_signe" })[0]
+                      var hasAnyDoc = !!(avenantSigne || avenantBrouillon || contratOriginel)
+
+                      if (!hasAnyDoc) return null
+
+                      return (
+                        <div style={{
+                          background: "#FAFAFA",
+                          border: "1px solid #EBEBEB",
+                          borderRadius: 5,
+                          padding: 8,
+                          marginBottom: 8,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6
+                        }}>
+                          <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.5, color: "#888" }}>
+                            📁 Documents
+                          </div>
+
+                          {/* Avenant signé (si présent, en haut = le plus récent) */}
+                          {avenantSigne ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: contratOriginel ? "1px dashed #DDD" : "none" }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#16A34A" }}>✅ Avenant signé</span>
+                              <span style={{ fontSize: 10, color: "#666" }}>· {fmtDate(avenantSigne.uploaded_at)}</span>
+                              <button
+                                className="btn btn-sm btn-y"
+                                style={{ marginLeft: "auto" }}
+                                onClick={function () { openContractDoc(avenantSigne) }}
+                              >📄 Ouvrir</button>
+                            </div>
+                          ) : null}
+
+                          {/* Avenant brouillon (à signer) — affiché seulement si pas encore d'avenant signé */}
+                          {!avenantSigne && avenantBrouillon ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: contratOriginel ? "1px dashed #DDD" : "none" }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#FF82D7" }}>📝 Avenant en cours</span>
+                              <span style={{ fontSize: 10, color: "#666", fontStyle: "italic" }}>· à faire signer</span>
+                              <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+                                <button
+                                  className="btn btn-sm btn-y"
+                                  onClick={function () { openContractDoc(avenantBrouillon) }}
+                                >📄 Ouvrir</button>
+                                <button
+                                  className="btn btn-sm"
+                                  onClick={function () { triggerAvenantSignedUpload(c) }}
+                                  title="Uploader le PDF/scan de l'avenant signé par le salarié"
+                                >📥 Uploader signé</button>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {/* Contrat originel (en bas = le plus ancien) */}
+                          {contratOriginel ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0" }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#191923" }}>📜 Contrat originel</span>
+                              <span style={{ fontSize: 10, color: "#666" }}>
+                                · signé le {fmtDate(contratOriginel.uploaded_at)}
+                                {(c.date_embauche || c.date_debut) ? (" · effet " + fmtDate(c.date_embauche || c.date_debut)) : ""}
+                              </span>
+                              <button
+                                className="btn btn-sm btn-y"
+                                style={{ marginLeft: "auto" }}
+                                onClick={function () { openContractDoc(contratOriginel) }}
+                              >📄 Ouvrir</button>
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    })()}
+
+                    {/* === BOUTONS D'ACTION CONTEXTUELS === */}
+                    {(function () {
+                      var docs = contractDocs[c.id] || []
+                      var hasContratSigne = docs.some(function (d) { return d.doc_type === "contrat_signe" })
+                      return (
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {/* Voir/Imprimer = regénère un PDF Meshuga, utile seulement si pas de contrat signé attaché */}
+                          {!hasContratSigne ? (
+                            <button
+                              className="btn btn-sm btn-y"
+                              onClick={function () { if (props.onContractPreview) props.onContractPreview(c) }}
+                            >👁 Voir / Imprimer</button>
+                          ) : null}
+                          {c.status === "draft" || c.status === "finalized" ? (
+                            <button
+                              className="btn btn-sm"
+                              onClick={function () { if (props.onContractEdit) props.onContractEdit(c) }}
+                            >✏️ Éditer</button>
+                          ) : null}
+                          {!hasContratSigne ? (
+                            <button
+                              className="btn btn-sm"
+                              onClick={function () { triggerSignedUpload(c) }}
+                            >📥 Uploader contrat signé</button>
+                          ) : null}
+                          <button
+                            className="btn btn-sm btn-red"
+                            onClick={function () { deleteContract(c) }}
+                            title="Supprimer ce contrat"
+                          >×</button>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })}
