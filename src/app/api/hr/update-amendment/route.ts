@@ -1,280 +1,87 @@
 // src/app/api/hr/update-amendment/route.ts
-// Génère un avenant de mise à jour pour aligner un contrat existant sur les
-// dernières normes (clauses modernes : HACCP, RGPD, droit déconnexion, etc.)
-// Utilise la lib partagée src/lib/hr/clauses-library.ts.
+// Génère un avenant de mise à jour aligné sur la DA Meshuga existante
+// (même CSS partagé que le contrat extra et les CDI).
 
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { renderClauses, getCatalog } from '@/lib/hr/clauses-library'
+import {
+  buildSharedCss,
+  buildSharedHeader,
+  buildSharedSignatures,
+  wrapHtml,
+  esc,
+} from '@/app/dashboard/rh/contractBuilders'
 
 export var runtime = 'nodejs'
 
-function escapeHtml(s: any): string {
-  if (s === null || s === undefined) return ''
-  return String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-}
-
-function fmtDateFr(iso: any): string {
-  if (!iso) return '—'
+function dateLongFr(iso: any): string {
+  if (!iso) return '[date à compléter]'
   try {
-    var s = String(iso).slice(0, 10)
-    var p = s.split('-')
-    if (p.length !== 3) return s
-    return p[2] + '/' + p[1] + '/' + p[0]
-  } catch (e) { return String(iso) }
+    var d = new Date(String(iso).slice(0, 10))
+    if (isNaN(d.getTime())) return String(iso)
+    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+  } catch { return String(iso) }
 }
 
 function buildHtml(data: any): string {
   var emp = data.employee || {}
   var ctr = data.contract || {}
   var clauseIds: string[] = data.clauses || []
-  var dateEffet = fmtDateFr(data.date_effet || new Date().toISOString().slice(0, 10))
-  var villeSig = data.ville_signature || 'Paris'
-  var dateSig = fmtDateFr(data.date_signature || new Date().toISOString().slice(0, 10))
-  var fullName = (emp.civilite || '') + ' ' + (emp.prenom || '') + ' ' + ((emp.nom || '').toUpperCase())
-  var fullAddress = (emp.adresse ? emp.adresse + ', ' : '') + (emp.code_postal || '') + ' ' + (emp.ville || '')
-  var contratLabel = data.contract_label || 'contrat de travail'
-  var contratDate = ctr.date_debut ? fmtDateFr(ctr.date_debut) : (ctr.created_at ? fmtDateFr(ctr.created_at) : '—')
 
-  // Génération des clauses via la lib partagée (numérotées à partir de 1)
-  var rendered = renderClauses(clauseIds, 1)
-  var clausesHtml = rendered.html
+  var civilite = emp.civilite || 'Madame'
+  var isFemale = (civilite === 'Madame' || civilite === 'Mademoiselle')
+
+  var dateEffet = dateLongFr(data.date_effet || new Date().toISOString().slice(0, 10))
+  var contratLabel = data.contract_label || 'contrat de travail'
+  var contratDate = ctr.date_debut ? dateLongFr(ctr.date_debut) : (ctr.created_at ? dateLongFr(ctr.created_at) : '—')
+  var fonction = ctr.fonction || '—'
+
+  // Header partagé (logo + cover + parties)
+  var header = buildSharedHeader({
+    emp: emp,
+    titreCover: 'AVENANT AU CONTRAT DE TRAVAIL',
+    sousTitreCover: 'Mise à jour des clauses contractuelles · CCN Restauration Rapide (IDCC 1501)',
+    typeBandeau: 'AVENANT',
+    logoUri: data.logoUri || null,
+  })
+
+  // Article 1 : Préambule (objet de l'avenant)
+  var body = ''
+    + '<div class="art"><span class="art-num">Article 1.</span><span class="art-title">Objet de l\'avenant</span></div>'
+    + '<div class="body">'
+    + '<p>Le présent avenant a pour objet de <strong>compléter et mettre à jour</strong> les clauses du ' + esc(contratLabel) + ' conclu entre les Parties (date d\'effet du contrat initial : <strong>' + esc(contratDate) + '</strong>), afin de l\'aligner sur les obligations légales et conventionnelles en vigueur ainsi que sur les procédures internes actuelles de l\'établissement.</p>'
+    + '<p>' + (isFemale ? 'La Salariée' : 'Le Salarié') + ' est ' + (isFemale ? 'employée' : 'employé') + ' en qualité de <strong>' + esc(fonction) + '</strong>.</p>'
+    + '<p>Les clauses du contrat initial non expressément modifiées par le présent avenant <strong>restent pleinement applicables</strong>. L\'<strong>ancienneté ' + (isFemale ? 'de la Salariée' : 'du Salarié') + ' et l\'ensemble de ses droits acquis</strong> (notamment les congés payés et la prime d\'ancienneté le cas échéant) sont intégralement conservés.</p>'
+    + '<p>Le présent avenant prend effet le <strong>' + esc(dateEffet) + '</strong>.</p>'
+    + '</div>'
+
+  // Articles 2+ : clauses modernes via la lib (avec genderize)
+  var rendered = renderClauses(clauseIds, 2, isFemale)
+  body += rendered.html
   var nextIdx = rendered.nextIdx
 
-  if (!clausesHtml) {
-    clausesHtml = '<p style="font-style:italic;color:#777;">Aucune clause sélectionnée.</p>'
-    nextIdx = 1
-  }
+  // Dernier article : dispositions finales
+  body += '<div class="art"><span class="art-num">Article ' + nextIdx + '.</span><span class="art-title">Dispositions finales</span></div>'
+       +  '<div class="body">'
+       +  '<p>Le présent avenant fait partie intégrante du contrat de travail conclu entre les Parties. Les autres clauses du contrat initial demeurent inchangées et continuent de produire tous leurs effets.</p>'
+       +  '<p>Le présent avenant est établi en deux exemplaires originaux, dont un est remis à chaque Partie.</p>'
+       +  '</div>'
 
-  return `<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="utf-8" />
-<title>Avenant — ${escapeHtml(fullName)}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">
-<style>
-  * {
-    box-sizing: border-box;
-    -webkit-print-color-adjust: exact !important;
-    -moz-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
-  }
-  @page { size: A4 portrait; margin: 18mm 16mm 18mm 16mm; }
-  html, body {
-    margin: 0; padding: 0;
-    font-family: 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
-    color: #191923;
-    background: #FFFFFF;
-    font-size: 11pt;
-    line-height: 1.5;
-  }
-  @media screen { body { padding: 12mm; max-width: 210mm; margin: 0 auto; } }
+  var signatures = buildSharedSignatures(
+    {
+      date_signature: data.date_signature || new Date().toISOString().slice(0, 10),
+      ville_signature: data.ville_signature || 'Paris',
+    },
+    emp,
+    fonction
+  )
 
-  .header {
-    border-bottom: 3px solid #191923;
-    padding-bottom: 6mm;
-    margin-bottom: 8mm;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 8mm;
-  }
-  .title-yellow {
-    background: #FFEB5A;
-    border: 2.5px solid #191923;
-    box-shadow: 4px 4px 0 #191923;
-    padding: 5mm 7mm;
-    flex: 1;
-  }
-  .title-yellow .yellowtail { font-family: 'Yellowtail', cursive; font-size: 28pt; color: #FF82D7; line-height: 1; }
-  .title-yellow .sub { font-weight: 900; text-transform: uppercase; font-size: 10pt; letter-spacing: 1.5px; margin-top: 2mm; }
-  .header-right { text-align: right; font-size: 8.5pt; }
-  .header-right .label { font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #FF82D7; }
-
-  .preamble {
-    background: #FFF8E1;
-    border: 2.5px solid #FF82D7;
-    box-shadow: 4px 4px 0 #FF82D7;
-    padding: 5mm 6mm;
-    margin-bottom: 8mm;
-    font-size: 10pt;
-    line-height: 1.5;
-  }
-  .preamble .yt { font-family: 'Yellowtail', cursive; font-size: 16pt; color: #FF82D7; line-height: 1; margin-bottom: 3mm; }
-
-  h2 {
-    font-family: 'Arial Narrow', Arial, sans-serif;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 11pt;
-    color: #191923;
-    background: #FFEB5A;
-    padding: 2mm 4mm;
-    margin: 6mm 0 3mm 0;
-    border: 1.5px solid #191923;
-    border-left: 5px solid #FF82D7;
-    page-break-after: avoid;
-  }
-
-  p { margin: 2mm 0; }
-  ul { margin: 2mm 0; padding-left: 6mm; }
-  ul li { margin: 1mm 0; }
-
-  .parties { display: flex; gap: 6mm; margin: 4mm 0 8mm; }
-  .partie {
-    flex: 1;
-    background: #FFFFFF;
-    border: 2px solid #191923;
-    box-shadow: 3px 3px 0 #191923;
-    padding: 4mm;
-    font-size: 10pt;
-  }
-  .partie .ptitre {
-    background: #FF82D7;
-    color: #191923;
-    font-weight: 900;
-    text-transform: uppercase;
-    font-size: 9pt;
-    letter-spacing: 1px;
-    padding: 1.5mm 3mm;
-    margin: -4mm -4mm 3mm -4mm;
-    border-bottom: 2px solid #191923;
-  }
-
-  .signatures { display: flex; gap: 8mm; margin-top: 12mm; page-break-inside: avoid; }
-  .sig-box {
-    flex: 1;
-    border: 2px solid #191923;
-    box-shadow: 3px 3px 0 #191923;
-    padding: 4mm;
-    background: #FFFFFF;
-  }
-  .sig-box .sig-label { font-size: 8pt; text-transform: uppercase; font-weight: 900; letter-spacing: 1px; color: #FF82D7; }
-  .sig-box .sig-name { font-weight: 900; margin-top: 1mm; font-size: 10pt; }
-  .sig-box .sig-zone { height: 28mm; margin-top: 3mm; border-top: 1px dashed #BBB; }
-  .sig-mention { font-size: 8.5pt; color: #555; margin-top: 2mm; font-style: italic; }
-  .small { font-size: 8.5pt; color: #555; }
-
-  .print-button {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: #FF82D7;
-    color: #191923;
-    border: 2.5px solid #191923;
-    box-shadow: 4px 4px 0 #191923;
-    padding: 10px 20px;
-    font-family: 'Arial Narrow', Arial, sans-serif;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 11pt;
-    cursor: pointer;
-    z-index: 100;
-  }
-  .print-button:hover { background: #FFEB5A; }
-  @media print { .no-print { display: none !important; } }
-</style>
-</head>
-<body>
-
-<button class="no-print print-button" onclick="window.print()">↓ Imprimer / PDF</button>
-
-<div class="header">
-  <div class="title-yellow">
-    <div class="yellowtail">Avenant au contrat</div>
-    <div class="sub">Mise à jour des clauses contractuelles</div>
-  </div>
-  <div class="header-right">
-    <div class="label">Établissement</div>
-    <div>SAS Aegia Food</div>
-    <div>Meshuga Crazy Deli</div>
-    <div>3 rue Vavin, 75006 Paris</div>
-    <div class="label" style="margin-top:2mm;">SIRET</div>
-    <div>904 639 531 00014</div>
-    <div class="label" style="margin-top:2mm;">CCN</div>
-    <div>Restauration Rapide<br/>IDCC 1501</div>
-  </div>
-</div>
-
-<div class="preamble">
-  <div class="yt">Préambule</div>
-  <p>
-    Le présent avenant a pour objet de <strong>compléter et mettre à jour</strong> les clauses
-    du ${escapeHtml(contratLabel)} conclu entre les parties (date d'effet : <strong>${contratDate}</strong>),
-    afin de l'aligner sur les obligations légales et conventionnelles en vigueur ainsi que sur les
-    procédures internes actuelles de l'établissement.
-  </p>
-  <p>
-    Les clauses du contrat initial non expressément modifiées par le présent avenant <strong>restent
-    pleinement applicables</strong>. L'<strong>ancienneté du salarié et l'ensemble de ses droits
-    acquis</strong> (notamment les congés payés et la prime d'ancienneté le cas échéant) sont
-    intégralement conservés.
-  </p>
-  <p>
-    Le présent avenant prend effet le <strong>${dateEffet}</strong>.
-  </p>
-</div>
-
-<h2>Article préliminaire — Parties</h2>
-
-<div class="parties">
-  <div class="partie">
-    <div class="ptitre">L'Employeur</div>
-    <strong>SASU AEGIA FOOD</strong><br/>
-    Représentée par M. Edward TOURET, Président<br/>
-    Siège social : 3 rue Vavin, 75006 Paris<br/>
-    SIRET : 904 639 531 00014<br/>
-    CCN : Restauration Rapide (IDCC 1501)
-  </div>
-  <div class="partie">
-    <div class="ptitre">Le Salarié</div>
-    <strong>${escapeHtml(fullName)}</strong><br/>
-    ${emp.date_naissance ? 'Né(e) le ' + fmtDateFr(emp.date_naissance) + (emp.lieu_naissance ? ' à ' + escapeHtml(emp.lieu_naissance) : '') + '<br/>' : ''}
-    ${fullAddress.trim() ? 'Demeurant : ' + escapeHtml(fullAddress.trim()) + '<br/>' : ''}
-    ${emp.num_secu ? 'N° de Sécurité sociale : ' + escapeHtml(emp.num_secu) + '<br/>' : ''}
-    Employé(e) en qualité de ${escapeHtml(ctr.fonction || '—')}
-  </div>
-</div>
-
-${clausesHtml}
-
-<h2>Article ${nextIdx} — Dispositions finales</h2>
-<p>
-  Le présent avenant fait partie intégrante du contrat de travail conclu entre les parties.
-  Les autres clauses du contrat initial demeurent inchangées et continuent de produire tous leurs effets.
-</p>
-<p>
-  Le présent avenant est établi en deux exemplaires originaux, dont un est remis à chaque partie.
-</p>
-
-<div class="signatures">
-  <div class="sig-box">
-    <div class="sig-label">L'Employeur</div>
-    <div class="sig-name">M. Edward TOURET</div>
-    <div class="small">Président SASU AEGIA FOOD</div>
-    <div class="sig-zone"></div>
-    <div class="sig-mention">Cachet de l'entreprise + signature</div>
-  </div>
-  <div class="sig-box">
-    <div class="sig-label">Le Salarié</div>
-    <div class="sig-name">${escapeHtml(fullName)}</div>
-    <div class="sig-zone"></div>
-    <div class="sig-mention">Précédé de la mention manuscrite « Lu et approuvé, bon pour accord »</div>
-  </div>
-</div>
-
-<p style="margin-top: 8mm; text-align: center; font-size: 9pt; color: #555;">
-  Fait à <strong>${escapeHtml(villeSig)}</strong>, le <strong>${dateSig}</strong>, en deux exemplaires originaux.
-</p>
-
-</body>
-</html>`
+  return wrapHtml({
+    titre: 'Avenant — ' + (emp.prenom || '') + ' ' + ((emp.nom || '').toUpperCase()),
+    css: buildSharedCss(data.logoUri || null),
+    body: header + body + signatures,
+  })
 }
 
 export async function POST(req: Request) {
@@ -285,13 +92,9 @@ export async function POST(req: Request) {
 
     var admin = createAdminClient()
     var resE = await admin.from('hr_employees').select('*').eq('id', body.employee_id).single()
-    if (resE.error || !resE.data) {
-      return NextResponse.json({ error: 'employé introuvable' }, { status: 404 })
-    }
+    if (resE.error || !resE.data) return NextResponse.json({ error: 'employé introuvable' }, { status: 404 })
     var resC = await admin.from('hr_contracts').select('*').eq('id', body.contract_id).single()
-    if (resC.error || !resC.data) {
-      return NextResponse.json({ error: 'contrat introuvable' }, { status: 404 })
-    }
+    if (resC.error || !resC.data) return NextResponse.json({ error: 'contrat introuvable' }, { status: 404 })
 
     var html = buildHtml({
       employee: resE.data,
@@ -301,6 +104,7 @@ export async function POST(req: Request) {
       date_effet: body.date_effet,
       ville_signature: body.ville_signature,
       date_signature: body.date_signature,
+      logoUri: null,
     })
 
     return new Response(html, {
