@@ -23,7 +23,7 @@ import { extractStoppageFromImages } from '@/lib/hr/ocr-stoppage'
 import { assemblePdfFromImages } from '@/lib/hr/pdf-assembler'
 
 export var runtime = 'nodejs'
-export var maxDuration = 60
+export var maxDuration = 300
 
 export async function POST(req: Request) {
   var uploadedPaths: string[] = []
