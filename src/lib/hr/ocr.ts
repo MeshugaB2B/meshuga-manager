@@ -136,6 +136,7 @@ Conventions de sortie :
 - Heures hebdo : nombre (35, 39, 24...)
 - contract.type : extra | cdi_cuisinier | cdi_caissier | cdi_cadre selon poste. Si CDI cadre → cdi_cadre. Si CDI cuisine → cdi_cuisinier. Si CDI caisse/vente → cdi_caissier. Si CDD/extra/mission → extra. Si pas tranchable → null
 - contract.type_brut : ce qui est ÉCRIT (ex: "CDI", "CDD d'usage", "Contrat à durée déterminée")
+- contract.statut_cadre : DOIT être STRICTEMENT l'une de ces 3 valeurs : "cadre", "non-cadre", "agent_maitrise". Mapping : "Employé", "Ouvrier", "Non cadre", "Niveau I/II/III" → "non-cadre". "Agent de maîtrise", "Niveau IV" → "agent_maitrise". "Cadre", "Niveau V/VI/VII" → "cadre". Si pas tranchable → null. NE JAMAIS retourner "non", "employé" ou autre valeur libre.
 - exit_info.motif_sortie : demission | licenciement | rupture_conv | fin_cdd | rupture_periode_essai | retraite | abandon_poste | autre
 - meta.detected_avenant : true si le titre/préambule mentionne "avenant"
 - meta.confidence : "high" si tout lisible, "medium" si quelques doutes, "low" si plusieurs champs indéterminables
