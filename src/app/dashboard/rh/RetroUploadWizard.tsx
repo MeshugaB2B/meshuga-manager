@@ -198,6 +198,56 @@ function fillEmployeeFromExtraction(current: any, extracted: any) {
   return copy
 }
 
+// Normalise une valeur de statut_cadre. Accepte les variations IA et libellés
+// humains, retourne UNE des 3 valeurs autorisées par la contrainte SQL :
+// 'cadre' | 'non-cadre' | 'agent_maitrise' | null
+function normalizeStatutCadre(v: any): string | null {
+  if (v === null || v === undefined || v === "") return null
+  var s = String(v).toLowerCase().trim()
+  // Valeurs déjà normalisées
+  if (s === "cadre") return "cadre"
+  if (s === "non-cadre") return "non-cadre"
+  if (s === "agent_maitrise") return "agent_maitrise"
+  // Variantes "non-cadre" : "non", "non cadre", "non_cadre", "employé", "employe", "ouvrier"
+  if (s === "non" || s === "non cadre" || s === "non_cadre"
+      || s === "employé" || s === "employe" || s === "ouvrier"
+      || s === "ouvrière" || s === "ouvriere" || s === "employée" || s === "employee") {
+    return "non-cadre"
+  }
+  // Variantes "agent de maîtrise" : "agent", "maitrise", "agent maitrise"…
+  if (s.indexOf("agent") >= 0 || s.indexOf("maitrise") >= 0 || s.indexOf("maîtrise") >= 0
+      || s === "am") {
+    return "agent_maitrise"
+  }
+  // Variantes "cadre" : déjà couvert ci-dessus, mais "cadre supérieur" etc.
+  if (s.indexOf("cadre") >= 0) return "cadre"
+  // Inconnu → null (préférable à un crash DB)
+  return null
+}
+
+// Normalise une valeur de type de contrat (4 valeurs autorisées + null)
+function normalizeContractType(v: any): string {
+  if (v === null || v === undefined || v === "") return "extra"
+  var s = String(v).toLowerCase().trim()
+  var allowed = ["extra", "cdi_cuisinier", "cdi_caissier", "cdi_cadre"]
+  if (allowed.indexOf(s) >= 0) return s
+  // Variantes
+  if (s.indexOf("cuisin") >= 0) return "cdi_cuisinier"
+  if (s.indexOf("caiss") >= 0 || s.indexOf("vend") >= 0) return "cdi_caissier"
+  if (s.indexOf("cadre") >= 0) return "cdi_cadre"
+  if (s.indexOf("extra") >= 0 || s === "cdd" || s === "cdd_usage") return "extra"
+  return "extra" // fallback safe
+}
+
+// Normalise un nombre (string "1 900,50" → 1900.50, null si vide/invalide)
+function normalizeNumber(v: any): number | null {
+  if (v === null || v === undefined || v === "") return null
+  if (typeof v === "number") return isNaN(v) ? null : v
+  var s = String(v).replace(/\s/g, "").replace(/€/g, "").replace(",", ".")
+  var n = parseFloat(s)
+  return isNaN(n) ? null : n
+}
+
 // Mapping infos contrat extraites → formulaire
 function fillContractFromExtraction(current: any, extracted: any) {
   if (!extracted) return current
@@ -207,8 +257,10 @@ function fillContractFromExtraction(current: any, extracted: any) {
       copy[k] = extracted[k]
     }
   })
-  if (!copy.type) copy.type = "extra"
-  if (!copy.statut_cadre) copy.statut_cadre = "non-cadre"
+  // Normaliser les enums avant d'arriver au formulaire
+  copy.type = normalizeContractType(copy.type)
+  var normStatut = normalizeStatutCadre(copy.statut_cadre)
+  copy.statut_cadre = normStatut === null ? "non-cadre" : normStatut
   return copy
 }
 
@@ -594,12 +646,21 @@ export default function RetroUploadWizard(props: any) {
           var v = contractFields[k]
           if (v === "" || v === null || v === undefined) return
           if (k === "taux_horaire_brut" || k === "salaire_brut_mensuel" || k === "heures_hebdo" || k === "heures_mensuelles" || k === "periode_essai_mois") {
-            var n = parseFloat(String(v).replace(",", "."))
-            if (!isNaN(n)) ctrPayload[k] = n
+            var n = normalizeNumber(v)
+            if (n !== null) ctrPayload[k] = n
             return
           }
           ctrPayload[k] = v
         })
+        // Sanitization finale des enums (sécurité contre les contraintes SQL)
+        ctrPayload.type = normalizeContractType(ctrPayload.type)
+        var normalizedStatut = normalizeStatutCadre(ctrPayload.statut_cadre)
+        if (normalizedStatut === null) {
+          // Si on n'a pas pu normaliser, on retire le champ (DB acceptera NULL)
+          delete ctrPayload.statut_cadre
+        } else {
+          ctrPayload.statut_cadre = normalizedStatut
+        }
         ctrPayload.status = "archived"
         ctrPayload.contract_label = (docType === "avenant" ? "Avenant — " : "Contrat — ") + (contractFields.fonction || "")
 
@@ -607,8 +668,8 @@ export default function RetroUploadWizard(props: any) {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify(ctrPayload),
         })
-        var dataPatch = await resPatch.json()
-        if (!resPatch.ok) throw new Error("Sauvegarde contrat : " + (dataPatch.error || ""))
+        var pPatch = await parseApiResponse(resPatch)
+        if (!pPatch.ok) throw new Error("Sauvegarde contrat : " + pPatch.errorText)
 
         // Marquer le doc OCR comme validé
         var newLabel = DOC_TYPE_LABELS[docType] || "Document"
