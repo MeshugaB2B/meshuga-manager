@@ -22,6 +22,7 @@ import { useState, useEffect, useRef } from "react"
 import { createClient } from "@supabase/supabase-js"
 import DocumentsManager from "./DocumentsManager"
 import OffboardingWizard from "./OffboardingWizard"
+import WorkStoppageWizard from "./WorkStoppageWizard"
 import {
   NATIONALITES,
   getContractTypeMeta,
@@ -45,6 +46,10 @@ export default function EmployeeDetail(props) {
   var [uploadingWelcomePack, setUploadingWelcomePack] = useState(false)
   var [showOffboarding, setShowOffboarding] = useState(false)
   var [unmarkingExit, setUnmarkingExit] = useState(false)
+  var [stoppages, setStoppages] = useState([])
+  var [showStoppageWizard, setShowStoppageWizard] = useState(false)
+  var [editingStoppage, setEditingStoppage] = useState(null)
+  var [reEmploying, setReEmploying] = useState(false)
   var signedFileInputRef = useRef(null)
   var welcomePackFileInputRef = useRef(null)
 
@@ -79,6 +84,16 @@ export default function EmployeeDetail(props) {
     } else {
       setWelcomePackDocs([])
     }
+
+    // Charge les arrêts de travail
+    try {
+      var resSt = await fetch("/api/hr/work-stoppages?employee_id=" + props.employeeId)
+      var dataSt = await resSt.json()
+      if (resSt.ok) setStoppages(dataSt.stoppages || [])
+    } catch (e) {
+      // non-fatal
+    }
+
     setLoading(false)
   }
 
@@ -366,6 +381,102 @@ export default function EmployeeDetail(props) {
     }
   }
 
+  // === Ré-embauche : créer un nouveau cycle pour un salarié déjà parti ===
+  async function handleReHire() {
+    if (!emp.date_sortie) return
+    var today = new Date().toISOString().slice(0, 10)
+    var dateStr = window.prompt(
+      "Date de ré-embauche (format JJ/MM/AAAA ou AAAA-MM-JJ). Laisse vide pour aujourd'hui :",
+      ""
+    )
+    if (dateStr === null) return // annulé
+    var dateIso = today
+    if (dateStr.trim()) {
+      // Convertir DD/MM/YYYY → YYYY-MM-DD si nécessaire
+      var s = dateStr.trim()
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+        var parts = s.split("/")
+        dateIso = parts[2] + "-" + parts[1] + "-" + parts[0]
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        dateIso = s
+      } else {
+        alert("Format de date invalide. Utilise JJ/MM/AAAA ou AAAA-MM-JJ.")
+        return
+      }
+    }
+    setReEmploying(true)
+    try {
+      // 1) Créer un nouveau cycle ouvert
+      var resCyc = await fetch("/api/hr/cycles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employee_id: emp.id,
+          date_entree: dateIso,
+          notes: "Ré-embauche le " + dateIso,
+        }),
+      })
+      var dataCyc = await resCyc.json()
+      if (!resCyc.ok) throw new Error(dataCyc.error || "Création nouveau cycle")
+
+      // 2) Restaurer le statut actif sur hr_employees
+      await supabase.from("hr_employees").update({
+        date_sortie: null,
+        motif_sortie: null,
+      }).eq("id", emp.id)
+
+      if (props.onSaved) props.onSaved("Nouveau cycle d'emploi créé — utilise '+ Nouveau contrat' pour ajouter son contrat")
+      load()
+    } catch (e: any) {
+      alert("Erreur ré-embauche : " + e.message)
+    } finally {
+      setReEmploying(false)
+    }
+  }
+
+  // === Helpers Arrêts de travail ===
+  var stoppageTypeLabels = {
+    arret_maladie: "Arrêt maladie",
+    accident_travail: "Accident travail",
+    accident_trajet: "Accident trajet",
+    maladie_pro: "Maladie pro",
+    conge_maternite: "Congé maternité",
+    conge_paternite: "Congé paternité",
+    conge_adoption: "Congé adoption",
+    conge_parental: "Congé parental",
+    autre: "Autre",
+  }
+
+  function stoppageTypeIcon(t) {
+    if (t === "arret_maladie") return "🤒"
+    if (t === "accident_travail" || t === "accident_trajet") return "🚑"
+    if (t === "maladie_pro") return "⚕️"
+    if (t === "conge_maternite" || t === "conge_paternite" || t === "conge_adoption") return "👶"
+    if (t === "conge_parental") return "👨‍👩‍👧"
+    return "📋"
+  }
+
+  function isStoppageOngoing(s) {
+    if (!s.date_fin) return true
+    var today = new Date().toISOString().slice(0, 10)
+    return s.date_fin >= today
+  }
+
+  async function deleteStoppage(s) {
+    if (!window.confirm("Supprimer cet arrêt ? Action irréversible.")) return
+    try {
+      var res = await fetch("/api/hr/work-stoppages?id=" + s.id, { method: "DELETE" })
+      if (!res.ok) {
+        var d = await res.json()
+        throw new Error(d.error || "Erreur suppression")
+      }
+      if (props.onSaved) props.onSaved("Arrêt supprimé")
+      load()
+    } catch (e: any) {
+      alert("Erreur : " + e.message)
+    }
+  }
+
   // === Render ===
   if (loading || !emp) {
     return (
@@ -458,12 +569,20 @@ export default function EmployeeDetail(props) {
                 title="Marquer le salarié comme parti (date de sortie + motif)"
               >📤 Marquer comme parti</button>
             ) : (
-              <button
-                className="btn btn-red"
-                onClick={handleUnmarkExit}
-                disabled={unmarkingExit}
-                title="Annuler le départ et rouvrir le cycle d'emploi"
-              >{unmarkingExit ? "..." : "↩ Annuler le départ"}</button>
+              <span style={{ display: "contents" }}>
+                <button
+                  className="btn btn-y"
+                  onClick={handleReHire}
+                  disabled={reEmploying}
+                  title="Créer un nouveau cycle d'emploi (la personne revient travailler)"
+                >{reEmploying ? "..." : "🔁 Nouvelle embauche"}</button>
+                <button
+                  className="btn btn-red"
+                  onClick={handleUnmarkExit}
+                  disabled={unmarkingExit}
+                  title="Annuler le départ (rouvre le cycle clôturé — utiliser uniquement si erreur)"
+                >{unmarkingExit ? "..." : "↩ Annuler le départ"}</button>
+              </span>
             )}
           </div>
         </div>
@@ -699,6 +818,90 @@ export default function EmployeeDetail(props) {
           )}
         </div>
 
+        {/* === BLOC ARRÊTS DE TRAVAIL === */}
+        <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <div className="ct" style={{ marginBottom: 0 }}>🩹 Arrêts de travail ({stoppages.length})</div>
+            <button
+              className="btn btn-sm btn-p"
+              onClick={function () {
+                setEditingStoppage(null)
+                setShowStoppageWizard(true)
+              }}
+            >+ Ajouter un arrêt</button>
+          </div>
+          {stoppages.length === 0 ? (
+            <div style={{ fontSize: 11, opacity: 0.6, padding: "10px 0" }}>
+              Aucun arrêt enregistré. Tu peux saisir manuellement ou uploader le certificat médical (l'IA extrait les dates).
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {stoppages.map(function (s) {
+                var ongoing = isStoppageOngoing(s)
+                return (
+                  <div key={s.id} style={{
+                    padding: 10,
+                    background: ongoing ? "#FFF8E1" : "#FFFFFF",
+                    border: "2px solid " + (ongoing ? "#FFEB5A" : "#EDEDED"),
+                    borderRadius: 6,
+                    display: "flex",
+                    gap: 10,
+                    alignItems: "flex-start",
+                    flexWrap: "wrap",
+                  }}>
+                    <div style={{ fontSize: 22, lineHeight: 1 }}>{stoppageTypeIcon(s.stoppage_type)}</div>
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 2 }}>
+                        <strong style={{ fontSize: 13 }}>{stoppageTypeLabels[s.stoppage_type] || s.stoppage_type}</strong>
+                        {ongoing ? (
+                          <span style={{
+                            background: "#FFEB5A", color: "#191923",
+                            padding: "2px 6px", borderRadius: 3, fontSize: 9, fontWeight: 900,
+                            border: "1px solid #191923",
+                          }}>EN COURS</span>
+                        ) : null}
+                        {s.is_prolongation ? (
+                          <span style={{
+                            background: "#FF82D7", color: "#191923",
+                            padding: "2px 6px", borderRadius: 3, fontSize: 9, fontWeight: 900,
+                            border: "1px solid #191923",
+                          }}>PROLONGATION</span>
+                        ) : null}
+                      </div>
+                      <div style={{ fontSize: 11, marginBottom: 2 }}>
+                        Du <b>{fmtDate(s.date_debut)}</b>
+                        {s.date_fin ? (
+                          <span> au <b>{fmtDate(s.date_fin)}</b></span>
+                        ) : (
+                          <span> (en cours)</span>
+                        )}
+                      </div>
+                      {s.motif ? <div style={{ fontSize: 11, opacity: 0.8 }}>{s.motif}</div> : null}
+                      {s.prescripteur ? <div style={{ fontSize: 10, opacity: 0.6 }}>{s.prescripteur}</div> : null}
+                      {s.document_path ? (
+                        <div style={{ fontSize: 9, opacity: 0.5, marginTop: 2 }}>📎 Certificat médical archivé</div>
+                      ) : null}
+                    </div>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button
+                        className="btn btn-sm"
+                        onClick={function () {
+                          setEditingStoppage(s)
+                          setShowStoppageWizard(true)
+                        }}
+                      >✏️</button>
+                      <button
+                        className="btn btn-sm btn-red"
+                        onClick={function () { deleteStoppage(s) }}
+                      >🗑</button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
         {/* === BLOC DOSSIER DE BIENVENUE === */}
         <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
           <div className="ct">📋 Dossier de bienvenue</div>
@@ -773,6 +976,24 @@ export default function EmployeeDetail(props) {
           onSaved={function (msg) {
             setShowOffboarding(false)
             if (props.onSaved) props.onSaved(msg || "Salarié marqué comme parti")
+            load()
+          }}
+        />
+      ) : null}
+
+      {/* === MODAL STOPPAGE WIZARD === */}
+      {showStoppageWizard && emp ? (
+        <WorkStoppageWizard
+          employee={emp}
+          existing={editingStoppage}
+          onClose={function () {
+            setShowStoppageWizard(false)
+            setEditingStoppage(null)
+          }}
+          onSaved={function (msg) {
+            setShowStoppageWizard(false)
+            setEditingStoppage(null)
+            if (props.onSaved) props.onSaved(msg || "Arrêt enregistré")
             load()
           }}
         />
