@@ -473,6 +473,8 @@ export async function POST(req: Request) {
   try {
     var body = await req.json()
     var employee_id = body.employee_id
+    var contract_id = body.contract_id  // optionnel : si fourni, on attache le doc à ce contrat
+    var shouldSave = !!body.save  // optionnel : si true, sauvegarde dans Storage + crée row
 
     if (!employee_id) {
       return NextResponse.json({ error: 'employee_id requis' }, { status: 400 })
@@ -507,10 +509,84 @@ export async function POST(req: Request) {
       date_signature: body.date_signature,
     })
 
+    // Si save=true : on sauvegarde le HTML dans Storage et on crée un row
+    // hr_contract_documents avec doc_type='contrat_genere'. Comme ça le contrat
+    // apparaît dans la fiche du salarié avec les actions (voir, télécharger,
+    // remplacer par version signée).
+    var documentId: string | null = null
+    var storagePath: string | null = null
+
+    if (shouldSave && contract_id) {
+      try {
+        var todayIso = new Date().toISOString().slice(0, 10)
+        var stamp = Date.now()
+        storagePath = `${employee_id}/${contract_id}/contrat_genere/${todayIso}_${stamp}.html`
+
+        var htmlBuffer = Buffer.from(html, 'utf-8')
+        var uploadRes = await admin.storage
+          .from('hr-contract-docs')
+          .upload(storagePath, htmlBuffer, {
+            contentType: 'text/html; charset=utf-8',
+            cacheControl: '0',
+            upsert: false,
+          })
+        if (uploadRes.error) throw new Error('Upload Storage : ' + uploadRes.error.message)
+
+        // Vérifier qu'un précédent doc 'contrat_genere' existe pour ce contrat,
+        // si oui on le supprime (Edward a régénéré un nouveau brouillon)
+        var prevDocs = await admin
+          .from('hr_contract_documents')
+          .select('id, file_path')
+          .eq('contract_id', contract_id)
+          .eq('doc_type', 'contrat_genere')
+        if (prevDocs.data && prevDocs.data.length > 0) {
+          for (var pd of prevDocs.data) {
+            if (pd.file_path) {
+              try { await admin.storage.from('hr-contract-docs').remove([pd.file_path]) } catch {}
+            }
+          }
+          await admin.from('hr_contract_documents')
+            .delete()
+            .in('id', prevDocs.data.map(function (d: any) { return d.id }))
+        }
+
+        // Créer le nouveau row
+        var fullName = (employeeMerged.prenom || '') + ' ' + ((employeeMerged.nom || '').toUpperCase())
+        var insertRes = await admin
+          .from('hr_contract_documents')
+          .insert({
+            contract_id: contract_id,
+            doc_type: 'contrat_genere',
+            file_path: storagePath,
+            mime_type: 'text/html; charset=utf-8',
+            file_size: htmlBuffer.length,
+            label: 'Contrat de régularisation — ' + fullName.trim() + ' (à signer)',
+            validated_by_user: false,  // brouillon, pas signé
+            uploaded_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single()
+        if (insertRes.error) {
+          // Rollback Storage si insert échoue
+          try { await admin.storage.from('hr-contract-docs').remove([storagePath]) } catch {}
+          throw new Error('Insert document : ' + insertRes.error.message)
+        }
+        documentId = insertRes.data.id
+      } catch (e: any) {
+        // eslint-disable-next-line no-console
+        console.error('Erreur sauvegarde contrat de régularisation:', e)
+        // On ne bloque pas la génération : Edward a au moins le HTML dans le navigateur
+        // mais on signale l'échec via un header pour que le client sache
+      }
+    }
+
     return new Response(html, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'X-Document-Id': documentId || '',
+        'X-Storage-Path': storagePath || '',
+        'X-Saved': documentId ? 'true' : 'false',
       },
     })
   } catch (e: any) {
