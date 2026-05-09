@@ -67,6 +67,67 @@ function formatDateFr(iso: any) {
   return parts[2] + "/" + parts[1] + "/" + parts[0]
 }
 
+// Convertit n'importe quelle erreur en message lisible (jamais "[object Object]").
+function errMsg(e: any): string {
+  if (!e) return "Erreur inconnue"
+  if (typeof e === "string") return e
+  if (e.message) return e.message
+  if (e.error) return typeof e.error === "string" ? e.error : JSON.stringify(e.error)
+  try {
+    var s = JSON.stringify(e)
+    if (s && s !== "{}") return s
+  } catch (_) {}
+  return "Erreur inconnue"
+}
+
+// Parse safely une réponse fetch (peut être JSON ou HTML d'erreur Vercel).
+// Retourne {ok, data, errorText}. Détecte aussi les timeouts (status 504/...).
+async function parseApiResponse(res: any): Promise<any> {
+  var ct = (res.headers.get("content-type") || "").toLowerCase()
+  var isHtml = ct.indexOf("text/html") === 0
+  var isJson = ct.indexOf("application/json") === 0
+
+  // Cas 413 Vercel : Request Entity Too Large
+  if (res.status === 413) {
+    return { ok: false, status: 413, errorText: "Documents trop volumineux pour Vercel (limite 4.5 MB)" }
+  }
+  // Cas 504 Vercel : Gateway Timeout (la fonction a dépassé son maxDuration)
+  if (res.status === 504) {
+    return { ok: false, status: 504, errorText: "Timeout : l'analyse IA a dépassé le temps maximal. Réessaie ou réduis le nombre de pages." }
+  }
+  // Cas HTML d'erreur Vercel (timeouts non-504, pages d'erreur statique)
+  if (isHtml && !res.ok) {
+    var txt = ""
+    try { txt = await res.text() } catch (_) {}
+    var hint = ""
+    if (txt.indexOf("FUNCTION_PAYLOAD_TOO_LARGE") >= 0) hint = " (documents trop volumineux)"
+    else if (txt.indexOf("FUNCTION_INVOCATION_TIMEOUT") >= 0) hint = " (timeout : l'analyse a pris trop de temps — réessaie)"
+    else if (txt.indexOf("FUNCTION_INVOCATION_FAILED") >= 0) hint = " (erreur serveur — réessaie dans 30s)"
+    return { ok: false, status: res.status, errorText: "Erreur serveur " + res.status + hint }
+  }
+  // Cas standard JSON
+  if (isJson) {
+    try {
+      var data = await res.json()
+      return { ok: res.ok, status: res.status, data: data, errorText: data?.error || null }
+    } catch (e: any) {
+      return { ok: false, status: res.status, errorText: "Réponse invalide du serveur" }
+    }
+  }
+  // Cas inconnu (pas de content-type) : tente JSON sinon texte
+  try {
+    var rawText = await res.text()
+    try {
+      var parsedData = JSON.parse(rawText)
+      return { ok: res.ok, status: res.status, data: parsedData, errorText: parsedData?.error || null }
+    } catch (_) {
+      return { ok: res.ok, status: res.status, errorText: rawText.slice(0, 200) || "Réponse vide" }
+    }
+  } catch (e: any) {
+    return { ok: false, status: res.status, errorText: errMsg(e) }
+  }
+}
+
 function emptyEmployee() {
   return {
     civilite: "Monsieur",
@@ -381,19 +442,19 @@ export default function RetroUploadWizard(props: any) {
         var stubEmp = resStub.data
 
         var todayIso = new Date().toISOString().slice(0, 10)
-        var resStubCycle = await fetch("/api/hr/cycles", {
+        var rcStub = await fetch("/api/hr/cycles", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ employee_id: stubEmp.id, date_entree: todayIso }),
         })
-        var dataStubCycle = await resStubCycle.json()
-        if (!resStubCycle.ok) throw new Error("Préparation cycle : " + (dataStubCycle.error || ""))
+        var pStub = await parseApiResponse(rcStub)
+        if (!pStub.ok) throw new Error("Préparation cycle : " + pStub.errorText)
 
         setActiveEmployee(stubEmp)
-        setActiveCycle(dataStubCycle.cycle)
+        setActiveCycle(pStub.data.cycle)
         // continue ci-dessous avec activeEmployee + activeCycle
         var workingEmployee = stubEmp
-        var workingCycle = dataStubCycle.cycle
+        var workingCycle = pStub.data.cycle
       } else {
         var workingEmployee = activeEmployee
         var workingCycle = activeCycle
@@ -412,9 +473,9 @@ export default function RetroUploadWizard(props: any) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(draftBody),
       })
-      var dataCtr = await resCtr.json()
-      if (!resCtr.ok) throw new Error("Contrat draft : " + (dataCtr.error || ""))
-      contractIdLocal = dataCtr.contract.id
+      var pCtr = await parseApiResponse(resCtr)
+      if (!pCtr.ok) throw new Error("Contrat draft : " + pCtr.errorText)
+      contractIdLocal = pCtr.data.contract.id
       setPendingContractId(contractIdLocal)
 
       // Étape C : compresser les images (multi-niveaux si nécessaire) puis upload
@@ -435,24 +496,20 @@ export default function RetroUploadWizard(props: any) {
         fd.append("file_" + String(i).padStart(3, "0"), compressedFiles[i])
       }
       var resUp = await fetch("/api/hr/upload-pages", { method: "POST", body: fd })
-
-      // Détection 413 (Vercel renvoie du HTML, pas du JSON)
-      if (resUp.status === 413 || (!resUp.ok && resUp.headers.get("content-type")?.indexOf("text/html") === 0)) {
-        throw new Error("Documents trop volumineux malgré la compression (" + sizeMb.toFixed(1) + " MB). Réduis le nombre de photos ou prends-les en plus basse résolution.")
-      }
-      var dataUp = await resUp.json()
-      if (!resUp.ok) throw new Error("Upload : " + (dataUp.error || ""))
-      var docId = dataUp.document.id
+      var pUp = await parseApiResponse(resUp)
+      if (!pUp.ok) throw new Error("Upload : " + pUp.errorText)
+      var docId = pUp.data.document.id
       setPendingDocId(docId)
 
       // Étape D : OCR
-      setAnalysisProgress("4/4 — Analyse IA en cours (~10-30s)...")
+      setAnalysisProgress("4/4 — Analyse IA en cours (peut prendre 1-2 min sur gros doc)...")
       var resEx = await fetch("/api/hr/extract-contract", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contract_doc_id: docId }),
       })
-      var dataEx = await resEx.json()
-      if (!resEx.ok) throw new Error("Analyse IA : " + (dataEx.error || ""))
+      var pEx = await parseApiResponse(resEx)
+      if (!pEx.ok) throw new Error("Analyse IA : " + pEx.errorText)
+      var dataEx = pEx.data
 
       var ext = dataEx.extraction || {}
       setExtraction(ext)
@@ -480,7 +537,7 @@ export default function RetroUploadWizard(props: any) {
 
       setPhase("review")
     } catch (e: any) {
-      setError(e.message || "Erreur analyse")
+      setError("Erreur analyse : " + errMsg(e))
       setPhase("drop")
     } finally {
       setAnalysisProgress("")
@@ -610,7 +667,7 @@ export default function RetroUploadWizard(props: any) {
       showToast("Document enregistré ✓")
       setPhase("saved")
     } catch (e: any) {
-      setError(e.message || "Erreur sauvegarde")
+      setError("Erreur sauvegarde : " + errMsg(e))
     } finally {
       setSaving(false)
     }
@@ -692,7 +749,7 @@ export default function RetroUploadWizard(props: any) {
       showToast("Salarié créé — pense à faire signer un avenant de mise en conformité")
       setPhase("saved")
     } catch (e: any) {
-      setError("Création : " + e.message)
+      setError("Création : " + errMsg(e))
     } finally {
       setSaving(false)
     }
