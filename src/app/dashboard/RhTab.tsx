@@ -276,7 +276,7 @@ export default function RhTab() {
                   onClick={function () { setViewingEmployeeId(e.id) }}
                   style={{
                     background: "#FFFFFF",
-                    border: "2px solid #191923",
+                    border: e.needs_regularization ? "2.5px solid #FF82D7" : "2px solid #191923",
                     borderRadius: 8,
                     padding: 14,
                     cursor: "pointer",
@@ -284,7 +284,8 @@ export default function RhTab() {
                     gridTemplateColumns: "auto 1fr auto",
                     gap: 14,
                     alignItems: "center",
-                    transition: "background 0.15s"
+                    transition: "background 0.15s",
+                    boxShadow: e.needs_regularization ? "3px 3px 0 #FF82D7" : "none",
                   }}
                   onMouseEnter={function (ev) { ev.currentTarget.style.background = "#FFF8E1" }}
                   onMouseLeave={function (ev) { ev.currentTarget.style.background = "#FFFFFF" }}
@@ -298,6 +299,22 @@ export default function RhTab() {
                       <span style={{ fontFamily: "Yellowtail, cursive", fontSize: 22, color: "#FF82D7", lineHeight: 1 }}>
                         {e.prenom || "—"} {(e.nom || "").toUpperCase()}
                       </span>
+                      {e.needs_regularization ? (
+                        <span style={{
+                          background: "#FF82D7",
+                          color: "#191923",
+                          padding: "3px 8px",
+                          borderRadius: 4,
+                          fontSize: 9,
+                          fontWeight: 900,
+                          textTransform: "uppercase",
+                          letterSpacing: ".5px",
+                          border: "1.5px solid #191923",
+                          boxShadow: "2px 2px 0 #191923",
+                        }}>
+                          ⚠ À RÉGULARISER
+                        </span>
+                      ) : null}
                       {meta && (
                         <span style={{
                           background: meta.color,
