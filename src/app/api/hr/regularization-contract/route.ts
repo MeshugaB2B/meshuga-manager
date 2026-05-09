@@ -2,11 +2,16 @@
 // Génère le HTML imprimable du contrat de régularisation (CDI formalisant
 // une relation existante non écrite). Charte Meshuga respectée.
 //
-// POST { employee_id, date_embauche, fonction, salaire_brut_mensuel, ... }
+// Contient TOUTES les clauses modernes (HACCP, RGPD, droit déconnexion, etc.)
+// pour que les salariés régularisés aient le même niveau de protection
+// que ceux qui signent l'avenant de mise à jour.
+//
+// POST { employee_id, date_embauche, employee, contract, ville_signature }
 // → renvoie HTML qui s'imprime/sauvegarde en PDF via window.print()
 
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { renderClauses, ALL_CLAUSE_IDS } from '@/lib/hr/clauses-library'
 
 export var runtime = 'nodejs'
 
@@ -32,8 +37,15 @@ function fmtDateFr(iso: any): string {
   }
 }
 
+function fmtCcyFr(n: any): string {
+  if (n === null || n === undefined || n === '') return '—'
+  var num = parseFloat(String(n).replace(',', '.'))
+  if (isNaN(num)) return '—'
+  return num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 // Normalise une date en ISO yyyy-mm-dd. Corrige les inversions jour/mois
-// faites par l'IA (ex: "1952-19-05" → "1952-05-19"). Fallback safe.
+// faites par l'IA (ex: "1952-19-05" → "1952-05-19").
 function normalizeDateIso(v: any): string | null {
   if (!v) return null
   var s = String(v).trim()
@@ -52,15 +64,7 @@ function normalizeDateIso(v: any): string | null {
   return null
 }
 
-function fmtCcyFr(n: any): string {
-  if (n === null || n === undefined || n === '') return '—'
-  var num = parseFloat(String(n).replace(',', '.'))
-  if (isNaN(num)) return '—'
-  return num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
 function buildHtml(data: any): string {
-  var todayFr = fmtDateFr(new Date().toISOString().slice(0, 10))
   var emp = data.employee || {}
   var ctr = data.contract || {}
   var dateEmbaucheFr = fmtDateFr(data.date_embauche)
@@ -74,6 +78,13 @@ function buildHtml(data: any): string {
   var salaireMensuel = fmtCcyFr(ctr.salaire_brut_mensuel)
   var statutLabel = ctr.statut_cadre === 'cadre' ? 'Cadre'
     : (ctr.statut_cadre === 'agent_maitrise' ? 'Agent de maîtrise' : 'Non-cadre')
+
+  // Génération des clauses modernes (Articles 8 à 15)
+  // Articles 1-7 : parties + nature + fonction + lieu + horaires + rémunération + PE + congés
+  // Articles 16-17 : CCN + dispositions finales (calculées dynamiquement)
+  var clausesRendered = renderClauses(ALL_CLAUSE_IDS, 8)
+  var clausesHtml = clausesRendered.html
+  var nextIdx = clausesRendered.nextIdx  // ex: 16
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -139,7 +150,6 @@ function buildHtml(data: any): string {
   }
   .header-right .label { font-weight: 900; text-transform: uppercase; letter-spacing: 1px; color: #FF82D7; }
 
-  /* ENCART RÉGULARISATION en haut — visible immédiatement */
   .reg-banner {
     background: #FFF8E1;
     border: 2.5px solid #FF82D7;
@@ -170,6 +180,7 @@ function buildHtml(data: any): string {
     margin: 6mm 0 3mm 0;
     border: 1.5px solid #191923;
     border-left: 5px solid #FF82D7;
+    page-break-after: avoid;
   }
 
   p { margin: 2mm 0; }
@@ -377,8 +388,8 @@ function buildHtml(data: any): string {
 <h2>Article 4 — Lieu de travail</h2>
 <p>
   Le lieu de travail principal est l'établissement Meshuga Crazy Deli, situé au 3 rue Vavin, 75006 Paris.
-  Le salarié pourra être amené à travailler ponctuellement sur d'autres lieux pour les besoins de l'activité
-  (événements, prestations traiteur, livraisons), dans la limite de la zone Île-de-France.
+  Les modalités de mobilité dans le cadre de prestations événementielles sont précisées à l'article
+  ${ALL_CLAUSE_IDS.indexOf('mobilite') + 8} ci-après.
 </p>
 
 <h2>Article 5 — Durée et horaires de travail</h2>
@@ -403,47 +414,35 @@ function buildHtml(data: any): string {
   structurelles ainsi qu'à toute autre prime ou avantage prévu par la convention collective IDCC 1501.
 </p>
 
-<h2>Article 7 — Période d'essai</h2>
+<h2>Article 7 — Période d'essai et congés payés</h2>
 <p>
   En raison du caractère régularisateur du présent contrat formalisant une relation préexistant
   depuis le ${dateEmbaucheFr}, <strong>aucune période d'essai n'est applicable</strong>. Le salarié
   est confirmé dans ses fonctions au titre de l'ancienneté déjà acquise.
 </p>
-
-<h2>Article 8 — Congés payés</h2>
 <p>
   Le salarié bénéficie des congés payés dans les conditions prévues par les articles L.3141-3 et
   suivants du Code du travail, soit 2,5 jours ouvrables par mois de travail effectif. Les droits
   acquis depuis l'entrée du salarié dans l'entreprise (${dateEmbaucheFr}) lui restent dus.
 </p>
 
-<h2>Article 9 — Régimes obligatoires</h2>
-<p>Le salarié bénéficie de :</p>
-<ul>
-  <li><strong>Couverture mutuelle santé</strong> via le contrat collectif de l'entreprise</li>
-  <li><strong>Régime de prévoyance</strong> Gan Eurocourtage Vie (au titre de la CCN 1501)</li>
-  <li><strong>Régime de retraite complémentaire</strong> KLESIA</li>
-  <li><strong>Médecine du travail</strong> assurée par EFFICIENCE — 64 rue de Vaugirard, 75006 Paris</li>
-</ul>
+${clausesHtml}
 
-<h2>Article 10 — Convention collective et règlement</h2>
+<h2>Article ${nextIdx} — Convention collective et règlement</h2>
 <p>
   Pour tout ce qui n'est pas prévu au présent contrat, les parties se réfèrent aux dispositions
   de la <strong>Convention Collective Nationale de la Restauration Rapide (IDCC 1501)</strong>
   et au Code du travail.
 </p>
 
-<h2>Article 11 — Confidentialité et loyauté</h2>
-<p>
-  Le salarié s'engage à respecter une obligation de loyauté envers l'employeur et à ne pas divulguer
-  les informations confidentielles dont il aurait connaissance dans le cadre de ses fonctions
-  (recettes, fournisseurs, clientèle, méthodes commerciales…).
-</p>
-
-<h2>Article 12 — Dispositions finales</h2>
+<h2>Article ${nextIdx + 1} — Dispositions finales</h2>
 <p>
   Le présent contrat est établi en deux exemplaires originaux, dont un est remis à chaque partie.
   Toute modification ultérieure devra faire l'objet d'un avenant écrit signé par les deux parties.
+</p>
+<p class="small">
+  Le salarié reconnaît avoir reçu, lu et compris l'ensemble des clauses du présent contrat,
+  ainsi que les documents annexes mentionnés à l'article ${ALL_CLAUSE_IDS.indexOf('documents_annexes') + 8}.
 </p>
 
 <div class="signatures">
@@ -481,10 +480,8 @@ export async function POST(req: Request) {
     if (!body.date_embauche) {
       return NextResponse.json({ error: 'date_embauche requise' }, { status: 400 })
     }
-    // Sanitize la date d'embauche (corrige inversions jour/mois)
     var dateEmbaucheClean = normalizeDateIso(body.date_embauche) || body.date_embauche
 
-    // Vérifier que l'employé existe (et récupérer ses infos s'il manque des champs)
     var admin = createAdminClient()
     var { data: emp } = await admin
       .from('hr_employees')
@@ -496,13 +493,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'employé introuvable' }, { status: 404 })
     }
 
-    // Merge données employé : on prend les infos passées dans body.employee
-    // (édition Edward) et on complète avec celles de la base
     var employeeMerged = Object.assign({}, emp, body.employee || {})
-    // Sanitize date_naissance dans l'employé final (au cas où elle traîne cassée)
     if (employeeMerged.date_naissance) {
       var dnClean = normalizeDateIso(employeeMerged.date_naissance)
-      employeeMerged.date_naissance = dnClean // null si pas normalisable
+      employeeMerged.date_naissance = dnClean
     }
 
     var html = buildHtml({
