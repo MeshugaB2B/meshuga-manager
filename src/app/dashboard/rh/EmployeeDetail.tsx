@@ -23,6 +23,7 @@ import { createClient } from "@supabase/supabase-js"
 import DocumentsManager from "./DocumentsManager"
 import OffboardingWizard from "./OffboardingWizard"
 import WorkStoppageWizard from "./WorkStoppageWizard"
+import RegularizationWizard from "./RegularizationWizard"
 import {
   NATIONALITES,
   getContractTypeMeta,
@@ -45,6 +46,7 @@ export default function EmployeeDetail(props) {
   var [uploadingSignedFor, setUploadingSignedFor] = useState(null)
   var [uploadingWelcomePack, setUploadingWelcomePack] = useState(false)
   var [showOffboarding, setShowOffboarding] = useState(false)
+  var [showRegularization, setShowRegularization] = useState(false)
   var [unmarkingExit, setUnmarkingExit] = useState(false)
   var [stoppages, setStoppages] = useState([])
   var [showStoppageWizard, setShowStoppageWizard] = useState(false)
@@ -587,6 +589,44 @@ export default function EmployeeDetail(props) {
           </div>
         </div>
 
+        {/* === BANDEAU RÉGULARISATION (si needs_regularization) === */}
+        {emp.needs_regularization ? (
+          <div
+            style={{
+              background: "#FF82D7",
+              border: "2.5px solid #191923",
+              boxShadow: "4px 4px 0 #191923",
+              padding: 14,
+              margin: "0 16px 16px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <div style={{ fontFamily: "Yellowtail, cursive", fontSize: 22, color: "#191923", lineHeight: 1, marginBottom: 4 }}>
+                  À régulariser
+                </div>
+                <div style={{ fontSize: 12, lineHeight: 1.5, color: "#191923" }}>
+                  Ce salarié n'a <strong>aucun contrat formalisé</strong>. Click sur "📝 Régulariser" pour générer un contrat de régularisation à partir de ses fiches de paie.
+                  L'IA reconstituera la date d'embauche et les conditions actuelles.
+                </div>
+              </div>
+              <button
+                className="btn"
+                onClick={function () { setShowRegularization(true) }}
+                style={{
+                  background: "#FFEB5A",
+                  color: "#191923",
+                  border: "2.5px solid #191923",
+                  boxShadow: "3px 3px 0 #191923",
+                  fontWeight: 900,
+                  fontSize: 13,
+                  padding: "10px 16px",
+                }}
+              >📝 Régulariser</button>
+            </div>
+          </div>
+        ) : null}
+
         {/* === BLOC INFOS PERSONNELLES === */}
         <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -976,6 +1016,19 @@ export default function EmployeeDetail(props) {
           onSaved={function (msg) {
             setShowOffboarding(false)
             if (props.onSaved) props.onSaved(msg || "Salarié marqué comme parti")
+            load()
+          }}
+        />
+      ) : null}
+
+      {/* === MODAL RÉGULARISATION === */}
+      {showRegularization && emp ? (
+        <RegularizationWizard
+          employee={emp}
+          onClose={function () { setShowRegularization(false) }}
+          onSaved={function (msg) {
+            setShowRegularization(false)
+            if (props.onSaved) props.onSaved(msg || "Régularisation lancée")
             load()
           }}
         />
