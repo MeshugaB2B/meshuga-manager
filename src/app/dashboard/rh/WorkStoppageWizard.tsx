@@ -145,11 +145,12 @@ export default function WorkStoppageWizard(props: any) {
     if (files.length === 0) { setError("Ajoute le certificat médical"); return }
     setPhase("analyzing")
     try {
-      // Compression des images (si > 1.5 MB)
+      // Compression des images (multi-niveaux si nécessaire)
       setAnalysisProgress("Optimisation des images...")
       var rawFiles = files.map(function (f: any) { return f.file })
-      var compressedFiles = await compressFileList(rawFiles, function (cur: number, total: number) {
-        setAnalysisProgress("Optimisation (" + (cur + 1) + "/" + total + ")...")
+      var compressedFiles = await compressFileList(rawFiles, function (cur: number, total: number, level: string) {
+        var levelLabel = level === "L1" ? "" : (level === "L2" ? " (qualité réduite)" : " (qualité minimale)")
+        setAnalysisProgress("Optimisation" + levelLabel + " (" + (cur + 1) + "/" + total + ")...")
       })
       var sizeMb = totalSizeMb(compressedFiles)
       setAnalysisProgress("Upload + analyse IA (" + sizeMb.toFixed(1) + " MB)...")
