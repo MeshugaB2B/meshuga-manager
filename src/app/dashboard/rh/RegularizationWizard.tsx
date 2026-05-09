@@ -499,7 +499,7 @@ export default function RegularizationWizard(props: any) {
               doc_type: "contrat_signe",
               file_path: origPath,
               mime_type: origMime,
-              file_size: origSize,
+              size_bytes: origSize,
               label: "Contrat originel — " + fullName.trim(),
               validated_by_user: true,
               uploaded_at: new Date().toISOString(),
@@ -507,9 +507,9 @@ export default function RegularizationWizard(props: any) {
             .select("id")
             .single()
           if (resInsDoc.error) {
-            // Pas bloquant : on continue, Edward verra le warning
-            // eslint-disable-next-line no-console
-            console.warn("Création doc contrat originel :", resInsDoc.error.message)
+            // Bloquant : on alerte Edward pour qu'il sache que le contrat originel
+            // n'a pas été rattaché. Sinon il avancerait sans s'en apercevoir.
+            throw new Error("Rattachement contrat originel impossible : " + resInsDoc.error.message)
           }
         }
       }
