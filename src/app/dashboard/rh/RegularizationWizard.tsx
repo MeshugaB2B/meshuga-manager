@@ -94,6 +94,51 @@ function fmtFr(iso: string): string {
   return p[2] + "/" + p[1] + "/" + p[0]
 }
 
+// Normalise une date en ISO yyyy-mm-dd. Gère :
+//  - "1952-05-19" déjà valide → garde
+//  - "1952-19-05" inversé (mois > 12) → corrige en "1952-05-19"
+//  - "19/05/1952" format FR → "1952-05-19"
+//  - "2022-10-16" valide → garde
+//  - vide / invalide → ""
+function normalizeDateIso(v: any): string {
+  if (!v) return ""
+  var s = String(v).trim()
+  if (!s) return ""
+
+  // Format ISO yyyy-mm-dd ou yyyy-dd-mm
+  var isoMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (isoMatch) {
+    var year = parseInt(isoMatch[1], 10)
+    var p2 = parseInt(isoMatch[2], 10)
+    var p3 = parseInt(isoMatch[3], 10)
+    var month: number
+    var day: number
+    if (p2 >= 1 && p2 <= 12 && p3 >= 1 && p3 <= 31) {
+      // yyyy-MM-dd valide
+      month = p2; day = p3
+    } else if (p2 > 12 && p2 <= 31 && p3 >= 1 && p3 <= 12) {
+      // yyyy-dd-MM (inversé) → corrige
+      month = p3; day = p2
+    } else {
+      return ""
+    }
+    return year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0")
+  }
+
+  // Format FR dd/mm/yyyy ou dd-mm-yyyy ou dd.mm.yyyy
+  var frMatch = s.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})$/)
+  if (frMatch) {
+    var d = parseInt(frMatch[1], 10)
+    var m = parseInt(frMatch[2], 10)
+    var y = parseInt(frMatch[3], 10)
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0")
+    }
+  }
+
+  return ""
+}
+
 export default function RegularizationWizard(props: any) {
   // props : { employee, onClose, onSaved }
   var emp = props.employee
@@ -213,15 +258,28 @@ export default function RegularizationWizard(props: any) {
       var data = p.data
       var consolidated = data.consolidated
 
-      // Pré-remplir
-      if (consolidated.date_embauche) setDateEmbauche(consolidated.date_embauche)
+      // Pré-remplir — TOUTES les dates passent par normalizeDateIso pour
+      // corriger les inversions jour/mois faites par l'IA
+      if (consolidated.date_embauche) {
+        var normalizedEmbauche = normalizeDateIso(consolidated.date_embauche)
+        setDateEmbauche(normalizedEmbauche || consolidated.date_embauche)
+      }
       setDateExtractedExplicitly(!!consolidated.date_embauche_extracted_explicitly)
       var newEmpFields: any = Object.assign({}, employeeFields)
       var keys = ["civilite", "prenom", "nom", "date_naissance", "lieu_naissance",
         "nationalite", "adresse", "code_postal", "ville", "num_secu"]
       keys.forEach(function (k: any) {
         var v = consolidated.employee?.[k]
-        if (v && !newEmpFields[k]) newEmpFields[k] = v
+        if (v && !newEmpFields[k]) {
+          // Normaliser les champs date
+          if (k === "date_naissance") {
+            var normalized = normalizeDateIso(v)
+            if (normalized) newEmpFields[k] = normalized
+            // si pas normalisable, on laisse vide (Edward verra et corrigera)
+          } else {
+            newEmpFields[k] = v
+          }
+        }
       })
       setEmployeeFields(newEmpFields)
 
@@ -256,10 +314,25 @@ export default function RegularizationWizard(props: any) {
 
     setSaving(true)
     try {
+      // Normaliser TOUTES les dates avant l'envoi (sécurité finale)
+      var dateEmbaucheClean = normalizeDateIso(dateEmbauche)
+      if (!dateEmbaucheClean) {
+        throw new Error("Date d'embauche invalide : " + dateEmbauche + " — corrige-la dans le formulaire (format yyyy-mm-dd)")
+      }
+
       // 1) Mettre à jour la fiche employé en base avec les infos validées
       var updateEmp: any = {}
       Object.keys(employeeFields).forEach(function (k: any) {
-        if (employeeFields[k]) updateEmp[k] = employeeFields[k]
+        if (employeeFields[k]) {
+          // Normaliser les champs date
+          if (k === "date_naissance") {
+            var normalized = normalizeDateIso(employeeFields[k])
+            if (normalized) updateEmp[k] = normalized
+            // sinon on n'envoie pas le champ (DB acceptera NULL)
+          } else {
+            updateEmp[k] = employeeFields[k]
+          }
+        }
       })
       var resUpd = await supabase.from("hr_employees").update(updateEmp).eq("id", emp.id).select("*").single()
       if (resUpd.error) throw new Error("MAJ employé : " + resUpd.error.message)
@@ -270,15 +343,20 @@ export default function RegularizationWizard(props: any) {
       if (pCyc.ok) {
         var openCycle = (pCyc.data.cycles || []).find(function (c: any) { return !c.date_sortie })
         if (openCycle) {
-          await supabase.from("hr_employment_cycles").update({ date_entree: dateEmbauche }).eq("id", openCycle.id)
+          await supabase.from("hr_employment_cycles").update({ date_entree: dateEmbaucheClean }).eq("id", openCycle.id)
         }
       }
 
-      // 3) Générer le HTML du contrat
+      // 3) Générer le HTML du contrat (avec dates clean)
+      var employeePayload = Object.assign({}, employeeFields)
+      if (employeePayload.date_naissance) {
+        var dn = normalizeDateIso(employeePayload.date_naissance)
+        employeePayload.date_naissance = dn || null
+      }
       var payload = {
         employee_id: emp.id,
-        date_embauche: dateEmbauche,
-        employee: employeeFields,
+        date_embauche: dateEmbaucheClean,
+        employee: employeePayload,
         contract: contractFields,
       }
       var resGen = await fetch("/api/hr/regularization-contract", {
