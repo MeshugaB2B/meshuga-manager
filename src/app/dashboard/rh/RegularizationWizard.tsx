@@ -146,6 +146,7 @@ export default function RegularizationWizard(props: any) {
   var onSaved = props.onSaved || function () {}
 
   var [phase, setPhase] = useState("drop")  // drop | analyzing | review | done
+  var [contractSaved, setContractSaved] = useState(false)
   var [error, setError] = useState("")
   var [progress, setProgress] = useState("")
   var [saving, setSaving] = useState(false)
@@ -381,6 +382,7 @@ export default function RegularizationWizard(props: any) {
 
       // 2bis) Mettre à jour le contrat existant avec le bon type + infos extraites.
       // Le contrat draft "extra" créé par défaut devient le vrai CDI archivé.
+      var savedContractId: any = null
       if (openCycleId) {
         var resContracts = await supabase
           .from("hr_contracts")
@@ -410,21 +412,26 @@ export default function RegularizationWizard(props: any) {
           var sb = parseFloat(String(contractFields.salaire_brut_mensuel || "").replace(",", "."))
           if (!isNaN(sb)) ctrUpdate.salaire_brut_mensuel = sb
           await supabase.from("hr_contracts").update(ctrUpdate).eq("id", ctrToUpdate.id)
+          savedContractId = ctrToUpdate.id
         }
       }
 
-      // 3) Générer le HTML du contrat (avec dates clean)
+      // 3) Générer le HTML du contrat (avec dates clean) ET le sauvegarder
+      // dans Storage pour qu'il apparaisse dans la liste des documents du contrat.
       var employeePayload = Object.assign({}, employeeFields)
       if (employeePayload.date_naissance) {
         var dn = normalizeDateIso(employeePayload.date_naissance)
         employeePayload.date_naissance = dn || null
       }
-      var payload = {
+      var payload: any = {
         employee_id: emp.id,
         date_embauche: dateEmbaucheClean,
         employee: employeePayload,
         contract: contractFields,
+        save: true,  // demander à l'API de sauvegarder dans hr_contract_documents
       }
+      if (savedContractId) payload.contract_id = savedContractId
+
       var resGen = await fetch("/api/hr/regularization-contract", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -433,6 +440,9 @@ export default function RegularizationWizard(props: any) {
         var pGen = await parseApiResponse(resGen)
         throw new Error("Génération PDF : " + (pGen.errorText || "erreur"))
       }
+
+      // Vérifier si la sauvegarde a réussi (header X-Saved)
+      var wasSaved = resGen.headers.get("X-Saved") === "true"
 
       // 4) Ouvrir le HTML dans un nouvel onglet pour impression
       var html = await resGen.text()
@@ -448,6 +458,7 @@ export default function RegularizationWizard(props: any) {
         window.open(url, "_blank")
       }
 
+      setContractSaved(wasSaved)
       setPhase("done")
     } catch (e: any) {
       setError(errMsg(e))
@@ -692,6 +703,23 @@ export default function RegularizationWizard(props: any) {
                   Le contrat de régularisation s'est ouvert dans un nouvel onglet.
                 </div>
               </div>
+
+              {contractSaved ? (
+                <div className="card-p" style={{ padding: 12, marginBottom: 14, fontSize: 12 }}>
+                  <strong>📎 Sauvegardé dans la fiche salarié</strong>
+                  <div style={{ marginTop: 4, lineHeight: 1.5 }}>
+                    Le contrat est aussi disponible dans la fiche du salarié, section "Documents",
+                    avec le badge <strong>"Contrat généré (à signer)"</strong>. Tu pourras le
+                    re-télécharger ou re-imprimer à tout moment depuis là-bas.
+                  </div>
+                </div>
+              ) : (
+                <div className="card" style={{ padding: 12, marginBottom: 14, fontSize: 12, background: "#FFF8E1", borderColor: "#191923" }}>
+                  ⚠ Le contrat n'a pas pu être sauvegardé automatiquement dans la fiche.
+                  Pense à enregistrer le PDF localement avant de fermer le nouvel onglet.
+                </div>
+              )}
+
               <div className="card" style={{ marginBottom: 14 }}>
                 <div className="ct">📋 Étapes suivantes</div>
                 <ol style={{ paddingLeft: 18, fontSize: 11, lineHeight: 1.7 }}>
