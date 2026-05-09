@@ -55,6 +55,7 @@ export default function EmployeeDetail(props) {
   var [showStoppageWizard, setShowStoppageWizard] = useState(false)
   var [editingStoppage, setEditingStoppage] = useState(null)
   var [reEmploying, setReEmploying] = useState(false)
+  var [generatingAmendmentFor, setGeneratingAmendmentFor] = useState(null)
   var signedFileInputRef = useRef(null)
   var avenantSignedInputRef = useRef(null)
   var welcomePackFileInputRef = useRef(null)
@@ -313,6 +314,61 @@ export default function EmployeeDetail(props) {
       window.open(res.data.signedUrl, "_blank")
     } catch (err) {
       alert("Erreur ouverture : " + (err.message || err))
+    }
+  }
+
+  // === Génère un avenant pour un contrat (appelle l'API qui sauvegarde aussi en base) ===
+  async function generateAmendment(c) {
+    if (!c || !emp) return
+    if (generatingAmendmentFor) return // déjà en cours
+    setGeneratingAmendmentFor(c.id)
+    try {
+      var dateEmbauche = c.date_embauche || c.date_debut || ""
+      var todayIso = new Date().toISOString().slice(0, 10)
+      var res = await fetch("/api/hr/update-amendment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employee_id: emp.id,
+          contract_id: c.id,
+          contract_label: "contrat de travail (" + (c.fonction || "CDI") + ")"
+            + (dateEmbauche ? (" du " + dateEmbauche) : ""),
+          clauses: [
+            "confidentialite", "haccp", "tenue_hygiene", "rgpd",
+            "mobilite", "deconnexion", "regimes_actualises", "documents_annexes",
+          ],
+          date_effet: todayIso,
+          ville_signature: "Paris",
+          date_signature: todayIso,
+          save: true,
+        }),
+      })
+      if (!res.ok) {
+        var errMsg = "Erreur HTTP " + res.status
+        try {
+          var errData = await res.json()
+          if (errData && errData.error) errMsg = errData.error
+        } catch (e) { /* pas de JSON, on garde errMsg */ }
+        throw new Error(errMsg)
+      }
+      // L'API renvoie le HTML — on l'ouvre dans un nouvel onglet pour preview
+      var html = await res.text()
+      var saved = res.headers.get("X-Saved")
+      var blob = new Blob([html], { type: "text/html;charset=utf-8" })
+      var url = URL.createObjectURL(blob)
+      window.open(url, "_blank")
+      if (saved !== "true") {
+        // Sauvegarde en base a échoué côté API mais HTML généré quand même
+        alert("Avenant généré dans le navigateur, mais la sauvegarde en base a échoué. "
+          + "Regarde la console serveur Vercel pour les détails.")
+      } else {
+        if (props.onSaved) props.onSaved("Avenant généré ✓")
+      }
+      setGeneratingAmendmentFor(null)
+      load()
+    } catch (err) {
+      setGeneratingAmendmentFor(null)
+      alert("Erreur génération avenant : " + (err.message || err))
     }
   }
 
@@ -975,8 +1031,11 @@ export default function EmployeeDetail(props) {
                       })[0]
                       var contratOriginel = docs.filter(function (d) { return d.doc_type === "contrat_signe" })[0]
                       var hasAnyDoc = !!(avenantSigne || avenantBrouillon || contratOriginel)
+                      var isGenerating = generatingAmendmentFor === c.id
 
-                      if (!hasAnyDoc) return null
+                      // On affiche la zone Documents s'il y a au moins un doc OU si on peut
+                      // générer un avenant (= il y a un contrat originel mais pas encore d'avenant)
+                      if (!hasAnyDoc && !contratOriginel) return null
 
                       return (
                         <div style={{
@@ -1011,7 +1070,7 @@ export default function EmployeeDetail(props) {
                             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: contratOriginel ? "1px dashed #DDD" : "none" }}>
                               <span style={{ fontSize: 12, fontWeight: 700, color: "#FF82D7" }}>📝 Avenant en cours</span>
                               <span style={{ fontSize: 10, color: "#666", fontStyle: "italic" }}>· à faire signer</span>
-                              <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+                              <div style={{ marginLeft: "auto", display: "flex", gap: 4, flexWrap: "wrap" }}>
                                 <button
                                   className="btn btn-sm btn-y"
                                   onClick={function () { openContractDoc(avenantBrouillon) }}
@@ -1021,7 +1080,28 @@ export default function EmployeeDetail(props) {
                                   onClick={function () { triggerAvenantSignedUpload(c) }}
                                   title="Uploader le PDF/scan de l'avenant signé par le salarié"
                                 >📥 Uploader signé</button>
+                                <button
+                                  className="btn btn-sm"
+                                  disabled={isGenerating}
+                                  onClick={function () { if (confirm("Régénérer l'avenant ? La version actuelle sera remplacée.")) generateAmendment(c) }}
+                                  title="Régénérer un nouvel avenant (l'ancien brouillon sera remplacé)"
+                                >{isGenerating ? "⏳ Génération..." : "🔄 Régénérer"}</button>
                               </div>
+                            </div>
+                          ) : null}
+
+                          {/* Pas d'avenant du tout : bouton pour en générer un */}
+                          {!avenantSigne && !avenantBrouillon ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: contratOriginel ? "1px dashed #DDD" : "none" }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#888" }}>📝 Aucun avenant</span>
+                              <span style={{ fontSize: 10, color: "#666", fontStyle: "italic" }}>· mise à jour des clauses modernes possible</span>
+                              <button
+                                className="btn btn-sm btn-y"
+                                style={{ marginLeft: "auto" }}
+                                disabled={isGenerating}
+                                onClick={function () { generateAmendment(c) }}
+                                title="Génère un avenant qui ajoute les clauses modernes (HACCP, RGPD, mobilité, déconnexion, etc.)"
+                              >{isGenerating ? "⏳ Génération..." : "📝 Générer un avenant"}</button>
                             </div>
                           ) : null}
 
