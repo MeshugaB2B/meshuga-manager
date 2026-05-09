@@ -1025,17 +1025,28 @@ export default function EmployeeDetail(props) {
                     {/* === TIMELINE DOCUMENTS (du plus récent au plus ancien) === */}
                     {(function () {
                       var docs = contractDocs[c.id] || []
-                      var avenantSigne = docs.filter(function (d) { return d.doc_type === "avenant" })[0]
+                      // TOUS les avenants signés (un salarié peut en avoir plusieurs au fil du temps)
+                      var avenantsSignes = docs.filter(function (d) { return d.doc_type === "avenant" })
+                      avenantsSignes.sort(function (a, b) {
+                        return new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+                      })
+                      // L'avenant brouillon en cours (s'il existe)
                       var avenantBrouillon = docs.filter(function (d) {
                         return d.doc_type === "contrat_genere" && (d.label || "").toLowerCase().indexOf("avenant") >= 0
                       })[0]
                       var contratOriginel = docs.filter(function (d) { return d.doc_type === "contrat_signe" })[0]
-                      var hasAnyDoc = !!(avenantSigne || avenantBrouillon || contratOriginel)
+                      var hasAnyDoc = avenantsSignes.length > 0 || !!avenantBrouillon || !!contratOriginel
                       var isGenerating = generatingAmendmentFor === c.id
 
-                      // On affiche la zone Documents s'il y a au moins un doc OU si on peut
-                      // générer un avenant (= il y a un contrat originel mais pas encore d'avenant)
-                      if (!hasAnyDoc && !contratOriginel) return null
+                      if (!hasAnyDoc) return null
+
+                      // Label adaptatif du bouton "Générer" selon contexte
+                      var generateBtnLabel = avenantsSignes.length > 0
+                        ? "📝 Générer un nouvel avenant"
+                        : "📝 Générer un avenant"
+                      var generateBtnTitle = avenantsSignes.length > 0
+                        ? "Génère un nouvel avenant pour mettre à jour les clauses (HACCP, RGPD, etc.). L'ancien avenant signé reste archivé."
+                        : "Génère un avenant qui ajoute les clauses modernes (HACCP, RGPD, mobilité, déconnexion, etc.)"
 
                       return (
                         <div style={{
@@ -1052,22 +1063,28 @@ export default function EmployeeDetail(props) {
                             📁 Documents
                           </div>
 
-                          {/* Avenant signé (si présent, en haut = le plus récent) */}
-                          {avenantSigne ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: contratOriginel ? "1px dashed #DDD" : "none" }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: "#16A34A" }}>✅ Avenant signé</span>
-                              <span style={{ fontSize: 10, color: "#666" }}>· {fmtDate(avenantSigne.uploaded_at)}</span>
-                              <button
-                                className="btn btn-sm btn-y"
-                                style={{ marginLeft: "auto" }}
-                                onClick={function () { openContractDoc(avenantSigne) }}
-                              >📄 Ouvrir</button>
-                            </div>
-                          ) : null}
+                          {/* Tous les avenants signés (du plus récent au plus ancien) */}
+                          {avenantsSignes.map(function (av, idx) {
+                            var isMostRecent = idx === 0
+                            var label = avenantsSignes.length > 1
+                              ? ("✅ Avenant signé n°" + (avenantsSignes.length - idx))
+                              : "✅ Avenant signé"
+                            return (
+                              <div key={av.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: "1px dashed #DDD", opacity: isMostRecent ? 1 : 0.65 }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: isMostRecent ? "#16A34A" : "#666" }}>{label}</span>
+                                <span style={{ fontSize: 10, color: "#666" }}>· {fmtDate(av.uploaded_at)}{!isMostRecent ? " (archivé)" : ""}</span>
+                                <button
+                                  className="btn btn-sm btn-y"
+                                  style={{ marginLeft: "auto" }}
+                                  onClick={function () { openContractDoc(av) }}
+                                >📄 Ouvrir</button>
+                              </div>
+                            )
+                          })}
 
-                          {/* Avenant brouillon (à signer) — affiché seulement si pas encore d'avenant signé */}
-                          {!avenantSigne && avenantBrouillon ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: contratOriginel ? "1px dashed #DDD" : "none" }}>
+                          {/* Avenant brouillon en cours (à signer) */}
+                          {avenantBrouillon ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: "1px dashed #DDD" }}>
                               <span style={{ fontSize: 12, fontWeight: 700, color: "#FF82D7" }}>📝 Avenant en cours</span>
                               <span style={{ fontSize: 10, color: "#666", fontStyle: "italic" }}>· à faire signer</span>
                               <div style={{ marginLeft: "auto", display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -1083,25 +1100,32 @@ export default function EmployeeDetail(props) {
                                 <button
                                   className="btn btn-sm"
                                   disabled={isGenerating}
-                                  onClick={function () { if (confirm("Régénérer l'avenant ? La version actuelle sera remplacée.")) generateAmendment(c) }}
-                                  title="Régénérer un nouvel avenant (l'ancien brouillon sera remplacé)"
+                                  onClick={function () { if (confirm("Régénérer l'avenant ? La version brouillon actuelle sera remplacée.")) generateAmendment(c) }}
+                                  title="Régénérer le brouillon (l'ancien sera remplacé, les avenants déjà signés ne sont pas touchés)"
                                 >{isGenerating ? "⏳ Génération..." : "🔄 Régénérer"}</button>
                               </div>
                             </div>
                           ) : null}
 
-                          {/* Pas d'avenant du tout : bouton pour en générer un */}
-                          {!avenantSigne && !avenantBrouillon ? (
+                          {/* Pas de brouillon en cours : toujours offrir la génération
+                              (qu'il y ait déjà un avenant signé obsolète ou rien du tout) */}
+                          {!avenantBrouillon ? (
                             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: contratOriginel ? "1px dashed #DDD" : "none" }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: "#888" }}>📝 Aucun avenant</span>
-                              <span style={{ fontSize: 10, color: "#666", fontStyle: "italic" }}>· mise à jour des clauses modernes possible</span>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#888" }}>
+                                {avenantsSignes.length > 0 ? "📝 Mise à jour" : "📝 Aucun avenant"}
+                              </span>
+                              <span style={{ fontSize: 10, color: "#666", fontStyle: "italic" }}>
+                                {avenantsSignes.length > 0
+                                  ? "· l'avenant signé peut être obsolète"
+                                  : "· mise à jour des clauses modernes possible"}
+                              </span>
                               <button
                                 className="btn btn-sm btn-y"
                                 style={{ marginLeft: "auto" }}
                                 disabled={isGenerating}
                                 onClick={function () { generateAmendment(c) }}
-                                title="Génère un avenant qui ajoute les clauses modernes (HACCP, RGPD, mobilité, déconnexion, etc.)"
-                              >{isGenerating ? "⏳ Génération..." : "📝 Générer un avenant"}</button>
+                                title={generateBtnTitle}
+                              >{isGenerating ? "⏳ Génération..." : generateBtnLabel}</button>
                             </div>
                           ) : null}
 
