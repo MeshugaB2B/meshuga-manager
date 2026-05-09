@@ -6,6 +6,7 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@supabase/supabase-js"
+import { compressFileList, totalSizeMb } from "@/lib/imageCompress"
 
 var supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -143,14 +144,27 @@ export default function WorkStoppageWizard(props: any) {
     setError("")
     if (files.length === 0) { setError("Ajoute le certificat médical"); return }
     setPhase("analyzing")
-    setAnalysisProgress("Upload + analyse IA en cours (~10-30s)...")
     try {
+      // Compression des images (si > 1.5 MB)
+      setAnalysisProgress("Optimisation des images...")
+      var rawFiles = files.map(function (f: any) { return f.file })
+      var compressedFiles = await compressFileList(rawFiles, function (cur: number, total: number) {
+        setAnalysisProgress("Optimisation (" + (cur + 1) + "/" + total + ")...")
+      })
+      var sizeMb = totalSizeMb(compressedFiles)
+      setAnalysisProgress("Upload + analyse IA (" + sizeMb.toFixed(1) + " MB)...")
+
       var fd = new FormData()
       fd.append("employee_id", emp.id)
-      for (var i = 0; i < files.length; i++) {
-        fd.append("file_" + String(i).padStart(3, "0"), files[i].file)
+      for (var i = 0; i < compressedFiles.length; i++) {
+        fd.append("file_" + String(i).padStart(3, "0"), compressedFiles[i])
       }
       var res = await fetch("/api/hr/extract-stoppage", { method: "POST", body: fd })
+
+      // Détection 413 (Vercel renvoie du HTML, pas du JSON)
+      if (res.status === 413 || (!res.ok && res.headers.get("content-type")?.indexOf("text/html") === 0)) {
+        throw new Error("Documents trop volumineux malgré la compression (" + sizeMb.toFixed(1) + " MB). Réduis le nombre de photos ou prends-les en plus basse résolution.")
+      }
       var data = await res.json()
       if (!res.ok) throw new Error(data.error || "Extraction échouée")
 
