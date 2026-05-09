@@ -417,11 +417,12 @@ export default function RetroUploadWizard(props: any) {
       contractIdLocal = dataCtr.contract.id
       setPendingContractId(contractIdLocal)
 
-      // Étape C : compresser les images (si > 1.5 MB) puis upload
+      // Étape C : compresser les images (multi-niveaux si nécessaire) puis upload
       setAnalysisProgress("3/4 — Optimisation des images...")
       var rawFiles = files.map(function (f: any) { return f.file })
-      var compressedFiles = await compressFileList(rawFiles, function (cur: number, total: number) {
-        setAnalysisProgress("3/4 — Optimisation (" + (cur + 1) + "/" + total + ")...")
+      var compressedFiles = await compressFileList(rawFiles, function (cur: number, total: number, level: string) {
+        var levelLabel = level === "L1" ? "" : (level === "L2" ? " (qualité réduite)" : " (qualité minimale)")
+        setAnalysisProgress("3/4 — Optimisation" + levelLabel + " (" + (cur + 1) + "/" + total + ")...")
       })
       var sizeMb = totalSizeMb(compressedFiles)
       setAnalysisProgress("3/4 — Upload des documents (" + sizeMb.toFixed(1) + " MB)...")
