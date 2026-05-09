@@ -13,7 +13,9 @@ import { downloadFromHrBucket } from '@/lib/hr/storage'
 import { extractContractFromImages } from '@/lib/hr/ocr'
 
 export var runtime = 'nodejs'
-export var maxDuration = 60
+// 300s = 5 min : Vercel Pro max. Nécessaire pour les gros contrats où Claude
+// Vision peut prendre 1-2 min sur 8+ pages.
+export var maxDuration = 300
 
 export async function POST(req: Request) {
   try {
