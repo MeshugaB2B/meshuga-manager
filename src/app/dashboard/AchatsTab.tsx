@@ -42,7 +42,7 @@ var INGREDIENT_FAMILIES = {
   ail:             ['ail', 'garlic', 'aïl'],
   cornichons:      ['cornichon', 'pickle', 'gherkin'],
   salade_feuilles: ['sucrine', 'romaine', 'mâche', 'mache', 'roquette', 'lettuce', 'feuille'],
-  oeuf:            ['oeuf', 'œuf', 'egg', 'jaune', 'yolk'],
+  oeuf:            ['oeuf', 'œuf', 'egg', 'yolk'],
   beurre:          ['beurre', 'butter'],
   cacahuete:       ['cacahuète', 'cacahuete', 'peanut', 'pbn', 'whole earth'],
   banane:          ['banane', 'banana'],
@@ -138,13 +138,14 @@ export default function AchatsTab(props) {
   }, [])
 
   // ---------------------------------------------------------------------------
-  // GROUPEMENT : construire la liste des "ingredients" (cards) à afficher.
-  // Chaque ingrédient = 1 ou N sources (products + lignes texte libre) regroupées.
+  // GROUPEMENT V2 — abandonné l'approche "famille" qui mélangeait des SKU
+  // distincts (Pain Std vs Pain Mini, Jaune d'œuf vs œufs).
+  // Maintenant : 1 product = 1 card. Lignes texte libre groupées seulement si
+  // article + fournisseur sont identiques (même SKU pour de vrai).
   // ---------------------------------------------------------------------------
-  function getGroupKey(name, isProduct) {
-    var fam = getFamily(name)
-    if (fam) return 'fam:' + fam
-    return 'name:' + normalizeName(name)
+  function getGroupKey(name, isProduct, productId, supplier, unit) {
+    if (isProduct && productId) return 'p:' + productId
+    return 'f:' + normalizeName(name) + '::' + (supplier || '') + '::' + (unit || '')
   }
 
   function buildIngredients() {
@@ -157,7 +158,7 @@ export default function AchatsTab(props) {
     products.forEach(function(p){
       var sup = supById[p.supplier_id]
       var supName = sup ? sup.name : '—'
-      var key = getGroupKey(p.name, true)
+      var key = getGroupKey(p.name, true, p.id, supName, p.unit)
       if (!groups[key]) groups[key] = { key: key, name: p.name, family: getFamily(p.name), sources: [], usages: [] }
       // Si le nom du product est plus court que le canonical existant, le garder
       if (p.name.length < groups[key].name.length) groups[key].name = p.name
@@ -182,13 +183,13 @@ export default function AchatsTab(props) {
         // retrouver le product
         var prod = products.filter(function(p){ return p.id === ri.product_id })[0]
         if (prod) {
-          keyP = getGroupKey(prod.name, true)
+          keyP = getGroupKey(prod.name, true, prod.id, null, null)
           if (groups[keyP]) groups[keyP].usages.push(ri)
         }
         return
       }
       // texte libre : ajouter comme source si pas déjà couvert par un product de même groupe
-      var key = getGroupKey(ri.article, false)
+      var key = getGroupKey(ri.article, false, null, ri.fournisseur, ri.unite)
       var sigKey = key + '::' + (ri.fournisseur || '') + '::' + (ri.unite || '')
       if (!riByKey[sigKey]) {
         riByKey[sigKey] = {
