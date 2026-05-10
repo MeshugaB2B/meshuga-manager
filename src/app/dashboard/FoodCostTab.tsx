@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import IngredientPopup from './IngredientPopup'
 import FoodCostInvoiceWizard from './FoodCostInvoiceWizard'
 import FoodCostHistoryTab from './FoodCostHistoryTab'
+import AchatsTab from './AchatsTab'
 import ProductRecipeAssignment from './ProductRecipeAssignment'
 
 function sb() {
@@ -497,14 +498,14 @@ export default function FoodCostTab(props) {
       {/* HEADER */}
       <div className="ph">
         <div>
-          <div className="pt">Food Cost 🥩</div>
+          <div className="pt">Cuisine 🥪</div>
           <div className="ps">{groupedList.length} recettes · {drinks.length} boissons · Seuil alerte : {fcSeuil}%</div>
         </div>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
           <button className="btn btn-y btn-sm" style={{background:fcView==='recettes'?'#191923':'transparent',color:fcView==='recettes'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('recettes');setFcSelectedParent(null)}}>Recettes</button>
           <button className="btn btn-y btn-sm" style={{background:fcView==='fournisseurs'?'#191923':'transparent',color:fcView==='fournisseurs'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('fournisseurs');setFcSelectedParent(null)}}>Fournisseurs</button>
           <button className="btn btn-y btn-sm" style={{background:fcView==='imports'?'#191923':'transparent',color:fcView==='imports'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('imports');setFcSelectedParent(null)}}>Imports</button>
-          <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
+          <button className="btn btn-y btn-sm" style={{background:fcView==='achats'?'#191923':'transparent',color:fcView==='achats'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('achats');setFcSelectedParent(null)}}>🛒 Achats</button>          <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
           <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewDrinkModal({name:'',supplier_name:'',purchase_price_ht:0,selling_price_ttc:0})}}>+ Boisson</button>
           <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Facture</button>
         </div>
@@ -992,8 +993,13 @@ export default function FoodCostTab(props) {
 
 
       {/* ========== VUE IMPORTS ========== */}
-      {fcView === 'imports' && (
+    {fcView === 'imports' && (
         <FoodCostHistoryTab toast={toast} />
+      )}
+
+      {/* ========== VUE ACHATS (catalogue dynamique multi-fournisseurs) ========== */}
+      {fcView === 'achats' && (
+        <AchatsTab toast={toast} />
       )}
 
       {/* ========== VUE FOURNISSEURS ========== */}
