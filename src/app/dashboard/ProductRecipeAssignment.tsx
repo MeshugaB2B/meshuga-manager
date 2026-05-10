@@ -41,7 +41,7 @@ var INGREDIENT_FAMILIES = {
   ail:             ['ail', 'garlic', 'aïl'],
   cornichons:      ['cornichon', 'pickle', 'gherkin'],
   salade_feuilles: ['sucrine', 'romaine', 'mâche', 'mache', 'roquette', 'lettuce', 'feuille'],
-  oeuf:            ['oeuf', 'œuf', 'egg', 'jaune', 'yolk'],
+  oeuf:            ['oeuf', 'œuf', 'egg', 'yolk'],
   beurre:          ['beurre', 'butter'],
   cacahuete:       ['cacahuète', 'cacahuete', 'peanut', 'pbn'],
   banane:          ['banane', 'banana'],
