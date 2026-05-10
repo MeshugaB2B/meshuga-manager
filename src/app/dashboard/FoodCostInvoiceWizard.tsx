@@ -338,8 +338,8 @@ export default function FoodCostInvoiceWizard(props) {
 
   // ============= RENDER =============
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:300,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={function(){ if (!extractLoading && !committing) onClose() }}>
-      <div style={{background:'#fff',borderRadius:'16px 16px 0 0',padding:0,width:'100%',maxWidth:680,maxHeight:'92vh',overflow:'hidden',display:'flex',flexDirection:'column'}} onClick={function(e){e.stopPropagation()}}>
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}} onClick={function(){ if (!extractLoading && !committing) onClose() }}>
+      <div style={{background:'#fff',borderRadius:16,padding:0,width:'100%',maxWidth:680,maxHeight:'92vh',overflow:'hidden',display:'flex',flexDirection:'column',boxShadow:'0 20px 60px rgba(0,0,0,.3)'}} onClick={function(e){e.stopPropagation()}}>
 
         {/* HEADER avec stepper */}
         <div style={{padding:'16px 20px 12px',borderBottom:'1.5px solid #F0F0F0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
