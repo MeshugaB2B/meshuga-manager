@@ -159,6 +159,18 @@ export default function AchatsTab(props) {
     })
   }
 
+  // Ouvrir une facture stockée dans le bucket supplier-invoices via URL signée
+  function openInvoice(invoicePath) {
+    if (!invoicePath) return
+    sb().storage.from('supplier-invoices').createSignedUrl(invoicePath, 3600).then(function(res){
+      if (res.data && res.data.signedUrl) {
+        window.open(res.data.signedUrl, '_blank')
+      } else {
+        alert('Facture non disponible : ' + (res.error ? res.error.message : 'erreur inconnue'))
+      }
+    })
+  }
+
   // ---------------------------------------------------------------------------
   // Données dérivées : filtres, comparateur, orphans, lignes texte libre
   // ---------------------------------------------------------------------------
@@ -299,12 +311,31 @@ export default function AchatsTab(props) {
           <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Historique factures</div>
           {allPricesForArticle.length > 0 ? allPricesForArticle.slice().reverse().map(function(ph) {
             var phSup = supplierMapForChart[ph.product_id] || '?'
+            var hasInvoice = !!ph.invoice_path
             return (
-              <div key={ph.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'6px 0',borderBottom:'1px solid #F5F5F5',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+              <div
+                key={ph.id}
+                onClick={hasInvoice ? function(){ openInvoice(ph.invoice_path) } : undefined}
+                style={{
+                  display:'flex',justifyContent:'space-between',fontSize:12,padding:'6px 8px',
+                  borderBottom:'1px solid #F5F5F5',alignItems:'center',gap:6,flexWrap:'wrap',
+                  cursor:hasInvoice?'pointer':'default',
+                  borderRadius:4,
+                  transition:'background .12s'
+                }}
+                onMouseOver={hasInvoice ? function(e){ e.currentTarget.style.background = '#FFF5FB' } : undefined}
+                onMouseOut={hasInvoice ? function(e){ e.currentTarget.style.background = 'transparent' } : undefined}
+                title={hasInvoice ? 'Cliquer pour ouvrir la facture' : ''}
+              >
                 <span style={{fontWeight:700,minWidth:80}}>{new Date(ph.invoice_date).toLocaleDateString('fr-FR')}</span>
                 <span style={{fontSize:11,color:'#888'}}>{phSup}</span>
+                {ph.pack_label && <span style={{fontSize:10,color:'#666'}}>{ph.pack_label}</span>}
                 <span style={{fontWeight:900}}>{Number(ph.master_unit_price).toFixed(2)} €/{prod.unit}</span>
-                {ph.invoice_filename && <span style={{fontSize:10,color:'#888'}}>{ph.invoice_filename}</span>}
+                {ph.invoice_filename && (
+                  <span style={{fontSize:10,color:hasInvoice?'#FF82D7':'#888',fontWeight:hasInvoice?900:400}}>
+                    {hasInvoice ? '📄 ' : ''}{ph.invoice_filename}
+                  </span>
+                )}
               </div>
             )
           }) : <div style={{fontSize:13,color:'#888'}}>Aucune facture importée pour ce produit.</div>}
