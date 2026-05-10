@@ -11,10 +11,75 @@ function fmt(n) {
 }
 
 // =============================================================================
+// Familles fonctionnelles d'ingrédients pour la détection de doublons.
+// Si un product et un ingrédient existant partagent une famille, c'est probablement
+// un doublon métier (ex: "Saucisse italienne" et "saucisse SCHWARTS" dans Hot Dog
+// = pas 2 saucisses, c'est la même fonction dans la recette).
+//
+// Pour étendre : ajouter une nouvelle famille, l'ordre n'importe pas, le 1er match gagne.
+// Mots ignorés : sel, poivre, sucre, eau, huile (omniprésents, jamais des doublons).
+// =============================================================================
+var INGREDIENT_FAMILIES = {
+  saucisse:        ['saucisse', 'sausage', 'frankfurt', 'wurst', 'hot dog'],
+  pain:            ['pain', 'bun', 'brioche', 'rye', 'bread', 'bagel'],
+  fromage_jaune:   ['cheddar', 'american cheese', 'swiss', 'comté', 'gruyère', 'gruyere', 'emmental'],
+  fromage_pate:    ['mozzarella', 'feta', 'parmesan', 'parmigiano', 'cream cheese', 'philadelphia'],
+  homard:          ['homard', 'lobster', 'crabe', 'crab'],
+  saumon:          ['saumon', 'salmon', 'lox'],
+  thon:            ['thon', 'tuna'],
+  poulet:          ['poulet', 'chicken'],
+  pastrami_viande: ['pastrami', 'corned beef', 'corned'],
+  mayo:            ['mayo', 'mayonnaise', 'aioli'],
+  moutarde:        ['moutarde', 'mustard', 'dijon'],
+  ketchup:         ['ketchup'],
+  oignon:          ['oignon', 'onion', 'shallot', 'echalote', 'échalote'],
+  ail:             ['ail', 'garlic', 'aïl'],
+  cornichons:      ['cornichon', 'pickle', 'gherkin'],
+  salade_feuilles: ['sucrine', 'romaine', 'mâche', 'mache', 'roquette', 'lettuce', 'feuille'],
+  oeuf:            ['oeuf', 'œuf', 'egg', 'jaune', 'yolk'],
+  beurre:          ['beurre', 'butter'],
+  cacahuete:       ['cacahuète', 'cacahuete', 'peanut', 'pbn'],
+  banane:          ['banane', 'banana'],
+  pomme_terre:     ['pomme de terre', 'patate', 'potato', 'agria'],
+  vinaigre:        ['vinaigre', 'vinegar'],
+  tomate:          ['tomate', 'tomato'],
+  citron:          ['citron', 'lemon', 'lime'],
+  capres:          ['câpre', 'capre', 'caper'],
+  estragon:        ['estragon', 'tarragon'],
+  croutons:        ['crouton', 'croûton'],
+  // Boissons - chaque type de soda est sa propre famille (Coca ≠ Coca Zero ≠ Sprite)
+  // donc on ne définit pas de famille générique "soda"
+}
+
+// Détection avec gestion des mots courts (≤4 chars) en mode "mot entier" pour éviter
+// les faux positifs (ex: "ail" ne doit PAS matcher "détail" ou "travail")
+function getFamily(name) {
+  var n = ' ' + String(name || '').toLowerCase().trim().replace(/[,;.\-_]/g, ' ').replace(/\s+/g, ' ') + ' '
+  if (n.length <= 2) return null
+  var keys = Object.keys(INGREDIENT_FAMILIES)
+  var i, j
+  for (i = 0; i < keys.length; i++) {
+    var fam = keys[i]
+    var words = INGREDIENT_FAMILIES[fam]
+    for (j = 0; j < words.length; j++) {
+      var kw = words[j]
+      if (kw.length <= 4) {
+        // Mot court : exiger mot entier (avec ou sans 's' pluriel)
+        if (n.indexOf(' ' + kw + ' ') >= 0 || n.indexOf(' ' + kw + 's ') >= 0) return fam
+      } else {
+        // Mot long : substring suffisant
+        if (n.indexOf(kw) >= 0) return fam
+      }
+    }
+  }
+  return null
+}
+
+// =============================================================================
 // ProductRecipeAssignment
 //
 // Composant réutilisable pour affecter UN produit à N recettes,
-// avec une quantité par recette et détection de doublons texte libre.
+// avec une quantité par recette et détection de doublons (texte libre + famille).
 //
 // Props :
 //   - product : { id, name, unit, current_price, supplier_id, ... } (le product déjà en DB)
@@ -24,11 +89,12 @@ function fmt(n) {
 //   - onCancel : callback() pour fermer le composant
 //   - toast : function(msg)
 //
-// Logique de save :
-// Pour chaque recette cochée :
-//   1. Si une ligne recipe_ingredients existe avec product_id = product.id → UPDATE qté
-//   2. Sinon, si une ligne existe en texte libre dont le nom matche product.name → UPDATE en y mettant product_id (reconnexion catalogue)
-//   3. Sinon → INSERT nouvelle ligne avec product_id
+// Logique de save par recette cochée :
+//   1. Si ligne recipe_ingredients existe avec product_id = product.id → UPDATE qté
+//   2. Sinon si nom texte libre similaire → UPDATE en y mettant product_id (reconnexion catalogue)
+//   3. Sinon si conflit de famille détecté ET utilisateur a choisi 'replace' → UPDATE de la ligne en doublon
+//   4. Sinon si conflit de famille mais 'force_add' → INSERT (cas légitime : 2 fromages différents)
+//   5. Sinon → INSERT nouvelle ligne avec product_id
 // Pour les recettes décochées (qui avaient une ligne avant) → DELETE
 // =============================================================================
 export default function ProductRecipeAssignment(props) {
@@ -63,6 +129,7 @@ export default function ProductRecipeAssignment(props) {
 
       // Initialiser les selections pour chaque recette
       var prodNameLow = String(product.name || '').toLowerCase().trim()
+      var prodFamily = getFamily(product.name)
       var nextSel = {}
       var i
       for (i = 0; i < allRecipes.length; i++) {
@@ -70,15 +137,24 @@ export default function ProductRecipeAssignment(props) {
         // Chercher si une ligne recipe_ingredients existe pour ce product dans cette recette
         var existing = null
         var textFreeMatch = null
+        var familyConflict = null  // ligne d'une autre famille mais même fonction culinaire
         var ii
         for (ii = 0; ii < allIngs.length; ii++) {
           var ing = allIngs[ii]
           if (ing.recipe_id !== r.id) continue
           if (ing.product_id === product.id) { existing = ing; break }
-          // Sinon : matching texte libre par nom approximatif
+          // Match nom direct
           var ingName = String(ing.article || '').toLowerCase().trim()
           if (ingName && prodNameLow && (ingName === prodNameLow || ingName.indexOf(prodNameLow) >= 0 || prodNameLow.indexOf(ingName) >= 0)) {
             if (!textFreeMatch) textFreeMatch = ing
+            continue
+          }
+          // Match famille fonctionnelle (ex: "saucisse SCHWARTS" vs "Saucisse italienne")
+          if (prodFamily && !familyConflict) {
+            var ingFamily = getFamily(ing.article)
+            if (ingFamily === prodFamily) {
+              familyConflict = ing
+            }
           }
         }
 
@@ -89,6 +165,7 @@ export default function ProductRecipeAssignment(props) {
         if (existing) initialQty = Number(existing.qte || 0)
         else if (preQty !== undefined && preQty !== null) initialQty = Number(preQty)
         else if (textFreeMatch) initialQty = Number(textFreeMatch.qte || 0)
+        else if (familyConflict) initialQty = Number(familyConflict.qte || 0)
 
         nextSel[r.id] = {
           selected: initialSelected,
@@ -96,7 +173,14 @@ export default function ProductRecipeAssignment(props) {
           existing_id: existing ? existing.id : null,
           is_text_free_match: !!(textFreeMatch && !existing),
           text_free_id: textFreeMatch && !existing ? textFreeMatch.id : null,
-          original_label: textFreeMatch && !existing ? textFreeMatch.article : null
+          original_label: textFreeMatch && !existing ? textFreeMatch.article : null,
+          // Nouveau : conflit de famille
+          has_family_conflict: !!(familyConflict && !existing && !textFreeMatch),
+          family_conflict_id: familyConflict && !existing && !textFreeMatch ? familyConflict.id : null,
+          family_conflict_label: familyConflict && !existing && !textFreeMatch ? familyConflict.article : null,
+          family_conflict_qty: familyConflict && !existing && !textFreeMatch ? Number(familyConflict.qte || 0) : 0,
+          // Choix utilisateur quand conflit de famille : 'replace' (default) ou 'force_add'
+          conflict_resolution: 'replace'
         }
       }
       setSelections(nextSel)
@@ -194,6 +278,17 @@ export default function ProductRecipeAssignment(props) {
     })
   }
 
+  function setConflictResolution(recipeId, mode) {
+    // mode = 'replace' (par défaut, UPDATE de la ligne en doublon) | 'force_add' (INSERT en plus)
+    setSelections(function(prev){
+      var next = Object.assign({}, prev)
+      var cur = prev[recipeId]
+      if (!cur) return prev
+      next[recipeId] = Object.assign({}, cur, { conflict_resolution: mode })
+      return next
+    })
+  }
+
   // ============= SAVE =============
   function doSave() {
     if (saving) return
@@ -212,6 +307,7 @@ export default function ProductRecipeAssignment(props) {
     if (product.supplier_name) supName = product.supplier_name
 
     var i
+    var familyReplacements = 0
     for (i = 0; i < keys.length; i++) {
       var rid = keys[i]
       var sel = selections[rid]
@@ -247,8 +343,23 @@ export default function ProductRecipeAssignment(props) {
             }
           })
           conversions++
+        } else if (sel.has_family_conflict && sel.family_conflict_id && sel.conflict_resolution !== 'force_add') {
+          // Conflit de famille résolu en 'replace' : UPDATE de la ligne en doublon avec les nouvelles infos
+          updates.push({
+            id: sel.family_conflict_id,
+            payload: {
+              product_id: product.id,
+              article: product.name,
+              fournisseur: supName || '',
+              unite: product.unit || 'kg',
+              qte: qte,
+              prix_achat: prix,
+              cout: cout
+            }
+          })
+          familyReplacements++
         } else {
-          // INSERT nouvelle ligne
+          // INSERT nouvelle ligne (cas standard OU force_add explicite par l'utilisateur)
           inserts.push({
             recipe_id: rid,
             article: product.name,
@@ -324,6 +435,7 @@ export default function ProductRecipeAssignment(props) {
         if (updates.length > 0) parts.push(updates.length + ' mise' + (updates.length > 1 ? 's' : '') + ' à jour')
         if (deletes.length > 0) parts.push(deletes.length + ' retrait' + (deletes.length > 1 ? 's' : ''))
         if (conversions > 0) parts.push(conversions + ' lien' + (conversions > 1 ? 's' : '') + ' catalogue rétabli' + (conversions > 1 ? 's' : ''))
+        if (familyReplacements > 0) parts.push(familyReplacements + ' doublon' + (familyReplacements > 1 ? 's' : '') + ' remplacé' + (familyReplacements > 1 ? 's' : ''))
         msg += parts.join(' · ')
         toast(msg)
         onSaved()
@@ -350,6 +462,7 @@ export default function ProductRecipeAssignment(props) {
 
   var nbSelected = Object.keys(selections).filter(function(k){ return selections[k] && selections[k].selected }).length
   var nbConversions = Object.keys(selections).filter(function(k){ return selections[k] && selections[k].selected && selections[k].is_text_free_match }).length
+  var nbFamilyConflicts = Object.keys(selections).filter(function(k){ return selections[k] && selections[k].selected && selections[k].has_family_conflict && !selections[k].is_text_free_match }).length
 
   var unit = product && product.unit ? product.unit : 'kg'
   var displayU = displayUnit(unit)
@@ -380,6 +493,12 @@ export default function ProductRecipeAssignment(props) {
       {nbConversions > 0 && (
         <div style={{background:'#FFF8E1',borderRadius:6,padding:'8px 10px',marginBottom:10,border:'1px solid #FFE099',fontSize:11,color:'#856B00'}}>
           💡 {nbConversions} ligne{nbConversions > 1 ? 's' : ''} en texte libre va{nbConversions > 1 ? 'ont' : ''} être convertie{nbConversions > 1 ? 's' : ''} en lien catalogue → propagation auto des futures mises à jour de prix.
+        </div>
+      )}
+
+      {nbFamilyConflicts > 0 && (
+        <div style={{background:'#FFF6E5',borderRadius:6,padding:'8px 10px',marginBottom:10,border:'1px solid #FFD699',fontSize:11,color:'#A05A00'}}>
+          ⚠️ {nbFamilyConflicts} doublon{nbFamilyConflicts > 1 ? 's' : ''} potentiel{nbFamilyConflicts > 1 ? 's' : ''} détecté{nbFamilyConflicts > 1 ? 's' : ''} : un ingrédient de la même famille existe déjà. Choisis « Remplacer » (recommandé) ou « Ajouter en plus » (si vraiment 2 ingrédients différents).
         </div>
       )}
 
@@ -414,24 +533,45 @@ export default function ProductRecipeAssignment(props) {
               {g.variants.map(function(r){
                 var sel = selections[r.id] || { selected: false, qty_master: 0 }
                 var qtyDisp = masterToDisplay(sel.qty_master, unit)
+                var resolution = sel.conflict_resolution || 'replace'
                 return (
-                  <div key={r.id} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',borderTop:'1px dashed #F5F5F5'}}>
-                    <label style={{display:'flex',alignItems:'center',gap:6,flex:1,cursor:'pointer',minWidth:0}}>
-                      <input type="checkbox" checked={!!sel.selected} onChange={function(){toggleRecipe(r.id)}} style={{width:14,height:14,flexShrink:0}} />
-                      <span style={{fontSize:11,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                        {r.variant_label || (r.variant_key === 'standard' ? 'Standard' : r.name)}
-                        {sel.is_text_free_match && (
-                          <span style={{fontSize:9,marginLeft:6,padding:'1px 5px',background:'#FFF8E1',color:'#856B00',borderRadius:3,fontWeight:900}}>↻ EXISTE</span>
-                        )}
-                        {sel.existing_id && !sel.is_text_free_match && (
-                          <span style={{fontSize:9,marginLeft:6,padding:'1px 5px',background:'#E8F8EE',color:'#009D3A',borderRadius:3,fontWeight:900}}>✓ LIÉ</span>
-                        )}
-                      </span>
-                    </label>
-                    {sel.selected && (
-                      <div style={{display:'flex',alignItems:'center',gap:3,flexShrink:0}}>
-                        <input type="number" step={isKgUnit(unit) ? '1' : '0.01'} value={qtyDisp || ''} onChange={function(e){setQty(r.id, e.target.value)}} placeholder="0" style={{width:54,padding:'3px 5px',fontSize:11,fontWeight:700,border:'1.5px solid #DDD',borderRadius:4,textAlign:'right'}} />
-                        <span style={{fontSize:10,opacity:.6,minWidth:18}}>{displayU}</span>
+                  <div key={r.id} style={{padding:'4px 0',borderTop:'1px dashed #F5F5F5'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <label style={{display:'flex',alignItems:'center',gap:6,flex:1,cursor:'pointer',minWidth:0}}>
+                        <input type="checkbox" checked={!!sel.selected} onChange={function(){toggleRecipe(r.id)}} style={{width:14,height:14,flexShrink:0}} />
+                        <span style={{fontSize:11,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                          {r.variant_label || (r.variant_key === 'standard' ? 'Standard' : r.name)}
+                          {sel.is_text_free_match && (
+                            <span style={{fontSize:9,marginLeft:6,padding:'1px 5px',background:'#FFF8E1',color:'#856B00',borderRadius:3,fontWeight:900}}>↻ EXISTE</span>
+                          )}
+                          {sel.existing_id && !sel.is_text_free_match && (
+                            <span style={{fontSize:9,marginLeft:6,padding:'1px 5px',background:'#E8F8EE',color:'#009D3A',borderRadius:3,fontWeight:900}}>✓ LIÉ</span>
+                          )}
+                          {sel.has_family_conflict && !sel.is_text_free_match && !sel.existing_id && (
+                            <span style={{fontSize:9,marginLeft:6,padding:'1px 5px',background:'#FFE8C2',color:'#A05A00',borderRadius:3,fontWeight:900}}>⚠️ DOUBLON</span>
+                          )}
+                        </span>
+                      </label>
+                      {sel.selected && (
+                        <div style={{display:'flex',alignItems:'center',gap:3,flexShrink:0}}>
+                          <input type="number" step={isKgUnit(unit) ? '1' : '0.01'} value={qtyDisp || ''} onChange={function(e){setQty(r.id, e.target.value)}} placeholder="0" style={{width:54,padding:'3px 5px',fontSize:11,fontWeight:700,border:'1.5px solid #DDD',borderRadius:4,textAlign:'right'}} />
+                          <span style={{fontSize:10,opacity:.6,minWidth:18}}>{displayU}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Zone de résolution du conflit famille */}
+                    {sel.has_family_conflict && sel.selected && (
+                      <div style={{marginTop:5,marginLeft:22,padding:'7px 9px',background:'#FFF6E5',borderRadius:5,border:'1px solid #FFD699',fontSize:10}}>
+                        <div style={{fontWeight:900,color:'#A05A00',marginBottom:4}}>
+                          Cette recette contient déjà <span style={{padding:'1px 5px',background:'#fff',borderRadius:3}}>« {sel.family_conflict_label} »</span>
+                          {sel.family_conflict_qty > 0 && <span style={{opacity:.7}}> · {sel.family_conflict_qty} {displayU}</span>}
+                        </div>
+                        <div style={{fontSize:10,opacity:.8,marginBottom:5}}>Le nouveau produit a la même fonction culinaire — c&apos;est probablement un doublon.</div>
+                        <div style={{display:'flex',gap:4}}>
+                          <button onClick={function(){setConflictResolution(r.id, 'replace')}} style={{flex:1,padding:'4px 6px',fontSize:10,fontWeight:900,borderRadius:4,border:'1.5px solid '+(resolution==='replace'?'#A05A00':'#DDD'),background:resolution==='replace'?'#A05A00':'#fff',color:resolution==='replace'?'#fff':'#555',cursor:'pointer'}}>↻ Remplacer (recommandé)</button>
+                          <button onClick={function(){setConflictResolution(r.id, 'force_add')}} style={{flex:1,padding:'4px 6px',fontSize:10,fontWeight:900,borderRadius:4,border:'1.5px solid '+(resolution==='force_add'?'#888':'#DDD'),background:resolution==='force_add'?'#888':'#fff',color:resolution==='force_add'?'#fff':'#555',cursor:'pointer'}}>+ Ajouter en plus</button>
+                        </div>
                       </div>
                     )}
                   </div>
