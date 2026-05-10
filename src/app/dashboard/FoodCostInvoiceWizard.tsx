@@ -174,13 +174,81 @@ export default function FoodCostInvoiceWizard(props) {
 
   function allLinesValid() {
     if (lines.length === 0) return false
-    return lines.every(isLineValid)
+    if (!lines.every(isLineValid)) return false
+    // Bloquer si outliers non confirmés
+    var hasUnacknowledgedOutlier = lines.some(function(l){
+      if (l.outlier_acknowledged) return false
+      var oi = getOutlierInfo(l)
+      return oi !== null
+    })
+    if (hasUnacknowledgedOutlier) return false
+    // Bloquer si extraction_warning sur une ligne non éditée par l'utilisateur
+    var hasUneditedWarning = lines.some(function(l){
+      if (l.disposition === 'fees_taxes') return false
+      if (l.user_edited) return false
+      return l.extraction_warning === 'pack_unknown' || (Number(l.master_unit_price || 0) <= 0 && l.disposition !== 'fees_taxes')
+    })
+    if (hasUneditedWarning) return false
+    return true
   }
 
   function isSupplierValid() {
     if (!supplierChoice) return false
     if (supplierChoice.id) return true
     return supplierChoice.name && String(supplierChoice.name).trim().length >= 2
+  }
+
+  // ============= OUTLIER DETECTION (seuil ±50%) =============
+  // Pour chaque ligne match_existing : compare master_unit_price extrait au current_price actuel
+  // Retourne null si pas d'outlier, sinon { ratio, currentPrice, newPrice, severity }
+  function getOutlierInfo(l) {
+    if (l.disposition !== 'match_existing') return null
+    if (!l.matched_product_id) return null
+    var prod = allProducts.filter(function(p){ return p.id === l.matched_product_id })[0]
+    if (!prod) return null
+    var current = Number(prod.current_price || 0)
+    var extracted = Number(l.master_unit_price || 0)
+    if (current <= 0 || extracted <= 0) return null
+    var ratio = extracted / current
+    if (ratio >= 0.5 && ratio <= 1.5) return null // dans la zone normale ±50%
+    var severity = (ratio > 3 || ratio < 0.33) ? 'critical' : 'warning'
+    return {
+      ratio: ratio,
+      currentPrice: current,
+      newPrice: extracted,
+      severity: severity,
+      pctChange: Math.round((ratio - 1) * 100),
+      productName: prod.name,
+      productUnit: prod.unit
+    }
+  }
+
+  // Recalcul automatique master_unit_price quand l'utilisateur édite pack_price ou master_qty_per_pack
+  function updateLinePack(lineIndex, field, value) {
+    setLines(function(prev){
+      var next = prev.slice()
+      var l = Object.assign({}, next[lineIndex])
+      l[field] = value
+      // Si on a pack_price ET qty > 0, recalculer master_unit_price
+      var pp = Number(field === 'pack_price' ? value : l.pack_price)
+      var qpp = Number(field === 'master_qty_per_pack' ? value : l.master_qty_per_pack)
+      if (pp > 0 && qpp > 0) {
+        l.master_unit_price = pp / qpp
+        l.outlier_acknowledged = true // l'utilisateur a corrigé manuellement, on l'autorise à passer
+      }
+      // Marquer que la ligne a été éditée par l'utilisateur (extraction_warning sautée)
+      l.user_edited = true
+      next[lineIndex] = l
+      return next
+    })
+  }
+
+  function acknowledgeOutlier(lineIndex) {
+    setLines(function(prev){
+      var next = prev.slice()
+      next[lineIndex] = Object.assign({}, next[lineIndex], { outlier_acknowledged: true })
+      return next
+    })
   }
 
   // ============= COMMIT =============
@@ -190,6 +258,8 @@ export default function FoodCostInvoiceWizard(props) {
     var payload = {
       invoice_date: extractData ? extractData.invoice_date : new Date().toISOString().split('T')[0],
       file_name: file ? file.name : null,
+      file_base64: file ? file.base64 : null,
+      file_type: file ? file.type : null,
       total_ht: extractData ? extractData.total_ht : 0,
       supplier: {
         id: supplierChoice.id || null,
@@ -408,14 +478,61 @@ export default function FoodCostInvoiceWizard(props) {
                 </div>
               )}
 
+              {/* === ALERTE OUTLIERS PRIX (écart >50% vs prix actuel) === */}
+              {(function(){
+                var outliers = lines.map(function(l, idx){
+                  var oi = getOutlierInfo(l)
+                  if (!oi || l.outlier_acknowledged) return null
+                  return { idx: idx, info: oi, line: l }
+                }).filter(function(x){ return x !== null })
+                if (outliers.length === 0) return null
+                return (
+                  <div style={{background:'#FFEBE6',borderRadius:10,padding:'12px 14px',marginBottom:14,border:'2px solid #CC0066'}}>
+                    <div style={{fontSize:13,fontWeight:900,color:'#CC0066',marginBottom:4}}>
+                      🚨 {outliers.length} prix suspect{outliers.length > 1 ? 's' : ''} d&eacute;tect&eacute;{outliers.length > 1 ? 's' : ''}
+                    </div>
+                    <div style={{fontSize:11,opacity:.75,marginBottom:8}}>
+                      &Eacute;cart &gt; 50% vs prix actuel en base. V&eacute;rifie le conditionnement avant de valider.
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* === ALERTE EXTRACTION_WARNING (conditionnement inconnu côté IA) === */}
+              {(function(){
+                var warns = lines.map(function(l, idx){
+                  if (l.disposition === 'fees_taxes') return null
+                  if (l.user_edited) return null
+                  if (l.extraction_warning === 'pack_unknown' || (Number(l.master_unit_price || 0) <= 0 && l.disposition !== 'fees_taxes')) {
+                    return { idx: idx, line: l }
+                  }
+                  return null
+                }).filter(function(x){ return x !== null })
+                if (warns.length === 0) return null
+                return (
+                  <div style={{background:'#FFF8E1',borderRadius:10,padding:'12px 14px',marginBottom:14,border:'2px solid #FF9500'}}>
+                    <div style={{fontSize:13,fontWeight:900,color:'#856B00',marginBottom:4}}>
+                      📦 {warns.length} ligne{warns.length > 1 ? 's' : ''} avec conditionnement &agrave; pr&eacute;ciser
+                    </div>
+                    <div style={{fontSize:11,opacity:.75}}>
+                      Claude n&apos;a pas pu d&eacute;duire le conditionnement avec certitude. Saisis le pack et la quantit&eacute; ci-dessous.
+                    </div>
+                  </div>
+                )
+              })()}
+
               {lines.map(function(l, idx){
                 var disp = l.disposition
                 var color = dispColor(disp)
                 var valid = isLineValid(l)
-                var bgColor = !valid ? '#FFF8E1' : '#fff'
+                var oi = getOutlierInfo(l)
+                var hasOutlier = oi !== null && !l.outlier_acknowledged
+                var hasPackWarning = !l.user_edited && (l.extraction_warning === 'pack_unknown' || (Number(l.master_unit_price || 0) <= 0 && disp !== 'fees_taxes'))
+                var bgColor = hasOutlier ? '#FFEBE6' : (hasPackWarning ? '#FFF8E1' : (!valid ? '#FFF8E1' : '#fff'))
+                var borderColor = hasOutlier ? '#CC0066' : (hasPackWarning ? '#FF9500' : (valid ? '#EEE' : '#FF9500'))
 
                 return (
-                  <div key={idx} style={{background:bgColor,borderRadius:8,padding:10,marginBottom:6,border:'1.5px solid '+(valid?'#EEE':'#FF9500')}}>
+                  <div key={idx} style={{background:bgColor,borderRadius:8,padding:10,marginBottom:6,border:'1.5px solid '+borderColor}}>
                     {/* Ligne header */}
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
                       <div style={{flex:1,minWidth:0}}>
@@ -430,6 +547,52 @@ export default function FoodCostInvoiceWizard(props) {
                         {dispLabel(disp)} {l.ui_expanded ? '▲' : '▼'}
                       </button>
                     </div>
+
+                    {/* Encart OUTLIER : prix suspect vs prix actuel */}
+                    {hasOutlier && (
+                      <div style={{marginTop:8,padding:'8px 10px',background:'#fff',border:'1.5px solid #CC0066',borderRadius:6}}>
+                        <div style={{fontSize:11,fontWeight:900,color:'#CC0066',marginBottom:4}}>
+                          🚨 Prix {oi.pctChange > 0 ? '+' : ''}{oi.pctChange}% vs prix actuel ({fmt(oi.currentPrice)}€/{oi.productUnit})
+                        </div>
+                        <div style={{fontSize:10,opacity:.75,marginBottom:6}}>
+                          Probable erreur de conditionnement OCR. V&eacute;rifie ou corrige ci-dessous.
+                        </div>
+                        <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginBottom:6}}>
+                          <label style={{fontSize:10,fontWeight:700}}>Pack label :</label>
+                          <input type="text" value={l.pack_label || ''} onChange={function(e){ updateLinePack(idx, 'pack_label', e.target.value) }} placeholder="ex: Bidon 5L" style={{padding:'4px 8px',fontSize:11,border:'1px solid #DDD',borderRadius:4,minWidth:120}} />
+                          <label style={{fontSize:10,fontWeight:700}}>Pack price (€) :</label>
+                          <input type="number" step="0.01" value={l.pack_price || 0} onChange={function(e){ updateLinePack(idx, 'pack_price', Number(e.target.value)) }} style={{padding:'4px 8px',fontSize:11,border:'1px solid #DDD',borderRadius:4,width:80}} />
+                          <label style={{fontSize:10,fontWeight:700}}>Qté/pack ({l.master_unit}) :</label>
+                          <input type="number" step="0.01" value={l.master_qty_per_pack || 0} onChange={function(e){ updateLinePack(idx, 'master_qty_per_pack', Number(e.target.value)) }} style={{padding:'4px 8px',fontSize:11,border:'1px solid #DDD',borderRadius:4,width:70}} />
+                          <span style={{fontSize:11,fontWeight:900,color:'#191923'}}>= {fmt(l.master_unit_price)} €/{l.master_unit}</span>
+                        </div>
+                        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                          <button onClick={function(){ acknowledgeOutlier(idx) }} style={{padding:'4px 10px',fontSize:10,fontWeight:900,borderRadius:6,border:'1.5px solid #CC0066',background:'#fff',color:'#CC0066',cursor:'pointer'}}>✓ Confirmer ce prix tel quel</button>
+                          <button onClick={function(){ setLineDisposition(idx, 'fees_taxes') }} style={{padding:'4px 10px',fontSize:10,fontWeight:900,borderRadius:6,border:'1.5px solid #888',background:'#fff',color:'#888',cursor:'pointer'}}>Ignorer cette ligne</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Encart PACK_UNKNOWN : conditionnement non détecté */}
+                    {!hasOutlier && hasPackWarning && (
+                      <div style={{marginTop:8,padding:'8px 10px',background:'#fff',border:'1.5px solid #FF9500',borderRadius:6}}>
+                        <div style={{fontSize:11,fontWeight:900,color:'#856B00',marginBottom:4}}>
+                          📦 Conditionnement &agrave; pr&eacute;ciser
+                        </div>
+                        <div style={{fontSize:10,opacity:.75,marginBottom:6}}>
+                          Claude n&apos;a pas pu d&eacute;duire le pack. Saisis-le manuellement.
+                        </div>
+                        <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+                          <label style={{fontSize:10,fontWeight:700}}>Pack label :</label>
+                          <input type="text" value={l.pack_label || ''} onChange={function(e){ updateLinePack(idx, 'pack_label', e.target.value) }} placeholder="ex: Bidon 5L" style={{padding:'4px 8px',fontSize:11,border:'1px solid #DDD',borderRadius:4,minWidth:120}} />
+                          <label style={{fontSize:10,fontWeight:700}}>Pack price (€) :</label>
+                          <input type="number" step="0.01" value={l.pack_price || 0} onChange={function(e){ updateLinePack(idx, 'pack_price', Number(e.target.value)) }} style={{padding:'4px 8px',fontSize:11,border:'1px solid #DDD',borderRadius:4,width:80}} />
+                          <label style={{fontSize:10,fontWeight:700}}>Qté/pack ({l.master_unit}) :</label>
+                          <input type="number" step="0.01" value={l.master_qty_per_pack || 0} onChange={function(e){ updateLinePack(idx, 'master_qty_per_pack', Number(e.target.value)) }} style={{padding:'4px 8px',fontSize:11,border:'1px solid #DDD',borderRadius:4,width:70}} />
+                          <span style={{fontSize:11,fontWeight:900,color:'#191923'}}>= {fmt(l.master_unit_price)} €/{l.master_unit}</span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Quand match_existing déjà résolu (compact) */}
                     {!l.ui_expanded && disp === 'match_existing' && l.matched_name && (
