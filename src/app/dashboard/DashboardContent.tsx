@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import FoodCostTab from './FoodCostTab'
-import SuppliersTab from './SuppliersTab'
 import FoodCostAlertsWidget from './FoodCostAlertsWidget'
 import NotifsTab from './NotifsTab'
 import JournalTab from './JournalTab'
@@ -850,8 +849,7 @@ function DashboardImpl() {
     {id: 'instagram', label: 'Instagram', icon: '📸'},
     {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
     {id: 'notifs', label: 'Notifications', icon: '🔔'},
-    {id: 'foodcost', label: 'Food Cost', icon: '🥩'},
-    {id: 'fournisseurs', label: 'Fournisseurs', icon: '📦'},
+    {id: 'foodcost', label: 'Cuisine', icon: '🥪'},
     {id: 'rh', label: 'Ressources Humaines', icon: '👥'},
     {id: 'legal', label: 'Légal & Conformité', icon: '⚖️'},
     {id: 'messagerie', label: 'Messagerie', icon: '💬'},
@@ -901,7 +899,7 @@ function DashboardImpl() {
               )
             })}
             <div className="sb-sec">Gestion</div>
-            {NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['chasse','foodcost','fournisseurs','rh','legal','annuaire','reporting','vault'].indexOf(n.id) > -1 }).map(function(n) {              return (
+            {NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['chasse','foodcost','rh','legal','annuaire','reporting','vault'].indexOf(n.id) > -1 }).map(function(n) {              return (
                 <div key={n.id} className={page === n.id ? 'ni active' : 'ni'} onClick={function() { nav(n.id) }}>
                   <span style={{fontSize:14}}>{n.icon}</span>{n.label}
                 </div>
@@ -2496,18 +2494,6 @@ function DashboardImpl() {
               messages={messages}
             />
           )}
-            {page === 'fournisseurs' && (
-              <div className="mc">
-                <div className="ph">
-                  <div>
-                    <div className="pt">📦 Catalogue Fournisseurs</div>
-                    <div className="ps">Suivi des prix · Liaison recettes</div>
-                  </div>
-                </div>
-                <SuppliersTab />
-              </div>
-            )}
-
          {page === 'rh' && <RhTab />}
           {page === 'legal' && <LegalTab />}
             {page === 'foodcost' && (
@@ -2651,8 +2637,7 @@ function DashboardImpl() {
           <div className="bb-menu-circle"><img src={STAMP_PINK} alt="menu" /></div>
           <span className="bb-menu-lbl">Menu</span>
         </div>
-        <div className={page === "foodcost" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("foodcost") }}><span className="bb-ico">{"🥩"}</span><span className="bb-lbl">Food</span></div>
-        <div className={page === "messagerie" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("messagerie") }}><span className="bb-ico">{"💬"}</span><span className="bb-lbl">Messages</span></div>
+        <div className={page === "foodcost" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("foodcost") }}><span className="bb-ico">{"🥪"}</span><span className="bb-lbl">Cuisine</span></div>        <div className={page === "messagerie" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("messagerie") }}><span className="bb-ico">{"💬"}</span><span className="bb-lbl">Messages</span></div>
         <div className={page === "tasks" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("tasks") }}><span className="bb-ico">{"✅"}</span><span className="bb-lbl">Tasks</span></div>
       </div>
       <div className={menuOpen ? "mms-overlay open" : "mms-overlay"} onClick={function(){ setMenuOpen(false) }}></div>
@@ -2673,8 +2658,7 @@ function DashboardImpl() {
         </div>
         <div className="mms-sec">Gestion</div>
         <div className="mms-grid">
-          <div className={page === "foodcost" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("foodcost"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🥩"}</div><div className="mms-tile-lbl">Food Cost</div></div>
-          <div className={page === "fournisseurs" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("fournisseurs"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📦"}</div><div className="mms-tile-lbl">Fournisseurs</div></div>
+         <div className={page === "foodcost" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("foodcost"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🥪"}</div><div className="mms-tile-lbl">Cuisine</div></div>
           <div className={page === "annuaire" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("annuaire"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📇"}</div><div className="mms-tile-lbl">Annuaire</div></div>
           <div className={page === "chasse" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("chasse"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔍"}</div><div className="mms-tile-lbl">Chasse</div></div>
           <div className={page === "reporting" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("reporting"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📊"}</div><div className="mms-tile-lbl">Reporting</div></div>
