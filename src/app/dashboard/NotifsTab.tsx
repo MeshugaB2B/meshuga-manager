@@ -46,59 +46,89 @@ export default function NotifsTab(props) {
     Promise.all([
       // Tous les product_prices, joinés avec product + supplier
       sb().from('product_prices').select('id, product_id, master_unit_price, pack_label, invoice_date, invoice_filename, invoice_path').order('invoice_date', { ascending: false }),
-      sb().from('products').select('id, name, supplier_id, current_price, unit, category'),
+      sb().from('products').select('id, name, supplier_id, article_id, current_price, unit, category'),
       sb().from('suppliers').select('id, name'),
       sb().from('recipes').select('id, name, parent_slug, variant_key, variant_label, food_cost_pct, prix_vente_ttc, is_active').eq('is_active', true),
-      sb().from('recipe_ingredients').select('recipe_id, product_id')
+      sb().from('recipe_ingredients').select('recipe_id, product_id'),
+      sb().from('articles').select('id, name')
     ]).then(function(res){
       var pp = res[0].data || []
       var prods = res[1].data || []
       var sups = res[2].data || []
       var recs = res[3].data || []
       var ris = res[4].data || []
+      var arts = res[5].data || []
 
-      // Index supplier par id
+      // Index supplier par id, article par id, product par id
       var supById = {}
       sups.forEach(function(s){ supById[s.id] = s })
+      var artById = {}
+      arts.forEach(function(a){ artById[a.id] = a })
+      var prodById = {}
+      prods.forEach(function(p){ prodById[p.id] = p })
 
-      // Grouper product_prices par product_id (déjà triés DESC par invoice_date)
-      var pricesByProd = {}
+      // Grouper product_prices par CLÉ DE COMPARAISON :
+      // - article_id si disponible (= comparer entre fournisseurs du même ingrédient)
+      // - sinon product_id (fallback pour les products sans article_id)
+      var pricesByKey = {}
       pp.forEach(function(p){
-        if (Number(p.master_unit_price || 0) <= 0) return  // ignorer les prix nuls
-        if (!pricesByProd[p.product_id]) pricesByProd[p.product_id] = []
-        pricesByProd[p.product_id].push(p)
+        if (Number(p.master_unit_price || 0) <= 0) return
+        var prod = prodById[p.product_id]
+        if (!prod) return
+        var key = prod.article_id ? 'a:' + prod.article_id : 'p:' + p.product_id
+        if (!pricesByKey[key]) pricesByKey[key] = []
+        pricesByKey[key].push(p)
       })
 
-      // Calculer les variations : pour chaque product, comparer le dernier prix avec le précédent
+      // Calculer les variations : pour chaque clé, comparer le dernier prix avec le précédent
       var allVariations = []
-      Object.keys(pricesByProd).forEach(function(pid){
-        var hist = pricesByProd[pid]
-        if (hist.length < 2) return  // pas de référence précédente
+      Object.keys(pricesByKey).forEach(function(key){
+        var hist = pricesByKey[key]
+        if (hist.length < 2) return
         var curr = hist[0]
         var prev = hist[1]
         var currP = Number(curr.master_unit_price)
         var prevP = Number(prev.master_unit_price)
         if (prevP <= 0) return
         var pct = ((currP - prevP) / prevP) * 100
-        if (Math.abs(pct) < thresholdPct) return  // sous le seuil
+        if (Math.abs(pct) < thresholdPct) return
 
-        var prod = prods.filter(function(p){ return p.id === pid })[0]
-        if (!prod) return
-        var sup = supById[prod.supplier_id]
+        var currProd = prodById[curr.product_id]
+        var prevProd = prodById[prev.product_id]
+        if (!currProd) return
+        var currSup = supById[currProd.supplier_id]
+        var prevSup = prevProd ? supById[prevProd.supplier_id] : null
 
-        // Recettes utilisatrices
+        // Détecter changement de fournisseur
+        var supplierChanged = currProd.supplier_id !== (prevProd ? prevProd.supplier_id : null)
+        var article = currProd.article_id ? artById[currProd.article_id] : null
+
+        // Vérifier que les unités sont compatibles (sinon comparaison hasardeuse)
+        if (prevProd && currProd.unit !== prevProd.unit) return
+
+        // Recettes utilisatrices (tous les products du même article)
         var usingRecipeIds = {}
-        ris.forEach(function(r){ if (r.product_id === pid) usingRecipeIds[r.recipe_id] = 1 })
+        var productIdsForArticle = currProd.article_id
+          ? prods.filter(function(p){ return p.article_id === currProd.article_id }).map(function(p){ return p.id })
+          : [currProd.id]
+        ris.forEach(function(r){
+          if (productIdsForArticle.indexOf(r.product_id) >= 0) usingRecipeIds[r.recipe_id] = 1
+        })
         var usingRecipes = recs.filter(function(r){ return usingRecipeIds[r.id] }).map(function(r){
           return { id: r.id, name: r.name, food_cost_pct: r.food_cost_pct }
         })
 
         allVariations.push({
-          product_id: pid,
-          product_name: prod.name,
-          supplier: sup ? sup.name : '—',
-          unit: prod.unit,
+          comparison_key: key,
+          product_id: curr.product_id,
+          product_name: currProd.name,
+          article_name: article ? article.name : currProd.name,
+          supplier: currSup ? currSup.name : '—',
+          prev_supplier: prevSup ? prevSup.name : (currSup ? currSup.name : '—'),
+          supplier_changed: supplierChanged,
+          unit: currProd.unit,
           pack_label: curr.pack_label,
+          prev_pack_label: prev.pack_label,
           new_price: currP,
           old_price: prevP,
           new_date: curr.invoice_date,
@@ -173,12 +203,21 @@ export default function NotifsTab(props) {
             var borderColor = severity === 'high' ? '#CC0066' : (severity === 'mid' ? '#FF82D7' : '#FFB0D7')
             var badgeColor = severity === 'high' ? '#CC0066' : (severity === 'mid' ? '#CC0066' : '#FF82D7')
             return (
-              <div key={v.product_id} style={{background:'#FFE5F0',border:'1.5px solid '+borderColor,borderRadius:10,padding:'10px 12px',marginBottom:8}}>
+              <div key={v.comparison_key} style={{background:'#FFE5F0',border:'1.5px solid '+borderColor,borderRadius:10,padding:'10px 12px',marginBottom:8}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,flexWrap:'wrap'}}>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:900,color:'#191923'}}>{v.product_name}</div>
+                    <div style={{fontSize:13,fontWeight:900,color:'#191923',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                      {v.article_name}
+                      {v.supplier_changed && (
+                        <span style={{padding:'2px 8px',background:'#191923',color:'#FFEB5A',borderRadius:10,fontSize:9,fontWeight:900,textTransform:'uppercase',letterSpacing:.3}}>🔄 Changement fournisseur</span>
+                      )}
+                    </div>
                     <div style={{fontSize:11,color:'#666',marginTop:2}}>
-                      {v.supplier}
+                      {v.supplier_changed ? (
+                        <span><strong>{v.prev_supplier}</strong> → <strong>{v.supplier}</strong></span>
+                      ) : (
+                        <span>{v.supplier}</span>
+                      )}
                       {v.pack_label && <span> · {v.pack_label}</span>}
                     </div>
                     <div style={{fontSize:11,marginTop:4,color:'#191923'}}>
@@ -214,12 +253,21 @@ export default function NotifsTab(props) {
           <div style={{fontFamily:'Yellowtail',fontSize:18,color:'#009D3A',marginBottom:8}}>▼ Baisses ({baisses.length})</div>
           {baisses.map(function(v){
             return (
-              <div key={v.product_id} style={{background:'#E8FFE8',border:'1.5px solid #009D3A',borderRadius:10,padding:'10px 12px',marginBottom:8}}>
+              <div key={v.comparison_key} style={{background:'#E8FFE8',border:'1.5px solid #009D3A',borderRadius:10,padding:'10px 12px',marginBottom:8}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,flexWrap:'wrap'}}>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:900,color:'#191923'}}>{v.product_name}</div>
+                    <div style={{fontSize:13,fontWeight:900,color:'#191923',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                      {v.article_name}
+                      {v.supplier_changed && (
+                        <span style={{padding:'2px 8px',background:'#191923',color:'#FFEB5A',borderRadius:10,fontSize:9,fontWeight:900,textTransform:'uppercase',letterSpacing:.3}}>🔄 Changement fournisseur</span>
+                      )}
+                    </div>
                     <div style={{fontSize:11,color:'#666',marginTop:2}}>
-                      {v.supplier}
+                      {v.supplier_changed ? (
+                        <span><strong>{v.prev_supplier}</strong> → <strong>{v.supplier}</strong></span>
+                      ) : (
+                        <span>{v.supplier}</span>
+                      )}
                       {v.pack_label && <span> · {v.pack_label}</span>}
                     </div>
                     <div style={{fontSize:11,marginTop:4,color:'#191923'}}>
