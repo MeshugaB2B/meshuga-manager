@@ -1,163 +1,277 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createClient } from '@supabase/supabase-js'
 
+function sb() {
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
+}
+
+function fmtPrice(n) {
+  var v = Number(n || 0)
+  if (v < 1) return v.toFixed(3).replace(/\.?0+$/, '')
+  return v.toFixed(2)
+}
+
+function fmtDate(s) {
+  if (!s) return ''
+  var d = new Date(s)
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+}
+
+// =============================================================================
+// NotifsTab — Notifications réelles basées sur l'historique des achats
+//
+// PRINCIPE CRITIQUE : les hausses/baisses sont calculées UNIQUEMENT à partir
+// de product_prices chronologique d'un même product_id. On ne compare JAMAIS
+// recipe_ingredients.prix_achat avec products.current_price (logique précédente
+// qui montrait des fausses hausses dues aux changements de fournisseur).
+//
+// Une "hausse" = j'ai payé plus cher chez le MÊME fournisseur que la fois d'avant.
+// =============================================================================
 export default function NotifsTab(props) {
-  var toast = props.toast
-  var isEmy = props.isEmy
-  var pushEnabled = props.pushEnabled
-  var setPushEnabled = props.setPushEnabled
-  var pushLoading = props.pushLoading
-  var setPushLoading = props.setPushLoading
-  var registerPush = props.registerPush
-  var unregisterPush = props.unregisterPush
+  var toast = props.toast || function(){}
+  var fcSeuil = Number(props.fcSeuil || 30) // seuil food cost % depuis DashboardContent
 
-  var [pushTestStatus, setPushTestStatus] = useState(null)
-  var [pushTestLoading, setPushTestLoading] = useState(false)
-  var [notifTitle, setNotifTitle] = useState('')
-  var [notifBody, setNotifBody] = useState('')
-  var [notifTarget, setNotifTarget] = useState('all')
-  var [notifSending, setNotifSending] = useState(false)
-  var [notifSent, setNotifSent] = useState(false)
+  var [loading, setLoading] = useState(true)
+  var [variations, setVariations] = useState([])  // hausses + baisses fusionnées
+  var [recipesHigh, setRecipesHigh] = useState([])
+  var [recipeIngs, setRecipeIngs] = useState([])
+  var [recipes, setRecipes] = useState([])
+  var [thresholdPct, setThresholdPct] = useState(5)
+
+  useEffect(function(){ loadData() }, [thresholdPct])
+
+  function loadData() {
+    setLoading(true)
+    Promise.all([
+      // Tous les product_prices, joinés avec product + supplier
+      sb().from('product_prices').select('id, product_id, master_unit_price, pack_label, invoice_date, invoice_filename, invoice_path').order('invoice_date', { ascending: false }),
+      sb().from('products').select('id, name, supplier_id, current_price, unit, category'),
+      sb().from('suppliers').select('id, name'),
+      sb().from('recipes').select('id, name, parent_slug, variant_key, variant_label, food_cost_pct, prix_vente_ttc, is_active').eq('is_active', true),
+      sb().from('recipe_ingredients').select('recipe_id, product_id')
+    ]).then(function(res){
+      var pp = res[0].data || []
+      var prods = res[1].data || []
+      var sups = res[2].data || []
+      var recs = res[3].data || []
+      var ris = res[4].data || []
+
+      // Index supplier par id
+      var supById = {}
+      sups.forEach(function(s){ supById[s.id] = s })
+
+      // Grouper product_prices par product_id (déjà triés DESC par invoice_date)
+      var pricesByProd = {}
+      pp.forEach(function(p){
+        if (Number(p.master_unit_price || 0) <= 0) return  // ignorer les prix nuls
+        if (!pricesByProd[p.product_id]) pricesByProd[p.product_id] = []
+        pricesByProd[p.product_id].push(p)
+      })
+
+      // Calculer les variations : pour chaque product, comparer le dernier prix avec le précédent
+      var allVariations = []
+      Object.keys(pricesByProd).forEach(function(pid){
+        var hist = pricesByProd[pid]
+        if (hist.length < 2) return  // pas de référence précédente
+        var curr = hist[0]
+        var prev = hist[1]
+        var currP = Number(curr.master_unit_price)
+        var prevP = Number(prev.master_unit_price)
+        if (prevP <= 0) return
+        var pct = ((currP - prevP) / prevP) * 100
+        if (Math.abs(pct) < thresholdPct) return  // sous le seuil
+
+        var prod = prods.filter(function(p){ return p.id === pid })[0]
+        if (!prod) return
+        var sup = supById[prod.supplier_id]
+
+        // Recettes utilisatrices
+        var usingRecipeIds = {}
+        ris.forEach(function(r){ if (r.product_id === pid) usingRecipeIds[r.recipe_id] = 1 })
+        var usingRecipes = recs.filter(function(r){ return usingRecipeIds[r.id] }).map(function(r){
+          return { id: r.id, name: r.name, food_cost_pct: r.food_cost_pct }
+        })
+
+        allVariations.push({
+          product_id: pid,
+          product_name: prod.name,
+          supplier: sup ? sup.name : '—',
+          unit: prod.unit,
+          pack_label: curr.pack_label,
+          new_price: currP,
+          old_price: prevP,
+          new_date: curr.invoice_date,
+          old_date: prev.invoice_date,
+          pct: pct,
+          invoice_path: curr.invoice_path,
+          using_recipes: usingRecipes
+        })
+      })
+
+      // Tri par |pct| décroissant
+      allVariations.sort(function(a,b){ return Math.abs(b.pct) - Math.abs(a.pct) })
+
+      // Recettes au-dessus du seuil food cost
+      var highFC = recs.filter(function(r){
+        return Number(r.food_cost_pct || 0) > fcSeuil
+      }).sort(function(a,b){ return Number(b.food_cost_pct||0) - Number(a.food_cost_pct||0) })
+
+      setVariations(allVariations)
+      setRecipesHigh(highFC)
+      setRecipeIngs(ris)
+      setRecipes(recs)
+      setLoading(false)
+    })
+  }
+
+  function openInvoice(invoicePath) {
+    if (!invoicePath) return
+    sb().storage.from('supplier-invoices').createSignedUrl(invoicePath, 3600).then(function(res){
+      if (res.data && res.data.signedUrl) {
+        window.open(res.data.signedUrl, '_blank')
+      } else {
+        toast('Facture non disponible')
+      }
+    })
+  }
+
+  if (loading) return <div style={{padding:40,textAlign:'center',opacity:0.5,fontFamily:'Yellowtail',fontSize:18}}>Chargement…</div>
+
+  var hausses = variations.filter(function(v){ return v.pct > 0 })
+  var baisses = variations.filter(function(v){ return v.pct < 0 })
 
   return (
-<div>
-  <div className="ph">
-    <div><div className="pt">Notifications 🔔</div><div className="ps">Envoyer · Gérer les abonnements</div></div>
-  </div>
-  <div style={{padding:16,display:'flex',flexDirection:'column',gap:16,maxWidth:520}}>
-
-    {/* Envoi manuel */}
-    <div style={{background:'#fff',borderRadius:12,padding:20,border:'1.5px solid #FFEB5A'}}>
-      <div style={{fontFamily:'Yellowtail,cursive',fontSize:20,color:'#191923',marginBottom:16}}>Envoyer une notification</div>
-      <div style={{display:'flex',flexDirection:'column',gap:10}}>
-        <div>
-          <label style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#666',display:'block',marginBottom:4}}>Titre</label>
-          <input className="inp" value={notifTitle} onChange={function(e){setNotifTitle(e.target.value)}} placeholder="Ex: Nouvelle commande reçue !" style={{width:'100%'}} />
+    <div>
+      {/* Header */}
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:13,opacity:.6,marginBottom:8}}>
+          Variations de prix entre achats successifs chez le même fournisseur. Aucun changement de fournisseur n&apos;est compté ici.
         </div>
-        <div>
-          <label style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#666',display:'block',marginBottom:4}}>Message</label>
-          <textarea className="inp" value={notifBody} onChange={function(e){setNotifBody(e.target.value)}} placeholder="Votre message ici..." rows={3} style={{width:'100%',resize:'vertical'}} />
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <span style={{fontSize:11,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,opacity:.5}}>Seuil de variation :</span>
+          {[5, 10, 15, 20].map(function(t){
+            var active = thresholdPct === t
+            return (
+              <button key={t} onClick={function(){setThresholdPct(t)}} style={{
+                padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,
+                border:'1.5px solid '+(active?'#191923':'#DDD'),
+                background:active?'#FFEB5A':'#fff',
+                color:'#191923',cursor:'pointer'
+              }}>±{t}%</button>
+            )
+          })}
         </div>
-        <div>
-          <label style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:1,color:'#666',display:'block',marginBottom:4}}>Destinataire</label>
-          <select className="inp" value={notifTarget} onChange={function(e){setNotifTarget(e.target.value)}} style={{width:'100%'}}>
-            <option value="all">Tout le monde (Edward + Emy)</option>
-            <option value="edward">Edward uniquement</option>
-            <option value="emy">Emy uniquement</option>
-          </select>
-        </div>
-        <button
-          className="btn"
-          style={{background:'#FFEB5A',color:'#191923',fontWeight:900,marginTop:4,opacity:notifSending||!notifTitle||!notifBody?0.5:1}}
-          disabled={notifSending||!notifTitle||!notifBody}
-          onClick={function(){
-            setNotifSending(true)
-            setNotifSent(false)
-            fetch('https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-push',{
-              method:'POST',
-              headers:{'Content-Type':'application/json'},
-              body:JSON.stringify({title:notifTitle,body:notifBody,target:notifTarget})
-            }).then(function(){
-              setNotifSent(true)
-              setNotifTitle('')
-              setNotifBody('')
-              setTimeout(function(){setNotifSent(false)},3000)
-            }).catch(function(e){toast('Erreur: '+e.message)})
-            .finally(function(){setNotifSending(false)})
-          }}
-        >
-          {notifSending ? '⏳ Envoi...' : notifSent ? '✅ Envoyée !' : '🔔 Envoyer'}
-        </button>
       </div>
-    </div>
 
-    {/* Briefing du jour */}
-    <div style={{background:'#fff',borderRadius:12,padding:20,border:'1px solid #eee'}}>
-      <div style={{fontFamily:'Yellowtail,cursive',fontSize:18,color:'#191923',marginBottom:12}}>Briefing du jour</div>
-      <div style={{fontSize:12,color:'#666',marginBottom:12}}>Envoie à Edward et Emy leur programme du jour avec conseil IA.</div>
-      <button
-        className="btn"
-        style={{background:'#191923',color:'#FFEB5A',fontWeight:900,width:'100%'}}
-        onClick={function(){
-          fetch('/api/daily-briefing',{method:'POST'})
-            .then(function(){toast('🌭 Briefing envoyé !')})
-            .catch(function(e){toast('Erreur: '+e.message)})
-        }}
-      >
-        🌭 Envoyer le briefing maintenant
-      </button>
-    </div>
-
-    {/* Abonnement push */}
-    <div style={{background:'#fff',borderRadius:12,padding:20,border:'1px solid #eee'}}>
-      <div style={{fontFamily:'Yellowtail,cursive',fontSize:18,color:'#191923',marginBottom:12}}>Mon abonnement</div>
-
-      <button
-        className="btn"
-        style={{width:'100%',background:pushEnabled?'#009D3A':'#f5f5f5',color:pushEnabled?'#fff':'#191923',fontWeight:900,opacity:pushLoading?0.5:1,marginBottom:8}}
-        disabled={pushLoading}
-        onClick={pushEnabled?unregisterPush:registerPush}
-      >
-        {pushLoading?'⏳ ...':(pushEnabled?'🔔 Notifications activées — Désactiver':'🔕 Activer mes notifications')}
-      </button>
-
-      {pushEnabled && (
-        <button
-          className="btn btn-sm"
-          style={{width:'100%',background:'#F0F0FF',color:'#005FFF',fontWeight:900,opacity:pushTestLoading?0.5:1}}
-          disabled={pushTestLoading}
-          onClick={function(){
-            setPushTestLoading(true)
-            setPushTestStatus(null)
-            var role = isEmy ? 'emy' : 'edward'
-            fetch('/api/test-push',{
-              method:'POST',
-              headers:{'Content-Type':'application/json'},
-              body:JSON.stringify({target: role})
-            })
-            .then(function(r){return r.json()})
-            .then(function(data){
-              if (data.error) { setPushTestStatus('fail:server: '+data.error); return }
-              if (data.sent > 0) {
-                setPushTestStatus('ok')
-              } else if (!data.total) {
-                setPushTestStatus('nosub')
-              } else {
-                var errDetail = data.errors && data.errors.length > 0 ? data.errors[0] : 'http='+data.httpStatus+' sent=0/'+data.total+(data.raw?' | '+String(data.raw).substring(0,120):'')
-                setPushTestStatus('fail:'+errDetail)
-              }
-            })
-            .catch(function(e){setPushTestStatus('fail:fetch error: '+(e&&e.message||String(e)))})
-            .finally(function(){setPushTestLoading(false)})
-          }}
-        >
-          {pushTestLoading ? '⏳ Test en cours...' : '🧪 Tester ma connexion'}
-        </button>
-      )}
-
-      {pushTestStatus === 'ok' && (
-        <div style={{marginTop:8,background:'#F0FFF4',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#009D3A',fontWeight:700,textAlign:'center'}}>
-          ✅ Connexion OK — tu devrais recevoir une notif dans quelques secondes
-        </div>
-      )}
-      {pushTestStatus && pushTestStatus !== 'ok' && pushTestStatus !== 'nosub' && (
-        <div style={{marginTop:8,background:'#FFF5F5',borderRadius:8,padding:'8px 12px'}}>
-          <div style={{fontSize:12,color:'#CC0066',fontWeight:700,marginBottom:4}}>❌ Envoi échoué</div>
-          <div style={{fontSize:10,color:'#555',wordBreak:'break-all',fontFamily:'monospace'}}>{pushTestStatus.replace('fail:','')}</div>
-        </div>
-      )}
-      {pushTestStatus === 'nosub' && (
-        <div style={{marginTop:8,background:'#FFF5F5',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#CC0066',fontWeight:700}}>
-          ❌ Aucun abonnement trouvé — clique sur "Activer mes notifications"
+      {/* HAUSSES */}
+      {hausses.length > 0 && (
+        <div style={{marginBottom:18}}>
+          <div style={{fontFamily:'Yellowtail',fontSize:18,color:'#CC0066',marginBottom:8}}>▲ Hausses ({hausses.length})</div>
+          {hausses.map(function(v){
+            var severity = Math.abs(v.pct) >= 20 ? 'high' : (Math.abs(v.pct) >= 10 ? 'mid' : 'low')
+            var borderColor = severity === 'high' ? '#CC0066' : (severity === 'mid' ? '#FF82D7' : '#FFB0D7')
+            var badgeColor = severity === 'high' ? '#CC0066' : (severity === 'mid' ? '#CC0066' : '#FF82D7')
+            return (
+              <div key={v.product_id} style={{background:'#FFE5F0',border:'1.5px solid '+borderColor,borderRadius:10,padding:'10px 12px',marginBottom:8}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,flexWrap:'wrap'}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:900,color:'#191923'}}>{v.product_name}</div>
+                    <div style={{fontSize:11,color:'#666',marginTop:2}}>
+                      {v.supplier}
+                      {v.pack_label && <span> · {v.pack_label}</span>}
+                    </div>
+                    <div style={{fontSize:11,marginTop:4,color:'#191923'}}>
+                      <span style={{opacity:.6}}>{fmtDate(v.old_date)}</span> {fmtPrice(v.old_price)}€ → <span style={{opacity:.6}}>{fmtDate(v.new_date)}</span> <strong>{fmtPrice(v.new_price)}€/{v.unit}</strong>
+                    </div>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
+                    <div style={{padding:'3px 10px',background:badgeColor,color:'#fff',borderRadius:14,fontSize:13,fontWeight:900}}>+{v.pct.toFixed(1)}%</div>
+                    {v.invoice_path && (
+                      <button onClick={function(){openInvoice(v.invoice_path)}} style={{padding:'2px 8px',fontSize:10,fontWeight:900,borderRadius:10,border:'1px solid '+badgeColor,background:'#fff',color:badgeColor,cursor:'pointer'}}>📄 Facture</button>
+                    )}
+                  </div>
+                </div>
+                {v.using_recipes.length > 0 && (
+                  <div style={{marginTop:6,paddingTop:6,borderTop:'1px dashed #FFB0D7',display:'flex',flexWrap:'wrap',gap:4}}>
+                    {v.using_recipes.slice(0, 8).map(function(r){
+                      var rFCColor = Number(r.food_cost_pct || 0) > fcSeuil ? '#CC0066' : '#8A6D00'
+                      var rFCBg = Number(r.food_cost_pct || 0) > fcSeuil ? '#FFE0E0' : '#FFF3B0'
+                      return <span key={r.id} style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,background:rFCBg,color:rFCColor,border:'1px solid '+rFCColor,textTransform:'uppercase'}}>{r.name} {r.food_cost_pct ? '(' + Number(r.food_cost_pct).toFixed(1) + '%)' : ''}</span>
+                    })}
+                    {v.using_recipes.length > 8 && <span style={{fontSize:9,opacity:.6}}>+{v.using_recipes.length - 8} autres</span>}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
-      <div style={{fontSize:11,color:'#aaa',marginTop:8,textAlign:'center'}}>
-        Notifications automatiques : 8h briefing · 12h30 relances · 18h bilan
-      </div>
-    </div>
+      {/* BAISSES */}
+      {baisses.length > 0 && (
+        <div style={{marginBottom:18}}>
+          <div style={{fontFamily:'Yellowtail',fontSize:18,color:'#009D3A',marginBottom:8}}>▼ Baisses ({baisses.length})</div>
+          {baisses.map(function(v){
+            return (
+              <div key={v.product_id} style={{background:'#E8FFE8',border:'1.5px solid #009D3A',borderRadius:10,padding:'10px 12px',marginBottom:8}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,flexWrap:'wrap'}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:900,color:'#191923'}}>{v.product_name}</div>
+                    <div style={{fontSize:11,color:'#666',marginTop:2}}>
+                      {v.supplier}
+                      {v.pack_label && <span> · {v.pack_label}</span>}
+                    </div>
+                    <div style={{fontSize:11,marginTop:4,color:'#191923'}}>
+                      <span style={{opacity:.6}}>{fmtDate(v.old_date)}</span> {fmtPrice(v.old_price)}€ → <span style={{opacity:.6}}>{fmtDate(v.new_date)}</span> <strong>{fmtPrice(v.new_price)}€/{v.unit}</strong>
+                    </div>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
+                    <div style={{padding:'3px 10px',background:'#009D3A',color:'#fff',borderRadius:14,fontSize:13,fontWeight:900}}>{v.pct.toFixed(1)}%</div>
+                    {v.invoice_path && (
+                      <button onClick={function(){openInvoice(v.invoice_path)}} style={{padding:'2px 8px',fontSize:10,fontWeight:900,borderRadius:10,border:'1px solid #009D3A',background:'#fff',color:'#009D3A',cursor:'pointer'}}>📄 Facture</button>
+                    )}
+                  </div>
+                </div>
+                {v.using_recipes.length > 0 && (
+                  <div style={{marginTop:6,paddingTop:6,borderTop:'1px dashed #A0E0A0',display:'flex',flexWrap:'wrap',gap:4}}>
+                    {v.using_recipes.slice(0, 8).map(function(r){
+                      return <span key={r.id} style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,background:'#FFF3B0',color:'#8A6D00',border:'1px solid #EED980',textTransform:'uppercase'}}>{r.name}</span>
+                    })}
+                    {v.using_recipes.length > 8 && <span style={{fontSize:9,opacity:.6}}>+{v.using_recipes.length - 8} autres</span>}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
-  </div>
-</div>
+      {/* FOOD COST DÉPASSÉ */}
+      {recipesHigh.length > 0 && (
+        <div style={{marginBottom:18}}>
+          <div style={{fontFamily:'Yellowtail',fontSize:18,color:'#856B00',marginBottom:8}}>⚠ Food cost &gt; {fcSeuil}% ({recipesHigh.length})</div>
+          {recipesHigh.map(function(r){
+            return (
+              <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',marginBottom:6,background:'#FFF3B0',border:'1.5px solid #EED980',borderRadius:8,gap:8,flexWrap:'wrap'}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:900,color:'#191923'}}>{r.name}</div>
+                  <div style={{fontSize:10,color:'#666',marginTop:2}}>Prix vente : {Number(r.prix_vente_ttc || 0).toFixed(2)}€ TTC</div>
+                </div>
+                <div style={{padding:'3px 10px',background:'#CC0066',color:'#fff',borderRadius:14,fontSize:13,fontWeight:900}}>{Number(r.food_cost_pct || 0).toFixed(1)}%</div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* État vide */}
+      {hausses.length === 0 && baisses.length === 0 && recipesHigh.length === 0 && (
+        <div style={{padding:32,textAlign:'center',background:'#fff',borderRadius:10,border:'1.5px solid #E8F8EE'}}>
+          <div style={{fontFamily:'Yellowtail',fontSize:22,color:'#009D3A'}}>Tout va bien !</div>
+          <div style={{fontSize:12,color:'#888',marginTop:4}}>Aucune variation &ge; ±{thresholdPct}% sur les derniers achats · Food cost ok sur toutes les recettes</div>
+        </div>
+      )}
+    </div>
   )
 }
