@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import IngredientPopup from './IngredientPopup'
+import FoodCostInvoiceWizard from './FoodCostInvoiceWizard'
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
@@ -49,10 +50,8 @@ export default function FoodCostTab(props) {
   var [newRecipeModal, setNewRecipeModal] = useState(null) // null ou {name, categorie, prix_vente_ttc, tva}
   var [newDrinkModal, setNewDrinkModal] = useState(null)    // null ou {name, supplier_name, purchase_price_ht, selling_price_ttc}
 
+  // Modal Facture : remplacée par FoodCostInvoiceWizard (refonte 4 étapes)
   var [fcInvoiceModal, setFcInvoiceModal] = useState(false)
-  var [fcInvoiceLoading, setFcInvoiceLoading] = useState(false)
-  var [fcInvoiceResult, setFcInvoiceResult] = useState(null)
-  var [fcInvoiceMatches, setFcInvoiceMatches] = useState([])
 
   var [drinkEdit, setDrinkEdit] = useState(null)
 
@@ -907,7 +906,7 @@ export default function FoodCostTab(props) {
                 </div>
 
                 <div style={{fontSize:10,opacity:.6,background:'#FAFAFA',padding:8,borderRadius:6,marginBottom:10}}>
-                  💡 Le produit sera ajouté à la base puis directement à cette recette. La quantité utilisée se renseigne ensuite (clic sur l'ingrédient).
+                  💡 Le produit sera ajouté à la base puis directement à cette recette. La quantité utilisée se renseigne ensuite (clic sur l&apos;ingrédient).
                 </div>
 
                 <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
@@ -985,7 +984,7 @@ export default function FoodCostTab(props) {
             })}
 
             {v.ingredients.length === 0 && (
-              <div style={{padding:20,textAlign:'center',opacity:.5,fontSize:12,background:'#fff',borderRadius:8,border:'1px dashed #DDD'}}>Aucun ingrédient. Clique sur "+ Ajouter" pour commencer.</div>
+              <div style={{padding:20,textAlign:'center',opacity:.5,fontSize:12,background:'#fff',borderRadius:8,border:'1px dashed #DDD'}}>Aucun ingrédient. Clique sur &quot;+ Ajouter&quot; pour commencer.</div>
             )}
           </div>
         )
@@ -1119,136 +1118,13 @@ export default function FoodCostTab(props) {
         </div>
       )}
 
-      {/* ========== MODAL FACTURE ========== */}
-      {fcInvoiceModal && (
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:300,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={function(){if(!fcInvoiceLoading){setFcInvoiceModal(false);setFcInvoiceResult(null);setFcInvoiceMatches([])}}}>
-          <div style={{background:'#fff',borderRadius:'16px 16px 0 0',padding:20,width:'100%',maxWidth:520,maxHeight:'90vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-              <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923'}}>📄 Importer une facture</div>
-              {!fcInvoiceLoading && <button style={{background:'none',border:'none',fontSize:22,cursor:'pointer',color:'#888'}} onClick={function(){setFcInvoiceModal(false);setFcInvoiceResult(null);setFcInvoiceMatches([])}}>✕</button>}
-            </div>
-
-            {!fcInvoiceResult && !fcInvoiceLoading && (
-              <div>
-                <div style={{fontSize:13,color:'#555',marginBottom:16}}>Upload un PDF ou une photo de ta facture fournisseur.</div>
-                <label style={{display:'block',background:'#F8F9FF',border:'2px dashed #DDEEFF',borderRadius:10,padding:'30px 20px',textAlign:'center',cursor:'pointer'}}>
-                  <div style={{fontSize:32,marginBottom:8}}>📂</div>
-                  <div style={{fontWeight:900,fontSize:14,color:'#005FFF'}}>Choisir un PDF ou une photo</div>
-                  <input type="file" accept=".pdf,image/*" style={{display:'none'}} onChange={function(e){
-                    var file = e.target && e.target.files && e.target.files[0]
-                    if (!file) return
-                    setFcInvoiceLoading(true)
-                    var reader = new FileReader()
-                    reader.onload = function(ev){
-                      var base64 = ev.target ? String(ev.target.result).split(',')[1] : ''
-                      fetch('/api/import-invoice', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({pdfBase64: base64, fileName: file.name, mediaType: file.type})
-                      }).then(function(r){return r.json()}).then(function(data){
-                        if (data.error) { toast('Erreur: ' + data.error); setFcInvoiceLoading(false); return }
-                        var allIngs = []
-                        var gi
-                        for (gi = 0; gi < groupedList.length; gi++) {
-                          var vs = Object.values(groupedList[gi].variants)
-                          var vi
-                          for (vi = 0; vi < vs.length; vi++) {
-                            var ii
-                            for (ii = 0; ii < vs[vi].ingredients.length; ii++) {
-                              var ing = vs[vi].ingredients[ii]
-                              if (!allIngs.find(function(x){return x.article.toLowerCase() === (ing.article || '').toLowerCase()})) {
-                                allIngs.push({ article: ing.article, prix_actuel: ing.prix_achat, unite: ing.unite })
-                              }
-                            }
-                          }
-                        }
-                        var matches = (data.lignes || []).map(function(ligne){
-                          var articleLow = (ligne.article || '').toLowerCase()
-                          var matched = allIngs.find(function(x){
-                            var xLow = x.article.toLowerCase()
-                            return xLow.indexOf(articleLow) > -1 || articleLow.indexOf(xLow) > -1
-                          })
-                          return { ligne: ligne, matched: matched || null, selected: matched ? true : false }
-                        })
-                        setFcInvoiceResult(data)
-                        setFcInvoiceMatches(matches)
-                        setFcInvoiceLoading(false)
-                      }).catch(function(err){ toast('Erreur: ' + err.message); setFcInvoiceLoading(false) })
-                    }
-                    reader.readAsDataURL(file)
-                  }} />
-                </label>
-              </div>
-            )}
-
-            {fcInvoiceLoading && (
-              <div style={{textAlign:'center',padding:'40px 20px'}}>
-                <div style={{fontSize:40,marginBottom:12}}>🧠</div>
-                <div style={{fontWeight:900,fontSize:15}}>Claude lit la facture...</div>
-              </div>
-            )}
-
-            {fcInvoiceResult && !fcInvoiceLoading && (
-              <div>
-                <div style={{background:'#F0FFF4',borderRadius:8,padding:'10px 14px',marginBottom:14,border:'1.5px solid #009D3A'}}>
-                  <div style={{fontWeight:900,fontSize:13,color:'#009D3A'}}>{fcInvoiceResult.fournisseur} · {fcInvoiceResult.date}</div>
-                  <div style={{fontSize:11,color:'#555',marginTop:2}}>{(fcInvoiceResult.lignes || []).length} articles · Total HT : {fcInvoiceResult.total_ht}€</div>
-                </div>
-                {fcInvoiceMatches.map(function(m, idx){
-                  var prixActuel = m.matched ? m.matched.prix_actuel : null
-                  var diff = prixActuel ? Math.round((m.ligne.prix_unitaire_ht - prixActuel) * 100) / 100 : null
-                  var hausse = diff !== null && diff > 0
-                  return (
-                    <div key={idx} style={{background:m.selected?'#F0FFF4':'#FAFAFA',borderRadius:8,padding:'10px 12px',marginBottom:6,border:'1.5px solid '+(m.selected?'#009D3A':'#EEE')}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8}}>
-                        <input type="checkbox" checked={m.selected} onChange={function(){
-                          setFcInvoiceMatches(function(prev){ return prev.map(function(x, i){return i === idx ? Object.assign({}, x, {selected: !x.selected}) : x}) })
-                        }} style={{width:16,height:16}} />
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:13,fontWeight:700}}>{m.ligne.article_original || m.ligne.article}</div>
-                          <div style={{fontSize:10,color:'#888'}}>
-                            {m.ligne.prix_unitaire_ht}€/{m.ligne.unite}
-                            {m.matched && <span style={{marginLeft:8,color:'#005FFF'}}>→ {m.matched.article}</span>}
-                            {!m.matched && <span style={{marginLeft:8,color:'#CC0066'}}>⚠️ Sans correspondance</span>}
-                          </div>
-                        </div>
-                        {diff !== null && (
-                          <div style={{textAlign:'right'}}>
-                            <div style={{fontSize:12,fontWeight:900,color:hausse?'#CC0066':'#009D3A'}}>{hausse?'+':''}{diff}€</div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-                <div style={{display:'flex',gap:8,marginTop:16}}>
-                  <button className="btn" onClick={function(){setFcInvoiceResult(null);setFcInvoiceMatches([])}}>← Retour</button>
-                  <button className="btn btn-y" style={{flex:1,fontWeight:900}} onClick={function(){
-                    var promises = []
-                    var mi
-                    for (mi = 0; mi < fcInvoiceMatches.length; mi++) {
-                      var m = fcInvoiceMatches[mi]
-                      if (!m.selected || !m.matched) continue
-                      promises.push(
-                        sb().from('recipe_ingredients')
-                          .update({ prix_achat: m.ligne.prix_unitaire_ht })
-                          .eq('article', m.matched.article)
-                      )
-                    }
-                    Promise.all(promises).then(function(){
-                      toast('✅ ' + promises.length + ' prix mis à jour')
-                      setFcInvoiceModal(false)
-                      setFcInvoiceResult(null)
-                      setFcInvoiceMatches([])
-                      loadData()
-                    }).catch(function(e){ toast('Erreur: ' + e.message) })
-                  }}>✅ Mettre à jour {fcInvoiceMatches.filter(function(m){return m.selected && m.matched}).length} prix</button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* ========== WIZARD FACTURE (4 étapes) ========== */}
+      <FoodCostInvoiceWizard
+        isOpen={fcInvoiceModal}
+        onClose={function(){ setFcInvoiceModal(false) }}
+        onSuccess={loadData}
+        toast={toast}
+      />
 
       {ingPopup && <IngredientPopup ing={ingPopup} onClose={function(){setIngPopup(null)}} />}
     </div>
