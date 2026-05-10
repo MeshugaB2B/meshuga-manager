@@ -92,7 +92,7 @@ export default function AchatsTab(props) {
     allDates.sort()
     if (allDates.length < 2) return null
     var allVals = []
-    Object.values(seriesMap).forEach(function(pp) { pp.forEach(function(p) { allVals.push(Number(p.price)) }) })
+    Object.values(seriesMap).forEach(function(pp) { pp.forEach(function(p) { allVals.push(Number(p.master_unit_price)) }) })
     var minV = Math.min.apply(null, allVals) * 0.92
     var maxV = Math.max.apply(null, allVals) * 1.08
     var range = maxV - minV || 1
@@ -110,8 +110,8 @@ export default function AchatsTab(props) {
       var pts = pp.map(function(p) {
         var di = allDates.indexOf(p.invoice_date)
         var x = pad + (allDates.length > 1 ? (di / (allDates.length - 1)) * chartW : chartW / 2)
-        var y = pad + chartH - ((Number(p.price) - minV) / range) * chartH
-        return {x: x, y: y, price: Number(p.price)}
+        var y = pad + chartH - ((Number(p.master_unit_price) - minV) / range) * chartH
+        return {x: x, y: y, price: Number(p.master_unit_price)}
       })
       svgParts.push({points: pts, color: color})
       ci++
@@ -303,7 +303,7 @@ export default function AchatsTab(props) {
               <div key={ph.id} style={{display:'flex',justifyContent:'space-between',fontSize:12,padding:'6px 0',borderBottom:'1px solid #F5F5F5',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                 <span style={{fontWeight:700,minWidth:80}}>{new Date(ph.invoice_date).toLocaleDateString('fr-FR')}</span>
                 <span style={{fontSize:11,color:'#888'}}>{phSup}</span>
-                <span style={{fontWeight:900}}>{Number(ph.price).toFixed(2)} €/{prod.unit}</span>
+                <span style={{fontWeight:900}}>{Number(ph.master_unit_price).toFixed(2)} €/{prod.unit}</span>
                 {ph.invoice_filename && <span style={{fontSize:10,color:'#888'}}>{ph.invoice_filename}</span>}
               </div>
             )
