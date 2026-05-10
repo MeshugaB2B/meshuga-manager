@@ -22,9 +22,10 @@ function fmt(n) {
 var INGREDIENT_FAMILIES = {
   saucisse:        ['saucisse', 'sausage', 'frankfurt', 'wurst', 'hot dog'],
   pain:            ['pain', 'bun', 'brioche', 'rye', 'bread', 'bagel'],
-  fromage_jaune:   ['cheddar', 'american cheese', 'swiss', 'comté', 'gruyère', 'gruyere', 'emmental'],
+  fromage_jaune:   ['cheddar', 'american cheese', 'swiss', 'comté', 'gruyère', 'gruyere', 'emmental', 'gouda'],
   fromage_pate:    ['mozzarella', 'feta', 'parmesan', 'parmigiano', 'cream cheese', 'philadelphia'],
-  homard:          ['homard', 'lobster', 'crabe', 'crab'],
+  // 'lobster' retiré : ambigu (cf "Mayo lobster" qui n'est pas un crustacé)
+  homard_crustace: ['homard', 'crabe', 'crab', 'écrevisse', 'ecrevisse', 'crevette', 'crustacé'],
   saumon:          ['saumon', 'salmon', 'lox'],
   thon:            ['thon', 'tuna'],
   poulet:          ['poulet', 'chicken'],
@@ -32,7 +33,11 @@ var INGREDIENT_FAMILIES = {
   mayo:            ['mayo', 'mayonnaise', 'aioli'],
   moutarde:        ['moutarde', 'mustard', 'dijon'],
   ketchup:         ['ketchup'],
-  oignon:          ['oignon', 'onion', 'shallot', 'echalote', 'échalote'],
+  // ORDRE IMPORTANT : sous-familles spécifiques AVANT la générique.
+  // 'pickles onions' doit matcher oignon_marine, pas oignon_frais (qui contient 'onion').
+  oignon_marine:   ['pickles onion', 'pickled onion', 'oignon confit', 'pickle onions'],
+  oignon_frit:     ['oignon frit', 'oignons frits', 'fried onion', 'crispy onion'],
+  oignon_frais:    ['oignon', 'onion', 'shallot', 'echalote', 'échalote', 'cebette', 'ciboule'],
   ail:             ['ail', 'garlic', 'aïl'],
   cornichons:      ['cornichon', 'pickle', 'gherkin'],
   salade_feuilles: ['sucrine', 'romaine', 'mâche', 'mache', 'roquette', 'lettuce', 'feuille'],
@@ -40,7 +45,7 @@ var INGREDIENT_FAMILIES = {
   beurre:          ['beurre', 'butter'],
   cacahuete:       ['cacahuète', 'cacahuete', 'peanut', 'pbn'],
   banane:          ['banane', 'banana'],
-  pomme_terre:     ['pomme de terre', 'patate', 'potato', 'agria'],
+  pomme_terre:     ['pomme de terre', 'pomme terre', 'patate', 'potato', 'agria'],
   vinaigre:        ['vinaigre', 'vinegar'],
   tomate:          ['tomate', 'tomato'],
   citron:          ['citron', 'lemon', 'lime'],
