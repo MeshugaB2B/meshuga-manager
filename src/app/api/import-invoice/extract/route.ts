@@ -41,31 +41,47 @@ Pour CHAQUE LIGNE de la facture :
    - "consommable" = produit non-alimentaire ou nettoyage (liquide vaisselle, essuie-tout, gants, sacs poubelle, papier toilette, produits d'entretien)
    - "fees_taxes" = NON-PRODUIT (frais de port, frais de livraison, transport, remise globale, eco-participation, taxes sur facture). C'est CRUCIAL : si la ligne n'est pas un produit physique, classe-la ici, pas en autre chose.
 
-2. CONDITIONNEMENT et PRIX :
+2. CONDITIONNEMENT et PRIX (LE PLUS IMPORTANT) :
    - "pack_label" : libelle humain du conditionnement tel qu'il apparait sur la facture (ex: "Bidon 5L", "Carton 12 x 33cl", "Sac 10kg", "Poche 650g")
    - "pack_price" : prix du PACK ENTIER tel que sur la facture en EUR HT
    - "master_unit" : unite normalisee parmi "kg", "L", "U" (jamais "g", "ml", "piece")
    - "master_qty_per_pack" : quantite en unite master que contient le pack (ex: bidon 5L -> 5, carton 12 x 33cl -> 3.96, sac 10kg -> 10, paquet de 6 unites -> 6)
-   - "master_unit_price" : prix unitaire dans l'unite master = pack_price / master_qty_per_pack (calcule)
+   - "master_unit_price" : prix unitaire dans l'unite master = pack_price DIVISE PAR master_qty_per_pack
+
+⚠️ ERREUR CRITIQUE A NE JAMAIS FAIRE :
+NE JAMAIS recopier pack_price comme master_unit_price.
+Un bidon de 5L d'huile a 8.25 EUR : pack_price=8.25, master_qty_per_pack=5, master_unit_price=1.65 (=8.25/5).
+Si tu mets master_unit_price=8.25 pour un bidon de 5L, tu me factures 8.25 EUR par LITRE au lieu de par bidon = ERREUR DE FACTEUR 5.
+
+⚠️ SI tu n'es pas sur du conditionnement (par ex pack_label flou ou master_qty_per_pack ambigu) :
+- Mets master_qty_per_pack = 0 (zero) et master_unit_price = 0
+- Mets confidence < 50
+- NE PAS deviner et NE PAS recopier pack_price comme prix unitaire master
 
 3. CONFIANCE :
    - "confidence" : entier 0-100 indiquant ta confiance dans l'extraction de cette ligne
    - 100 = libelle clair, conditionnement explicite, prix sans ambiguite
    - 70-90 = lecture correcte mais ambiguite mineure (ex: unite implicite)
    - <70 = lecture difficile (texte flou, conditionnement non specifie)
+   - <50 = JE PREFERE QUE L'UTILISATEUR VERIFIE manuellement (mets master_qty_per_pack=0)
 
 4. AUTRES CHAMPS :
    - "article" : nom court canonique (ex: "Cheddar", "Coca Cola")
    - "article_original" : description complete telle qu'elle apparait
    - "quantity" : quantite de pack achetee (ex: 2 bidons -> 2)
 
-EXEMPLES :
+EXEMPLES CORRECTS :
 - "BIDON 5L HUILE TOURNESOL FRITURE x 2 = 16.50 EUR HT"
   -> { article: "Huile tournesol friture", article_original: "BIDON 5L HUILE TOURNESOL FRITURE", categorie: "ingredient", quantity: 2, pack_label: "Bidon 5L", pack_price: 8.25, master_unit: "L", master_qty_per_pack: 5, master_unit_price: 1.65, confidence: 95 }
 - "CHEDDAR BARRE 5KG x 1 = 41.30 EUR HT"
   -> { article: "Cheddar", article_original: "CHEDDAR BARRE 5KG", categorie: "ingredient", quantity: 1, pack_label: "Barre 5kg", pack_price: 41.30, master_unit: "kg", master_qty_per_pack: 5, master_unit_price: 8.26, confidence: 100 }
 - "FRAIS DE LIVRAISON = 8.50 EUR"
   -> { article: "Frais de livraison", article_original: "FRAIS DE LIVRAISON", categorie: "fees_taxes", quantity: 1, pack_label: "", pack_price: 8.50, master_unit: "U", master_qty_per_pack: 1, master_unit_price: 8.50, confidence: 100 }
+
+EXEMPLE A NE PAS FAIRE (pack_price recopie en master_unit_price) :
+- "BIDON 5L HUILE x 1 = 8.25 EUR" (mauvais lecture)
+  -> ❌ { ..., pack_price: 8.25, master_qty_per_pack: 1, master_unit_price: 8.25 }  // FAUX : ce serait 8.25 EUR/L au lieu de 1.65
+  -> ✅ Si tu n'es pas sur du conditionnement, mets master_qty_per_pack: 0, master_unit_price: 0, confidence: 40
 
 Retourne UNIQUEMENT un JSON valide (sans markdown, sans backticks) :
 {
@@ -190,6 +206,8 @@ Retourne UNIQUEMENT un JSON valide (sans markdown, sans backticks) :
 
       // Ligne fees_taxes : pas de matching, c'est meta
       if (ligne.categorie === 'fees_taxes') {
+        // Pour fees_taxes, master_unit_price = pack_price (car master_qty=1, par convention)
+        var feesPP = Number(ligne.pack_price || 0)
         enrichedLignes.push({
           line_index: i,
           article_original: ligne.article_original || ligne.article || '',
@@ -197,10 +215,11 @@ Retourne UNIQUEMENT un JSON valide (sans markdown, sans backticks) :
           categorie: 'fees_taxes',
           quantity: Number(ligne.quantity || 1),
           pack_label: ligne.pack_label || '',
-          pack_price: Number(ligne.pack_price || 0),
+          pack_price: feesPP,
           master_unit: ligne.master_unit || 'U',
-          master_qty_per_pack: Number(ligne.master_qty_per_pack || 1),
-          master_unit_price: Number(ligne.master_unit_price || ligne.pack_price || 0),
+          master_qty_per_pack: 1,
+          master_unit_price: feesPP, // pour fees_taxes, c'est juste le prix de la ligne
+          extraction_warning: null,
           vision_confidence: Number(ligne.confidence || 100),
           // Pas de matching produit pour les fees_taxes
           match_type: 'fees_taxes',
@@ -248,6 +267,35 @@ Retourne UNIQUEMENT un JSON valide (sans markdown, sans backticks) :
         suggestedDisposition = 'create_new'
       }
 
+      // Calcul intelligent master_unit_price :
+      // 1. Si l'IA a fourni un master_unit_price > 0 ET cohérent avec pack/qty → on l'utilise
+      // 2. Sinon, on tente le calcul pack_price / master_qty_per_pack
+      // 3. Si toujours pas calculable → on flag la ligne avec extraction_warning = 'pack_unknown'
+      var packPrice = Number(ligne.pack_price || 0)
+      var qtyPerPack = Number(ligne.master_qty_per_pack || 0)
+      var aiMasterUnitPrice = Number(ligne.master_unit_price || 0)
+      var calculatedMUP = 0
+      var extractionWarning: string | null = null
+
+      if (aiMasterUnitPrice > 0 && packPrice > 0 && qtyPerPack > 0) {
+        // Vérifier la cohérence : si l'IA donne master_unit_price ≈ pack_price alors que qty > 1, c'est suspect (sans doute pack_price recopié)
+        var expectedMUP = packPrice / qtyPerPack
+        if (qtyPerPack > 1 && Math.abs(aiMasterUnitPrice - packPrice) < 0.01 && Math.abs(aiMasterUnitPrice - expectedMUP) > 0.5) {
+          // L'IA a recopié pack_price comme master_unit_price : on corrige
+          calculatedMUP = expectedMUP
+          extractionWarning = 'ai_copied_pack_price'
+        } else {
+          calculatedMUP = aiMasterUnitPrice
+        }
+      } else if (packPrice > 0 && qtyPerPack > 0) {
+        // L'IA n'a pas fourni master_unit_price : on calcule
+        calculatedMUP = packPrice / qtyPerPack
+      } else {
+        // Conditionnement inconnu : on flag pour vérification utilisateur
+        calculatedMUP = 0
+        extractionWarning = 'pack_unknown'
+      }
+
       enrichedLignes.push({
         line_index: i,
         article_original: ligne.article_original || ligne.article || '',
@@ -255,10 +303,11 @@ Retourne UNIQUEMENT un JSON valide (sans markdown, sans backticks) :
         categorie: ligne.categorie || 'ingredient',
         quantity: Number(ligne.quantity || 1),
         pack_label: ligne.pack_label || '',
-        pack_price: Number(ligne.pack_price || 0),
+        pack_price: packPrice,
         master_unit: ligne.master_unit || 'kg',
-        master_qty_per_pack: Number(ligne.master_qty_per_pack || 1),
-        master_unit_price: Number(ligne.master_unit_price || 0),
+        master_qty_per_pack: qtyPerPack || 1,
+        master_unit_price: calculatedMUP,
+        extraction_warning: extractionWarning,
         vision_confidence: Number(ligne.confidence || 50),
         match_type: matchType,
         match_confidence: matchConfidence,
