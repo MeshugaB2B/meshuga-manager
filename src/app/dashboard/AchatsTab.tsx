@@ -77,12 +77,18 @@ export default function AchatsTab(props) {
   }
 
   // ---------------------------------------------------------------------------
-  // Graphe SVG d'évolution prix multi-fournisseurs (repris de SuppliersTab)
+  // Graphe SVG d'évolution prix multi-fournisseurs - VERSION AMÉLIORÉE
+  // - Plus grand (full width responsive, hauteur 280)
+  // - Grille horizontale subtile
+  // - Axes Y (prix) et X (dates) étiquetés
+  // - Points plus gros avec halo
+  // - Légende propre
+  // - Couleurs charté Meshuga
   // ---------------------------------------------------------------------------
   function renderPriceChart(productIds, allPrices, supplierMap) {
     var seriesMap = {}
     productIds.forEach(function(pid) {
-      var pp = allPrices.filter(function(p) { return p.product_id === pid })
+      var pp = allPrices.filter(function(p) { return p.product_id === pid }).sort(function(a,b){ return String(a.invoice_date).localeCompare(String(b.invoice_date)) })
       if (pp.length > 0) seriesMap[pid] = pp
     })
     var allDates = []
@@ -93,12 +99,18 @@ export default function AchatsTab(props) {
     if (allDates.length < 2) return null
     var allVals = []
     Object.values(seriesMap).forEach(function(pp) { pp.forEach(function(p) { allVals.push(Number(p.master_unit_price)) }) })
-    var minV = Math.min.apply(null, allVals) * 0.92
-    var maxV = Math.max.apply(null, allVals) * 1.08
+    var rawMin = Math.min.apply(null, allVals)
+    var rawMax = Math.max.apply(null, allVals)
+    var minV = Math.max(0, rawMin - (rawMax - rawMin) * 0.15)
+    var maxV = rawMax + (rawMax - rawMin) * 0.15
+    if (minV === maxV) { minV = rawMin * 0.9; maxV = rawMax * 1.1 }
     var range = maxV - minV || 1
-    var w = 320, h = 150, pad = 35
-    var chartW = w - pad * 2, chartH = h - pad * 2
-    var colors = ['#FF82D7', '#FFEB5A', '#191923', '#009D3A', '#005FFF']
+
+    var w = 800, h = 320, padL = 60, padR = 30, padT = 30, padB = 60
+    var chartW = w - padL - padR, chartH = h - padT - padB
+
+    // Palette Meshuga
+    var colors = ['#FF82D7', '#191923', '#009D3A', '#005FFF', '#FF9500', '#8A6D00']
     var ci = 0
     var svgParts = []
     var legends = []
@@ -109,44 +121,92 @@ export default function AchatsTab(props) {
       legends.push({color: color, name: supName})
       var pts = pp.map(function(p) {
         var di = allDates.indexOf(p.invoice_date)
-        var x = pad + (allDates.length > 1 ? (di / (allDates.length - 1)) * chartW : chartW / 2)
-        var y = pad + chartH - ((Number(p.master_unit_price) - minV) / range) * chartH
-        return {x: x, y: y, price: Number(p.master_unit_price)}
+        var x = padL + (allDates.length > 1 ? (di / (allDates.length - 1)) * chartW : chartW / 2)
+        var y = padT + chartH - ((Number(p.master_unit_price) - minV) / range) * chartH
+        return {x: x, y: y, price: Number(p.master_unit_price), date: p.invoice_date, pack_label: p.pack_label}
       })
-      svgParts.push({points: pts, color: color})
+      svgParts.push({points: pts, color: color, supplier: supName})
       ci++
     })
-    var dateLabels = allDates.map(function(d, i) {
-      var x = pad + (allDates.length > 1 ? (i / (allDates.length - 1)) * chartW : chartW / 2)
-      var dt = new Date(d)
-      return {x: x, label: dt.toLocaleDateString('fr-FR', {month: 'short', year: '2-digit'})}
-    })
+
+    // Y-axis labels : 5 graduations
+    var ySteps = 5
+    var yLabels = []
+    for (var yi = 0; yi <= ySteps; yi++) {
+      var val = minV + (range / ySteps) * yi
+      var yPos = padT + chartH - (yi / ySteps) * chartH
+      yLabels.push({y: yPos, val: val, label: val >= 1 ? val.toFixed(2) : val.toFixed(3)})
+    }
+
+    // X-axis labels : maximum 8 dates
+    var xStep = allDates.length <= 8 ? 1 : Math.ceil(allDates.length / 8)
+    var xLabels = []
+    for (var xi = 0; xi < allDates.length; xi += xStep) {
+      var x = padL + (allDates.length > 1 ? (xi / (allDates.length - 1)) * chartW : chartW / 2)
+      var dt = new Date(allDates[xi])
+      xLabels.push({x: x, label: dt.toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'})})
+    }
+
     return (
-      <div>
-        <div style={{display:'flex',gap:12,marginBottom:8,flexWrap:'wrap'}}>
+      <div style={{background:'#fff',border:'1.5px solid #EEE',borderRadius:10,padding:'12px 14px'}}>
+        {/* Légende */}
+        <div style={{display:'flex',gap:16,marginBottom:10,flexWrap:'wrap',paddingBottom:10,borderBottom:'1px dashed #EEE'}}>
           {legends.map(function(l, i) {
-            return <span key={i} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}>
-              <span style={{width:10,height:10,borderRadius:2,background:l.color,border:'1px solid #191923'}}></span>
-              <span style={{fontWeight:700}}>{l.name}</span>
+            return <span key={i} style={{display:'flex',alignItems:'center',gap:5,fontSize:11}}>
+              <span style={{width:14,height:14,borderRadius:3,background:l.color,border:'1.5px solid #191923'}}></span>
+              <span style={{fontWeight:900}}>{l.name}</span>
             </span>
           })}
         </div>
-        <svg viewBox={"0 0 " + w + " " + h} style={{width:'100%',maxWidth:340,height:'auto'}}>
+        <svg viewBox={"0 0 " + w + " " + h} style={{width:'100%',height:'auto',display:'block'}}>
+          {/* Grille horizontale */}
+          {yLabels.map(function(yl, i) {
+            return (
+              <g key={'grid-' + i}>
+                <line x1={padL} y1={yl.y} x2={padL + chartW} y2={yl.y} stroke={i === 0 ? '#191923' : '#F0F0F0'} strokeWidth={i === 0 ? 1.5 : 1} />
+                <text x={padL - 8} y={yl.y + 4} textAnchor="end" style={{fontSize:11,fill:'#888',fontFamily:'Arial, sans-serif',fontWeight:600}}>{yl.label}€</text>
+              </g>
+            )
+          })}
+
+          {/* Axe X */}
+          <line x1={padL} y1={padT + chartH} x2={padL + chartW} y2={padT + chartH} stroke="#191923" strokeWidth={1.5} />
+
+          {/* Lignes verticales discrètes pour les dates */}
+          {xLabels.map(function(xl, i) {
+            return <line key={'xgrid-' + i} x1={xl.x} y1={padT} x2={xl.x} y2={padT + chartH} stroke="#F8F8F8" strokeWidth={1} />
+          })}
+
+          {/* Séries (lignes + points) */}
           {svgParts.map(function(s, si) {
             var polyStr = s.points.map(function(p) { return p.x + ',' + p.y }).join(' ')
-            return <g key={si}>
-              <polyline points={polyStr} fill="none" stroke={s.color} strokeWidth="2.5" />
-              {s.points.map(function(p, pi) {
-                return <g key={pi}>
-                  <circle cx={p.x} cy={p.y} r="4" fill={s.color} stroke="#191923" strokeWidth="1.5" />
-                  <text x={p.x} y={p.y - 8} textAnchor="middle" style={{fontSize:7,fontWeight:900,fill:'#191923',fontFamily:'Arial Narrow'}}>{p.price.toFixed(2)}</text>
-                </g>
-              })}
-            </g>
+            return (
+              <g key={'series-' + si}>
+                {/* Ligne avec ombre */}
+                <polyline points={polyStr} fill="none" stroke={s.color} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />
+                {/* Points avec halo */}
+                {s.points.map(function(p, pi) {
+                  return (
+                    <g key={'pt-' + pi}>
+                      <title>{p.date} · {s.supplier} · {p.price.toFixed(2)} €{p.pack_label ? ' (' + p.pack_label + ')' : ''}</title>
+                      <circle cx={p.x} cy={p.y} r={9} fill={s.color} fillOpacity={0.2} />
+                      <circle cx={p.x} cy={p.y} r={5.5} fill="#fff" stroke={s.color} strokeWidth={2.5} />
+                      <text x={p.x} y={p.y - 14} textAnchor="middle" style={{fontSize:11,fontWeight:900,fill:'#191923',fontFamily:'Arial, sans-serif'}}>{p.price.toFixed(2)}</text>
+                    </g>
+                  )
+                })}
+              </g>
+            )
           })}
-          {dateLabels.map(function(d, i) {
-            return <text key={i} x={d.x} y={h - 4} textAnchor="middle" style={{fontSize:7,fill:'#888',fontFamily:'Arial Narrow'}}>{d.label}</text>
+
+          {/* Labels axe X */}
+          {xLabels.map(function(xl, i) {
+            return <text key={'xl-' + i} x={xl.x} y={h - 30} textAnchor="middle" style={{fontSize:11,fill:'#555',fontFamily:'Arial, sans-serif',fontWeight:700}}>{xl.label}</text>
           })}
+
+          {/* Légende axes */}
+          <text x={padL - 50} y={padT - 10} style={{fontSize:10,fill:'#888',fontFamily:'Arial, sans-serif',fontWeight:700,textTransform:'uppercase',letterSpacing:.5}}>Prix unitaire</text>
+          <text x={w - padR} y={h - 10} textAnchor="end" style={{fontSize:10,fill:'#888',fontFamily:'Arial, sans-serif',fontWeight:700,textTransform:'uppercase',letterSpacing:.5}}>Date d&apos;achat</text>
         </svg>
       </div>
     )
