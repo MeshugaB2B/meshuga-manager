@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import IngredientPopup from './IngredientPopup'
 import FoodCostInvoiceWizard from './FoodCostInvoiceWizard'
+import FoodCostHistoryTab from './FoodCostHistoryTab'
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
@@ -504,6 +505,7 @@ export default function FoodCostTab(props) {
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
           <button className="btn btn-y btn-sm" style={{background:fcView==='recettes'?'#191923':'transparent',color:fcView==='recettes'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('recettes');setFcSelectedParent(null)}}>Recettes</button>
           <button className="btn btn-y btn-sm" style={{background:fcView==='fournisseurs'?'#191923':'transparent',color:fcView==='fournisseurs'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('fournisseurs');setFcSelectedParent(null)}}>Fournisseurs</button>
+          <button className="btn btn-y btn-sm" style={{background:fcView==='imports'?'#191923':'transparent',color:fcView==='imports'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('imports');setFcSelectedParent(null)}}>Imports</button>
           <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
           <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewDrinkModal({name:'',supplier_name:'',purchase_price_ht:0,selling_price_ttc:0})}}>+ Boisson</button>
           <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Facture</button>
@@ -990,6 +992,11 @@ export default function FoodCostTab(props) {
         )
       })()}
 
+
+      {/* ========== VUE IMPORTS ========== */}
+      {fcView === 'imports' && (
+        <FoodCostHistoryTab toast={toast} />
+      )}
 
       {/* ========== VUE FOURNISSEURS ========== */}
       {fcView === 'fournisseurs' && (function(){
