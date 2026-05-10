@@ -69,6 +69,42 @@ export async function POST(req: Request) {
     }
     var invoiceDate: string = body.invoice_date || new Date().toISOString().split('T')[0]
     var fileName: string = body.file_name || ''
+    var invoicePath: string | null = null
+
+    // ------------------------------------------------------------------------
+    // 0. UPLOAD DE LA FACTURE DANS LE BUCKET supplier-invoices (si fournie)
+    // ------------------------------------------------------------------------
+    if (body.file_base64 && body.file_type && fileName) {
+      try {
+        // Décoder base64 en bytes
+        var base64Data = String(body.file_base64).replace(/^data:[^;]+;base64,/, '')
+        var binaryString = Buffer.from(base64Data, 'base64')
+
+        // Path : YYYY/MM/YYYY-MM-DD_filename (organisation chronologique)
+        var datePart = invoiceDate.split('-')
+        var safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 80)
+        // Préfixer avec un timestamp court pour éviter les collisions sur même jour
+        var ts = Date.now().toString(36)
+        var path = datePart[0] + '/' + datePart[1] + '/' + invoiceDate + '_' + ts + '_' + safeName
+
+        var uploadRes = await supabase.storage
+          .from('supplier-invoices')
+          .upload(path, binaryString, {
+            contentType: body.file_type,
+            upsert: false
+          })
+
+        if (uploadRes.error) {
+          console.error('Storage upload error:', uploadRes.error)
+          // Non-bloquant : on continue le commit même si l'upload échoue
+        } else if (uploadRes.data) {
+          invoicePath = uploadRes.data.path
+        }
+      } catch (uploadErr: any) {
+        console.error('Upload exception:', uploadErr)
+        // Non-bloquant
+      }
+    }
 
     // ------------------------------------------------------------------------
     // 1. RESOLUTION DU FOURNISSEUR (creation si necessaire)
@@ -236,8 +272,10 @@ export async function POST(req: Request) {
           pack_price: Number(ligne.pack_price || 0) || null,
           pack_label: ligne.pack_label || null,
           master_qty_per_pack: Number(ligne.master_qty_per_pack || 0) || null,
+          article_original: ligne.article_original || null,
           invoice_date: invoiceDate,
-          invoice_filename: fileName || null
+          invoice_filename: fileName || null,
+          invoice_path: invoicePath || null
         })
         if (!pricesInsert.error) summary.price_history_inserted++
 
