@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import IngredientPopup from './IngredientPopup'
 import FoodCostInvoiceWizard from './FoodCostInvoiceWizard'
 import FoodCostHistoryTab from './FoodCostHistoryTab'
+import ProductRecipeAssignment from './ProductRecipeAssignment'
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
@@ -44,6 +45,10 @@ export default function FoodCostTab(props) {
   var [creatingProduct, setCreatingProduct] = useState(false)
   var [newProductDraft, setNewProductDraft] = useState(null) // {name, supplier_mode, supplier_id, new_supplier_name, current_price, unit, category}
   var [creatingProductSaving, setCreatingProductSaving] = useState(false)
+
+  // 2e étape après création produit : affectation aux recettes (composant ProductRecipeAssignment)
+  var [pendingAssignment, setPendingAssignment] = useState(null)
+  // Format : { product, current_recipe_id } ou null
 
   var [editingPrixTTC, setEditingPrixTTC] = useState(null)
   var [editingMeta, setEditingMeta] = useState(null) // { name, categorie, tva }
@@ -304,28 +309,21 @@ export default function FoodCostTab(props) {
           return
         }
         var p = res.data
-        sb().from('recipe_ingredients').insert({
-          recipe_id: recipeId,
-          article: p.name,
-          fournisseur: supplierName,
-          unite: p.unit || 'kg',
-          prix_achat: Number(p.current_price || 0),
-          qte: 0,
-          cout: 0,
-          product_id: p.id
-        }).then(function(res2){
-          if (res2.error) {
-            toast('Produit créé mais erreur ajout : ' + res2.error.message)
-            setCreatingProductSaving(false)
-            return
-          }
-          toast('✅ Produit créé et ajouté à la recette (quantité à renseigner)')
-          setCreatingProductSaving(false)
-          setCreatingProduct(false)
-          setNewProductDraft(null)
-          setAddIngOpen(false)
-          setAddIngSearch('')
-          loadData()
+        // Au lieu d'INSERT recipe_ingredients direct, on bascule en 2e etape :
+        // ProductRecipeAssignment s'ouvre avec la recette courante pre-cochee.
+        // L'utilisateur peut alors cocher d'autres recettes + saisir une qte par recette.
+        toast('✅ Produit créé. Sélectionne les recettes et saisis les quantités.')
+        setCreatingProductSaving(false)
+        setCreatingProduct(false)
+        setNewProductDraft(null)
+        setAddIngOpen(false)
+        setAddIngSearch('')
+        // Recharger les products pour que ProductRecipeAssignment voit le nouveau
+        loadData()
+        // Ouvrir la 2e etape avec recette courante pre-cochee
+        setPendingAssignment({
+          product: Object.assign({}, p, { supplier_name: supplierName }),
+          current_recipe_id: recipeId
         })
       })
     }
@@ -1132,6 +1130,30 @@ export default function FoodCostTab(props) {
         onSuccess={loadData}
         toast={toast}
       />
+
+      {/* ========== 2e ÉTAPE APRÈS CRÉATION PRODUIT : multi-affectation ========== */}
+      {pendingAssignment && pendingAssignment.product && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:12}} onClick={function(){
+          // Click hors modal = annuler (le product reste créé mais sans affectation)
+          setPendingAssignment(null)
+        }}>
+          <div style={{width:'100%',maxWidth:640,maxHeight:'90vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
+            <ProductRecipeAssignment
+              product={pendingAssignment.product}
+              preselectedRecipeIds={pendingAssignment.current_recipe_id ? [pendingAssignment.current_recipe_id] : []}
+              preselectedQuantities={{}}
+              onSaved={function(){
+                setPendingAssignment(null)
+                loadData()
+              }}
+              onCancel={function(){
+                setPendingAssignment(null)
+              }}
+              toast={toast}
+            />
+          </div>
+        </div>
+      )}
 
       {ingPopup && <IngredientPopup ing={ingPopup} onClose={function(){setIngPopup(null)}} />}
     </div>
