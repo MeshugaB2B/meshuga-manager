@@ -25,7 +25,16 @@ export async function POST(req: Request) {
     // 1. APPEL CLAUDE VISION avec prompt enrichi
     // ------------------------------------------------------------------------
     var promptText = `Tu es un assistant pour Meshuga Crazy Deli, restaurant deli new-yorkais a Paris.
-Extrais TOUTES les lignes de cette facture fournisseur avec une rigueur ARITHMETIQUE.
+Tu lis des factures fournisseurs et extrais les donnees structurees.
+
+REGLE FONDAMENTALE QUE TU NE DOIS JAMAIS OUBLIER :
+La facture contient TOUJOURS 3 colonnes essentielles pour chaque ligne :
+  - QUANTITE FACTUREE (parfois "Qte fac" ou "Qte" tout court) : nombre d'unites elementaires
+  - PRIX UNITAIRE HT (parfois "PU HT" ou "Prix Unit.") : prix d'UNE unite elementaire
+  - TOTAL HT (parfois "Montant HT") : qty x PU
+
+LE PRIX UNITAIRE EST TON ANCRE. Tu le lis DIRECTEMENT sur la facture.
+Tu ne le calcules JAMAIS. Tu ne le devines JAMAIS depuis le libelle "xN" du produit.
 
 ============================================================
 ETAPE 1 - FOURNISSEUR
@@ -34,160 +43,204 @@ Identifie precisement le nom commercial (pas la raison sociale complete avec SAS
 Si SIRET visible, extrais-le. Si une adresse email du fournisseur visible, extrais le domaine.
 
 ============================================================
-ETAPE 2 - POUR CHAQUE LIGNE : LES 3 VALEURS DE BASE
+ETAPE 2 - LIRE LES 3 CHIFFRES DE LA LIGNE
 ============================================================
-Une ligne de facture a TOUJOURS 3 colonnes que tu DOIS extraire :
-- "qty_ordered" = quantite commandee/livree (colonne "Qte" sur la facture)
-- "unit_price_invoice" = prix unitaire affiche dans la colonne "PU HT" / "Prix Unit." de la facture (en EUR HT)
-- "total_ligne_ht" = total HT de la ligne (colonne "Total HT" / "Montant")
+Pour chaque ligne, repere les 3 colonnes critiques :
+- "qty_invoiced" = QUANTITE FACTUREE (colonne "Qte fac" ou "Qte"). 
+  C'est le NOMBRE D'UNITES ELEMENTAIRES facturees.
+  Ex: 3 colis de 24 bouteilles -> qty_invoiced = 72 (bouteilles)
+  Ex: 1 sac de 25kg -> qty_invoiced = 1 (sac)
+  Ex: 2 bidons -> qty_invoiced = 2 (bidons)
+- "unit_price_invoice" = PRIX UNITAIRE HT (colonne "PU HT" ou "Prix Unit.")
+  C'est le prix d'UNE unite elementaire telle qu'imprimee sur la facture.
+  TU LE LIS DIRECTEMENT. Tu ne le calcules pas.
+- "total_ligne_ht" = TOTAL HT (colonne "Montant HT" ou "Total HT")
 
-REGLE ARITHMETIQUE STRICTE : qty_ordered x unit_price_invoice ≈ total_ligne_ht (tolerance 5%)
-Si ces 3 valeurs n'ont pas de coherence, c'est une erreur de lecture. Re-lis attentivement.
+REGLE D'OR : qty_invoiced x unit_price_invoice ≈ total_ligne_ht (tolerance 5%)
+Si les 3 ne sont pas coherents, c'est une mauvaise lecture. Re-lis.
 
 ============================================================
-ETAPE 3 - CATEGORISATION
+ETAPE 3 - IDENTIFIER LE TYPE D'UNITE ELEMENTAIRE
 ============================================================
-- "boisson" = boisson destinee a la revente client (Coca, Evian, Perrier, Ice Tea, Orangina, jus, eaux, etc.)
+La colonne "Qte livree" indique le code de l'unite de commande :
+- COL = colis
+- BT = bouteille
+- BCL = bocal
+- POT = pot
+- BID = bidon
+- SAC = sac
+- BTE = boite
+- CRT = carton
+- PCH = poche
+
+MAIS la colonne "Qte FACTUREE" est ce qui compte. Elle peut etre :
+- Soit en MEME UNITE que Qte livree (ex: 1 SAC livre = 1 sac facture)
+- Soit en UNITES INDIVIDUELLES (ex: 3 COL livres = 72 bouteilles facturees)
+
+Le PU HT est TOUJOURS le prix d'une unite de la colonne "Qte facturee".
+
+EXEMPLES TYPIQUES :
+- "Evian 50CLx24" - Qte livree: 3 COL, Qte facturee: 72, PU: 0.678
+  -> chaque bouteille coute 0.678 EUR. 72 x 0.678 = 48.82 EUR
+- "Coca 33CLx24" - Qte livree: 4 COL, Qte facturee: 96, PU: 0.739
+  -> chaque cannette coute 0.739 EUR. 96 x 0.739 = 70.94 EUR
+- "Huile colza bid 5Lx3" - Qte livree: 1 COL, Qte facturee: 3, PU: 8.25
+  -> chaque BIDON coute 8.25 EUR. 3 x 8.25 = 24.75 EUR
+- "Pdt frite 25kg" - Qte livree: 1 SAC, Qte facturee: 25, PU: 0.46
+  -> chaque KG coute 0.46 EUR. 25 x 0.46 = 11.50 EUR
+
+============================================================
+ETAPE 4 - CATEGORISATION
+============================================================
+- "boisson" = boisson destinee a la revente client (Coca, Evian, Perrier, Ice Tea, Orangina, jus, eaux)
 - "ingredient" = produit alimentaire entrant en cuisine (viande, fromage, legumes, condiments, pain, epices, huile, sucre, sel, conserves, sauces)
 - "packaging" = emballage produit fini (boites, sacs, gobelets, couvercles, films, sachets)
 - "consommable" = non-alimentaire (entretien, gants, sacs poubelle, papier toilette, produits nettoyage)
 - "fees_taxes" = frais de port, livraison, transport, remise, eco-participation, taxes
 
 ============================================================
-ETAPE 4 - COMPRENDRE LE LIBELLE FOURNISSEUR (CRITICAL)
+ETAPE 5 - CALCULER master_unit_price SELON LA CATEGORIE
 ============================================================
-Les libelles fournisseurs ressemblent souvent a :
-  "Soda cola (bte slim 33CLx24) Coca Cola"
-  "Fleur mais bte 700Gx12 Maizena"
-  "Bidon 5L huile tournesol"
-
-Le "xN" dans le libelle PEUT signifier 2 choses TRES DIFFERENTES :
-  CAS A : "xN" = pack reel commercialise (carton de N unites achete ensemble)
-          Ex: "Coca 33clx24" = 1 carton contient 24 cannettes
-          Detection : si unit_price_invoice = total / qty et qu'on s'attend a un prix raisonnable POUR LE CARTON ENTIER
-                      OU si la categorie est "boisson" et le libelle contient un format de cannette/bouteille (33cl, 50cl, 1.5L)
-  CAS B : "xN" = info commerciale (N boites par palette, mais on achete a la boite)
-          Ex: "Maizena 700gx12" = on achete 1 boite de 700g (le 12 est juste "par carton de 12")
-          Detection : si unit_price_invoice est coherent avec UNE SEULE unite (la boite individuelle)
-
-Pour decider : compare unit_price_invoice avec ce qui est plausible.
-Une cannette Coca coute ~0.60-1€. Un carton de 24 cannettes coute ~15-20€.
-Une boite de Maizena 700g coute ~3-5€. Un carton de 12 boites coute ~40-60€.
-
-============================================================
-ETAPE 5 - REMPLIR LES CHAMPS DE SORTIE
-============================================================
-
-Champs obligatoires pour CHAQUE ligne :
-- "article" : nom court canonique (ex: "Cheddar", "Coca Cola")
-- "article_original" : description complete telle qu'elle apparait sur la facture
-- "categorie" : voir etape 3
-- "qty_ordered" : quantite de la colonne "Qte" (nombre de cartons / bidons / poches achetes)
-- "unit_price_invoice" : prix unitaire affiche sur la facture (prix d'UN carton/bidon/poche)
-- "total_ligne_ht" : total HT de la ligne
-- "pack_label" : description humaine du conditionnement reel commercialise (ex: "Carton 24x33cl", "Bidon 5L", "Boite 700g", "Poche 650g")
-- "pack_interpretation" : "pack_reel" si le "xN" du libelle est un pack achete d'un coup (CAS A), "boite_seule" si on achete a la boite (CAS B), "vrac" si vrac pur (bidon/sac/bouteille), "unite" si vendu a l'unite simple
-- "confidence" : 0-100 ta confiance dans l'extraction
-
-Champs CALCULES selon la categorie (a remplir TOI-MEME selon ces regles) :
 
 ** Si categorie = "boisson" **
-  - master_unit = "U" (TOUJOURS, on suit le prix par cannette/bouteille)
-  - units_per_pack = nombre de cannettes/bouteilles dans UN carton commande
-    (ex: "Coca 33clx24" -> 24 ; "Evian 50clx24" -> 24 ; "Perrier 1.5L x6" -> 6)
-  - master_unit_price = unit_price_invoice / units_per_pack
-    (ex: carton Coca a 17.74 EUR contient 24 cannettes -> master_unit_price = 17.74/24 = 0.739 EUR/cannette)
+  master_unit = "U" (on suit le prix par bouteille/cannette)
+  master_unit_price = unit_price_invoice (DIRECTEMENT, pas de calcul)
+  master_qty_per_pack = qty_invoiced (info : nombre total achete)
+  
+  Ex : Evian PU 0.678 -> master_unit_price = 0.678 EUR/bouteille
 
-** Si categorie = "ingredient" en VRAC (bidon, bouteille, sac, pot, bocal) **
-  - master_unit = "L" pour liquides, "kg" pour solides
-  - units_per_pack = contenance du bidon/sac/pot en L ou kg (ex: "Bidon 5L" -> 5 ; "Sac 25kg" -> 25 ; "Pot 1kg" -> 1 ; "Boite 700g" -> 0.7)
-  - master_unit_price = unit_price_invoice / units_per_pack
-    (ex: bidon 5L huile a 8.25 EUR -> master_unit_price = 8.25/5 = 1.65 EUR/L)
-    (ex: boite Maizena 700g a 3.90 EUR -> master_unit_price = 3.90/0.7 = 5.57 EUR/kg)
+** Si categorie = "ingredient" en VRAC liquide (bidon, bouteille XL) **
+  master_unit = "L"
+  Lire la CONTENANCE du bidon dans la designation (ex: "bid 5L" -> 5, "bid 7,5L" -> 7.5)
+  master_unit_price = unit_price_invoice / contenance
+  master_qty_per_pack = contenance (pour info)
+  
+  Ex : Bidon 5L PU 8.25 -> master_unit_price = 8.25/5 = 1.65 EUR/L
 
-** Si categorie = "ingredient" en pack-de-N (poches, barquettes vendues par carton) **
-  - Cas tricky : "Thon listao pch 650Gx12" -> 12 poches de 650g par carton
-  - Si pack_interpretation = "pack_reel" (achete le carton entier) :
-      master_unit = "kg" (ou "L"), units_per_pack = N * poids_unitaire_kg
-      ex: carton 12x650g = 12 * 0.65 = 7.8 kg, master_unit_price = unit_price_invoice / 7.8
-  - Si pack_interpretation = "boite_seule" (achete 1 poche) :
-      master_unit = "kg" (ou "L"), units_per_pack = poids_unitaire_kg seul
-      ex: poche 650g = 0.65 kg, master_unit_price = unit_price_invoice / 0.65
+** Si categorie = "ingredient" en VRAC solide (sac, pot kg) **
+  master_unit = "kg"
+  CAS A : si la facture est libelle au kg (ex: sac 25kg, PU = prix/kg)
+    -> master_unit_price = unit_price_invoice (DIRECTEMENT)
+    -> master_qty_per_pack = 1
+  CAS B : si la facture est libelle par contenant (ex: pot 1kg, PU = prix/pot)
+    -> Lire le poids du contenant dans la designation
+    -> master_unit_price = unit_price_invoice / poids
+    -> master_qty_per_pack = poids
+  
+  Pour decider : si qty_invoiced est un grand nombre (ex: 25) = facturation au kg (CAS A)
+                 si qty_invoiced est petit (1, 2, 3) = facturation au contenant (CAS B)
+
+** Si categorie = "ingredient" en pack-d'unites (poches, barquettes vendues a l'unite) **
+  master_unit = "U"
+  master_unit_price = unit_price_invoice (DIRECTEMENT)
+  master_qty_per_pack = qty_invoiced
+  
+  Ex : Boite Maizena 700g PU 3.90 -> master_unit_price = 3.90 EUR/boite (on suit le prix par boite)
+  
+  NOTE : si tu veux convertir en kg, fais-le SEPAREMENT.
+  Mais master_unit_price est TOUJOURS le PU de la facture.
 
 ** Si categorie = "packaging" ou "consommable" **
-  - master_unit = "U", units_per_pack = nombre d'unites contenues dans 1 pack
-  - master_unit_price = unit_price_invoice / units_per_pack
+  master_unit = "U"
+  master_unit_price = unit_price_invoice (DIRECTEMENT)
+  master_qty_per_pack = qty_invoiced
 
 ** Si categorie = "fees_taxes" **
-  - master_unit = "U", units_per_pack = 1, master_unit_price = unit_price_invoice
+  master_unit = "U", master_qty_per_pack = 1
+  master_unit_price = unit_price_invoice
 
 ============================================================
 ETAPE 6 - SI TU N'ES PAS SUR
 ============================================================
-Si tu hesites sur "pack_reel" vs "boite_seule", ou si units_per_pack te semble ambigu :
+Si tu n'arrives pas a lire clairement les 3 chiffres (qty_invoiced, unit_price_invoice, total_ligne_ht) :
 - Mets confidence < 50
-- Mets units_per_pack = 0 et master_unit_price = 0
+- Mets master_unit_price = 0
 - L'utilisateur completera manuellement
 
+NE DEVINE JAMAIS. Ne calcule jamais a partir du "xN" du libelle interne fournisseur.
+
 ============================================================
-EXEMPLES CONCRETS (avec arithmetique verifiee)
+RAPPEL FONDAMENTAL
+============================================================
+LA DESIGNATION DU PRODUIT EST DU BRUIT.
+Les libelles comme "Soda cola (bte slim 33CLx24) Coca Cola" ou "Fleur mais bte 700Gx12 Maizena"
+sont des codes internes du fournisseur. Le "xN" qu'ils contiennent NE T'INFORME PAS sur la quantite achetee.
+La VERITE est dans les COLONNES NUMERIQUES : qty_invoiced, unit_price_invoice, total_ligne_ht.
+
+============================================================
+EXEMPLES CONCRETS
 ============================================================
 
-EX 1 : "Soda cola (bte slim 33CLx24) Coca Cola" - Qte 4 - PU 17.74 - Total 70.96
+EX 1 : Evian
+  Designation: "Eau miner nat (PET 50CLx24) Evian"
+  Qte livree: 3 (COL), Qte facturee: 72, PU: 0.678, Total: 48.82
 {
-  article: "Coca Cola",
-  article_original: "Soda cola (bte slim 33CLx24) Coca Cola",
+  article: "Evian",
+  article_original: "Eau miner nat (PET 50CLx24) Evian",
   categorie: "boisson",
-  qty_ordered: 4, unit_price_invoice: 17.74, total_ligne_ht: 70.96,
-  pack_label: "Carton 24x33cl",
-  pack_interpretation: "pack_reel",
+  qty_invoiced: 72, unit_price_invoice: 0.678, total_ligne_ht: 48.82,
   master_unit: "U",
-  units_per_pack: 24,
-  master_unit_price: 0.739,  // = 17.74/24
+  master_qty_per_pack: 72,
+  master_unit_price: 0.678,
   confidence: 100
 }
-Verification : 4 x 17.74 = 70.96 ✓
+Verification arithmetique : 72 x 0.678 = 48.82 OK
 
-EX 2 : "Fleur mais bte 700Gx12 Maizena" - Qte 1 - PU 3.90 - Total 3.90
+EX 2 : Maizena (1 boite, "Nx" interne ignore)
+  Designation: "Fleur mais bte 700Gx12 Maizena"
+  Qte livree: 1 (BTE), Qte facturee: 1, PU: 3.90, Total: 3.90
 {
   article: "Maizena",
   article_original: "Fleur mais bte 700Gx12 Maizena",
   categorie: "ingredient",
-  qty_ordered: 1, unit_price_invoice: 3.90, total_ligne_ht: 3.90,
-  pack_label: "Boite 700g",
-  pack_interpretation: "boite_seule",
-  master_unit: "kg",
-  units_per_pack: 0.7,
-  master_unit_price: 5.57,  // = 3.90/0.7
+  qty_invoiced: 1, unit_price_invoice: 3.90, total_ligne_ht: 3.90,
+  master_unit: "U",
+  master_qty_per_pack: 1,
+  master_unit_price: 3.90,
   confidence: 100
 }
-Verification : 1 x 3.90 = 3.90 ✓
-Justification "boite_seule" : 3.90 EUR est coherent pour 1 boite, pas pour 12 boites.
+Verification : 1 x 3.90 = 3.90 OK
 
-EX 3 : "BIDON 5L HUILE TOURNESOL FRITURE" - Qte 2 - PU 8.25 - Total 16.50
+EX 3 : Huile colza (3 bidons de 5L)
+  Designation: "Huile colza raffine bid 5Lx3"
+  Qte livree: 1 (COL), Qte facturee: 3, PU: 8.25, Total: 24.75
 {
-  article: "Huile tournesol friture",
-  article_original: "BIDON 5L HUILE TOURNESOL FRITURE",
+  article: "Huile colza",
+  article_original: "Huile colza raffine bid 5Lx3",
   categorie: "ingredient",
-  qty_ordered: 2, unit_price_invoice: 8.25, total_ligne_ht: 16.50,
-  pack_label: "Bidon 5L",
-  pack_interpretation: "vrac",
+  qty_invoiced: 3, unit_price_invoice: 8.25, total_ligne_ht: 24.75,
   master_unit: "L",
-  units_per_pack: 5,
-  master_unit_price: 1.65,  // = 8.25/5
+  master_qty_per_pack: 5,
+  master_unit_price: 1.65,  // = 8.25 / 5 (contenance bidon)
   confidence: 100
 }
+Verification : 3 x 8.25 = 24.75 OK. Contenance lue dans "bid 5L".
 
-EX 4 : "FRAIS DE LIVRAISON" - Qte 1 - PU 8.50 - Total 8.50
+EX 4 : Pommes de terre 25kg (facturee au kg)
+  Designation: "Pdt frite (Agria) 60+ 25kg"
+  Qte livree: 1 (SAC), Qte facturee: 25, PU: 0.46, Total: 11.50
+{
+  article: "Pommes de terre Agria",
+  article_original: "Pdt frite (Agria) 60+ 25kg",
+  categorie: "ingredient",
+  qty_invoiced: 25, unit_price_invoice: 0.46, total_ligne_ht: 11.50,
+  master_unit: "kg",
+  master_qty_per_pack: 1,
+  master_unit_price: 0.46,  // facturation au kg, PU est deja en EUR/kg
+  confidence: 100
+}
+Verification : 25 x 0.46 = 11.50 OK
+
+EX 5 : Frais de livraison
+  Designation: "FRAIS DE LIVRAISON"
+  Qte: 1, PU: 8.50, Total: 8.50
 {
   article: "Frais de livraison",
   article_original: "FRAIS DE LIVRAISON",
   categorie: "fees_taxes",
-  qty_ordered: 1, unit_price_invoice: 8.50, total_ligne_ht: 8.50,
-  pack_label: "",
-  pack_interpretation: "unite",
+  qty_invoiced: 1, unit_price_invoice: 8.50, total_ligne_ht: 8.50,
   master_unit: "U",
-  units_per_pack: 1,
+  master_qty_per_pack: 1,
   master_unit_price: 8.50,
   confidence: 100
 }
@@ -205,15 +258,14 @@ Retourne UNIQUEMENT un JSON valide (sans markdown, sans backticks) au format :
   "lignes": [
     {
       "article": "...",
-      "article_original": "...",
+      "article_original": "designation complete telle que sur la facture",
       "categorie": "ingredient|boisson|packaging|consommable|fees_taxes",
-      "qty_ordered": 1,
+      "qty_invoiced": 0,
       "unit_price_invoice": 0.00,
       "total_ligne_ht": 0.00,
-      "pack_label": "...",
-      "pack_interpretation": "pack_reel|boite_seule|vrac|unite",
+      "pack_label": "ex: Bidon 5L, Sac 25kg, Boite 700g, Carton 24x33cl",
       "master_unit": "kg|L|U",
-      "units_per_pack": 0,
+      "master_qty_per_pack": 0,
       "master_unit_price": 0.00,
       "confidence": 0
     }
@@ -382,23 +434,23 @@ Retourne UNIQUEMENT un JSON valide (sans markdown, sans backticks) au format :
       }
 
       // ====================================================================
-      // EXTRACTION DES 3 VALEURS DE BASE (avec rétrocompatibilité ancien schéma)
+      // EXTRACTION DES 3 VALEURS DE BASE
+      // (rétrocompatibilité ancien schéma : qty_ordered, units_per_pack)
       // ====================================================================
-      var qtyOrdered = Number(ligne.qty_ordered || ligne.quantity || 1)
+      var qtyInvoiced = Number(ligne.qty_invoiced || ligne.qty_ordered || ligne.quantity || 1)
       var unitPriceInvoice = Number(ligne.unit_price_invoice || ligne.pack_price || 0)
-      var totalLineHT = Number(ligne.total_ligne_ht || (qtyOrdered * unitPriceInvoice) || 0)
-      var unitsPerPack = Number(ligne.units_per_pack || ligne.master_qty_per_pack || 0)
+      var totalLineHT = Number(ligne.total_ligne_ht || (qtyInvoiced * unitPriceInvoice) || 0)
+      var aiMasterQty = Number(ligne.master_qty_per_pack || ligne.units_per_pack || 0)
       var aiMasterUnitPrice = Number(ligne.master_unit_price || 0)
-      var pi = String(ligne.pack_interpretation || '').toLowerCase()
       var cat = ligne.categorie || 'ingredient'
 
       // ====================================================================
-      // VÉRIFICATION ARITHMÉTIQUE : qty × unit_price ≈ total (tolérance 5%)
+      // VÉRIFICATION ARITHMÉTIQUE : qty × PU ≈ total (tolérance 5%)
       // ====================================================================
       var arithmeticOk = true
       var arithmeticWarning: string | null = null
-      if (qtyOrdered > 0 && unitPriceInvoice > 0 && totalLineHT > 0) {
-        var expectedTotal = qtyOrdered * unitPriceInvoice
+      if (qtyInvoiced > 0 && unitPriceInvoice > 0 && totalLineHT > 0) {
+        var expectedTotal = qtyInvoiced * unitPriceInvoice
         var deviation = Math.abs(expectedTotal - totalLineHT) / totalLineHT
         if (deviation > 0.05) {
           arithmeticOk = false
@@ -407,41 +459,71 @@ Retourne UNIQUEMENT un JSON valide (sans markdown, sans backticks) au format :
       }
 
       // ====================================================================
-      // RÈGLES MÉTIER PAR CATÉGORIE
+      // RÈGLES MÉTIER PAR CATÉGORIE (forcing du master_unit)
       // - boisson → master_unit='U' (€/cannette ou €/bouteille)
       // - ingredient → master_unit='kg' ou 'L' (€/kg ou €/L)
       // - packaging/consommable → master_unit='U'
+      // - fees_taxes → master_unit='U'
       // ====================================================================
       var masterUnit = ligne.master_unit || 'kg'
-      if (cat === 'boisson') {
-        masterUnit = 'U'  // forcer : toujours par cannette/bouteille
-      } else if (cat === 'packaging' || cat === 'consommable') {
-        masterUnit = ligne.master_unit || 'U'
+      if (cat === 'boisson' || cat === 'packaging' || cat === 'consommable' || cat === 'fees_taxes') {
+        masterUnit = 'U'
       } else if (cat === 'ingredient') {
-        // Garder kg ou L selon ce que l'IA a déterminé, défaut kg
+        // Pour ingredients : kg ou L selon le type
         if (masterUnit !== 'kg' && masterUnit !== 'L') masterUnit = 'kg'
       }
 
       // ====================================================================
-      // CALCUL master_unit_price : unit_price_invoice / units_per_pack
-      // (= prix de UN carton / le nombre d'unités master que contient ce carton)
+      // CALCUL FINAL master_unit_price
+      // Nouvelle logique : on FAIT CONFIANCE au master_unit_price retourné par l'IA
+      // car le prompt lui demande de le calculer correctement selon la catégorie.
+      // On vérifie juste qu'il est cohérent.
       // ====================================================================
       var calculatedMUP = 0
       var extractionWarning: string | null = arithmeticWarning
 
-      if (unitPriceInvoice > 0 && unitsPerPack > 0) {
-        calculatedMUP = unitPriceInvoice / unitsPerPack
-        // Sanity check : si l'IA a fourni aussi master_unit_price et qu'il diffère trop, garder le calcul
-        if (aiMasterUnitPrice > 0 && Math.abs(aiMasterUnitPrice - calculatedMUP) / calculatedMUP > 0.1) {
-          if (!extractionWarning) extractionWarning = 'ai_inconsistent_mup'
-        }
-      } else if (aiMasterUnitPrice > 0 && unitsPerPack > 0) {
-        // Fallback ancien champ
+      if (aiMasterUnitPrice > 0) {
+        // L'IA a fourni master_unit_price : on lui fait confiance
         calculatedMUP = aiMasterUnitPrice
+
+        // Sanity check :
+        // - Pour boisson/packaging/consommable/fees : master_unit_price devrait être ≈ unit_price_invoice
+        //   (car master_unit_price = PU directement)
+        // - Pour ingredient en vrac : master_unit_price peut diverger (= PU / contenance)
+        if ((cat === 'boisson' || cat === 'packaging' || cat === 'consommable' || cat === 'fees_taxes') 
+            && unitPriceInvoice > 0
+            && Math.abs(calculatedMUP - unitPriceInvoice) / unitPriceInvoice > 0.05) {
+          if (!extractionWarning) extractionWarning = 'mup_should_equal_pu'
+        }
+      } else if (unitPriceInvoice > 0) {
+        // Fallback : si l'IA n'a pas calculé, on tente
+        if (cat === 'boisson' || cat === 'packaging' || cat === 'consommable' || cat === 'fees_taxes') {
+          // Pour ces catégories : master_unit_price = PU directement
+          calculatedMUP = unitPriceInvoice
+        } else if (cat === 'ingredient' && aiMasterQty > 0) {
+          // Pour ingredient vrac : master_unit_price = PU / contenance
+          calculatedMUP = unitPriceInvoice / aiMasterQty
+        } else {
+          calculatedMUP = 0
+          extractionWarning = 'pack_unknown'
+        }
       } else {
-        // Conditionnement inconnu : on flag pour vérification utilisateur
         calculatedMUP = 0
         extractionWarning = 'pack_unknown'
+      }
+
+      // ====================================================================
+      // CALCUL master_qty_per_pack (info pour le wizard/UI)
+      // ====================================================================
+      var finalMasterQty = aiMasterQty
+      if (finalMasterQty <= 0 && calculatedMUP > 0 && unitPriceInvoice > 0) {
+        // Déduire la contenance
+        if (cat === 'boisson' || cat === 'packaging' || cat === 'consommable' || cat === 'fees_taxes') {
+          finalMasterQty = qtyInvoiced  // nombre total acheté
+        } else {
+          // Pour vrac : contenance = PU / master_unit_price
+          finalMasterQty = Math.round((unitPriceInvoice / calculatedMUP) * 100) / 100
+        }
       }
 
       enrichedLignes.push({
@@ -449,19 +531,17 @@ Retourne UNIQUEMENT un JSON valide (sans markdown, sans backticks) au format :
         article_original: ligne.article_original || ligne.article || '',
         article_canonical: article,
         categorie: cat,
-        // Anciens champs (rétrocompatibilité avec le wizard/commit existant)
-        quantity: qtyOrdered,
+        // Champs principaux (compatibles avec wizard/commit existant)
+        quantity: qtyInvoiced,
         pack_label: ligne.pack_label || '',
-        pack_price: unitPriceInvoice,  // = prix d'1 unité de commande (carton/bidon/poche)
+        pack_price: unitPriceInvoice,
         master_unit: masterUnit,
-        master_qty_per_pack: unitsPerPack,
+        master_qty_per_pack: finalMasterQty,
         master_unit_price: calculatedMUP,
-        // Nouveaux champs (pour vue détaillée et debug)
-        qty_ordered: qtyOrdered,
+        // Nouveaux champs pour la vue détaillée (3 valeurs facture)
+        qty_invoiced: qtyInvoiced,
         unit_price_invoice: unitPriceInvoice,
         total_ligne_ht: totalLineHT,
-        units_per_pack: unitsPerPack,
-        pack_interpretation: pi || null,
         arithmetic_ok: arithmeticOk,
         extraction_warning: extractionWarning,
         vision_confidence: Number(ligne.confidence || 50),
