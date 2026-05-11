@@ -134,6 +134,7 @@ export default function FoodCostTab(props) {
         name: r.name,
         variant_key: r.variant_key || 'standard',
         variant_label: r.variant_label || 'Standard',
+        categorie: r.categorie,
         prix_vente_ttc: prixTTC,
         prix_vente_ht: prixHT,
         tva_ratio: tvaRatio,
@@ -497,7 +498,15 @@ export default function FoodCostTab(props) {
       <div className="ph">
         <div>
           <div className="pt">Food Cost 🥩</div>
-          <div className="ps">{groupedList.length} recettes · {drinks.length} boissons · Seuil alerte : {fcSeuil}%</div>
+          <div className="ps">{(function(){
+            var total = 0
+            groupedList.forEach(function(p){
+              Object.keys(p.variants).forEach(function(vk){
+                if (p.variants[vk].categorie !== 'sous_recette') total++
+              })
+            })
+            return total
+          })()} recettes · {drinks.length} boissons · Seuil alerte : {fcSeuil}%</div>
         </div>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
           <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
@@ -522,11 +531,23 @@ export default function FoodCostTab(props) {
           {[
             {id:'tous',label:'Tous'},
             {id:'classique',label:'🥪 Sandwichs'},
+            {id:'mini',label:'🥨 Minis'},
             {id:'salade',label:'🥗 Salades'},
             {id:'accompagnement',label:'🍟 Accomp.'},
             {id:'boisson',label:'🥤 Boissons'}
           ].map(function(cat){
-            var count = cat.id === 'tous' ? groupedList.length : groupedList.filter(function(p){return (p.category || '') === cat.id}).length
+            // Compter par VARIANTE (pas par parent) pour cohérence avec l'affichage éclaté
+            var count = 0
+            groupedList.forEach(function(p){
+              Object.keys(p.variants).forEach(function(vk){
+                var vv = p.variants[vk]
+                if (cat.id === 'tous') {
+                  if (vv.categorie !== 'sous_recette') count++
+                } else if ((vv.categorie || '') === cat.id) {
+                  count++
+                }
+              })
+            })
             return (
               <button key={cat.id} className="btn btn-sm" style={{fontSize:10,background:fcCatFilter===cat.id?'#191923':'#F5F5F5',color:fcCatFilter===cat.id?'#FFEB5A':'#555',border:'1.5px solid '+(fcCatFilter===cat.id?'#191923':'#DDD')}} onClick={function(){setFcCatFilter(cat.id)}}>
                 {cat.label} <span style={{opacity:.5}}>({count})</span>
@@ -566,48 +587,119 @@ export default function FoodCostTab(props) {
             )}
           </div>
 
-          {/* LISTE RECETTES groupées */}
-          {groupedList.filter(function(p){
-            return fcCatFilter === 'tous' || (p.category || '') === fcCatFilter
-          }).sort(function(a, b){
-            var va = pickVariant(a, 'standard') || pickVariant(a, 'mini')
-            var vb = pickVariant(b, 'standard') || pickVariant(b, 'mini')
-            return (vb ? vb.food_cost_pct : 0) - (va ? va.food_cost_pct : 0)
-          }).map(function(parent){
-            var v = pickVariant(parent, 'standard') || pickVariant(parent, 'mini')
-            if (!v) return null
-            var alert = v.food_cost_pct > fcSeuil
-            var barColor = alert ? '#CC0066' : '#009D3A'
-            var hasVariants = Object.keys(parent.variants).length > 1
-            return (
-              <div key={parent.parent_slug} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(alert?'#CC0066':'#009D3A'),cursor:'pointer'}} onClick={function(){setFcSelectedParent(parent.parent_slug);setFcSelectedVariant(v.variant_key)}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                  <div style={{flex:1,minHeight:44,display:'flex',flexDirection:'column',justifyContent:'center'}}>
-                    <div style={{fontWeight:900,fontSize:14,display:'flex',alignItems:'center',gap:6}}>
-                      {parent.name}
-                      {parent.category === 'boisson' && <span style={{fontSize:9,background:'#F0F0F0',color:'#555',padding:'2px 6px',borderRadius:4,fontWeight:900}}>🏡 MAISON</span>}
-                      {hasVariants && <span style={{fontSize:9,background:'#FF82D7',color:'#fff',padding:'2px 6px',borderRadius:4,fontWeight:900}}>STD + MINI</span>}
-                    </div>
-                    <div style={{fontSize:11,opacity:.6}}>
-                      {v.ingredients.reduce(function(acc, i){
-                        return acc.indexOf(i.fournisseur) > -1 ? acc : acc.concat([i.fournisseur])
-                      }, []).slice(0, 2).join(', ')}
-                      {' · '}PV {fmt(v.prix_vente_ttc)}€ TTC · Marge HT {fmt(v.marge_ht)}€
-                    </div>
+          {/* LISTE RECETTES — organisée en rubriques séparées */}
+          {(function(){
+            // Construire la liste plate (1 entry par variante)
+            var flatList = []
+            groupedList.forEach(function(parent){
+              Object.keys(parent.variants).forEach(function(vk){
+                var vv = parent.variants[vk]
+                if (!vv) return
+                if (vv.categorie === 'sous_recette') return
+                flatList.push({parent: parent, variant: vv})
+              })
+            })
+
+            // Définition des rubriques dans l'ordre d'affichage
+            var sections = [
+              {
+                key: 'sandwichs_std',
+                label: '🥪 Sandwichs standards',
+                color: '#FF82D7',
+                matchCat: ['classique','mini','salade','accompagnement','boisson','tous'],
+                showWhen: ['tous','classique'],
+                filter: function(v){ return v.categorie === 'classique' && v.variant_key !== 'mini' }
+              },
+              {
+                key: 'sandwichs_mini',
+                label: '🥨 Sandwichs minis',
+                color: '#FFEB5A',
+                showWhen: ['tous','mini'],
+                filter: function(v){ return v.categorie === 'mini' }
+              },
+              {
+                key: 'salades_std',
+                label: '🥗 Salades standards',
+                color: '#009D3A',
+                showWhen: ['tous','salade'],
+                filter: function(v){ return v.categorie === 'salade' && v.variant_key !== 'mini' }
+              },
+              {
+                key: 'salades_mini',
+                label: '🥗 Salades minis',
+                color: '#FFEB5A',
+                showWhen: ['tous','salade','mini'],
+                filter: function(v){ return v.categorie === 'salade' && v.variant_key === 'mini' }
+              },
+              {
+                key: 'accomp',
+                label: '🍟 Accompagnements',
+                color: '#191923',
+                showWhen: ['tous','accompagnement'],
+                filter: function(v){ return v.categorie === 'accompagnement' }
+              },
+              {
+                key: 'boissons_maison',
+                label: '🏡 Boissons maison',
+                color: '#FF82D7',
+                showWhen: ['tous','boisson'],
+                filter: function(v){ return v.categorie === 'boisson' }
+              }
+            ]
+
+            // Filtrer les rubriques visibles selon le filtre catégorie
+            var visibleSections = sections.filter(function(s){ return s.showWhen.indexOf(fcCatFilter) > -1 })
+
+            return visibleSections.map(function(section){
+              var items = flatList.filter(function(it){ return section.filter(it.variant) })
+              if (items.length === 0) return null
+              items.sort(function(a,b){ return (b.variant.food_cost_pct || 0) - (a.variant.food_cost_pct || 0) })
+              return (
+                <div key={section.key} style={{marginBottom:20}}>
+                  <div style={{
+                    fontFamily:'Yellowtail',fontSize:22,color:'#191923',
+                    marginTop:18,marginBottom:10,paddingBottom:6,
+                    borderBottom:'3px solid '+section.color,
+                    display:'flex',alignItems:'baseline',gap:8
+                  }}>
+                    <span>{section.label}</span>
+                    <span style={{fontFamily:'Arial Narrow, Arial, sans-serif',fontSize:12,fontWeight:900,color:'#888'}}>({items.length})</span>
                   </div>
-                  <div style={{textAlign:'right',padding:'4px 8px'}}>
-                    <div style={{fontSize:20,fontWeight:900,color:barColor}}>{v.food_cost_pct}%</div>
-                    <div style={{fontSize:10,opacity:.5}}>food cost</div>
-                  </div>
-                  <button style={{background:'#FFE5E5',border:'none',color:'#CC0066',fontSize:14,cursor:'pointer',borderRadius:6,padding:'6px 10px',flexShrink:0,marginLeft:4}} onClick={function(e){e.stopPropagation();deleteRecipeParent(parent.parent_slug, parent.name)}}>🗑️</button>
+                  {items.map(function(it){
+                    var parent = it.parent
+                    var v = it.variant
+                    var alert = v.food_cost_pct > fcSeuil
+                    var barColor = alert ? '#CC0066' : '#009D3A'
+                    var displayName = v.name || parent.name
+                    return (
+                      <div key={parent.parent_slug + '__' + v.variant_key} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(alert?'#CC0066':'#009D3A'),cursor:'pointer'}} onClick={function(){setFcSelectedParent(parent.parent_slug);setFcSelectedVariant(v.variant_key)}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                          <div style={{flex:1,minHeight:44,display:'flex',flexDirection:'column',justifyContent:'center'}}>
+                            <div style={{fontWeight:900,fontSize:14}}>{displayName}</div>
+                            <div style={{fontSize:11,opacity:.6}}>
+                              {v.ingredients.reduce(function(acc, i){
+                                return acc.indexOf(i.fournisseur) > -1 ? acc : acc.concat([i.fournisseur])
+                              }, []).slice(0, 2).join(', ')}
+                              {' · '}PV {fmt(v.prix_vente_ttc)}€ TTC · Marge HT {fmt(v.marge_ht)}€
+                            </div>
+                          </div>
+                          <div style={{textAlign:'right',padding:'4px 8px'}}>
+                            <div style={{fontSize:20,fontWeight:900,color:barColor}}>{v.food_cost_pct}%</div>
+                            <div style={{fontSize:10,opacity:.5}}>food cost</div>
+                          </div>
+                          <button style={{background:'#FFE5E5',border:'none',color:'#CC0066',fontSize:14,cursor:'pointer',borderRadius:6,padding:'6px 10px',flexShrink:0,marginLeft:4}} onClick={function(e){e.stopPropagation();deleteRecipeParent(parent.parent_slug, parent.name)}}>🗑️</button>
+                        </div>
+                        <div style={{background:'#F0F0F0',borderRadius:20,height:6,overflow:'hidden'}}>
+                          <div style={{width:Math.min(v.food_cost_pct,60)/60*100+'%',background:barColor,height:'100%',borderRadius:20}} />
+                        </div>
+                        {alert && <div style={{fontSize:10,color:'#CC0066',fontWeight:900,marginTop:4}}>⚠️ Au-dessus du seuil de {fcSeuil}%</div>}
+                      </div>
+                    )
+                  })}
                 </div>
-                <div style={{background:'#F0F0F0',borderRadius:20,height:6,overflow:'hidden'}}>
-                  <div style={{width:Math.min(v.food_cost_pct,60)/60*100+'%',background:barColor,height:'100%',borderRadius:20}} />
-                </div>
-                {alert && <div style={{fontSize:10,color:'#CC0066',fontWeight:900,marginTop:4}}>⚠️ Au-dessus du seuil de {fcSeuil}%</div>}
-              </div>
-            )
-          })}
+              )
+            })
+          })()}
 
           {/* BOISSONS REVENTE — affichées quand filtre "tous" ou "boisson" */}
           {(fcCatFilter === 'tous' || fcCatFilter === 'boisson') && drinks.map(function(d){
