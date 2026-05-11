@@ -3,8 +3,6 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import IngredientPopup from './IngredientPopup'
 import FoodCostInvoiceWizard from './FoodCostInvoiceWizard'
-import FoodCostHistoryTab from './FoodCostHistoryTab'
-import AchatsTab from './AchatsTab'
 import ProductRecipeAssignment from './ProductRecipeAssignment'
 
 function sb() {
@@ -498,16 +496,13 @@ export default function FoodCostTab(props) {
       {/* HEADER */}
       <div className="ph">
         <div>
-          <div className="pt">Cuisine 🥪</div>
+          <div className="pt">Food Cost 🥩</div>
           <div className="ps">{groupedList.length} recettes · {drinks.length} boissons · Seuil alerte : {fcSeuil}%</div>
         </div>
         <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-          <button className="btn btn-y btn-sm" style={{background:fcView==='recettes'?'#191923':'transparent',color:fcView==='recettes'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('recettes');setFcSelectedParent(null)}}>Recettes</button>
-          <button className="btn btn-y btn-sm" style={{background:fcView==='fournisseurs'?'#191923':'transparent',color:fcView==='fournisseurs'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('fournisseurs');setFcSelectedParent(null)}}>Fournisseurs</button>
-          <button className="btn btn-y btn-sm" style={{background:fcView==='imports'?'#191923':'transparent',color:fcView==='imports'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('imports');setFcSelectedParent(null)}}>Imports</button>
-          <button className="btn btn-y btn-sm" style={{background:fcView==='achats'?'#191923':'transparent',color:fcView==='achats'?'#FFEB5A':'#191923'}} onClick={function(){setFcView('achats');setFcSelectedParent(null)}}>🛒 Achats</button>          <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
+          <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
           <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewDrinkModal({name:'',supplier_name:'',purchase_price_ht:0,selling_price_ttc:0})}}>+ Boisson</button>
-          <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Facture</button>
+          <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Importer facture</button>
         </div>
       </div>
 
@@ -991,63 +986,6 @@ export default function FoodCostTab(props) {
         )
       })()}
 
-
-      {/* ========== VUE IMPORTS ========== */}
-    {fcView === 'imports' && (
-        <FoodCostHistoryTab toast={toast} />
-      )}
-
-      {/* ========== VUE ACHATS (catalogue dynamique multi-fournisseurs) ========== */}
-      {fcView === 'achats' && (
-        <AchatsTab toast={toast} />
-      )}
-
-      {/* ========== VUE FOURNISSEURS ========== */}
-      {fcView === 'fournisseurs' && (function(){
-        var fourn = {}
-        var gi
-        for (gi = 0; gi < groupedList.length; gi++) {
-          var variants = Object.values(groupedList[gi].variants)
-          var vi
-          for (vi = 0; vi < variants.length; vi++) {
-            var vv = variants[vi]
-            var ingi
-            for (ingi = 0; ingi < vv.ingredients.length; ingi++) {
-              var ing = vv.ingredients[ingi]
-              var f = ing.fournisseur || '—'
-              if (!fourn[f]) fourn[f] = { name: f, articles: [], totalCout: 0, recettes: [] }
-              if (!fourn[f].articles.find(function(a){return a.article === ing.article})) {
-                fourn[f].articles.push({ article: ing.article, prix: ing.prix_achat, unite: ing.unite })
-              }
-              fourn[f].totalCout += Number(ing.prix_achat || 0) * Number(ing.qte || 0)
-              if (fourn[f].recettes.indexOf(groupedList[gi].name) === -1) fourn[f].recettes.push(groupedList[gi].name)
-            }
-          }
-        }
-        var fournList = Object.values(fourn).sort(function(a, b){return b.totalCout - a.totalCout})
-        return (
-          <div>
-            {fournList.map(function(f){
-              return (
-                <div key={f.name} className="card" style={{marginBottom:8}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                    <div>
-                      <div style={{fontWeight:900,fontSize:15}}>{f.name}</div>
-                      <div style={{fontSize:11,opacity:.5}}>{f.articles.length} articles · {f.recettes.length} recettes</div>
-                    </div>
-                    <div style={{fontWeight:900,fontSize:16,color:'#005FFF'}}>{fmt(f.totalCout)}€</div>
-                  </div>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                    {f.articles.map(function(a, idx){return(
-                      <span key={idx} style={{fontSize:10,background:'#F5F5F5',border:'1px solid #EEE',borderRadius:4,padding:'2px 6px'}}>{a.article} · {a.prix}€/{a.unite}</span>
-                    )})}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )
-      })()}
 
       {/* ========== MODAL NOUVELLE RECETTE ========== */}
       {newRecipeModal && (
