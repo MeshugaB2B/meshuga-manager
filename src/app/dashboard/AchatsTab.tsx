@@ -29,6 +29,9 @@ export default function AchatsTab(props) {
   var [showOrphans, setShowOrphans] = useState(true)
   var [showCompare, setShowCompare] = useState(true)
   var [showFreeText, setShowFreeText] = useState(true)
+  var [assignModal, setAssignModal] = useState(null)
+  var [assignForm, setAssignForm] = useState({recipe_id:'', qte:'', unite:'kg'})
+  var [assignSaving, setAssignSaving] = useState(false)
 
   useEffect(function() { loadData() }, [])
 
@@ -74,6 +77,62 @@ export default function AchatsTab(props) {
       })
     })
     return found
+  }
+
+  // Ouvrir le modal d'affectation pour un product
+  function openAssignModal(product) {
+    setAssignModal(product)
+    setAssignForm({recipe_id: '', qte: '', unite: product.unit || 'kg'})
+  }
+
+  // Affecter un product à une recette (insère une ligne dans recipe_ingredients)
+  function assignToRecipe() {
+    if (!assignModal) return
+    if (!assignForm.recipe_id) { alert('Choisis une recette'); return }
+    var qte = parseFloat(assignForm.qte)
+    if (!qte || qte <= 0) { alert('Quantité invalide'); return }
+    var prod = assignModal
+    var sup = suppliers.filter(function(s) { return s.id === prod.supplier_id })[0]
+    var payload = {
+      recipe_id: assignForm.recipe_id,
+      article: prod.name,
+      fournisseur: sup ? sup.name : '',
+      product_id: prod.id,
+      qte: qte,
+      unite: assignForm.unite,
+      prix_achat: Number(prod.current_price) || 0,
+      cout: qte * (Number(prod.current_price) || 0)
+    }
+    setAssignSaving(true)
+    sb().from('recipe_ingredients').insert(payload).then(function(r) {
+      setAssignSaving(false)
+      if (r.error) { alert('Erreur: ' + r.error.message); return }
+      // Recalculer food cost de la recette
+      var allRiForRecipe = recipeIngs.filter(function(ri) { return ri.recipe_id === assignForm.recipe_id }).concat([payload])
+      var newFc = 0
+      allRiForRecipe.forEach(function(ri) { newFc += Number(ri.qte || 0) * Number(ri.prix_achat || 0) })
+      var rec = recipes.filter(function(r2) { return r2.id === assignForm.recipe_id })[0]
+      if (rec) {
+        // Récupérer prix_vente_ht depuis la DB pour cohérence
+        sb().from('recipes').select('prix_vente_ht').eq('id', rec.id).single().then(function(rr) {
+          var pvht = rr.data ? Number(rr.data.prix_vente_ht) : 0
+          sb().from('recipes').update({
+            food_cost_eur: Math.round(newFc * 10000) / 10000,
+            food_cost_pct: pvht > 0 ? Math.round(100 * newFc / pvht * 100) / 100 : 0,
+            marge_ht: Math.round((pvht - newFc) * 10000) / 10000,
+            updated_at: new Date().toISOString()
+          }).eq('id', rec.id).then(function() {
+            toast('✅ Affecté à ' + rec.name)
+            setAssignModal(null)
+            setAssignForm({recipe_id:'', qte:'', unite:'kg'})
+            loadData()
+          })
+        })
+      } else {
+        setAssignModal(null)
+        loadData()
+      }
+    })
   }
 
   // ---------------------------------------------------------------------------
@@ -377,12 +436,15 @@ export default function AchatsTab(props) {
             )
           })}
 
-          <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Utilisé dans</div>
+          <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span>Utilisé dans</span>
+            <button onClick={function(){openAssignModal(prod)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'2px solid #FF82D7',background:'#FF82D7',color:'#fff',cursor:'pointer',fontFamily:'Arial Narrow, Arial, sans-serif'}}>+ Affecter à une recette</button>
+          </div>
           {prodRecipes.length > 0 ? prodRecipes.map(function(r) {
             return <span key={r.id} style={{display:'inline-block',padding:'5px 12px',borderRadius:20,fontSize:11,fontWeight:900,margin:3,background:'#FFEB5A',color:'#191923',border:'2px solid #191923',textTransform:'uppercase'}}>
               {r.full_name} <span style={{fontWeight:400,opacity:.7,marginLeft:3}}>· {r.qte}{r.unite}</span>
             </span>
-          }) : <span style={{fontSize:13,color:'#888',fontWeight:700}}>Hors recettes</span>}
+          }) : <span style={{fontSize:13,color:'#888',fontWeight:700}}>Hors recettes — clique &quot;+ Affecter&quot; pour l&apos;ajouter</span>}
 
           <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Évolution du prix</div>
           {allPricesForArticle.length >= 2 ? renderPriceChart(allProductIds, prices, supplierMapForChart) : <div style={{fontSize:13,color:'#888'}}>Pas encore d&apos;historique. Importe une facture pour commencer le suivi.</div>}
@@ -600,6 +662,67 @@ export default function AchatsTab(props) {
       {filteredSuppliers.length === 0 && (
         <div style={{padding:32,textAlign:'center',opacity:.5,fontSize:13}}>
           Aucun fournisseur dans cette catégorie.
+        </div>
+      )}
+
+      {/* ============ MODAL AFFECTATION À UNE RECETTE ============ */}
+      {assignModal && (
+        <div onClick={function(){setAssignModal(null)}} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200,padding:16}}>
+          <div onClick={function(e){e.stopPropagation()}} style={{background:'#fff',borderRadius:12,padding:24,maxWidth:500,width:'100%',maxHeight:'90vh',overflowY:'auto'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}}>
+              <div>
+                <div style={{fontFamily:'Yellowtail',fontSize:24,color:'#191923'}}>Affecter à une recette</div>
+                <div style={{fontSize:13,color:'#888',marginTop:4}}>
+                  <strong>{assignModal.name}</strong> · {Number(assignModal.current_price).toFixed(2)}€/{assignModal.unit}
+                </div>
+              </div>
+              <button onClick={function(){setAssignModal(null)}} style={{background:'transparent',border:'none',fontSize:22,cursor:'pointer',color:'#888',padding:0,lineHeight:1}}>✕</button>
+            </div>
+
+            <div style={{marginBottom:12}}>
+              <label style={{display:'block',fontSize:11,fontWeight:900,textTransform:'uppercase',color:'#888',marginBottom:4}}>Recette</label>
+              <select value={assignForm.recipe_id} onChange={function(e){setAssignForm(Object.assign({}, assignForm, {recipe_id: e.target.value}))}} style={{width:'100%',padding:'8px 10px',border:'2px solid #EBEBEB',borderRadius:6,fontSize:13}}>
+                <option value="">-- Choisir une recette --</option>
+                {recipes.slice().sort(function(a,b){
+                  var ca = a.categorie || 'zzz'
+                  var cb = b.categorie || 'zzz'
+                  if (ca !== cb) return ca.localeCompare(cb)
+                  return (a.name || '').localeCompare(b.name || '')
+                }).map(function(r){
+                  var label = (r.variant_label ? r.variant_label + ' ' : '') + r.name
+                  return <option key={r.id} value={r.id}>[{r.categorie || '?'}] {label}</option>
+                })}
+              </select>
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:8,marginBottom:12}}>
+              <div>
+                <label style={{display:'block',fontSize:11,fontWeight:900,textTransform:'uppercase',color:'#888',marginBottom:4}}>Quantité</label>
+                <input type="text" inputMode="decimal" value={assignForm.qte} onChange={function(e){setAssignForm(Object.assign({}, assignForm, {qte: e.target.value}))}} placeholder="ex: 0.005" style={{width:'100%',padding:'8px 10px',border:'2px solid #EBEBEB',borderRadius:6,fontSize:13}} />
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:11,fontWeight:900,textTransform:'uppercase',color:'#888',marginBottom:4}}>Unité</label>
+                <select value={assignForm.unite} onChange={function(e){setAssignForm(Object.assign({}, assignForm, {unite: e.target.value}))}} style={{width:'100%',padding:'8px 10px',border:'2px solid #EBEBEB',borderRadius:6,fontSize:13}}>
+                  <option value="kg">kg</option>
+                  <option value="L">L</option>
+                  <option value="U">U</option>
+                </select>
+              </div>
+            </div>
+
+            {assignForm.qte && parseFloat(assignForm.qte) > 0 && (
+              <div style={{background:'#FFF9E5',border:'1px solid #FFEB5A',borderRadius:6,padding:'8px 12px',marginBottom:12,fontSize:12}}>
+                💰 Coût ajouté : <strong>{(parseFloat(assignForm.qte) * Number(assignModal.current_price)).toFixed(3)}€</strong>
+              </div>
+            )}
+
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+              <button onClick={function(){setAssignModal(null)}} style={{padding:'8px 16px',background:'#fff',border:'1px solid #DDD',borderRadius:6,cursor:'pointer',fontSize:13,fontWeight:700,color:'#666'}}>Annuler</button>
+              <button onClick={assignToRecipe} disabled={assignSaving || !assignForm.recipe_id || !assignForm.qte} style={{padding:'8px 20px',background:assignSaving||!assignForm.recipe_id||!assignForm.qte?'#CCC':'#FF82D7',color:'#fff',border:'none',borderRadius:6,cursor:assignSaving||!assignForm.recipe_id||!assignForm.qte?'not-allowed':'pointer',fontSize:13,fontWeight:900}}>
+                {assignSaving ? '⏳ ...' : '✓ Affecter'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
