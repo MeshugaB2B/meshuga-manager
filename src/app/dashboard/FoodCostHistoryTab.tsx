@@ -51,6 +51,11 @@ export default function FoodCostHistoryTab(props) {
   var [rematchDeleteAlias, setRematchDeleteAlias] = useState(true)
   var [rematchSaving, setRematchSaving] = useState(false)
 
+  // ============= STATES ANOMALIES =============
+  var [editingAnomalyId, setEditingAnomalyId] = useState(null)
+  var [anomalyDraft, setAnomalyDraft] = useState({ pack_label: '', pack_price: '', master_qty_per_pack: '' })
+  var [anomalySaving, setAnomalySaving] = useState(false)
+
   // ============= LOAD DATA =============
   function loadData() {
     setLoading(true)
@@ -219,6 +224,190 @@ export default function FoodCostHistoryTab(props) {
   // ============= COMPUTED =============
   var invoices = buildInvoices()
 
+  // ============= ACTIONS ANOMALIES =============
+  function openInvoiceFromPath(invoicePath) {
+    if (!invoicePath) {
+      props.toast && props.toast('Cette ligne n\'a pas de facture stockée (import antérieur au système Storage)')
+      return
+    }
+    sb().storage.from('supplier-invoices').createSignedUrl(invoicePath, 3600).then(function(res){
+      if (res.data && res.data.signedUrl) {
+        window.open(res.data.signedUrl, '_blank')
+      } else {
+        props.toast && props.toast('Facture non disponible')
+      }
+    })
+  }
+
+  function startEditAnomaly(anomaly) {
+    setEditingAnomalyId(anomaly.id)
+    setAnomalyDraft({
+      pack_label: anomaly.pack_label || '',
+      pack_price: anomaly.pack_price || '',
+      master_qty_per_pack: anomaly.master_qty_per_pack || ''
+    })
+  }
+
+  function cancelEditAnomaly() {
+    setEditingAnomalyId(null)
+  }
+
+  function saveAnomaly(anomaly) {
+    var pp = parseFloat(String(anomalyDraft.pack_price || '0').replace(',', '.'))
+    var qpp = parseFloat(String(anomalyDraft.master_qty_per_pack || '0').replace(',', '.'))
+    if (pp <= 0 || qpp <= 0) {
+      props.toast && props.toast('Pack price et qty/pack doivent être > 0')
+      return
+    }
+    var newMUP = pp / qpp
+    setAnomalySaving(true)
+    sb().from('product_prices').update({
+      pack_label: anomalyDraft.pack_label || null,
+      pack_price: pp,
+      master_qty_per_pack: qpp,
+      master_unit_price: newMUP
+    }).eq('id', anomaly.id).then(function(res){
+      if (res.error) {
+        props.toast && props.toast('Erreur: ' + res.error.message)
+        setAnomalySaving(false)
+        return
+      }
+      // Recalculer current_price du product (médiane des prix restants)
+      sb().from('product_prices').select('master_unit_price').eq('product_id', anomaly.product_id).then(function(r){
+        if (r.data && r.data.length > 0) {
+          var prices = r.data.map(function(x){ return Number(x.master_unit_price) }).filter(function(v){ return v > 0 }).sort(function(a,b){ return a - b })
+          if (prices.length > 0) {
+            var median = prices[Math.floor(prices.length / 2)]
+            sb().from('products').update({ current_price: Math.round(median * 1000) / 1000 }).eq('id', anomaly.product_id).then(function(){
+              setAnomalySaving(false)
+              setEditingAnomalyId(null)
+              loadData()
+              props.toast && props.toast('✓ Anomalie corrigée et prix actuel recalculé')
+            })
+          } else {
+            setAnomalySaving(false)
+            setEditingAnomalyId(null)
+            loadData()
+          }
+        } else {
+          setAnomalySaving(false)
+          setEditingAnomalyId(null)
+          loadData()
+        }
+      })
+    })
+  }
+
+  function deleteAnomaly(anomaly) {
+    if (!confirm('Supprimer définitivement ce prix erroné ?\n\n' + anomaly.product_name + ' · ' + anomaly.invoice_date + ' · ' + anomaly.master_unit_price + '€')) return
+    setAnomalySaving(true)
+    sb().from('product_prices').delete().eq('id', anomaly.id).then(function(res){
+      if (res.error) {
+        props.toast && props.toast('Erreur: ' + res.error.message)
+        setAnomalySaving(false)
+        return
+      }
+      // Recalculer current_price
+      sb().from('product_prices').select('master_unit_price').eq('product_id', anomaly.product_id).then(function(r){
+        if (r.data && r.data.length > 0) {
+          var prices = r.data.map(function(x){ return Number(x.master_unit_price) }).filter(function(v){ return v > 0 }).sort(function(a,b){ return a - b })
+          if (prices.length > 0) {
+            var median = prices[Math.floor(prices.length / 2)]
+            sb().from('products').update({ current_price: Math.round(median * 1000) / 1000 }).eq('id', anomaly.product_id).then(function(){
+              setAnomalySaving(false)
+              loadData()
+              props.toast && props.toast('✓ Anomalie supprimée')
+            })
+          } else {
+            setAnomalySaving(false)
+            loadData()
+          }
+        } else {
+          setAnomalySaving(false)
+          loadData()
+        }
+      })
+    })
+  }
+
+  // ============= DÉTECTION OUTLIERS =============
+  // Une ligne product_prices est outlier si :
+  // - master_unit_price diffère de la médiane (de son product) de plus de ±50%
+  // OU
+  // - master_unit_price <= 0 (problème d'extraction)
+  function buildOutliers() {
+    if (priceLines.length === 0) return []
+
+    // Grouper par product_id
+    var byProduct = {}
+    priceLines.forEach(function(pl){
+      if (!pl.product_id) return
+      if (!byProduct[pl.product_id]) byProduct[pl.product_id] = []
+      byProduct[pl.product_id].push(pl)
+    })
+
+    var outliers = []
+    Object.keys(byProduct).forEach(function(pid){
+      var lines = byProduct[pid]
+      // Calculer la médiane sur les prix > 0
+      var sortedPrices = lines.map(function(l){ return Number(l.master_unit_price) }).filter(function(v){ return v > 0 }).sort(function(a,b){ return a - b })
+      if (sortedPrices.length === 0) return
+      var median = sortedPrices[Math.floor(sortedPrices.length / 2)]
+      var prod = allProducts.filter(function(p){ return p.id === pid })[0]
+      if (!prod) return
+      var sup = allSuppliers.filter(function(s){ return s.id === prod.supplier_id })[0]
+
+      lines.forEach(function(pl){
+        var price = Number(pl.master_unit_price)
+        var ratio = median > 0 ? price / median : 0
+        var isOutlier = false
+        var reason = ''
+
+        if (price <= 0) {
+          isOutlier = true
+          reason = 'Prix nul ou négatif'
+        } else if (sortedPrices.length >= 2 && (ratio > 1.5 || ratio < 0.5)) {
+          // Au moins 2 prix pour avoir une référence solide
+          isOutlier = true
+          var pct = Math.round((ratio - 1) * 100)
+          reason = (pct > 0 ? '+' : '') + pct + '% vs médiane'
+        }
+
+        if (isOutlier) {
+          outliers.push({
+            id: pl.id,
+            product_id: pid,
+            product_name: prod.name,
+            supplier_name: sup ? sup.name : '—',
+            unit: prod.unit,
+            invoice_date: pl.invoice_date,
+            invoice_filename: pl.invoice_filename,
+            invoice_path: pl.invoice_path,
+            pack_label: pl.pack_label,
+            pack_price: pl.pack_price,
+            master_qty_per_pack: pl.master_qty_per_pack,
+            master_unit_price: price,
+            median: median,
+            ratio: ratio,
+            reason: reason,
+            article_original: pl.article_original
+          })
+        }
+      })
+    })
+
+    // Trier par sévérité décroissante
+    outliers.sort(function(a,b){
+      var aSev = Math.abs(Math.log(a.ratio || 0.001))
+      var bSev = Math.abs(Math.log(b.ratio || 0.001))
+      return bSev - aSev
+    })
+
+    return outliers
+  }
+
+  var outliers = buildOutliers()
+
   // ============= RENDER =============
   if (loading) {
     return (
@@ -246,6 +435,9 @@ export default function FoodCostHistoryTab(props) {
         </button>
         <button onClick={function(){setSubView('aliases')}} style={{flex:1,padding:'10px 14px',background:subView==='aliases'?'#FF82D7':'transparent',color:subView==='aliases'?'#fff':'#555',border:'none',borderRadius:8,fontWeight:900,fontSize:13,cursor:'pointer'}}>
           🏷️ Alias mémorisés ({aliases.length})
+        </button>
+        <button onClick={function(){setSubView('anomalies')}} style={{flex:1,padding:'10px 14px',background:subView==='anomalies'?'#FF82D7':'transparent',color:subView==='anomalies'?'#fff':'#555',border:'none',borderRadius:8,fontWeight:900,fontSize:13,cursor:'pointer'}}>
+          🚨 Anomalies ({outliers.length})
         </button>
       </div>
 
@@ -486,6 +678,97 @@ export default function FoodCostHistoryTab(props) {
               <button onClick={doRematch} disabled={!isRematchValid() || rematchSaving} style={{padding:'10px 14px',borderRadius:8,border:'none',background:isRematchValid()?'#FF82D7':'#EEE',color:isRematchValid()?'#fff':'#888',fontWeight:900,fontSize:12,cursor:isRematchValid()?'pointer':'not-allowed'}}>{rematchSaving ? '…' : '✅ Confirmer la correction'}</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ============= SOUS-VUE ANOMALIES ============= */}
+      {subView === 'anomalies' && (
+        <div>
+          {outliers.length === 0 ? (
+            <div style={{padding:30,textAlign:'center',background:'#fff',borderRadius:10,border:'1px dashed #DDD'}}>
+              <div style={{fontSize:32,marginBottom:8}}>✅</div>
+              <div style={{fontSize:13,fontWeight:900,color:'#009D3A'}}>Aucune anomalie détectée</div>
+              <div style={{fontSize:11,opacity:.6,marginTop:4}}>Tous les prix de l&apos;historique semblent cohérents (écart &lt; ±50% vs médiane par produit).</div>
+            </div>
+          ) : (
+            <div>
+              <div style={{padding:'10px 14px',background:'#FFE5F0',borderRadius:8,border:'1.5px solid #CC0066',marginBottom:14}}>
+                <div style={{fontSize:13,fontWeight:900,color:'#CC0066'}}>🚨 {outliers.length} prix suspect{outliers.length > 1 ? 's' : ''} détecté{outliers.length > 1 ? 's' : ''}</div>
+                <div style={{fontSize:11,opacity:.75,marginTop:2}}>Écart &gt; ±50% vs la médiane du même produit. Ouvre la facture, corrige le conditionnement ou supprime la ligne erronée.</div>
+              </div>
+
+              {outliers.map(function(a){
+                var editing = editingAnomalyId === a.id
+                var draftPP = parseFloat(String(anomalyDraft.pack_price || '0').replace(',', '.'))
+                var draftQ = parseFloat(String(anomalyDraft.master_qty_per_pack || '0').replace(',', '.'))
+                var draftMUP = (draftPP > 0 && draftQ > 0) ? draftPP / draftQ : 0
+
+                return (
+                  <div key={a.id} style={{background:'#fff',border:'1.5px solid '+(editing ? '#FF82D7' : '#FFB0D7'),borderRadius:10,padding:'12px 14px',marginBottom:10}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,flexWrap:'wrap'}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:900,color:'#191923'}}>{a.product_name}</div>
+                        <div style={{fontSize:11,color:'#666',marginTop:2}}>
+                          {a.supplier_name} · {fmtDate(a.invoice_date)}
+                          {a.pack_label && <span> · {a.pack_label}</span>}
+                        </div>
+                        {a.article_original && a.article_original !== a.product_name && (
+                          <div style={{fontSize:10,opacity:.55,marginTop:2,fontStyle:'italic'}}>Sur la facture : « {a.article_original} »</div>
+                        )}
+                      </div>
+                      <div style={{textAlign:'right',flexShrink:0}}>
+                        <div style={{fontSize:14,fontWeight:900,color:'#CC0066'}}>{fmt(a.master_unit_price)}€/{a.unit}</div>
+                        <div style={{fontSize:10,color:'#888'}}>médiane : {fmt(a.median)}€/{a.unit}</div>
+                        <div style={{padding:'2px 8px',background:'#CC0066',color:'#fff',borderRadius:10,fontSize:10,fontWeight:900,marginTop:3,display:'inline-block'}}>{a.reason}</div>
+                      </div>
+                    </div>
+
+                    {!editing && (
+                      <div style={{display:'flex',gap:6,marginTop:10,flexWrap:'wrap'}}>
+                        {a.invoice_path && (
+                          <button onClick={function(){openInvoiceFromPath(a.invoice_path)}} style={{padding:'6px 12px',fontSize:11,fontWeight:900,borderRadius:6,border:'1.5px solid #191923',background:'#fff',cursor:'pointer'}}>📄 Voir la facture</button>
+                        )}
+                        <button onClick={function(){startEditAnomaly(a)}} style={{padding:'6px 12px',fontSize:11,fontWeight:900,borderRadius:6,border:'1.5px solid #FF82D7',background:'#FF82D7',color:'#fff',cursor:'pointer'}}>✏️ Corriger</button>
+                        <button onClick={function(){deleteAnomaly(a)}} disabled={anomalySaving} style={{padding:'6px 12px',fontSize:11,fontWeight:900,borderRadius:6,border:'1.5px solid #CC0066',background:'#fff',color:'#CC0066',cursor:anomalySaving?'not-allowed':'pointer'}}>🗑 Supprimer cette ligne</button>
+                      </div>
+                    )}
+
+                    {editing && (
+                      <div onClick={function(e){e.stopPropagation()}} style={{marginTop:12,padding:12,background:'#FFF5FB',borderRadius:8,border:'1px solid #FFB0D7'}}>
+                        <div style={{fontSize:11,fontWeight:900,color:'#CC0066',marginBottom:8}}>Corriger le conditionnement</div>
+                        <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:8,marginBottom:8}}>
+                          <div>
+                            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>Libellé pack</label>
+                            <input type="text" value={anomalyDraft.pack_label} onChange={function(e){setAnomalyDraft(Object.assign({}, anomalyDraft, {pack_label: e.target.value}))}} placeholder="ex: Bidon 5L" style={{width:'100%',padding:'7px 10px',fontSize:12,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}} />
+                          </div>
+                          <div>
+                            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>Prix pack (€)</label>
+                            <input type="text" inputMode="decimal" value={anomalyDraft.pack_price} onChange={function(e){setAnomalyDraft(Object.assign({}, anomalyDraft, {pack_price: e.target.value}))}} placeholder="0.00" style={{width:'100%',padding:'7px 10px',fontSize:12,fontWeight:700,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}} />
+                          </div>
+                          <div>
+                            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>Qté/pack ({a.unit})</label>
+                            <input type="text" inputMode="decimal" value={anomalyDraft.master_qty_per_pack} onChange={function(e){setAnomalyDraft(Object.assign({}, anomalyDraft, {master_qty_per_pack: e.target.value}))}} placeholder="0" style={{width:'100%',padding:'7px 10px',fontSize:12,fontWeight:700,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}} />
+                          </div>
+                        </div>
+
+                        {draftMUP > 0 && (
+                          <div style={{padding:'6px 10px',background:'#E8F8EE',border:'1.5px solid #009D3A',borderRadius:6,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                            <span style={{fontSize:11,fontWeight:700,color:'#005C24'}}>Nouveau prix calculé :</span>
+                            <span style={{fontSize:14,fontWeight:900,color:'#005C24'}}>{draftMUP < 1 ? draftMUP.toFixed(3) : draftMUP.toFixed(2)} €/{a.unit}</span>
+                          </div>
+                        )}
+
+                        <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
+                          <button onClick={cancelEditAnomaly} disabled={anomalySaving} style={{padding:'7px 12px',fontSize:11,fontWeight:900,borderRadius:6,border:'1.5px solid #DDD',background:'#fff',cursor:'pointer'}}>Annuler</button>
+                          <button onClick={function(){saveAnomaly(a)}} disabled={anomalySaving || draftMUP <= 0} style={{padding:'7px 12px',fontSize:11,fontWeight:900,borderRadius:6,border:'none',background:draftMUP>0?'#009D3A':'#EEE',color:draftMUP>0?'#fff':'#888',cursor:(draftMUP>0&&!anomalySaving)?'pointer':'not-allowed'}}>{anomalySaving ? '…' : '✓ Enregistrer'}</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
