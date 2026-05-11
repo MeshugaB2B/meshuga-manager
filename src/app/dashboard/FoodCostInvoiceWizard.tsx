@@ -223,24 +223,46 @@ export default function FoodCostInvoiceWizard(props) {
     }
   }
 
-  // Recalcul automatique master_unit_price quand l'utilisateur édite pack_price ou master_qty_per_pack
-  function updateLinePack(lineIndex, field, value) {
+  // ============= MISE À JOUR D'UNE LIGNE AVEC RECALCUL INTELLIGENT =============
+  // Accepte un objet de patchs. Si pack_price ou master_qty_per_pack change,
+  // recalcule automatiquement master_unit_price ET propage vers les nouveaux champs
+  // unit_price_invoice / units_per_pack pour rester cohérent.
+  function updateLineFields(lineIndex, patch) {
     setLines(function(prev){
       var next = prev.slice()
-      var l = Object.assign({}, next[lineIndex])
-      l[field] = value
-      // Si on a pack_price ET qty > 0, recalculer master_unit_price
-      var pp = Number(field === 'pack_price' ? value : l.pack_price)
-      var qpp = Number(field === 'master_qty_per_pack' ? value : l.master_qty_per_pack)
-      if (pp > 0 && qpp > 0) {
-        l.master_unit_price = pp / qpp
-        l.outlier_acknowledged = true // l'utilisateur a corrigé manuellement, on l'autorise à passer
+      var l = Object.assign({}, next[lineIndex], patch)
+
+      // Si on a touché à pack_price OU master_qty_per_pack OU pack_count, recalculer
+      var touchedCalcField = ('pack_price' in patch) || ('master_qty_per_pack' in patch) || ('pack_count' in patch) || ('per_pack_qty' in patch) || ('master_unit' in patch) || ('unit_price_invoice' in patch) || ('units_per_pack' in patch)
+      if (touchedCalcField) {
+        // Synchroniser les nouveaux champs avec les anciens (compatibilité)
+        if ('pack_price' in patch) l.unit_price_invoice = patch.pack_price
+        if ('unit_price_invoice' in patch) l.pack_price = patch.unit_price_invoice
+        if ('master_qty_per_pack' in patch) l.units_per_pack = patch.master_qty_per_pack
+        if ('units_per_pack' in patch) l.master_qty_per_pack = patch.units_per_pack
+
+        var pp = parseFloat(String(l.pack_price || l.unit_price_invoice || '0').replace(',', '.'))
+        var qpp = parseFloat(String(l.master_qty_per_pack || l.units_per_pack || '0').replace(',', '.'))
+        if (pp > 0 && qpp > 0) {
+          l.master_unit_price = pp / qpp
+          l.outlier_acknowledged = true
+          // Recalculer aussi le total HT estimé : qty × unit_price
+          var qt = parseFloat(String(l.qty_ordered || l.quantity || '1').replace(',', '.'))
+          if (qt > 0) l.total_ligne_ht = qt * pp
+        }
       }
-      // Marquer que la ligne a été éditée par l'utilisateur (extraction_warning sautée)
+
       l.user_edited = true
       next[lineIndex] = l
       return next
     })
+  }
+
+  // Garde-fou rétrocompatibilité pour les boutons existants
+  function updateLinePack(lineIndex, field, value) {
+    var patch = {}
+    patch[field] = value
+    updateLineFields(lineIndex, patch)
   }
 
   function acknowledgeOutlier(lineIndex) {
@@ -248,6 +270,46 @@ export default function FoodCostInvoiceWizard(props) {
       var next = prev.slice()
       next[lineIndex] = Object.assign({}, next[lineIndex], { outlier_acknowledged: true })
       return next
+    })
+  }
+
+  // ============= PRÉSETS DE CONDITIONNEMENT (pour saisie rapide) =============
+  // Type → instructions visuelles + champs à remplir
+  // 'vrac_l' = Bidon/Bouteille liquide (master = L)
+  // 'vrac_kg' = Sac/Pot solide (master = kg)
+  // 'pack_canette' = Carton de N cannettes/bouteilles (master = U, prix par cannette)
+  // 'pack_unite' = Barquette/Paquet de N unités (master = U)
+  // 'unite' = Vendu à l'unité (master = U, qty = 1)
+  // 'custom' = Saisie libre
+  var PACK_PRESETS = [
+    { key: 'vrac_l', label: '💧 Vrac liquide (€/L)', master_unit: 'L', hint: 'Ex: Bidon 5L, Bouteille 1.5L' },
+    { key: 'vrac_kg', label: '⚖️ Vrac solide (€/kg)', master_unit: 'kg', hint: 'Ex: Sac 10kg, Pot 1kg, Poche 650g' },
+    { key: 'pack_canette', label: '🥤 Pack de cannettes/bouteilles (€/unité)', master_unit: 'U', hint: 'Ex: Carton 24×33cl Coca - prix par cannette' },
+    { key: 'pack_unite', label: '📦 Pack d&apos;unités (€/unité)', master_unit: 'U', hint: 'Ex: Barquette 6 œufs, Pack 12 yaourts' },
+    { key: 'unite', label: '1️⃣ Vendu à l&apos;unité (€/u)', master_unit: 'U', hint: 'Ex: 1 pain, 1 bouquet' },
+    { key: 'custom', label: '✏️ Saisie libre', master_unit: 'kg', hint: 'Si rien ne convient' }
+  ]
+
+  function getPackType(l) {
+    if (l.pack_type) return l.pack_type
+    // Inférer depuis pack_label/master_unit existants
+    var pl = String(l.pack_label || '').toLowerCase()
+    if (l.master_unit === 'L') return 'vrac_l'
+    if (l.master_unit === 'kg') return 'vrac_kg'
+    if (pl.indexOf('cl') >= 0 || pl.indexOf('33cl') >= 0 || pl.indexOf('canette') >= 0) return 'pack_canette'
+    if (pl.match(/pack|carton|barquette|colis/i) && l.master_qty_per_pack > 1) return 'pack_unite'
+    return 'custom'
+  }
+
+  function setPackType(lineIndex, packType) {
+    var preset = PACK_PRESETS.filter(function(p){ return p.key === packType })[0]
+    if (!preset) return
+    updateLineFields(lineIndex, {
+      pack_type: packType,
+      master_unit: preset.master_unit,
+      // Reset les champs qui n'ont plus de sens (ex: passer de canette à vrac_kg)
+      pack_count: '',
+      per_pack_qty: ''
     })
   }
 
@@ -269,16 +331,23 @@ export default function FoodCostInvoiceWizard(props) {
         category: supplierChoice.category || 'ingredient'
       },
       lignes: lines.map(function(l){
+        // Garantir que pack_price, master_qty_per_pack, master_unit_price sont des numbers
+        // (l'utilisateur peut avoir saisi des strings via PackConfigurator)
+        var packPriceNum = parseFloat(String(l.pack_price || '0').replace(',', '.')) || 0
+        var qtyPerPackNum = parseFloat(String(l.master_qty_per_pack || '0').replace(',', '.')) || 0
+        var masterUnitPriceNum = (packPriceNum > 0 && qtyPerPackNum > 0)
+          ? packPriceNum / qtyPerPackNum
+          : (parseFloat(String(l.master_unit_price || '0').replace(',', '.')) || 0)
         return {
           article_original: l.article_original,
           article_canonical: l.article_canonical,
           categorie: l.categorie,
-          quantity: l.quantity,
-          pack_label: l.pack_label,
-          pack_price: l.pack_price,
-          master_unit: l.master_unit,
-          master_qty_per_pack: l.master_qty_per_pack,
-          master_unit_price: l.master_unit_price,
+          quantity: Number(l.quantity || 1),
+          pack_label: l.pack_label || '',
+          pack_price: packPriceNum,
+          master_unit: l.master_unit || 'kg',
+          master_qty_per_pack: qtyPerPackNum,
+          master_unit_price: masterUnitPriceNum,
           disposition: l.disposition,
           matched_product_id: l.matched_product_id || null,
           matched_article_id: l.matched_article_id || null,
@@ -534,63 +603,98 @@ export default function FoodCostInvoiceWizard(props) {
                 return (
                   <div key={idx} style={{background:bgColor,borderRadius:8,padding:10,marginBottom:6,border:'1.5px solid '+borderColor}}>
                     {/* Ligne header */}
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:900}}>{l.article_original || l.article_canonical}</div>
-                        <div style={{fontSize:10,opacity:.6}}>
-                          {l.pack_label && <span>{l.pack_label} · </span>}
-                          {fmt(l.pack_price)}€ HT · <strong>{fmt(l.master_unit_price)}€/{l.master_unit}</strong>
-                          {l.vision_confidence < 70 && <span style={{color:'#FF9500'}}> · ⚠ lecture incertaine</span>}
+                        {/* 3 valeurs facture clairement séparées */}
+                        <div style={{display:'flex',gap:10,marginTop:4,fontSize:11,flexWrap:'wrap'}}>
+                          <div style={{display:'flex',flexDirection:'column'}}>
+                            <span style={{fontSize:9,opacity:.5,fontWeight:700,textTransform:'uppercase'}}>Qté</span>
+                            <span style={{fontWeight:900}}>{fmt(l.qty_ordered || l.quantity || 1)}</span>
+                          </div>
+                          <div style={{display:'flex',flexDirection:'column'}}>
+                            <span style={{fontSize:9,opacity:.5,fontWeight:700,textTransform:'uppercase'}}>PU HT</span>
+                            <span style={{fontWeight:900}}>{fmt(l.unit_price_invoice || l.pack_price)}€</span>
+                          </div>
+                          <div style={{display:'flex',flexDirection:'column'}}>
+                            <span style={{fontSize:9,opacity:.5,fontWeight:700,textTransform:'uppercase'}}>Total HT</span>
+                            <span style={{fontWeight:900}}>{fmt(l.total_ligne_ht || (Number(l.qty_ordered || 1) * Number(l.unit_price_invoice || l.pack_price || 0)))}€</span>
+                          </div>
+                          <div style={{display:'flex',flexDirection:'column',borderLeft:'1.5px solid #DDD',paddingLeft:10}}>
+                            <span style={{fontSize:9,opacity:.5,fontWeight:700,textTransform:'uppercase'}}>Prix master</span>
+                            <span style={{fontWeight:900,color:'#FF82D7'}}>{fmt(l.master_unit_price)}€/{l.master_unit}</span>
+                          </div>
                         </div>
+                        {/* Pack label + interpretation */}
+                        {(l.pack_label || l.pack_interpretation) && (
+                          <div style={{fontSize:10,opacity:.6,marginTop:4}}>
+                            {l.pack_label && <span>📦 {l.pack_label}</span>}
+                            {l.pack_interpretation && (
+                              <span style={{marginLeft:6,padding:'1px 6px',background:'#F0F0F0',borderRadius:4,fontSize:9,fontWeight:700}}>
+                                {l.pack_interpretation === 'pack_reel' && 'Pack acheté entier'}
+                                {l.pack_interpretation === 'boite_seule' && '1 boîte achetée'}
+                                {l.pack_interpretation === 'vrac' && 'Vrac'}
+                                {l.pack_interpretation === 'unite' && 'À l\'unité'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {/* Alerte arithmétique */}
+                        {l.arithmetic_ok === false && (
+                          <div style={{fontSize:10,marginTop:4,padding:'4px 8px',background:'#FFEBE6',color:'#CC0066',borderRadius:4,fontWeight:700}}>
+                            ⚠ Qté × PU ≠ Total HT (écart &gt; 5%) — vérifie la lecture
+                          </div>
+                        )}
+                        {l.vision_confidence < 70 && (
+                          <div style={{fontSize:10,marginTop:3,color:'#FF9500',fontWeight:700}}>⚠ Lecture incertaine</div>
+                        )}
                       </div>
-                      <button onClick={function(){ updateLine(idx, {ui_expanded: !l.ui_expanded}) }} style={{background:color,color:disp==='fees_taxes'?'#fff':(disp==='match_existing'?'#fff':'#fff'),border:'none',padding:'4px 8px',borderRadius:6,fontSize:11,fontWeight:900,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      <button onClick={function(){ updateLine(idx, {ui_expanded: !l.ui_expanded}) }} style={{background:color,color:'#fff',border:'none',padding:'4px 8px',borderRadius:6,fontSize:11,fontWeight:900,cursor:'pointer',whiteSpace:'nowrap'}}>
                         {dispLabel(disp)} {l.ui_expanded ? '▲' : '▼'}
                       </button>
                     </div>
 
                     {/* Encart OUTLIER : prix suspect vs prix actuel */}
                     {hasOutlier && (
-                      <div style={{marginTop:8,padding:'8px 10px',background:'#fff',border:'1.5px solid #CC0066',borderRadius:6}}>
+                      <div style={{marginTop:8,padding:'10px 12px',background:'#fff',border:'1.5px solid #CC0066',borderRadius:6}} onClick={function(e){e.stopPropagation()}}>
                         <div style={{fontSize:11,fontWeight:900,color:'#CC0066',marginBottom:4}}>
                           🚨 Prix {oi.pctChange > 0 ? '+' : ''}{oi.pctChange}% vs prix actuel ({fmt(oi.currentPrice)}€/{oi.productUnit})
                         </div>
-                        <div style={{fontSize:10,opacity:.75,marginBottom:6}}>
-                          Probable erreur de conditionnement OCR. V&eacute;rifie ou corrige ci-dessous.
+                        <div style={{fontSize:10,opacity:.75,marginBottom:8}}>
+                          Probable erreur de lecture du conditionnement. Corrige ci-dessous ou confirme le nouveau prix.
                         </div>
-                        <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap',marginBottom:6}}>
-                          <label style={{fontSize:10,fontWeight:700}}>Pack label :</label>
-                          <input type="text" value={l.pack_label || ''} onChange={function(e){ updateLinePack(idx, 'pack_label', e.target.value) }} placeholder="ex: Bidon 5L" style={{padding:'4px 8px',fontSize:11,border:'1px solid #DDD',borderRadius:4,minWidth:120}} />
-                          <label style={{fontSize:10,fontWeight:700}}>Pack price (€) :</label>
-                          <input type="number" step="0.01" value={l.pack_price || 0} onChange={function(e){ updateLinePack(idx, 'pack_price', Number(e.target.value)) }} style={{padding:'4px 8px',fontSize:11,border:'1px solid #DDD',borderRadius:4,width:80}} />
-                          <label style={{fontSize:10,fontWeight:700}}>Qté/pack ({l.master_unit}) :</label>
-                          <input type="number" step="0.01" value={l.master_qty_per_pack || 0} onChange={function(e){ updateLinePack(idx, 'master_qty_per_pack', Number(e.target.value)) }} style={{padding:'4px 8px',fontSize:11,border:'1px solid #DDD',borderRadius:4,width:70}} />
-                          <span style={{fontSize:11,fontWeight:900,color:'#191923'}}>= {fmt(l.master_unit_price)} €/{l.master_unit}</span>
-                        </div>
-                        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                          <button onClick={function(){ acknowledgeOutlier(idx) }} style={{padding:'4px 10px',fontSize:10,fontWeight:900,borderRadius:6,border:'1.5px solid #CC0066',background:'#fff',color:'#CC0066',cursor:'pointer'}}>✓ Confirmer ce prix tel quel</button>
-                          <button onClick={function(){ setLineDisposition(idx, 'fees_taxes') }} style={{padding:'4px 10px',fontSize:10,fontWeight:900,borderRadius:6,border:'1.5px solid #888',background:'#fff',color:'#888',cursor:'pointer'}}>Ignorer cette ligne</button>
+                        <PackConfigurator
+                          line={l}
+                          lineIndex={idx}
+                          presets={PACK_PRESETS}
+                          getPackType={getPackType}
+                          setPackType={setPackType}
+                          updateLineFields={updateLineFields}
+                        />
+                        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:8}}>
+                          <button onClick={function(){ acknowledgeOutlier(idx) }} style={{padding:'5px 12px',fontSize:11,fontWeight:900,borderRadius:6,border:'1.5px solid #CC0066',background:'#fff',color:'#CC0066',cursor:'pointer'}}>✓ Le prix est correct tel quel</button>
+                          <button onClick={function(){ setLineDisposition(idx, 'fees_taxes') }} style={{padding:'5px 12px',fontSize:11,fontWeight:900,borderRadius:6,border:'1.5px solid #888',background:'#fff',color:'#888',cursor:'pointer'}}>Ignorer cette ligne</button>
                         </div>
                       </div>
                     )}
 
                     {/* Encart PACK_UNKNOWN : conditionnement non détecté */}
                     {!hasOutlier && hasPackWarning && (
-                      <div style={{marginTop:8,padding:'8px 10px',background:'#fff',border:'1.5px solid #FF9500',borderRadius:6}}>
+                      <div style={{marginTop:8,padding:'10px 12px',background:'#fff',border:'1.5px solid #FF9500',borderRadius:6}} onClick={function(e){e.stopPropagation()}}>
                         <div style={{fontSize:11,fontWeight:900,color:'#856B00',marginBottom:4}}>
-                          📦 Conditionnement &agrave; pr&eacute;ciser
+                          📦 Conditionnement non identifi&eacute;
                         </div>
-                        <div style={{fontSize:10,opacity:.75,marginBottom:6}}>
-                          Claude n&apos;a pas pu d&eacute;duire le pack. Saisis-le manuellement.
+                        <div style={{fontSize:10,opacity:.75,marginBottom:8}}>
+                          Choisis le type ci-dessous puis remplis les champs : on calcule le prix unitaire automatiquement.
                         </div>
-                        <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-                          <label style={{fontSize:10,fontWeight:700}}>Pack label :</label>
-                          <input type="text" value={l.pack_label || ''} onChange={function(e){ updateLinePack(idx, 'pack_label', e.target.value) }} placeholder="ex: Bidon 5L" style={{padding:'4px 8px',fontSize:11,border:'1px solid #DDD',borderRadius:4,minWidth:120}} />
-                          <label style={{fontSize:10,fontWeight:700}}>Pack price (€) :</label>
-                          <input type="number" step="0.01" value={l.pack_price || 0} onChange={function(e){ updateLinePack(idx, 'pack_price', Number(e.target.value)) }} style={{padding:'4px 8px',fontSize:11,border:'1px solid #DDD',borderRadius:4,width:80}} />
-                          <label style={{fontSize:10,fontWeight:700}}>Qté/pack ({l.master_unit}) :</label>
-                          <input type="number" step="0.01" value={l.master_qty_per_pack || 0} onChange={function(e){ updateLinePack(idx, 'master_qty_per_pack', Number(e.target.value)) }} style={{padding:'4px 8px',fontSize:11,border:'1px solid #DDD',borderRadius:4,width:70}} />
-                          <span style={{fontSize:11,fontWeight:900,color:'#191923'}}>= {fmt(l.master_unit_price)} €/{l.master_unit}</span>
-                        </div>
+                        <PackConfigurator
+                          line={l}
+                          lineIndex={idx}
+                          presets={PACK_PRESETS}
+                          getPackType={getPackType}
+                          setPackType={setPackType}
+                          updateLineFields={updateLineFields}
+                        />
                       </div>
                     )}
 
@@ -846,6 +950,358 @@ export default function FoodCostInvoiceWizard(props) {
         )}
 
       </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// PackConfigurator
+//
+// UI claire pour saisir le conditionnement d'une ligne de facture.
+// L'utilisateur choisit d'abord LE TYPE (vrac liquide / pack canettes / etc),
+// puis remplit 2-3 champs simples. Le master_unit_price est calculé en temps réel.
+//
+// Inputs gardés en string pour permettre la saisie de décimales (1.5, 0.33)
+// sans perdre la frappe à chaque keystroke.
+// =============================================================================
+function PackConfigurator(props) {
+  var l = props.line
+  var idx = props.lineIndex
+  var presets = props.presets
+  var getPackType = props.getPackType
+  var setPackType = props.setPackType
+  var updateLineFields = props.updateLineFields
+
+  var currentType = getPackType(l)
+  var preset = presets.filter(function(p){ return p.key === currentType })[0]
+  if (!preset) preset = presets[presets.length - 1]
+
+  // Helper : parser string en nombre tolérant à la virgule
+  function parseN(s) { return parseFloat(String(s || '0').replace(',', '.')) || 0 }
+
+  // Calculer master_unit_price prévisualisé
+  var pp = parseN(l.pack_price)
+  var qpp = parseN(l.master_qty_per_pack)
+  var preview = (pp > 0 && qpp > 0) ? (pp / qpp) : 0
+
+  function onTypeChange(e) {
+    setPackType(idx, e.target.value)
+  }
+
+  // Helpers pour les types complexes : pack_canette et pack_unite calculent qpp automatiquement
+  function onPackCountChange(e) {
+    var val = e.target.value
+    updateLineFields(idx, {
+      pack_count: val,
+      // Pour pack_canette/pack_unite : master_qty_per_pack = pack_count
+      master_qty_per_pack: val
+    })
+  }
+
+  function onPerPackQtyChange(e) {
+    // Ce champ existe pour info uniquement (ex: 33cl par cannette pour calculer L total)
+    updateLineFields(idx, { per_pack_qty: e.target.value })
+  }
+
+  function onPackPriceChange(e) {
+    updateLineFields(idx, { pack_price: e.target.value })
+  }
+
+  function onMasterQtyChange(e) {
+    updateLineFields(idx, { master_qty_per_pack: e.target.value })
+  }
+
+  function onPackLabelChange(e) {
+    updateLineFields(idx, { pack_label: e.target.value })
+  }
+
+  // -------- Rendu des champs selon le type --------
+  var fields = null
+
+  if (currentType === 'vrac_l' || currentType === 'vrac_kg') {
+    var unit = currentType === 'vrac_l' ? 'L' : 'kg'
+    fields = (
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+          <div>
+            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+              Contenance du contenant
+            </label>
+            <div style={{display:'flex',alignItems:'center',gap:4}}>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={l.master_qty_per_pack || ''}
+                onChange={onMasterQtyChange}
+                placeholder={currentType === 'vrac_l' ? 'ex: 5' : 'ex: 10'}
+                style={{flex:1,padding:'7px 10px',fontSize:13,fontWeight:700,border:'1.5px solid #DDD',borderRadius:6}}
+              />
+              <span style={{fontSize:12,fontWeight:900,color:'#191923'}}>{unit}</span>
+            </div>
+          </div>
+          <div>
+            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+              Prix du contenant
+            </label>
+            <div style={{display:'flex',alignItems:'center',gap:4}}>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={l.pack_price || ''}
+                onChange={onPackPriceChange}
+                placeholder="ex: 8.25"
+                style={{flex:1,padding:'7px 10px',fontSize:13,fontWeight:700,border:'1.5px solid #DDD',borderRadius:6}}
+              />
+              <span style={{fontSize:12,fontWeight:900,color:'#191923'}}>€</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+            Libellé sur la facture (optionnel)
+          </label>
+          <input
+            type="text"
+            value={l.pack_label || ''}
+            onChange={onPackLabelChange}
+            placeholder={currentType === 'vrac_l' ? 'ex: Bidon 5L huile' : 'ex: Sac 10kg farine'}
+            style={{width:'100%',padding:'7px 10px',fontSize:12,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}}
+          />
+        </div>
+      </div>
+    )
+  } else if (currentType === 'pack_canette') {
+    // Cannettes / petites bouteilles : prix UNITAIRE compte (le prix au litre n'importe pas)
+    fields = (
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+          <div>
+            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+              Nombre de cannettes/bouteilles
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={l.master_qty_per_pack || ''}
+              onChange={onPackCountChange}
+              placeholder="ex: 24"
+              style={{width:'100%',padding:'7px 10px',fontSize:13,fontWeight:700,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}}
+            />
+          </div>
+          <div>
+            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+              Contenance unitaire (info)
+            </label>
+            <input
+              type="text"
+              value={l.per_pack_qty || ''}
+              onChange={onPerPackQtyChange}
+              placeholder="ex: 33cl"
+              style={{width:'100%',padding:'7px 10px',fontSize:12,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}}
+            />
+          </div>
+          <div>
+            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+              Prix total du pack
+            </label>
+            <div style={{display:'flex',alignItems:'center',gap:4}}>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={l.pack_price || ''}
+                onChange={onPackPriceChange}
+                placeholder="ex: 15.14"
+                style={{flex:1,padding:'7px 10px',fontSize:13,fontWeight:700,border:'1.5px solid #DDD',borderRadius:6}}
+              />
+              <span style={{fontSize:12,fontWeight:900,color:'#191923'}}>€</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+            Libellé sur la facture (optionnel)
+          </label>
+          <input
+            type="text"
+            value={l.pack_label || ''}
+            onChange={onPackLabelChange}
+            placeholder="ex: Carton 24×33cl Coca"
+            style={{width:'100%',padding:'7px 10px',fontSize:12,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}}
+          />
+        </div>
+      </div>
+    )
+  } else if (currentType === 'pack_unite') {
+    fields = (
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+          <div>
+            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+              Nombre d&apos;unités dans le pack
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={l.master_qty_per_pack || ''}
+              onChange={onMasterQtyChange}
+              placeholder="ex: 6"
+              style={{width:'100%',padding:'7px 10px',fontSize:13,fontWeight:700,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}}
+            />
+          </div>
+          <div>
+            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+              Prix du pack
+            </label>
+            <div style={{display:'flex',alignItems:'center',gap:4}}>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={l.pack_price || ''}
+                onChange={onPackPriceChange}
+                placeholder="ex: 4.50"
+                style={{flex:1,padding:'7px 10px',fontSize:13,fontWeight:700,border:'1.5px solid #DDD',borderRadius:6}}
+              />
+              <span style={{fontSize:12,fontWeight:900,color:'#191923'}}>€</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+            Libellé sur la facture (optionnel)
+          </label>
+          <input
+            type="text"
+            value={l.pack_label || ''}
+            onChange={onPackLabelChange}
+            placeholder="ex: Barquette 6 œufs"
+            style={{width:'100%',padding:'7px 10px',fontSize:12,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}}
+          />
+        </div>
+      </div>
+    )
+  } else if (currentType === 'unite') {
+    // À l'unité : le prix = le prix master, qty = 1
+    fields = (
+      <div>
+        <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+          Prix unitaire
+        </label>
+        <div style={{display:'flex',alignItems:'center',gap:4,maxWidth:200}}>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={l.pack_price || ''}
+            onChange={function(e){
+              updateLineFields(idx, {
+                pack_price: e.target.value,
+                master_qty_per_pack: '1'
+              })
+            }}
+            placeholder="ex: 0.85"
+            style={{flex:1,padding:'7px 10px',fontSize:13,fontWeight:700,border:'1.5px solid #DDD',borderRadius:6}}
+          />
+          <span style={{fontSize:12,fontWeight:900,color:'#191923'}}>€/u</span>
+        </div>
+      </div>
+    )
+  } else {
+    // custom
+    fields = (
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+          <div>
+            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+              Prix du pack
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={l.pack_price || ''}
+              onChange={onPackPriceChange}
+              placeholder="0.00"
+              style={{width:'100%',padding:'7px 10px',fontSize:13,fontWeight:700,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}}
+            />
+          </div>
+          <div>
+            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+              Quantité (en {preset.master_unit})
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={l.master_qty_per_pack || ''}
+              onChange={onMasterQtyChange}
+              placeholder="1"
+              style={{width:'100%',padding:'7px 10px',fontSize:13,fontWeight:700,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}}
+            />
+          </div>
+          <div>
+            <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+              Unité master
+            </label>
+            <select
+              value={l.master_unit || 'kg'}
+              onChange={function(e){ updateLineFields(idx, {master_unit: e.target.value}) }}
+              style={{width:'100%',padding:'7px 10px',fontSize:12,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}}
+            >
+              <option value="kg">kg</option>
+              <option value="L">L</option>
+              <option value="U">U (unité)</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:3,textTransform:'uppercase',letterSpacing:.3}}>
+            Libellé sur la facture
+          </label>
+          <input
+            type="text"
+            value={l.pack_label || ''}
+            onChange={onPackLabelChange}
+            style={{width:'100%',padding:'7px 10px',fontSize:12,border:'1.5px solid #DDD',borderRadius:6,boxSizing:'border-box'}}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  // Construire le label "résultat" en fonction du type
+  var resultLabel = '€/' + preset.master_unit
+  if (currentType === 'pack_canette' || currentType === 'pack_unite' || currentType === 'unite') {
+    resultLabel = '€/unité'
+  }
+
+  return (
+    <div>
+      {/* Sélecteur de type */}
+      <div style={{marginBottom:10}}>
+        <label style={{display:'block',fontSize:10,fontWeight:900,color:'#555',marginBottom:4,textTransform:'uppercase',letterSpacing:.3}}>
+          Type de conditionnement
+        </label>
+        <select
+          value={currentType}
+          onChange={onTypeChange}
+          style={{width:'100%',padding:'8px 10px',fontSize:12,fontWeight:700,border:'1.5px solid #DDD',borderRadius:6,background:'#fff',cursor:'pointer'}}
+        >
+          {presets.map(function(p){
+            return <option key={p.key} value={p.key}>{p.label}</option>
+          })}
+        </select>
+        <div style={{fontSize:10,opacity:.6,marginTop:3,fontStyle:'italic'}}>{preset.hint}</div>
+      </div>
+
+      {/* Champs adaptés au type */}
+      {fields}
+
+      {/* Résultat calculé */}
+      {preview > 0 && (
+        <div style={{marginTop:10,padding:'8px 12px',background:'#E8F8EE',border:'1.5px solid #009D3A',borderRadius:6,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontSize:11,fontWeight:700,color:'#005C24'}}>✓ Prix calculé :</span>
+          <span style={{fontSize:15,fontWeight:900,color:'#005C24'}}>
+            {preview < 1 ? preview.toFixed(3) : preview.toFixed(2)} {resultLabel}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
