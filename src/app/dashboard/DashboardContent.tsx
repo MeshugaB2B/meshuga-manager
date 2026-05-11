@@ -850,7 +850,7 @@ function DashboardImpl() {
     {id: 'instagram', label: 'Instagram', icon: '📸'},
     {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
     {id: 'notifs', label: 'Notifications', icon: '🔔'},
-    {id: 'foodcost', label: 'Cuisine', icon: '🥪'},
+    {id: 'recipes', label: 'Recettes', icon: '🥪'},
     {id: 'purchases', label: 'Achats', icon: '🛒'},
     {id: 'rh', label: 'Ressources Humaines', icon: '👥'},
     {id: 'legal', label: 'Légal & Conformité', icon: '⚖️'},
