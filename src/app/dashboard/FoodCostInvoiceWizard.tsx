@@ -247,7 +247,7 @@ export default function FoodCostInvoiceWizard(props) {
           l.master_unit_price = pp / qpp
           l.outlier_acknowledged = true
           // Recalculer aussi le total HT estimé : qty × unit_price
-          var qt = parseFloat(String(l.qty_ordered || l.quantity || '1').replace(',', '.'))
+          var qt = parseFloat(String(l.qty_invoiced || l.qty_ordered || l.quantity || '1').replace(',', '.'))
           if (qt > 0) l.total_ligne_ht = qt * pp
         }
       }
@@ -610,7 +610,7 @@ export default function FoodCostInvoiceWizard(props) {
                         <div style={{display:'flex',gap:10,marginTop:4,fontSize:11,flexWrap:'wrap'}}>
                           <div style={{display:'flex',flexDirection:'column'}}>
                             <span style={{fontSize:9,opacity:.5,fontWeight:700,textTransform:'uppercase'}}>Qté</span>
-                            <span style={{fontWeight:900}}>{fmt(l.qty_ordered || l.quantity || 1)}</span>
+                            <span style={{fontWeight:900}}>{fmt(l.qty_invoiced || l.qty_ordered || l.quantity || 1)}</span>
                           </div>
                           <div style={{display:'flex',flexDirection:'column'}}>
                             <span style={{fontSize:9,opacity:.5,fontWeight:700,textTransform:'uppercase'}}>PU HT</span>
@@ -618,25 +618,17 @@ export default function FoodCostInvoiceWizard(props) {
                           </div>
                           <div style={{display:'flex',flexDirection:'column'}}>
                             <span style={{fontSize:9,opacity:.5,fontWeight:700,textTransform:'uppercase'}}>Total HT</span>
-                            <span style={{fontWeight:900}}>{fmt(l.total_ligne_ht || (Number(l.qty_ordered || 1) * Number(l.unit_price_invoice || l.pack_price || 0)))}€</span>
+                            <span style={{fontWeight:900}}>{fmt(l.total_ligne_ht || (Number(l.qty_invoiced || l.qty_ordered || 1) * Number(l.unit_price_invoice || l.pack_price || 0)))}€</span>
                           </div>
                           <div style={{display:'flex',flexDirection:'column',borderLeft:'1.5px solid #DDD',paddingLeft:10}}>
                             <span style={{fontSize:9,opacity:.5,fontWeight:700,textTransform:'uppercase'}}>Prix master</span>
                             <span style={{fontWeight:900,color:'#FF82D7'}}>{fmt(l.master_unit_price)}€/{l.master_unit}</span>
                           </div>
                         </div>
-                        {/* Pack label + interpretation */}
-                        {(l.pack_label || l.pack_interpretation) && (
+                        {/* Pack label */}
+                        {l.pack_label && (
                           <div style={{fontSize:10,opacity:.6,marginTop:4}}>
-                            {l.pack_label && <span>📦 {l.pack_label}</span>}
-                            {l.pack_interpretation && (
-                              <span style={{marginLeft:6,padding:'1px 6px',background:'#F0F0F0',borderRadius:4,fontSize:9,fontWeight:700}}>
-                                {l.pack_interpretation === 'pack_reel' && 'Pack acheté entier'}
-                                {l.pack_interpretation === 'boite_seule' && '1 boîte achetée'}
-                                {l.pack_interpretation === 'vrac' && 'Vrac'}
-                                {l.pack_interpretation === 'unite' && 'À l\'unité'}
-                              </span>
-                            )}
+                            <span>📦 {l.pack_label}</span>
                           </div>
                         )}
                         {/* Alerte arithmétique */}
