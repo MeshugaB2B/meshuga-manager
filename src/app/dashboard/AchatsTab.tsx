@@ -266,15 +266,34 @@ export default function AchatsTab(props) {
   })
   comparisons.sort(function(a, b) { return Number(b.saving) - Number(a.saving) })
 
-  // Orphans
+  // Orphans — VERSION CORRIGÉE
+  // Un product est orphelin SEULEMENT SI aucun product de son article n'est utilisé en recette
+  // ET que son article n'est pas en monthly_overhead ou fees_taxes
   var usedProductIds = {}
-  recipeIngs.forEach(function(ri){ if (ri.product_id) usedProductIds[ri.product_id] = 1 })
+  var usedArticleIds = {}
+  recipeIngs.forEach(function(ri){
+    if (!ri.product_id) return
+    usedProductIds[ri.product_id] = 1
+    var prod = products.filter(function(p) { return p.id === ri.product_id })[0]
+    if (prod && prod.article_id) usedArticleIds[prod.article_id] = 1
+  })
   var orphanProducts = products.filter(function(p) {
-    if (usedProductIds[p.id]) return false
+    // Catégories qui ne devraient jamais apparaître comme orphelins (overhead naturel)
     if (p.category === 'boisson' || p.category === 'drink') return false
     if (p.category === 'packaging') return false
+    if (p.category === 'consommable') return false
     var sup = suppliers.filter(function(s) { return s.id === p.supplier_id })[0]
     if (sup && sup.archived) return false
+    // Si le product a un article master, vérifier si AU MOINS UN product de cet article est utilisé
+    if (p.article_id) {
+      if (usedArticleIds[p.article_id]) return false
+      // Vérifier cost_imputation_mode de l'article : si overhead/fees, on l'exclut
+      var art = articles.filter(function(a) { return a.id === p.article_id })[0]
+      if (art && (art.cost_imputation_mode === 'monthly_overhead' || art.cost_imputation_mode === 'fees_taxes')) return false
+    } else {
+      // Sans article master : on regarde juste l'usage direct
+      if (usedProductIds[p.id]) return false
+    }
     return true
   })
 
@@ -477,14 +496,14 @@ export default function AchatsTab(props) {
         <button onClick={function(){setShowCompare(true)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #FF82D7',background:'#fff',color:'#FF82D7',cursor:'pointer',marginBottom:10}}>💰 Afficher le comparateur ({comparisons.length})</button>
       )}
 
-      {/* PRODUITS SANS RECETTE */}
+      {/* INGRÉDIENTS NON UTILISÉS EN RECETTE */}
       {orphanProducts.length > 0 && showOrphans && (
         <div style={{background:'#fff',border:'2px solid #CC0066',borderRadius:12,padding:16,marginBottom:14}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-            <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#CC0066'}}>🚫 Produits sans recette ({orphanProducts.length})</div>
+            <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#CC0066'}}>🚫 Ingrédients non utilisés en recette ({orphanProducts.length})</div>
             <button onClick={function(){setShowOrphans(false)}} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:16,opacity:.4}}>✕</button>
           </div>
-          <div style={{fontSize:12,color:'#888',marginBottom:8}}>Cliquez pour voir le détail · les produits historiques (témoins d&apos;achats passés) restent affichés ici</div>
+          <div style={{fontSize:12,color:'#888',marginBottom:8}}>Ces ingrédients ont été achetés mais n&apos;apparaissent dans aucune recette. Pour les alternatives multi-fournisseurs (ex: Cheddar HPS vs Foodflow), seuls les ingrédients dont AUCUN fournisseur n&apos;est utilisé apparaissent ici. Cliquez pour voir le détail.</div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {orphanProducts.map(function(op) {
               var sup = suppliers.filter(function(s) { return s.id === op.supplier_id })[0]
@@ -494,7 +513,7 @@ export default function AchatsTab(props) {
         </div>
       )}
       {!showOrphans && orphanProducts.length > 0 && (
-        <button onClick={function(){setShowOrphans(true)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #CC0066',background:'#fff',color:'#CC0066',cursor:'pointer',marginBottom:10}}>🚫 Afficher les orphelins ({orphanProducts.length})</button>
+        <button onClick={function(){setShowOrphans(true)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #CC0066',background:'#fff',color:'#CC0066',cursor:'pointer',marginBottom:10}}>🚫 Afficher les ingrédients non utilisés ({orphanProducts.length})</button>
       )}
 
       {/* LIGNES TEXTE LIBRE NON LIÉES */}
