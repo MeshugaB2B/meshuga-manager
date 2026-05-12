@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import AchatsTab from './AchatsTab'
 import FoodCostHistoryTab from './FoodCostHistoryTab'
+import ShoppingListTab from './ShoppingListTab'
 
 // =============================================================================
 // PurchasesTab — onglet top "Achats 🛒"
@@ -90,67 +91,8 @@ export default function PurchasesTab(props) {
       )}
 
       {subView === 'shopping' && (
-        <ShoppingListPlaceholder />
+        <ShoppingListTab toast={toast} />
       )}
-    </div>
-  )
-}
-
-// =============================================================================
-// Placeholder de la liste de courses (à développer plus tard)
-// =============================================================================
-function ShoppingListPlaceholder() {
-  return (
-    <div style={{
-      padding: '40px 20px',
-      textAlign: 'center',
-      background: '#fff',
-      borderRadius: 12,
-      border: '2px dashed #FFB0D7'
-    }}>
-      <div style={{fontSize: 48, marginBottom: 12}}>🛍️</div>
-      <h3 style={{
-        fontFamily: "'Yellowtail', cursive",
-        fontSize: 26,
-        color: '#191923',
-        margin: '0 0 8px 0'
-      }}>
-        Liste de courses
-      </h3>
-      <p style={{fontSize: 13, opacity: 0.7, maxWidth: 520, margin: '0 auto 16px auto', lineHeight: 1.5}}>
-        Bient&ocirc;t : g&eacute;n&eacute;ration automatique de la liste de courses bas&eacute;e sur le
-        stock minimum, les recettes pr&eacute;vues et le meilleur prix par fournisseur.
-      </p>
-      <div style={{
-        display: 'inline-block',
-        padding: '6px 14px',
-        background: '#FFEB5A',
-        borderRadius: 20,
-        fontSize: 11,
-        fontWeight: 900,
-        letterSpacing: 0.5
-      }}>
-        EN CONSTRUCTION
-      </div>
-
-      <div style={{
-        marginTop: 28,
-        padding: '16px 20px',
-        background: '#FFF8E1',
-        borderRadius: 8,
-        textAlign: 'left',
-        fontSize: 12,
-        opacity: 0.75,
-        maxWidth: 560,
-        margin: '28px auto 0 auto'
-      }}>
-        <strong style={{display: 'block', marginBottom: 6}}>Fonctionnalit&eacute;s pr&eacute;vues :</strong>
-        &bull; D&eacute;tection automatique des ingr&eacute;dients &agrave; commander selon le stock<br/>
-        &bull; Regroupement par fournisseur (Norbert, Foodflow, Rouquette, Episaveurs...)<br/>
-        &bull; Suggestion du meilleur prix entre fournisseurs disponibles<br/>
-        &bull; Export PDF ou envoi direct par email/SMS aux fournisseurs<br/>
-        &bull; Suivi des commandes en cours
-      </div>
     </div>
   )
 }
