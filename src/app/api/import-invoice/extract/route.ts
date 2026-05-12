@@ -526,6 +526,45 @@ Retourne UNIQUEMENT un JSON valide (sans markdown, sans backticks) au format :
         }
       }
 
+      // ====================================================================
+      // 🛡️ FILET DE SÉCURITÉ : PACK RULES
+      // Si le product est matché et qu'on a une règle de pack en base,
+      // on FORCE les valeurs de conditionnement et on recalcule le prix.
+      // Évite les erreurs OCR récurrentes sur boissons, sucrine, etc.
+      // ====================================================================
+      var packRuleApplied = false
+      var packRuleWarning: string | null = null
+      if (matchRow && matchRow.product_id) {
+        try {
+          var ruleRes = await supabase
+            .from('supplier_product_pack_rules')
+            .select('pack_label, master_unit, master_qty_per_pack, expected_price_min, expected_price_max')
+            .eq('product_id', matchRow.product_id)
+            .eq('is_active', true)
+            .limit(1)
+          if (ruleRes.data && ruleRes.data.length > 0) {
+            var rule = ruleRes.data[0]
+            var ruleQty = Number(rule.master_qty_per_pack)
+            if (unitPriceInvoice > 0 && ruleQty > 0) {
+              finalMasterQty = ruleQty
+              calculatedMUP = Math.round((unitPriceInvoice / ruleQty) * 10000) / 10000
+              masterUnit = rule.master_unit
+              ligne.pack_label = rule.pack_label
+              packRuleApplied = true
+              if (rule.expected_price_min !== null && rule.expected_price_max !== null) {
+                var minP = Number(rule.expected_price_min)
+                var maxP = Number(rule.expected_price_max)
+                if (unitPriceInvoice < minP || unitPriceInvoice > maxP) {
+                  packRuleWarning = 'Prix pack ' + unitPriceInvoice.toFixed(2) + 'EUR hors fourchette attendue [' + minP.toFixed(2) + '-' + maxP.toFixed(2) + 'EUR]'
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // En cas d'erreur DB sur pack_rules, on ne bloque pas l'extraction
+        }
+      }
+
       enrichedLignes.push({
         line_index: i,
         article_original: ligne.article_original || ligne.article || '',
@@ -551,7 +590,9 @@ Retourne UNIQUEMENT un JSON valide (sans markdown, sans backticks) au format :
         matched_product_id: matchRow ? matchRow.product_id : null,
         matched_name: matchRow ? matchRow.matched_name : null,
         suggestions: suggestionsList,
-        suggested_disposition: suggestedDisposition
+        suggested_disposition: suggestedDisposition,
+        pack_rule_applied: packRuleApplied,
+        pack_rule_warning: packRuleWarning
       })
     }
 
