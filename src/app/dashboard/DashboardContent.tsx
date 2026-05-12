@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import FoodCostTab from './FoodCostTab'
 import PurchasesTab from './PurchasesTab'
+import PilotageTab from './PilotageTab'
 import FoodCostAlertsWidget from './FoodCostAlertsWidget'
 import NotifsTab from './NotifsTab'
 import JournalTab from './JournalTab'
@@ -838,6 +839,7 @@ function DashboardImpl() {
   var zeltyEvol = zeltyData && zeltyData.evolution && zeltyData.evolution[zeltyPeriod] !== null && zeltyData.evolution[zeltyPeriod] !== undefined ? (zeltyData.evolution[zeltyPeriod] >= 0 ? '+' : '') + zeltyData.evolution[zeltyPeriod] + '%' : '--'
   var zeltyEvolColor = zeltyData && zeltyData.evolution && zeltyData.evolution[zeltyPeriod] !== null && zeltyData.evolution[zeltyPeriod] !== undefined ? (zeltyData.evolution[zeltyPeriod] >= 0 ? '#009D3A' : '#CC0066') : '#888'
   const NAV = [
+    {id: 'pilotage', label: '📊 Pilotage', icon: '📊'},
     {id: 'dash', label: 'Dashboard', icon: '⚡'},
     {id: 'chasse', label: 'Tableau de chasse', icon: '🎯'},
     {id: 'crm', label: 'CRM Prospects', icon: '◎'},
@@ -892,6 +894,14 @@ function DashboardImpl() {
               </div>
             </div>
           <nav className="sb-nav">
+            <div className="sb-sec">Pilotage</div>
+            {NAV.filter(function(n) { return n.id === 'pilotage' }).map(function(n) {
+              return (
+                <div key={n.id} className={page === n.id ? 'ni active' : 'ni'} onClick={function() { nav(n.id) }}>
+                  <span style={{fontSize:14}}>{n.icon}</span>{n.label}
+                </div>
+              )
+            })}
             <div className="sb-sec">Quotidien</div>
             {NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['dash','crm','devis','messagerie','calendrier'].indexOf(n.id) > -1 }).map(function(n) {
               return (
@@ -929,6 +939,10 @@ function DashboardImpl() {
 
         <div className="main">
           <div className="strip" />
+
+          {page === 'pilotage' && (
+            <PilotageTab toast={toast} />
+          )}
 
           {page === 'dash' && (
             <div>
@@ -2650,6 +2664,10 @@ function DashboardImpl() {
         <div className="mms-header">
           <div className="mms-title">Menu</div>
           <div className="mms-subtitle">Navigation</div>
+        </div>
+        <div className="mms-sec">Pilotage</div>
+        <div className="mms-grid">
+          <div className={page === "pilotage" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("pilotage"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📊"}</div><div className="mms-tile-lbl">Pilotage</div></div>
         </div>
         <div className="mms-sec">Quotidien</div>
         <div className="mms-grid">
