@@ -159,6 +159,7 @@ export async function POST(req: Request) {
       tasks_created: 0
     }
     var errors: any[] = []
+    var warnings: any[] = []
     var priceAlerts: any[] = [] // pour creation tasks/push apres
 
     for (var i = 0; i < body.lignes.length; i++) {
@@ -253,15 +254,73 @@ export async function POST(req: Request) {
         var oldPrice = oldProdRes.data ? Number(oldProdRes.data.current_price || 0) : 0
         var prodName = oldProdRes.data ? oldProdRes.data.name : ligne.article_original
 
+        // c-bis. FILET DE SÉCURITÉ : vérifier si une règle de pack existe pour ce product
+        // Si oui, on FORCE les valeurs de conditionnement de la règle et on recalcule master_unit_price
+        var packRuleRes = await supabase
+          .from('supplier_product_pack_rules')
+          .select('id, pack_label, master_unit, master_qty_per_pack, expected_price_min, expected_price_max')
+          .eq('product_id', productId)
+          .eq('is_active', true)
+          .limit(1)
+        var packRule = (packRuleRes.data && packRuleRes.data.length > 0) ? packRuleRes.data[0] : null
+
+        var ligneMasterQty = Number(ligne.master_qty_per_pack || 0)
+        var lignePackPrice = Number(ligne.pack_price || 0)
+        var ligneMasterUnitPrice = Number(ligne.master_unit_price || 0)
+        var ruleApplied = false
+
+        if (packRule) {
+          // Cas idéal : on a un pack_price fiable depuis l'OCR, et une règle qui dit le conditionnement
+          if (lignePackPrice > 0) {
+            // On force le conditionnement de la règle et on recalcule
+            var ruleQty = Number(packRule.master_qty_per_pack)
+            var recalculatedUnitPrice = lignePackPrice / ruleQty
+            // Vérifier que le pack_price est dans la fourchette attendue (si définie)
+            if (packRule.expected_price_min !== null && packRule.expected_price_max !== null) {
+              var minP = Number(packRule.expected_price_min)
+              var maxP = Number(packRule.expected_price_max)
+              if (lignePackPrice < minP || lignePackPrice > maxP) {
+                warnings.push({
+                  line: i,
+                  product: prodName,
+                  message: 'Prix pack ' + lignePackPrice.toFixed(2) + '€ hors fourchette attendue [' + minP.toFixed(2) + '-' + maxP.toFixed(2) + '€]. À vérifier.'
+                })
+              }
+            }
+            ligneMasterQty = ruleQty
+            ligneMasterUnitPrice = Math.round(recalculatedUnitPrice * 10000) / 10000
+            ligne.pack_label = packRule.pack_label
+            ruleApplied = true
+          } else if (ligneMasterUnitPrice > 0) {
+            // Cas dégradé : pas de pack_price, on a juste un prix unitaire. On garde mais on alerte si variation forte.
+            ligneMasterQty = Number(packRule.master_qty_per_pack)
+            ligne.pack_label = packRule.pack_label
+            ruleApplied = true
+          }
+        }
+
+        // c-ter. GARDE-FOU ANTI-ABERRATION : si variation > 50% (hausse ou baisse) sans confirmation, alerte
+        // On ne BLOQUE PAS l'import (utilisateur a peut-être validé via le wizard) mais on log dans warnings
+        if (oldPrice > 0 && ligneMasterUnitPrice > 0) {
+          var variationPct = Math.abs((ligneMasterUnitPrice - oldPrice) / oldPrice * 100)
+          if (variationPct > 50) {
+            warnings.push({
+              line: i,
+              product: prodName,
+              message: 'Variation prix ' + (ligneMasterUnitPrice > oldPrice ? '+' : '-') + variationPct.toFixed(1) + '% (' + oldPrice.toFixed(2) + ' → ' + ligneMasterUnitPrice.toFixed(2) + '€). ' + (ruleApplied ? 'Règle de pack appliquée.' : 'Aucune règle de pack — à vérifier manuellement.')
+            })
+          }
+        }
+
         // d. Update du product : current_price + conditionnement + last_purchase_date
-        var newMaster = Number(ligne.master_unit_price || 0)
+        var newMaster = ligneMasterUnitPrice
         var prodUpdate: any = {
           current_price: newMaster,
           last_purchase_date: invoiceDate
         }
         if (ligne.pack_label) prodUpdate.pack_label = ligne.pack_label
-        if (Number(ligne.master_qty_per_pack || 0) > 0) prodUpdate.master_qty_per_pack = Number(ligne.master_qty_per_pack)
-        if (Number(ligne.pack_price || 0) > 0) prodUpdate.last_pack_price = Number(ligne.pack_price)
+        if (ligneMasterQty > 0) prodUpdate.master_qty_per_pack = ligneMasterQty
+        if (lignePackPrice > 0) prodUpdate.last_pack_price = lignePackPrice
 
         await supabase.from('products').update(prodUpdate).eq('id', productId)
 
@@ -269,9 +328,9 @@ export async function POST(req: Request) {
         var pricesInsert = await supabase.from('product_prices').insert({
           product_id: productId,
           master_unit_price: newMaster,
-          pack_price: Number(ligne.pack_price || 0) || null,
+          pack_price: lignePackPrice || null,
           pack_label: ligne.pack_label || null,
-          master_qty_per_pack: Number(ligne.master_qty_per_pack || 0) || null,
+          master_qty_per_pack: ligneMasterQty || null,
           article_original: ligne.article_original || null,
           invoice_date: invoiceDate,
           invoice_filename: fileName || null,
@@ -368,6 +427,7 @@ export async function POST(req: Request) {
       supplier_id: supplierId,
       summary: summary,
       price_alerts: priceAlerts,
+      warnings: warnings,
       errors: errors
     })
 
