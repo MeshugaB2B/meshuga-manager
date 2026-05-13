@@ -1,11 +1,16 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { RECIPES_DATA } from './data'
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
 }
+
+// =============================================================================
+// FoodCostAlertsWidget v2 — "Suivi des prix d'achat"
+// Source : vue v_price_variations (compare 2 derniers prix master_unit_price)
+// PLUS de baseline Excel — uniquement données factures réelles
+// =============================================================================
 
 export default function FoodCostAlertsWidget() {
   var [changes, setChanges] = useState([])
@@ -15,93 +20,68 @@ export default function FoodCostAlertsWidget() {
 
   useEffect(function() { loadChanges() }, [])
 
-  function getRecipesForProduct(productName) {
-    var found = []
-    RECIPES_DATA.forEach(function(r) {
-      if (!r.ingredients) return
-      r.ingredients.forEach(function(ing) {
-        var ingName = (ing.article || '').toLowerCase()
-        var pName = productName.toLowerCase()
-        if (ingName === pName || ingName.indexOf(pName) > -1 || pName.indexOf(ingName) > -1) {
-          if (!found.find(function(f) { return f.name === r.name })) {
-            found.push({name: r.name, foodCostPct: r.foodCostPct || 0, prixHT: r.prixHT || 0})
-          }
-        }
-      })
-    })
-    return found
-  }
-
-  function getBaselinePrice(productName) {
-    var baseline = null
-    RECIPES_DATA.forEach(function(r) {
-      if (!r.ingredients) return
-      r.ingredients.forEach(function(ing) {
-        var ingName = (ing.article || '').toLowerCase()
-        var pName = productName.toLowerCase()
-        if (ingName === pName || ingName.indexOf(pName) > -1 || pName.indexOf(ingName) > -1) {
-          if (!baseline && ing.prix_achat) baseline = ing.prix_achat
-        }
-      })
-    })
-    return baseline
-  }
-
   function loadChanges() {
+    // Charger directement depuis v_price_variations (compare 2 derniers prix par produit)
     Promise.all([
-      sb().from('products').select('id, name, unit, current_price, supplier_id, category'),
-      sb().from('product_prices').select('product_id, price, invoice_date').order('invoice_date', {ascending: false}),
-      sb().from('suppliers').select('id, name, archived')
+      sb().from('v_price_variations').select('*').not('variation_pct', 'is', null).order('variation_pct', {ascending: false}),
+      sb().from('recipe_ingredients').select('article, recipe_id, product_id'),
+      sb().from('recipes').select('id, name, food_cost_pct, prix_vente_ttc')
     ]).then(function(results) {
-      var products = results[0].data || []
-      var prices = results[1].data || []
-      var suppliers = results[2].data || []
-      var supMap = {}
-      suppliers.forEach(function(s) { supMap[s.id] = s.name })
+      var variations = results[0].data || []
+      var ingredients = results[1].data || []
+      var recipes = results[2].data || []
+      
+      var recipeMap = {}
+      recipes.forEach(function(r){ recipeMap[r.id] = r })
+
+      function getRecipesForProduct(productId, productName) {
+        var found = []
+        ingredients.forEach(function(ing) {
+          if (ing.product_id === productId) {
+            var r = recipeMap[ing.recipe_id]
+            if (r && !found.find(function(f){return f.name === r.name})) {
+              found.push({name: r.name, foodCostPct: r.food_cost_pct || 0, prixHT: r.prix_vente_ttc || 0})
+            }
+          }
+        })
+        return found
+      }
 
       var allChanges = []
-      products.forEach(function(p) {
-        if (!supMap[p.supplier_id]) return
-        if (p.category !== 'ingredient') return
-        var pp = prices.filter(function(pr) { return pr.product_id === p.id })
-        if (pp.length < 2) {
-          var baseline = getBaselinePrice(p.name)
-          var current = Number(p.current_price)
-          if (baseline && Math.abs((current - baseline) / baseline * 100) >= 2) {
-            var bpct = ((current - baseline) / baseline * 100)
-            var recipes2 = getRecipesForProduct(p.name)
-            allChanges.push({
-              id: p.id, name: p.name, supplier: supMap[p.supplier_id], unit: p.unit,
-              oldPrice: baseline, newPrice: current,
-              changePct: bpct, lastDate: pp.length > 0 ? pp[0].invoice_date : '', prevDate: 'ref.',
-              recipes: recipes2, allPrices: pp
-            })
-          }
-          return
-        }
-        var latest = pp[0]
-        var previous = pp[1]
-        var changePct = previous.price > 0 ? ((latest.price - previous.price) / previous.price * 100) : 0
-        if (Math.abs(changePct) < 0.5) return
-        var recipes = getRecipesForProduct(p.name)
+      var seen = {}
+      variations.forEach(function(v) {
+        // Garder 1 seule entrée par produit (la plus récente = la première vu l'ordre)
+        if (seen[v.product_id]) return
+        seen[v.product_id] = true
+        // Filtrer les variations < 2%
+        if (Math.abs(Number(v.variation_pct)) < 2) return
         allChanges.push({
-          id: p.id, name: p.name, supplier: supMap[p.supplier_id], unit: p.unit,
-          oldPrice: Number(previous.price), newPrice: Number(latest.price),
-          changePct: changePct, lastDate: latest.invoice_date, prevDate: previous.invoice_date,
-          recipes: recipes, allPrices: pp
+          id: v.product_id,
+          name: v.product_name,
+          supplier: v.supplier_name || '—',
+          unit: '',
+          oldPrice: Number(v.previous_price),
+          newPrice: Number(v.current_price),
+          changePct: Number(v.variation_pct),
+          lastDate: v.invoice_date,
+          prevDate: v.previous_date,
+          recipes: getRecipesForProduct(v.product_id, v.product_name)
         })
       })
       allChanges.sort(function(a, b) { return b.changePct - a.changePct })
       setChanges(allChanges)
       setLoading(false)
-    })
+    }).catch(function(){ setLoading(false) })
   }
 
   function openDetail(item) {
     setSelectedItem(item)
-    sb().from('product_prices').select('price, invoice_date')
+    sb().from('product_prices').select('master_unit_price, invoice_date, pack_label')
       .eq('product_id', item.id).order('invoice_date', {ascending: true})
-      .then(function(r) { setPriceHistory(r.data || []) })
+      .then(function(r) {
+        var hist = (r.data || []).map(function(h){ return {price: h.master_unit_price, invoice_date: h.invoice_date, pack_label: h.pack_label} })
+        setPriceHistory(hist)
+      })
   }
 
   function createTask(item) {
@@ -114,7 +94,7 @@ export default function FoodCostAlertsWidget() {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           title: '🔴 Hausse prix — ' + item.name,
-          body: item.supplier + ': ' + item.oldPrice.toFixed(2) + ' → ' + item.newPrice.toFixed(2) + ' €/' + item.unit + ' (+' + Math.abs(item.changePct).toFixed(0) + '%) — Tâche créée',
+          body: item.supplier + ': ' + item.oldPrice.toFixed(2) + ' → ' + item.newPrice.toFixed(2) + ' € (+' + Math.abs(item.changePct).toFixed(0) + '%) — Tâche créée',
           target: 'all'
         })
       }).catch(function(){})
@@ -160,96 +140,96 @@ export default function FoodCostAlertsWidget() {
   }
 
   if (loading) return null
+  if (changes.length === 0) {
+    return (
+      <div style={{background:'#fff',border:'2px solid #191923',borderRadius:12,padding:16,marginBottom:16}}>
+        <div style={{fontFamily:'Yellowtail',fontSize:22,color:'#191923',marginBottom:4}}>📊 Suivi des prix d&apos;achat</div>
+        <div style={{fontSize:11,color:'#888',marginBottom:8}}>Aucune variation significative détectée</div>
+      </div>
+    )
+  }
 
   var hausse = changes.filter(function(c) { return c.changePct > 0 }).slice(0, 10)
   var baisse = changes.filter(function(c) { return c.changePct < 0 }).sort(function(a, b) { return a.changePct - b.changePct }).slice(0, 10)
 
   return (
     <div style={{background:'#fff',border:'2px solid #191923',borderRadius:12,padding:16,marginBottom:16}}>
-      <div style={{fontFamily:'Yellowtail',fontSize:22,color:'#191923',marginBottom:4}}>📊 Suivi des prix d'achat</div>
+      <div style={{fontFamily:'Yellowtail',fontSize:22,color:'#191923',marginBottom:4}}>📊 Suivi des prix d&apos;achat</div>
       <div style={{fontSize:11,color:'#888',marginBottom:12}}>{hausse.length} hausse{hausse.length !== 1 ? 's' : ''} · {baisse.length} baisse{baisse.length !== 1 ? 's' : ''} · dernière analyse factures</div>
 
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
         <div>
           <div style={{fontWeight:900,fontSize:12,color:'#CC0066',textTransform:'uppercase',marginBottom:6,letterSpacing:0.5}}>▲ Hausses</div>
-          {hausse.length === 0 && <div style={{fontSize:12,color:'#888',padding:8}}>Aucune hausse détectée</div>}
-          {hausse.map(function(h, i) {
-            var bg = h.changePct > 15 ? '#FFE0E0' : h.changePct > 5 ? '#FFF0E0' : '#FFF9D0'
-            var borderColor = h.changePct > 15 ? '#CC0066' : h.changePct > 5 ? '#E67300' : '#B8920A'
+          {hausse.map(function(c) {
             return (
-              <div key={i} onClick={function(){openDetail(h)}} style={{background:bg,border:'1px solid ' + borderColor,borderRadius:8,padding:'5px 8px',marginBottom:3,cursor:'pointer'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <div>
-                    <div style={{fontWeight:900,fontSize:11}}>{h.name}</div>
-                    <div style={{fontSize:10,color:'#888'}}>{h.supplier}</div>
-                  </div>
-                  <div style={{textAlign:'right'}}>
-                    <div style={{fontSize:12,fontWeight:900,color:borderColor}}>+{h.changePct.toFixed(1)}%</div>
-                    <div style={{fontSize:10,color:'#888'}}>{h.oldPrice.toFixed(2)} → {h.newPrice.toFixed(2)} €/{h.unit}</div>
-                  </div>
+              <div key={c.id} onClick={function(){openDetail(c)}} style={{border:'2px solid #FFC0D9',background:'#FFF0F5',borderRadius:8,padding:10,marginBottom:6,cursor:'pointer'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                  <div style={{fontWeight:900,fontSize:13,color:'#191923'}}>{c.name}</div>
+                  <div style={{fontWeight:900,fontSize:14,color:'#CC0066'}}>+{c.changePct.toFixed(1)}%</div>
                 </div>
-                {h.recipes.length > 0 && (
-                  <div style={{marginTop:4}}>
-                    {h.recipes.slice(0, 3).map(function(r) {
-                      return <span key={r.name} style={{display:'inline-block',padding:'1px 6px',borderRadius:8,fontSize:8,fontWeight:900,margin:1,background:'#FFF',color:'#8A6D00',border:'1px solid #EED980',textTransform:'uppercase'}}>{r.name} ({r.foodCostPct}%)</span>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'#888',marginTop:2}}>
+                  <div>{c.supplier}</div>
+                  <div style={{fontFamily:'Arial Narrow,Arial,sans-serif'}}>{c.oldPrice.toFixed(2)} → {c.newPrice.toFixed(2)} €</div>
+                </div>
+                {c.recipes.length > 0 && (
+                  <div style={{marginTop:4,display:'flex',flexWrap:'wrap',gap:3}}>
+                    {c.recipes.slice(0,3).map(function(r,i) {
+                      return (<span key={i} style={{fontSize:9,background:'#FFEB5A',padding:'1px 5px',borderRadius:8,color:'#191923',fontWeight:900}}>{r.name}</span>)
                     })}
                   </div>
                 )}
               </div>
             )
           })}
+          {hausse.length === 0 && <div style={{fontSize:11,color:'#888',padding:8,textAlign:'center'}}>Aucune hausse 🎉</div>}
         </div>
 
         <div>
           <div style={{fontWeight:900,fontSize:12,color:'#009D3A',textTransform:'uppercase',marginBottom:6,letterSpacing:0.5}}>▼ Baisses</div>
-          {baisse.length === 0 && <div style={{fontSize:12,color:'#888',padding:8}}>Aucune baisse détectée</div>}
-          {baisse.map(function(b, i) {
+          {baisse.map(function(c) {
             return (
-              <div key={i} onClick={function(){openDetail(b)}} style={{background:'#E8FFE8',border:'1px solid #009D3A',borderRadius:8,padding:'5px 8px',marginBottom:3,cursor:'pointer'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <div>
-                    <div style={{fontWeight:900,fontSize:11}}>{b.name}</div>
-                    <div style={{fontSize:10,color:'#888'}}>{b.supplier}</div>
-                  </div>
-                  <div style={{textAlign:'right'}}>
-                    <div style={{fontSize:12,fontWeight:900,color:'#009D3A'}}>{b.changePct.toFixed(1)}%</div>
-                    <div style={{fontSize:10,color:'#888'}}>{b.oldPrice.toFixed(2)} → {b.newPrice.toFixed(2)} €/{b.unit}</div>
-                  </div>
+              <div key={c.id} onClick={function(){openDetail(c)}} style={{border:'2px solid #C0E5C0',background:'#F0FFF0',borderRadius:8,padding:10,marginBottom:6,cursor:'pointer'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                  <div style={{fontWeight:900,fontSize:13,color:'#191923'}}>{c.name}</div>
+                  <div style={{fontWeight:900,fontSize:14,color:'#009D3A'}}>{c.changePct.toFixed(1)}%</div>
                 </div>
-                {b.recipes.length > 0 && (
-                  <div style={{marginTop:4}}>
-                    {b.recipes.slice(0, 3).map(function(r) {
-                      return <span key={r.name} style={{display:'inline-block',padding:'1px 6px',borderRadius:8,fontSize:8,fontWeight:900,margin:1,background:'#FFF',color:'#009D3A',border:'1px solid #B0E0B0',textTransform:'uppercase'}}>{r.name} ({r.foodCostPct}%)</span>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'#888',marginTop:2}}>
+                  <div>{c.supplier}</div>
+                  <div style={{fontFamily:'Arial Narrow,Arial,sans-serif'}}>{c.oldPrice.toFixed(2)} → {c.newPrice.toFixed(2)} €</div>
+                </div>
+                {c.recipes.length > 0 && (
+                  <div style={{marginTop:4,display:'flex',flexWrap:'wrap',gap:3}}>
+                    {c.recipes.slice(0,3).map(function(r,i) {
+                      return (<span key={i} style={{fontSize:9,background:'#FFEB5A',padding:'1px 5px',borderRadius:8,color:'#191923',fontWeight:900}}>{r.name}</span>)
                     })}
                   </div>
                 )}
               </div>
             )
           })}
+          {baisse.length === 0 && <div style={{fontSize:11,color:'#888',padding:8,textAlign:'center'}}>Aucune baisse</div>}
         </div>
       </div>
 
       {selectedItem && (
         <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={function(){setSelectedItem(null)}}>
-          <div style={{background:'#fff',borderRadius:12,border:'2px solid #FF82D7',padding:20,maxWidth:500,width:'100%',maxHeight:'80vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+          <div style={{background:'#fff',borderRadius:14,maxWidth:600,width:'100%',padding:20,maxHeight:'90vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
               <div>
                 <div style={{fontFamily:'Yellowtail',fontSize:22,color:'#191923'}}>{selectedItem.name}</div>
                 <div style={{fontSize:12,color:'#FF82D7',fontWeight:700}}>{selectedItem.supplier}</div>
               </div>
-              <button onClick={function(){setSelectedItem(null)}} style={{background:'transparent',border:'none',fontSize:20,cursor:'pointer',color:'#888'}}>✕</button>
+              <button type="button" onClick={function(){setSelectedItem(null)}} style={{background:'transparent',border:'none',fontSize:20,cursor:'pointer',color:'#888'}}>✕</button>
             </div>
 
-            <div style={{display:'flex',gap:16,marginTop:16}}>
-              <div style={{flex:1,background:'#FFF9D0',borderRadius:8,padding:12,textAlign:'center'}}>
-                <div style={{fontSize:11,color:'#888'}}>Prix précédent</div>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              <div style={{flex:1,background:'#F5F5F5',borderRadius:8,padding:12,textAlign:'center'}}>
+                <div style={{fontSize:10,color:'#888'}}>Avant</div>
                 <div style={{fontSize:20,fontWeight:900}}>{selectedItem.oldPrice.toFixed(2)} €</div>
-                <div style={{fontSize:10,color:'#888'}}>/{selectedItem.unit}</div>
               </div>
               <div style={{flex:1,background:selectedItem.changePct > 0 ? '#FFE0E0' : '#E8FFE8',borderRadius:8,padding:12,textAlign:'center'}}>
-                <div style={{fontSize:11,color:'#888'}}>Prix actuel</div>
+                <div style={{fontSize:10,color:'#888'}}>Actuel</div>
                 <div style={{fontSize:20,fontWeight:900}}>{selectedItem.newPrice.toFixed(2)} €</div>
-                <div style={{fontSize:10,color:'#888'}}>/{selectedItem.unit}</div>
               </div>
               <div style={{flex:1,background:selectedItem.changePct > 0 ? '#CC0066' : '#009D3A',borderRadius:8,padding:12,textAlign:'center'}}>
                 <div style={{fontSize:11,color:'rgba(255,255,255,0.7)'}}>Variation</div>
@@ -258,20 +238,21 @@ export default function FoodCostAlertsWidget() {
               </div>
             </div>
 
-            <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:16,marginBottom:4}}>Évolution du prix</div>
-            {priceHistory.length >= 2 ? renderChart(priceHistory) : <div style={{fontSize:12,color:'#888'}}>Historique insuffisant</div>}
+            {renderChart(priceHistory)}
 
-            <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:16,marginBottom:4}}>Recettes impactées</div>
-            {selectedItem.recipes.length > 0 ? selectedItem.recipes.map(function(r) {
-              return <div key={r.name} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:'1px solid #F0F0F0',fontSize:13}}>
-                <span style={{fontWeight:900}}>{r.name}</span>
-                <span style={{color:r.foodCostPct > 25 ? '#CC0066' : '#009D3A',fontWeight:900}}>FC: {r.foodCostPct}%</span>
-              </div>
-            }) : <div style={{fontSize:12,color:'#888'}}>Aucune recette liée</div>}
+            <div style={{fontSize:11,fontWeight:900,color:'#888',textTransform:'uppercase',marginTop:12,marginBottom:6,letterSpacing:0.5}}>Recettes impactées</div>
+            {selectedItem.recipes.length > 0 ? selectedItem.recipes.map(function(r,i) {
+              return (
+                <div key={i} style={{padding:'6px 10px',background:'#FAFAFA',borderRadius:6,marginBottom:3,fontSize:11,display:'flex',justifyContent:'space-between'}}>
+                  <span style={{fontWeight:700,color:'#191923'}}>{r.name}</span>
+                  <span style={{color:'#888'}}>{r.foodCostPct ? r.foodCostPct + '% FC' : ''}</span>
+                </div>
+              )
+            }) : <div style={{fontSize:11,color:'#888',padding:8,textAlign:'center'}}>Aucune recette utilise ce produit</div>}
 
             {selectedItem.changePct > 0 && (
-              <button onClick={function(){createTask(selectedItem)}} style={{marginTop:16,width:'100%',padding:'10px 0',fontSize:13,fontWeight:900,borderRadius:20,border:'2px solid #CC0066',background:'#FFE0E0',color:'#CC0066',cursor:'pointer',textTransform:'uppercase',fontFamily:'Arial Narrow, Arial, sans-serif'}}>
-                📋 Créer tâche "Renégocier" + notification
+              <button type="button" onClick={function(){createTask(selectedItem)}} style={{marginTop:16,width:'100%',padding:'10px 0',fontSize:13,fontWeight:900,borderRadius:20,border:'2px solid #CC0066',background:'#FFE0E0',color:'#CC0066',cursor:'pointer',textTransform:'uppercase',fontFamily:'Arial Narrow, Arial, sans-serif'}}>
+                Créer tâche : renégocier
               </button>
             )}
           </div>
