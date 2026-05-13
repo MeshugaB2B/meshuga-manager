@@ -17,8 +17,10 @@ function sb() {
 
 export default function FoodCostAlertWidget(props) {
   var [alerts, setAlerts] = useState([])
+  var [preparations, setPreparations] = useState([])
   var [stats, setStats] = useState({critique: 0, alerte: 0, surveillance: 0, baisse: 0, stable: 0})
   var [expanded, setExpanded] = useState(false)
+  var [tabView, setTabView] = useState('alertes') // 'alertes' ou 'preparations'
   var [loading, setLoading] = useState(true)
   var [modalRecipe, setModalRecipe] = useState(null)
   var [modalIngredients, setModalIngredients] = useState([])
@@ -39,8 +41,13 @@ export default function FoodCostAlertWidget(props) {
       .order('ecart_pct', { ascending: false })
       .then(function(res){
         var data = res.data || []
+        // Séparer les recettes principales des préparations maison
+        var prepCategories = ['sous_recette', 'sauce', 'accompagnement']
+        var preps = data.filter(function(r){ return prepCategories.indexOf(r.categorie) !== -1 })
+        var mains = data.filter(function(r){ return prepCategories.indexOf(r.categorie) === -1 })
+        
         var s = {critique: 0, alerte: 0, surveillance: 0, baisse: 0, stable: 0}
-        data.forEach(function(r){
+        mains.forEach(function(r){
           var p = Number(r.ecart_pct)
           if (p > 15) s.critique++
           else if (p > 8) s.alerte++
@@ -49,8 +56,9 @@ export default function FoodCostAlertWidget(props) {
           else s.stable++
         })
         setStats(s)
-        var filtered = data.filter(function(r){ return Math.abs(Number(r.ecart_pct)) >= threshold })
+        var filtered = mains.filter(function(r){ return Math.abs(Number(r.ecart_pct)) >= threshold })
         setAlerts(filtered)
+        setPreparations(preps)
         setLoading(false)
       })
   }
@@ -146,6 +154,24 @@ export default function FoodCostAlertWidget(props) {
           }}>{expanded ? '▲ Réduire' : '▼ Détails'}</button>
         </div>
 
+        {/* Onglets : Alertes vs Préparations maison */}
+        {expanded && (
+          <div style={{display: 'flex', gap: 4, marginBottom: 10, borderBottom: '1px solid #EBEBEB'}}>
+            <button type="button" onClick={function(){ setTabView('alertes') }} style={{
+              padding: '6px 12px', fontSize: 11, fontWeight: 900,
+              background: tabView === 'alertes' ? '#FF82D7' : 'transparent',
+              color: tabView === 'alertes' ? '#fff' : '#191923',
+              border: 'none', borderRadius: '6px 6px 0 0', cursor: 'pointer'
+            }}>🍔 Recettes ({alerts.length})</button>
+            <button type="button" onClick={function(){ setTabView('preparations') }} style={{
+              padding: '6px 12px', fontSize: 11, fontWeight: 900,
+              background: tabView === 'preparations' ? '#FF82D7' : 'transparent',
+              color: tabView === 'preparations' ? '#fff' : '#191923',
+              border: 'none', borderRadius: '6px 6px 0 0', cursor: 'pointer'
+            }}>🧪 Préparations Maison ({preparations.length})</button>
+          </div>
+        )}
+
         <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 6, marginBottom: hasAlerts && expanded ? 10 : 0}}>
           {stats.critique > 0 && (
             <div style={{background: '#FFE8EF', padding: '6px 8px', borderRadius: 6, textAlign: 'center'}}>
@@ -209,7 +235,7 @@ export default function FoodCostAlertWidget(props) {
           </div>
         )}
 
-        {expanded && hasAlerts && (
+        {expanded && tabView === 'alertes' && hasAlerts && (
           <div style={{marginTop: 8}}>
             <div style={{
               display: 'grid', gridTemplateColumns: '1fr 90px 90px 80px 90px',
@@ -249,6 +275,59 @@ export default function FoodCostAlertWidget(props) {
             }}>
               <b>📌 Méthode :</b> &quot;Actuel&quot; = dernier prix facturé. &quot;Moyenne&quot; = moyenne des 3 prix précédents. Écart positif = ton coût a augmenté → marge en baisse. Clique sur une recette pour voir les ingrédients et leur historique de prix.
             </div>
+          </div>
+        )}
+
+        {/* Onglet Préparations Maison */}
+        {expanded && tabView === 'preparations' && preparations.length > 0 && (
+          <div style={{marginTop: 8}}>
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 80px 90px 90px 80px',
+              gap: 6, padding: '6px 8px', fontSize: 9, fontWeight: 900,
+              textTransform: 'uppercase', color: '#888', letterSpacing: 0.5,
+              borderBottom: '1px solid #EBEBEB'
+            }}>
+              <div>Préparation (clic pour détails)</div>
+              <div style={{textAlign: 'right'}}>Catégorie</div>
+              <div style={{textAlign: 'right'}}>Food cost</div>
+              <div style={{textAlign: 'right'}}>Moyenne</div>
+              <div style={{textAlign: 'right'}}>Écart</div>
+            </div>
+            {preparations.map(function(r){
+              var meta = getLevel(r.ecart_pct)
+              var catLabel = r.categorie === 'sous_recette' ? '🥫 Sauce' : (r.categorie === 'sauce' ? '🥫 Sauce' : '🥗 Accompagnement')
+              return (
+                <div key={r.recipe_id} onClick={function(){ openRecipeDetail(r) }} style={{
+                  display: 'grid', gridTemplateColumns: '1fr 80px 90px 90px 80px',
+                  gap: 6, padding: '8px', marginTop: 3, background: '#fafaff',
+                  borderRadius: 6, alignItems: 'center', fontSize: 11,
+                  fontVariantNumeric: 'tabular-nums', cursor: 'pointer',
+                  border: '1px solid #EBEBEB'
+                }}>
+                  <div style={{fontWeight: 900, color: '#191923'}}>🔍 {r.recipe_name}</div>
+                  <div style={{textAlign: 'right', fontSize: 10, color: '#666'}}>{catLabel}</div>
+                  <div style={{textAlign: 'right', color: '#191923', fontWeight: 900}}>{fmtEur(r.food_cost_actuel, 3)}</div>
+                  <div style={{textAlign: 'right', color: '#555'}}>{fmtEur(r.food_cost_moyenne, 3)}</div>
+                  <div style={{textAlign: 'right', fontWeight: 900, color: meta.color}}>{fmtPct(r.ecart_pct)}</div>
+                </div>
+              )
+            })}
+            <div style={{
+              marginTop: 8, padding: '8px 10px', background: '#F5EBFF',
+              borderLeft: '3px solid #A06CD5', borderRadius: '0 6px 6px 0',
+              fontSize: 11, color: '#555', lineHeight: 1.5
+            }}>
+              <b>📌 Préparations maison :</b> sauces, accompagnements et sous-recettes faites à Meshuga. Le food cost est calculé à partir des prix réels actualisés des ingrédients. Clique pour voir la composition détaillée.
+            </div>
+          </div>
+        )}
+
+        {expanded && tabView === 'preparations' && preparations.length === 0 && (
+          <div style={{
+            marginTop: 8, padding: '12px 16px', background: '#F5EBFF',
+            borderRadius: 8, fontSize: 12, color: '#555', textAlign: 'center'
+          }}>
+            Aucune préparation maison enregistrée pour l&apos;instant.
           </div>
         )}
       </div>
