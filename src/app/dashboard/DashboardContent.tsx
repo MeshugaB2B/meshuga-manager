@@ -15,6 +15,8 @@ import QuoteWizard from './catering/QuoteWizard'
 import RhTab from './RhTab'
 import LegalTab from './LegalTab'
 import WeatherWidget from './WeatherWidget'
+import FoodCostAlertWidget from './FoodCostAlertWidget'
+import PendingInvoicesWidget from './PendingInvoicesWidget'
 import { G } from './styles'
 import { LOGO_PINK, LOGO_YELLOW, STAMP_YELLOW, STAMP_PINK } from './logos'
 import {
@@ -955,7 +957,11 @@ function DashboardImpl() {
                 {isEmy && <button className="btn btn-p btn-sm" onClick={function(){openModal('cr',{})}}>+ Nouveau CR</button>}
               </div>
 
+              <PendingInvoicesWidget />
+
               <WeatherWidget />
+
+              <FoodCostAlertWidget />
 
               {priceAlerts.length > 0 && (
                 <div style={{background:"#FFFFFF",border:"2px solid #FF3B30",borderLeft:"6px solid #FF3B30",borderRadius:8,padding:"10px 14px",marginBottom:12,boxShadow:"2px 2px 0 #191923"}}>
