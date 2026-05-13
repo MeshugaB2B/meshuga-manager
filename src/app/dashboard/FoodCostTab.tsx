@@ -536,6 +536,7 @@ export default function FoodCostTab(props) {
             {id:'mini',label:'🥨 Minis'},
             {id:'salade',label:'🥗 Salades'},
             {id:'accompagnement',label:'🍟 Accomp.'},
+            {id:'supplements',label:'💸 Suppléments'},
             {id:'boisson',label:'🥤 Boissons'},
             {id:'preparations',label:'🧪 Préparations'}
           ].map(function(cat){
@@ -547,6 +548,10 @@ export default function FoodCostTab(props) {
                   if (!isPrepCat(vv.categorie)) count++
                 } else if (cat.id === 'preparations') {
                   if (isPrepCat(vv.categorie)) count++
+                } else if (cat.id === 'supplements') {
+                  if (Number(vv.prix_vente_ttc) === 1 && vv.categorie === 'accompagnement') count++
+                } else if (cat.id === 'accompagnement') {
+                  if (vv.categorie === 'accompagnement' && Number(vv.prix_vente_ttc) !== 1) count++
                 } else if ((vv.categorie || '') === cat.id) {
                   count++
                 }
@@ -638,7 +643,14 @@ export default function FoodCostTab(props) {
                 label: '🍟 Accompagnements',
                 color: '#191923',
                 showWhen: ['tous','accompagnement'],
-                filter: function(v){ return v.categorie === 'accompagnement' }
+                filter: function(v){ return v.categorie === 'accompagnement' && Number(v.prix_vente_ttc) !== 1 }
+              },
+              {
+                key: 'supplements',
+                label: '💸 Suppléments',
+                color: '#FF82D7',
+                showWhen: ['tous','supplements'],
+                filter: function(v){ return v.categorie === 'accompagnement' && Number(v.prix_vente_ttc) === 1 }
               },
               {
                 key: 'boissons_maison',
