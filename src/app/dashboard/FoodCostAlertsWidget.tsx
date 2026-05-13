@@ -6,6 +6,15 @@ function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
 }
 
+function fmtPrice(v) {
+  if (v === null || v === undefined || isNaN(Number(v))) return '—'
+  var n = Number(v)
+  // 2 décimales par défaut, 3 si prix entre 0.001 et 0.10, 4 si < 0.001
+  if (Math.abs(n) >= 0.10) return n.toFixed(2)
+  if (Math.abs(n) >= 0.001) return n.toFixed(3)
+  return n.toFixed(4)
+}
+
 // =============================================================================
 // FoodCostAlertsWidget v2 — "Suivi des prix d'achat"
 // Source : vue v_price_variations (compare 2 derniers prix master_unit_price)
@@ -94,7 +103,7 @@ export default function FoodCostAlertsWidget() {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           title: '🔴 Hausse prix — ' + item.name,
-          body: item.supplier + ': ' + item.oldPrice.toFixed(2) + ' → ' + item.newPrice.toFixed(2) + ' € (+' + Math.abs(item.changePct).toFixed(0) + '%) — Tâche créée',
+          body: item.supplier + ': ' + fmtPrice(item.oldPrice) + ' → ' + fmtPrice(item.newPrice) + ' € (+' + Math.abs(item.changePct).toFixed(0) + '%) — Tâche créée',
           target: 'all'
         })
       }).catch(function(){})
@@ -130,7 +139,7 @@ export default function FoodCostAlertsWidget() {
           return (
             <g key={i}>
               <circle cx={p.x} cy={p.y} r="5" fill="#FFEB5A" stroke="#191923" strokeWidth="2" />
-              <text x={p.x} y={p.y - 10} textAnchor="middle" style={{fontSize:9,fontWeight:900,fill:'#191923',fontFamily:'Arial Narrow'}}>{p.price.toFixed(2)}€</text>
+              <text x={p.x} y={p.y - 10} textAnchor="middle" style={{fontSize:9,fontWeight:900,fill:'#191923',fontFamily:'Arial Narrow'}}>{fmtPrice(p.price)}€</text>
               <text x={p.x} y={h - 4} textAnchor="middle" style={{fontSize:8,fill:'#888',fontFamily:'Arial Narrow'}}>{label}</text>
             </g>
           )
@@ -169,7 +178,7 @@ export default function FoodCostAlertsWidget() {
                 </div>
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'#888',marginTop:2}}>
                   <div>{c.supplier}</div>
-                  <div style={{fontFamily:'Arial Narrow,Arial,sans-serif'}}>{c.oldPrice.toFixed(2)} → {c.newPrice.toFixed(2)} €</div>
+                  <div style={{fontFamily:'Arial Narrow,Arial,sans-serif'}}>{fmtPrice(c.oldPrice)} → {fmtPrice(c.newPrice)} €</div>
                 </div>
                 {c.recipes.length > 0 && (
                   <div style={{marginTop:4,display:'flex',flexWrap:'wrap',gap:3}}>
@@ -195,7 +204,7 @@ export default function FoodCostAlertsWidget() {
                 </div>
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'#888',marginTop:2}}>
                   <div>{c.supplier}</div>
-                  <div style={{fontFamily:'Arial Narrow,Arial,sans-serif'}}>{c.oldPrice.toFixed(2)} → {c.newPrice.toFixed(2)} €</div>
+                  <div style={{fontFamily:'Arial Narrow,Arial,sans-serif'}}>{fmtPrice(c.oldPrice)} → {fmtPrice(c.newPrice)} €</div>
                 </div>
                 {c.recipes.length > 0 && (
                   <div style={{marginTop:4,display:'flex',flexWrap:'wrap',gap:3}}>
@@ -225,11 +234,11 @@ export default function FoodCostAlertsWidget() {
             <div style={{display:'flex',gap:8,marginBottom:12}}>
               <div style={{flex:1,background:'#F5F5F5',borderRadius:8,padding:12,textAlign:'center'}}>
                 <div style={{fontSize:10,color:'#888'}}>Avant</div>
-                <div style={{fontSize:20,fontWeight:900}}>{selectedItem.oldPrice.toFixed(2)} €</div>
+                <div style={{fontSize:20,fontWeight:900}}>{fmtPrice(selectedItem.oldPrice)} €</div>
               </div>
               <div style={{flex:1,background:selectedItem.changePct > 0 ? '#FFE0E0' : '#E8FFE8',borderRadius:8,padding:12,textAlign:'center'}}>
                 <div style={{fontSize:10,color:'#888'}}>Actuel</div>
-                <div style={{fontSize:20,fontWeight:900}}>{selectedItem.newPrice.toFixed(2)} €</div>
+                <div style={{fontSize:20,fontWeight:900}}>{fmtPrice(selectedItem.newPrice)} €</div>
               </div>
               <div style={{flex:1,background:selectedItem.changePct > 0 ? '#CC0066' : '#009D3A',borderRadius:8,padding:12,textAlign:'center'}}>
                 <div style={{fontSize:11,color:'rgba(255,255,255,0.7)'}}>Variation</div>
