@@ -42,20 +42,17 @@ export default function FoodCostTab(props) {
   var [addIngOpen, setAddIngOpen] = useState(false)
   var [addIngSearch, setAddIngSearch] = useState('')
   var [creatingProduct, setCreatingProduct] = useState(false)
-  var [newProductDraft, setNewProductDraft] = useState(null) // {name, supplier_mode, supplier_id, new_supplier_name, current_price, unit, category}
+  var [newProductDraft, setNewProductDraft] = useState(null)
   var [creatingProductSaving, setCreatingProductSaving] = useState(false)
 
-  // 2e étape après création produit : affectation aux recettes (composant ProductRecipeAssignment)
   var [pendingAssignment, setPendingAssignment] = useState(null)
-  // Format : { product, current_recipe_id } ou null
 
   var [editingPrixTTC, setEditingPrixTTC] = useState(null)
-  var [editingMeta, setEditingMeta] = useState(null) // { name, categorie, tva }
+  var [editingMeta, setEditingMeta] = useState(null)
 
-  var [newRecipeModal, setNewRecipeModal] = useState(null) // null ou {name, categorie, prix_vente_ttc, tva}
-  var [newDrinkModal, setNewDrinkModal] = useState(null)    // null ou {name, supplier_name, purchase_price_ht, selling_price_ttc}
+  var [newRecipeModal, setNewRecipeModal] = useState(null)
+  var [newDrinkModal, setNewDrinkModal] = useState(null)
 
-  // Modal Facture : remplacée par FoodCostInvoiceWizard (refonte 4 étapes)
   var [fcInvoiceModal, setFcInvoiceModal] = useState(false)
 
   var [drinkEdit, setDrinkEdit] = useState(null)
@@ -174,13 +171,27 @@ export default function FoodCostTab(props) {
     return (Math.round(Number(n || 0) * 100) / 100).toFixed(2)
   }
 
+  function fmtPrep(n) {
+    var v = Number(n || 0)
+    if (Math.abs(v) >= 0.10) return v.toFixed(2)
+    if (Math.abs(v) >= 0.001) return v.toFixed(3)
+    return v.toFixed(4)
+  }
+
+  function isPrepCat(cat) {
+    return cat === 'sous_recette' || cat === 'sauce'
+  }
+
   function computeKPIs() {
     var allVariants = []
     var gi
     for (gi = 0; gi < groupedList.length; gi++) {
       var vs = Object.values(groupedList[gi].variants)
       var vi
-      for (vi = 0; vi < vs.length; vi++) allVariants.push(vs[vi])
+      for (vi = 0; vi < vs.length; vi++) {
+        // KPIs basés uniquement sur recettes vendables (pas les préparations maison)
+        if (!isPrepCat(vs[vi].categorie)) allVariants.push(vs[vi])
+      }
     }
     if (allVariants.length === 0) return { avg: 0, alerts: [], best: null, worst: null }
     var sum = 0
@@ -264,11 +275,11 @@ export default function FoodCostTab(props) {
     })
   }
 
-  // ============= CREATE PRODUCT INLINE (depuis fiche recette) =============
+  // ============= CREATE PRODUCT INLINE =============
   function openCreateProduct(prefilledName) {
     setNewProductDraft({
       name: prefilledName || '',
-      supplier_mode: 'existing', // 'existing' ou 'new'
+      supplier_mode: 'existing',
       supplier_id: '',
       new_supplier_name: '',
       current_price: 0,
@@ -309,18 +320,13 @@ export default function FoodCostTab(props) {
           return
         }
         var p = res.data
-        // Au lieu d'INSERT recipe_ingredients direct, on bascule en 2e etape :
-        // ProductRecipeAssignment s'ouvre avec la recette courante pre-cochee.
-        // L'utilisateur peut alors cocher d'autres recettes + saisir une qte par recette.
         toast('✅ Produit créé. Sélectionne les recettes et saisis les quantités.')
         setCreatingProductSaving(false)
         setCreatingProduct(false)
         setNewProductDraft(null)
         setAddIngOpen(false)
         setAddIngSearch('')
-        // Recharger les products pour que ProductRecipeAssignment voit le nouveau
         loadData()
-        // Ouvrir la 2e etape avec recette courante pre-cochee
         setPendingAssignment({
           product: Object.assign({}, p, { supplier_name: supplierName }),
           current_recipe_id: recipeId
@@ -336,7 +342,6 @@ export default function FoodCostTab(props) {
       }
       doInsertProduct(d.supplier_id, supName)
     } else {
-      // Créer le supplier d'abord
       var supCat = d.category === 'boisson' ? 'boisson' : (d.category || 'ingredient')
       sb().from('suppliers').insert({
         name: d.new_supplier_name.trim(),
@@ -372,21 +377,18 @@ export default function FoodCostTab(props) {
     })
   }
 
-  // ============= DELETE RECIPE (toutes variantes du parent_slug) =============
+  // ============= DELETE RECIPE =============
   function deleteRecipeParent(parentSlug, parentName) {
     if (!confirm('Supprimer définitivement la recette "' + parentName + '" (toutes variantes + ingrédients) ?\n\nCette action est irréversible.')) return
     var client = sb()
-    // Récupérer les IDs de toutes les variantes
     var variantIds = []
     var i
     for (i = 0; i < recipes.length; i++) {
       if (recipes[i].parent_slug === parentSlug) variantIds.push(recipes[i].id)
     }
     if (variantIds.length === 0) return
-    // 1. Delete ingredients
     client.from('recipe_ingredients').delete().in('recipe_id', variantIds).then(function(r1){
       if (r1.error) { toast('Erreur: ' + r1.error.message); return }
-      // 2. Delete recipes
       client.from('recipes').delete().in('id', variantIds).then(function(r2){
         if (r2.error) { toast('Erreur: ' + r2.error.message); return }
         toast('🗑️ ' + parentName + ' supprimée')
@@ -406,13 +408,13 @@ export default function FoodCostTab(props) {
     })
   }
 
-  // ============= UPDATE META RECIPE (name / categorie / tva) =============
+  // ============= UPDATE META RECIPE =============
   function startEditMeta(v, parent) {
     setEditingMeta({
       recipe_id: v.id,
       name: v.name,
       categorie: parent.category,
-      tva: v.tva_ratio * 100 // en pourcentage pour l'UI
+      tva: v.tva_ratio * 100
     })
   }
 
@@ -422,7 +424,7 @@ export default function FoodCostTab(props) {
     var payload = {
       name: editingMeta.name,
       categorie: editingMeta.categorie,
-      tva: editingMeta.tva, // stocké en pourcentage comme le reste de la DB
+      tva: editingMeta.tva,
       updated_at: new Date().toISOString()
     }
     sb().from('recipes').update(payload).eq('id', editingMeta.recipe_id).then(function(res){
@@ -502,7 +504,7 @@ export default function FoodCostTab(props) {
             var total = 0
             groupedList.forEach(function(p){
               Object.keys(p.variants).forEach(function(vk){
-                if (p.variants[vk].categorie !== 'sous_recette') total++
+                if (!isPrepCat(p.variants[vk].categorie)) total++
               })
             })
             return total
@@ -525,7 +527,7 @@ export default function FoodCostTab(props) {
         </div>
       )}
 
-      {/* CATEGORY FILTER - utilise les vraies catégories DB */}
+      {/* CATEGORY FILTER */}
       {fcView === 'recettes' && !fcSelectedParent && (
         <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
           {[
@@ -534,15 +536,17 @@ export default function FoodCostTab(props) {
             {id:'mini',label:'🥨 Minis'},
             {id:'salade',label:'🥗 Salades'},
             {id:'accompagnement',label:'🍟 Accomp.'},
-            {id:'boisson',label:'🥤 Boissons'}
+            {id:'boisson',label:'🥤 Boissons'},
+            {id:'preparations',label:'🧪 Préparations'}
           ].map(function(cat){
-            // Compter par VARIANTE (pas par parent) pour cohérence avec l'affichage éclaté
             var count = 0
             groupedList.forEach(function(p){
               Object.keys(p.variants).forEach(function(vk){
                 var vv = p.variants[vk]
                 if (cat.id === 'tous') {
-                  if (vv.categorie !== 'sous_recette') count++
+                  if (!isPrepCat(vv.categorie)) count++
+                } else if (cat.id === 'preparations') {
+                  if (isPrepCat(vv.categorie)) count++
                 } else if ((vv.categorie || '') === cat.id) {
                   count++
                 }
@@ -560,53 +564,51 @@ export default function FoodCostTab(props) {
       {/* ========== VUE RECETTES (liste) ========== */}
       {fcView === 'recettes' && !fcSelectedParent && (
         <div>
-          {/* KPIs */}
-          <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8,marginBottom:12}}>
-            <div style={{background:'#fff',borderRadius:10,padding:'12px 14px',border:'1.5px solid #EBEBEB'}}>
-              <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.5,marginBottom:4}}>Food cost moyen</div>
-              <div style={{fontSize:24,fontWeight:900,color:kpis.avg>fcSeuil?'#CC0066':'#009D3A'}}>{kpis.avg.toFixed(1)}%</div>
-            </div>
-            <div style={{background:'#fff',borderRadius:10,padding:'12px 14px',border:'1.5px solid '+(kpis.alerts.length>0?'#CC0066':'#EBEBEB')}}>
-              <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.5,marginBottom:4}}>⚠️ Au-dessus du seuil</div>
-              <div style={{fontSize:24,fontWeight:900,color:kpis.alerts.length>0?'#CC0066':'#009D3A'}}>{kpis.alerts.length}</div>
-              <div style={{fontSize:10,opacity:.5}}>{kpis.alerts.length>0?kpis.alerts.slice(0,3).map(function(v){return v.name}).join(', '):'Tout est OK ✅'}</div>
-            </div>
-            {kpis.best && (
-              <div style={{background:'#FFEB5A',borderRadius:10,padding:'12px 14px',border:'1.5px solid rgba(0,0,0,.1)'}}>
-                <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.7,marginBottom:4}}>🏆 Meilleure marge</div>
-                <div style={{fontSize:14,fontWeight:900}}>{kpis.best.name}</div>
-                <div style={{fontSize:12,opacity:.7}}>{kpis.best.food_cost_pct}% food cost</div>
-              </div>
-            )}
-            {kpis.worst && (
+          {/* KPIs - cachés en vue préparations */}
+          {fcCatFilter !== 'preparations' && (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8,marginBottom:12}}>
               <div style={{background:'#fff',borderRadius:10,padding:'12px 14px',border:'1.5px solid #EBEBEB'}}>
-                <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.5,marginBottom:4}}>📊 Plus chargé</div>
-                <div style={{fontSize:14,fontWeight:900}}>{kpis.worst.name}</div>
-                <div style={{fontSize:12,color:kpis.worst.food_cost_pct>fcSeuil?'#CC0066':'#555'}}>{kpis.worst.food_cost_pct}% food cost</div>
+                <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.5,marginBottom:4}}>Food cost moyen</div>
+                <div style={{fontSize:24,fontWeight:900,color:kpis.avg>fcSeuil?'#CC0066':'#009D3A'}}>{kpis.avg.toFixed(1)}%</div>
               </div>
-            )}
-          </div>
+              <div style={{background:'#fff',borderRadius:10,padding:'12px 14px',border:'1.5px solid '+(kpis.alerts.length>0?'#CC0066':'#EBEBEB')}}>
+                <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.5,marginBottom:4}}>⚠️ Au-dessus du seuil</div>
+                <div style={{fontSize:24,fontWeight:900,color:kpis.alerts.length>0?'#CC0066':'#009D3A'}}>{kpis.alerts.length}</div>
+                <div style={{fontSize:10,opacity:.5}}>{kpis.alerts.length>0?kpis.alerts.slice(0,3).map(function(v){return v.name}).join(', '):'Tout est OK ✅'}</div>
+              </div>
+              {kpis.best && (
+                <div style={{background:'#FFEB5A',borderRadius:10,padding:'12px 14px',border:'1.5px solid rgba(0,0,0,.1)'}}>
+                  <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.7,marginBottom:4}}>🏆 Meilleure marge</div>
+                  <div style={{fontSize:14,fontWeight:900}}>{kpis.best.name}</div>
+                  <div style={{fontSize:12,opacity:.7}}>{kpis.best.food_cost_pct}% food cost</div>
+                </div>
+              )}
+              {kpis.worst && (
+                <div style={{background:'#fff',borderRadius:10,padding:'12px 14px',border:'1.5px solid #EBEBEB'}}>
+                  <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.5,marginBottom:4}}>📊 Plus chargé</div>
+                  <div style={{fontSize:14,fontWeight:900}}>{kpis.worst.name}</div>
+                  <div style={{fontSize:12,color:kpis.worst.food_cost_pct>fcSeuil?'#CC0066':'#555'}}>{kpis.worst.food_cost_pct}% food cost</div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* LISTE RECETTES — organisée en rubriques séparées */}
           {(function(){
-            // Construire la liste plate (1 entry par variante)
             var flatList = []
             groupedList.forEach(function(parent){
               Object.keys(parent.variants).forEach(function(vk){
                 var vv = parent.variants[vk]
                 if (!vv) return
-                if (vv.categorie === 'sous_recette') return
                 flatList.push({parent: parent, variant: vv})
               })
             })
 
-            // Définition des rubriques dans l'ordre d'affichage
             var sections = [
               {
                 key: 'sandwichs_std',
                 label: '🥪 Sandwichs standards',
                 color: '#FF82D7',
-                matchCat: ['classique','mini','salade','accompagnement','boisson','tous'],
                 showWhen: ['tous','classique'],
                 filter: function(v){ return v.categorie === 'classique' && v.variant_key !== 'mini' }
               },
@@ -644,10 +646,16 @@ export default function FoodCostTab(props) {
                 color: '#FF82D7',
                 showWhen: ['tous','boisson'],
                 filter: function(v){ return v.categorie === 'boisson' }
+              },
+              {
+                key: 'preparations_maison',
+                label: '🧪 Préparations maison',
+                color: '#A06CD5',
+                showWhen: ['preparations'],
+                filter: function(v){ return isPrepCat(v.categorie) }
               }
             ]
 
-            // Filtrer les rubriques visibles selon le filtre catégorie
             var visibleSections = sections.filter(function(s){ return s.showWhen.indexOf(fcCatFilter) > -1 })
 
             return visibleSections.map(function(section){
@@ -668,30 +676,49 @@ export default function FoodCostTab(props) {
                   {items.map(function(it){
                     var parent = it.parent
                     var v = it.variant
-                    var alert = v.food_cost_pct > fcSeuil
-                    var barColor = alert ? '#CC0066' : '#009D3A'
+                    var isPrep = isPrepCat(v.categorie)
+                    var alert = !isPrep && v.food_cost_pct > fcSeuil
+                    var barColor = isPrep ? '#A06CD5' : (alert ? '#CC0066' : '#009D3A')
                     var displayName = v.name || parent.name
+                    var fournisseurs = v.ingredients.reduce(function(acc, i){
+                      return acc.indexOf(i.fournisseur) > -1 ? acc : acc.concat([i.fournisseur])
+                    }, []).slice(0, 2).filter(function(f){ return f && f.length > 0 })
                     return (
-                      <div key={parent.parent_slug + '__' + v.variant_key} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(alert?'#CC0066':'#009D3A'),cursor:'pointer'}} onClick={function(){setFcSelectedParent(parent.parent_slug);setFcSelectedVariant(v.variant_key)}}>
+                      <div key={parent.parent_slug + '__' + v.variant_key} className="card" style={{marginBottom:8,borderLeft:'4px solid '+barColor,cursor:'pointer'}} onClick={function(){setFcSelectedParent(parent.parent_slug);setFcSelectedVariant(v.variant_key)}}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
                           <div style={{flex:1,minHeight:44,display:'flex',flexDirection:'column',justifyContent:'center'}}>
-                            <div style={{fontWeight:900,fontSize:14}}>{displayName}</div>
+                            <div style={{fontWeight:900,fontSize:14,display:'flex',alignItems:'center',gap:6}}>
+                              {displayName}
+                              {isPrep && <span style={{fontSize:9,background:'#F3EBFA',color:'#A06CD5',padding:'2px 6px',borderRadius:4,fontWeight:900}}>🧪 MAISON</span>}
+                            </div>
                             <div style={{fontSize:11,opacity:.6}}>
-                              {v.ingredients.reduce(function(acc, i){
-                                return acc.indexOf(i.fournisseur) > -1 ? acc : acc.concat([i.fournisseur])
-                              }, []).slice(0, 2).join(', ')}
-                              {' · '}PV {fmt(v.prix_vente_ttc)}€ TTC · Marge HT {fmt(v.marge_ht)}€
+                              {fournisseurs.length > 0 ? fournisseurs.join(', ') : (isPrep ? 'Préparation interne' : '')}
+                              {isPrep
+                                ? (' · Food cost ' + fmtPrep(v.food_cost_ht) + '€')
+                                : (' · PV ' + fmt(v.prix_vente_ttc) + '€ TTC · Marge HT ' + fmt(v.marge_ht) + '€')
+                              }
                             </div>
                           </div>
                           <div style={{textAlign:'right',padding:'4px 8px'}}>
-                            <div style={{fontSize:20,fontWeight:900,color:barColor}}>{v.food_cost_pct}%</div>
-                            <div style={{fontSize:10,opacity:.5}}>food cost</div>
+                            {isPrep ? (
+                              <div>
+                                <div style={{fontSize:18,fontWeight:900,color:'#A06CD5'}}>{fmtPrep(v.food_cost_ht)}€</div>
+                                <div style={{fontSize:10,opacity:.5}}>food cost</div>
+                              </div>
+                            ) : (
+                              <div>
+                                <div style={{fontSize:20,fontWeight:900,color:barColor}}>{v.food_cost_pct}%</div>
+                                <div style={{fontSize:10,opacity:.5}}>food cost</div>
+                              </div>
+                            )}
                           </div>
                           <button style={{background:'#FFE5E5',border:'none',color:'#CC0066',fontSize:14,cursor:'pointer',borderRadius:6,padding:'6px 10px',flexShrink:0,marginLeft:4}} onClick={function(e){e.stopPropagation();deleteRecipeParent(parent.parent_slug, parent.name)}}>🗑️</button>
                         </div>
-                        <div style={{background:'#F0F0F0',borderRadius:20,height:6,overflow:'hidden'}}>
-                          <div style={{width:Math.min(v.food_cost_pct,60)/60*100+'%',background:barColor,height:'100%',borderRadius:20}} />
-                        </div>
+                        {!isPrep && (
+                          <div style={{background:'#F0F0F0',borderRadius:20,height:6,overflow:'hidden'}}>
+                            <div style={{width:Math.min(v.food_cost_pct,60)/60*100+'%',background:barColor,height:'100%',borderRadius:20}} />
+                          </div>
+                        )}
                         {alert && <div style={{fontSize:10,color:'#CC0066',fontWeight:900,marginTop:4}}>⚠️ Au-dessus du seuil de {fcSeuil}%</div>}
                       </div>
                     )
@@ -701,7 +728,7 @@ export default function FoodCostTab(props) {
             })
           })()}
 
-          {/* BOISSONS REVENTE — affichées quand filtre "tous" ou "boisson" */}
+          {/* BOISSONS REVENTE — affichées quand filtre "tous" ou "boisson" (pas en preparations) */}
           {(fcCatFilter === 'tous' || fcCatFilter === 'boisson') && drinks.map(function(d){
             var tvaR = tvaToRatio(d.tva_rate)
             if (tvaR === 0) tvaR = 0.20
@@ -754,6 +781,7 @@ export default function FoodCostTab(props) {
         var parent = selectedParent
         var v = pickVariant(parent, fcSelectedVariant)
         if (!v) return <div>Erreur variant</div>
+        var isPrep = isPrepCat(v.categorie)
         var tvaRatio = v.tva_ratio
         var conseilX4TTC = Math.round(v.food_cost_ht * 4 * (1 + tvaRatio) * 100) / 100
         var conseilX5TTC = Math.round(v.food_cost_ht * 5 * (1 + tvaRatio) * 100) / 100
@@ -764,7 +792,10 @@ export default function FoodCostTab(props) {
           <div>
             <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
               <button className="btn btn-sm" onClick={function(){setFcSelectedParent(null);setAddIngOpen(false);setEditingIngId(null);setEditingPrixTTC(null);setEditingMeta(null);setCreatingProduct(false);setNewProductDraft(null)}}>← Retour</button>
-              <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923',flex:1}}>{parent.name}</div>
+              <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923',flex:1,display:'flex',alignItems:'center',gap:8}}>
+                {parent.name}
+                {isPrep && <span style={{fontFamily:'Arial Narrow, Arial, sans-serif',fontSize:10,background:'#F3EBFA',color:'#A06CD5',padding:'3px 8px',borderRadius:4,fontWeight:900,textTransform:'uppercase'}}>🧪 Préparation maison</span>}
+              </div>
               <button className="btn btn-sm" style={{background:'#FFEB5A',fontWeight:900}} onClick={function(){startEditMeta(v, parent)}}>✏️ Modifier</button>
               <button className="btn btn-sm" style={{background:'#FFE5E5',color:'#CC0066',fontWeight:900}} onClick={function(){deleteRecipeParent(parent.parent_slug, parent.name)}}>🗑️ Supprimer</button>
             </div>
@@ -786,6 +817,8 @@ export default function FoodCostTab(props) {
                       <option value="accompagnement">🍟 Accomp.</option>
                       <option value="boisson">🥤 Boisson</option>
                       <option value="mini">🥨 Mini</option>
+                      <option value="sous_recette">🧪 Sous-recette maison</option>
+                      <option value="sauce">🧪 Sauce maison</option>
                     </select>
                   </div>
                   <div>
@@ -804,7 +837,7 @@ export default function FoodCostTab(props) {
               </div>
             )}
 
-            {/* Toggle variantes : ROSE quand actif */}
+            {/* Toggle variantes */}
             {variantsList.length > 1 && (
               <div style={{display:'flex',gap:0,marginBottom:16,background:'#F5F5F5',borderRadius:10,padding:4}}>
                 {variantsList.map(function(vv){
@@ -818,55 +851,74 @@ export default function FoodCostTab(props) {
               </div>
             )}
 
-            {/* PRIX CONSEILLE */}
-            <div style={{background:'#FF82D7',borderRadius:12,padding:16,marginBottom:12,border:'2px solid #fff'}}>
-              <div style={{fontFamily:"'Yellowtail',cursive",fontSize:18,color:'#191923',marginBottom:8}}>💡 Prix conseillé</div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                <div style={{background:'#FFEB5A',borderRadius:8,padding:'10px 12px'}}>
-                  <div style={{fontSize:10,color:'#191923',fontWeight:900,textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>x4 — minimum</div>
-                  <div style={{fontSize:22,fontWeight:900,color:'#191923'}}>{fmt(conseilX4TTC)}€ TTC</div>
+            {/* PRIX CONSEILLE - caché pour préparations maison */}
+            {!isPrep && (
+              <div style={{background:'#FF82D7',borderRadius:12,padding:16,marginBottom:12,border:'2px solid #fff'}}>
+                <div style={{fontFamily:"'Yellowtail',cursive",fontSize:18,color:'#191923',marginBottom:8}}>💡 Prix conseillé</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  <div style={{background:'#FFEB5A',borderRadius:8,padding:'10px 12px'}}>
+                    <div style={{fontSize:10,color:'#191923',fontWeight:900,textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>x4 — minimum</div>
+                    <div style={{fontSize:22,fontWeight:900,color:'#191923'}}>{fmt(conseilX4TTC)}€ TTC</div>
+                  </div>
+                  <div style={{background:'#fff',borderRadius:8,padding:'10px 12px'}}>
+                    <div style={{fontSize:10,color:'#CC0066',fontWeight:900,textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>x5 — confortable</div>
+                    <div style={{fontSize:22,fontWeight:900,color:'#CC0066'}}>{fmt(conseilX5TTC)}€ TTC</div>
+                  </div>
                 </div>
-                <div style={{background:'#fff',borderRadius:8,padding:'10px 12px'}}>
-                  <div style={{fontSize:10,color:'#CC0066',fontWeight:900,textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>x5 — confortable</div>
-                  <div style={{fontSize:22,fontWeight:900,color:'#CC0066'}}>{fmt(conseilX5TTC)}€ TTC</div>
+                <div style={{fontSize:11,color:'#191923',opacity:.6,marginTop:8}}>Food cost actuel : {fmt(v.food_cost_ht)}€ · TVA {(tvaRatio*100).toFixed(1)}%</div>
+              </div>
+            )}
+
+            {/* RECAP — adapté pour préparations */}
+            {isPrep ? (
+              <div style={{background:'#fff',borderRadius:12,padding:16,border:'2px solid #A06CD5',marginBottom:12}}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  <div style={{background:'#F3EBFA',borderRadius:8,padding:'10px 12px'}}>
+                    <div style={{fontSize:10,opacity:.6,textTransform:'uppercase',marginBottom:3,color:'#A06CD5',fontWeight:900}}>Food cost total</div>
+                    <div style={{fontWeight:900,fontSize:24,color:'#A06CD5'}}>{fmtPrep(v.food_cost_ht)}€</div>
+                    <div style={{fontSize:10,opacity:.6,marginTop:2}}>{v.ingredients.length} ingrédient{v.ingredients.length > 1 ? 's' : ''}</div>
+                  </div>
+                  <div style={{background:'#F8F9FF',borderRadius:8,padding:'10px 12px',border:'1.5px solid #DDEEFF'}}>
+                    <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginBottom:3}}>Usage</div>
+                    <div style={{fontWeight:900,fontSize:14,color:'#191923'}}>Préparation interne</div>
+                    <div style={{fontSize:10,opacity:.6,marginTop:2}}>Utilisée dans d&apos;autres recettes</div>
+                  </div>
                 </div>
               </div>
-              <div style={{fontSize:11,color:'#191923',opacity:.6,marginTop:8}}>Food cost actuel : {fmt(v.food_cost_ht)}€ · TVA {(tvaRatio*100).toFixed(1)}%</div>
-            </div>
-
-            {/* RECAP prix actuel + édition prix TTC inline */}
-            <div style={{background:'#fff',borderRadius:12,padding:16,border:'1.5px solid #EBEBEB',marginBottom:12}}>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:8}}>
-                <div style={{background:'#F8F9FF',borderRadius:8,padding:'10px 12px',border:'1.5px solid #DDEEFF'}}>
-                  <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginBottom:3}}>Prix de vente TTC</div>
-                  {editingPrixTTC === null && (
-                    <div>
-                      <div style={{fontWeight:900,fontSize:18,cursor:'pointer'}} onClick={function(){setEditingPrixTTC(v.prix_vente_ttc)}}>{fmt(v.prix_vente_ttc)}€</div>
-                      <div style={{fontSize:10,opacity:.4,marginTop:2}}>HT : {fmt(v.prix_vente_ht)}€</div>
-                    </div>
-                  )}
-                  {editingPrixTTC !== null && (
-                    <div style={{display:'flex',gap:4,alignItems:'center',marginTop:3,flexWrap:'wrap'}}>
-                      <input type="number" step="0.1" value={editingPrixTTC} onChange={function(e){setEditingPrixTTC(parseFloat(e.target.value)||0)}} style={{width:64,padding:'4px 6px',fontSize:14,fontWeight:900,border:'2px solid #005FFF',borderRadius:4}} autoFocus />
-                      <button className="btn btn-sm btn-y" style={{fontSize:10,padding:'4px 6px'}} onClick={function(){saveRecipePriceTTC(v.id, editingPrixTTC)}}>✓</button>
-                      <button className="btn btn-sm" style={{fontSize:10,padding:'4px 6px'}} onClick={function(){setEditingPrixTTC(null)}}>✕</button>
-                    </div>
-                  )}
-                </div>
-                <div style={{background:'#FFF5FB',borderRadius:8,padding:'10px 12px',border:'1.5px solid #FFD3EE'}}>
-                  <div style={{fontSize:10,opacity:.6,textTransform:'uppercase',marginBottom:3,color:'#CC0066'}}>Coût HT total</div>
-                  <div style={{fontWeight:900,fontSize:18,color:'#CC0066'}}>{fmt(v.food_cost_ht)}€</div>
-                  <div style={{fontSize:10,opacity:.6,marginTop:2}}>{v.ingredients.length} ingrédient{v.ingredients.length > 1 ? 's' : ''}</div>
-                </div>
-                <div style={{background:'#FFEB5A',borderRadius:8,padding:'10px 12px'}}>
-                  <div style={{fontSize:10,opacity:.6,textTransform:'uppercase',marginBottom:3}}>Coeff actuel</div>
-                  <div style={{fontWeight:900,fontSize:18}}>x{coeffActuel}</div>
-                  <div style={{fontSize:10,opacity:.6,marginTop:2}}>{v.food_cost_pct}% · Marge {fmt(v.marge_ht)}€</div>
+            ) : (
+              <div style={{background:'#fff',borderRadius:12,padding:16,border:'1.5px solid #EBEBEB',marginBottom:12}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:8}}>
+                  <div style={{background:'#F8F9FF',borderRadius:8,padding:'10px 12px',border:'1.5px solid #DDEEFF'}}>
+                    <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginBottom:3}}>Prix de vente TTC</div>
+                    {editingPrixTTC === null && (
+                      <div>
+                        <div style={{fontWeight:900,fontSize:18,cursor:'pointer'}} onClick={function(){setEditingPrixTTC(v.prix_vente_ttc)}}>{fmt(v.prix_vente_ttc)}€</div>
+                        <div style={{fontSize:10,opacity:.4,marginTop:2}}>HT : {fmt(v.prix_vente_ht)}€</div>
+                      </div>
+                    )}
+                    {editingPrixTTC !== null && (
+                      <div style={{display:'flex',gap:4,alignItems:'center',marginTop:3,flexWrap:'wrap'}}>
+                        <input type="number" step="0.1" value={editingPrixTTC} onChange={function(e){setEditingPrixTTC(parseFloat(e.target.value)||0)}} style={{width:64,padding:'4px 6px',fontSize:14,fontWeight:900,border:'2px solid #005FFF',borderRadius:4}} autoFocus />
+                        <button className="btn btn-sm btn-y" style={{fontSize:10,padding:'4px 6px'}} onClick={function(){saveRecipePriceTTC(v.id, editingPrixTTC)}}>✓</button>
+                        <button className="btn btn-sm" style={{fontSize:10,padding:'4px 6px'}} onClick={function(){setEditingPrixTTC(null)}}>✕</button>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{background:'#FFF5FB',borderRadius:8,padding:'10px 12px',border:'1.5px solid #FFD3EE'}}>
+                    <div style={{fontSize:10,opacity:.6,textTransform:'uppercase',marginBottom:3,color:'#CC0066'}}>Coût HT total</div>
+                    <div style={{fontWeight:900,fontSize:18,color:'#CC0066'}}>{fmt(v.food_cost_ht)}€</div>
+                    <div style={{fontSize:10,opacity:.6,marginTop:2}}>{v.ingredients.length} ingrédient{v.ingredients.length > 1 ? 's' : ''}</div>
+                  </div>
+                  <div style={{background:'#FFEB5A',borderRadius:8,padding:'10px 12px'}}>
+                    <div style={{fontSize:10,opacity:.6,textTransform:'uppercase',marginBottom:3}}>Coeff actuel</div>
+                    <div style={{fontWeight:900,fontSize:18}}>x{coeffActuel}</div>
+                    <div style={{fontSize:10,opacity:.6,marginTop:2}}>{v.food_cost_pct}% · Marge {fmt(v.marge_ht)}€</div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* INGREDIENTS - bulles BLANCHES + édition inline au clic + ajout/suppr direct */}
+            {/* INGREDIENTS */}
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
               <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:.5,opacity:.5}}>Ingrédients ({v.ingredients.length})</div>
               <button className="btn btn-sm btn-y" style={{fontSize:10,fontWeight:900}} onClick={function(){
@@ -1100,6 +1152,8 @@ export default function FoodCostTab(props) {
                   <option value="accompagnement">🍟 Accomp.</option>
                   <option value="boisson">🥤 Boisson</option>
                   <option value="mini">🥨 Mini</option>
+                  <option value="sous_recette">🧪 Sous-recette maison</option>
+                  <option value="sauce">🧪 Sauce maison</option>
                 </select>
               </div>
               <div>
@@ -1159,7 +1213,7 @@ export default function FoodCostTab(props) {
         </div>
       )}
 
-      {/* ========== WIZARD FACTURE (4 étapes) ========== */}
+      {/* ========== WIZARD FACTURE ========== */}
       <FoodCostInvoiceWizard
         isOpen={fcInvoiceModal}
         onClose={function(){ setFcInvoiceModal(false) }}
@@ -1167,10 +1221,9 @@ export default function FoodCostTab(props) {
         toast={toast}
       />
 
-      {/* ========== 2e ÉTAPE APRÈS CRÉATION PRODUIT : multi-affectation ========== */}
+      {/* ========== 2e ÉTAPE APRÈS CRÉATION PRODUIT ========== */}
       {pendingAssignment && pendingAssignment.product && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:12}} onClick={function(){
-          // Click hors modal = annuler (le product reste créé mais sans affectation)
           setPendingAssignment(null)
         }}>
           <div style={{width:'100%',maxWidth:640,maxHeight:'90vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
