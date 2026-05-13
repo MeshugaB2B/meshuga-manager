@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import FoodCostTab from './FoodCostTab'
+import PreparationsMaisonTab from './PreparationsMaisonTab'
 import PurchasesTab from './PurchasesTab'
 import PilotageTab from './PilotageTab'
 import FoodCostAlertsWidget from './FoodCostAlertsWidget'
@@ -857,6 +858,7 @@ function DashboardImpl() {
     {id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true},
     {id: 'notifs', label: 'Notifications', icon: '🔔'},
     {id: 'recipes', label: 'Recettes', icon: '🥪'},
+    {id: 'preparations', label: 'Préparations', icon: '🧪'},
     {id: 'purchases', label: 'Achats', icon: '🛒'},
     {id: 'rh', label: 'Ressources Humaines', icon: '👥'},
     {id: 'legal', label: 'Légal & Conformité', icon: '⚖️'},
@@ -915,7 +917,7 @@ function DashboardImpl() {
               )
             })}
             <div className="sb-sec">Gestion</div>
-{NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['chasse','recipes','purchases','rh','legal','annuaire','reporting','vault'].indexOf(n.id) > -1 }).map(function(n) {              return (                <div key={n.id} className={page === n.id ? 'ni active' : 'ni'} onClick={function() { nav(n.id) }}>
+{NAV.filter(function(n) { return (!n.edwardOnly || !isEmy) && ['chasse','recipes','preparations','purchases','rh','legal','annuaire','reporting','vault'].indexOf(n.id) > -1 }).map(function(n) {              return (                <div key={n.id} className={page === n.id ? 'ni active' : 'ni'} onClick={function() { nav(n.id) }}>
                   <span style={{fontSize:14}}>{n.icon}</span>{n.label}
                 </div>
               )
@@ -2537,7 +2539,7 @@ function DashboardImpl() {
               toast={toast}
             />
           )}
-
+{page === 'preparations' && <PreparationsMaisonTab />}
           {page === 'purchases' && (
             <PurchasesTab toast={toast} />
           )}
