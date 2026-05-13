@@ -1,6 +1,3 @@
-// Fichier : src/app/dashboard/PreparationsMaisonTab.tsx
-// Nouvel onglet — Préparations Maison (sauces, sous-recettes, accompagnements)
-
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
