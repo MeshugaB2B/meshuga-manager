@@ -3,22 +3,31 @@ import { useState } from 'react'
 import AchatsTab from './AchatsTab'
 import FoodCostHistoryTab from './FoodCostHistoryTab'
 import ShoppingListTab from './ShoppingListTab'
+import FoodCostInvoiceWizard from './FoodCostInvoiceWizard'
+import BatchInvoiceImport from './BatchInvoiceImport'
+import BatchValidation from './BatchValidation'
 
 // =============================================================================
 // PurchasesTab — onglet top "Achats 🛒"
 //
 // Wrapper qui regroupe tout ce qui concerne les achats fournisseurs :
-//  - Catalogue (= AchatsTab) : fournisseurs, comparateur, vue détail produit
-//  - Imports : historique des factures + alias mémorisés + anomalies
-//  - Liste de courses : placeholder pour proposition Emy (à venir)
+// - Catalogue (= AchatsTab) : fournisseurs, comparateur, vue détail produit
+// - Imports : historique des factures + alias mémorisés + anomalies
+// - Liste de courses : placeholder pour proposition Emy (à venir)
 //
-// Cohérence visuelle : nav en pills rose Meshuga + Yellowtail pour le titre.
+// Les 2 boutons d'import facture (unitaire et en masse) sont placés dans
+// l'en-tête pour être accessibles depuis n'importe quel sous-onglet.
 // =============================================================================
 
 export default function PurchasesTab(props) {
   var toast = props.toast || function(m){ console.log(m) }
-
   var [subView, setSubView] = useState('catalogue') // 'catalogue' | 'imports' | 'shopping'
+
+  // États pour les modals d'import
+  var [invoiceWizardOpen, setInvoiceWizardOpen] = useState(false)
+  var [batchImportOpen, setBatchImportOpen] = useState(false)
+  var [batchValidationOpen, setBatchValidationOpen] = useState(false)
+  var [currentBatchId, setCurrentBatchId] = useState(null)
 
   // -------- Styles communs (charté Meshuga) --------
   var subNavWrap = {
@@ -52,19 +61,58 @@ export default function PurchasesTab(props) {
 
   return (
     <div>
-      {/* En-tête de section */}
-      <div style={{marginBottom: 18}}>
-        <h2 style={{
-          fontFamily: "'Yellowtail', cursive",
-          fontSize: 38,
-          color: '#191923',
-          margin: 0,
-          lineHeight: 1.1
-        }}>
-          🛒 Achats
-        </h2>
-        <div style={{fontSize: 13, opacity: 0.65, marginTop: 4}}>
-          Fournisseurs · Catalogue produits · Historique des factures · Liste de courses
+      {/* En-tête de section avec boutons d'import à droite */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 18,
+        gap: 12,
+        flexWrap: 'wrap'
+      }}>
+        <div>
+          <h2 style={{
+            fontFamily: "'Yellowtail', cursive",
+            fontSize: 38,
+            color: '#191923',
+            margin: 0,
+            lineHeight: 1.1
+          }}>
+            🛒 Achats
+          </h2>
+          <div style={{fontSize: 13, opacity: 0.65, marginTop: 4}}>
+            Fournisseurs · Catalogue produits · Historique des factures · Liste de courses
+          </div>
+        </div>
+
+        {/* Boutons d'import — visibles depuis tous les sous-onglets */}
+        <div style={{display: 'flex', gap: 8, flexWrap: 'wrap'}}>
+          <button
+            className="btn btn-sm"
+            style={{
+              background: '#009D3A',
+              color: '#fff',
+              fontWeight: 900,
+              fontSize: 12,
+              padding: '10px 14px'
+            }}
+            onClick={function(){ setInvoiceWizardOpen(true) }}
+          >
+            📄 Importer une facture
+          </button>
+          <button
+            className="btn btn-sm"
+            style={{
+              background: '#191923',
+              color: '#FFEB5A',
+              fontWeight: 900,
+              fontSize: 12,
+              padding: '10px 14px'
+            }}
+            onClick={function(){ setBatchImportOpen(true) }}
+          >
+            📦 Import en masse
+          </button>
         </div>
       </div>
 
@@ -85,14 +133,53 @@ export default function PurchasesTab(props) {
       {subView === 'catalogue' && (
         <AchatsTab toast={toast} />
       )}
-
       {subView === 'imports' && (
         <FoodCostHistoryTab toast={toast} />
       )}
-
       {subView === 'shopping' && (
         <ShoppingListTab toast={toast} />
       )}
+
+      {/* ========== MODAL : Import facture unique (wizard) ========== */}
+      <FoodCostInvoiceWizard
+        isOpen={invoiceWizardOpen}
+        onClose={function(){ setInvoiceWizardOpen(false) }}
+        onSuccess={function(){
+          setInvoiceWizardOpen(false)
+          // Si on est sur l'onglet imports, on rafraîchit visuellement
+          if (subView === 'imports') {
+            // Force re-render léger en switchant brièvement
+            setSubView('imports')
+          }
+        }}
+        toast={toast}
+      />
+
+      {/* ========== MODAL : Import en masse ========== */}
+      <BatchInvoiceImport
+        isOpen={batchImportOpen}
+        onClose={function(){ setBatchImportOpen(false) }}
+        onSuccess={function(batchId){
+          setCurrentBatchId(batchId)
+          setBatchImportOpen(false)
+          setBatchValidationOpen(true)
+        }}
+        toast={toast}
+      />
+
+      <BatchValidation
+        isOpen={batchValidationOpen}
+        batchId={currentBatchId}
+        onClose={function(){
+          setBatchValidationOpen(false)
+          setCurrentBatchId(null)
+          // Rafraîchir l'onglet imports si on y est
+          if (subView === 'imports') {
+            setSubView('imports')
+          }
+        }}
+        toast={toast}
+      />
     </div>
   )
 }
