@@ -957,7 +957,7 @@ function DashboardImpl() {
                 {isEmy && <button className="btn btn-p btn-sm" onClick={function(){openModal('cr',{})}}>+ Nouveau CR</button>}
               </div>
 
-              <PendingInvoicesWidget />
+              <PendingInvoicesWidget toast={toast} onGoToImports={function(){ setPage("purchases") }} />
 
               <WeatherWidget />
 
