@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js'
 import IngredientPopup from './IngredientPopup'
 import FoodCostInvoiceWizard from './FoodCostInvoiceWizard'
 import ProductRecipeAssignment from './ProductRecipeAssignment'
+import BatchInvoiceImport from './BatchInvoiceImport'
+import BatchValidation from './BatchValidation'
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
@@ -54,6 +56,11 @@ export default function FoodCostTab(props) {
   var [newDrinkModal, setNewDrinkModal] = useState(null)
 
   var [fcInvoiceModal, setFcInvoiceModal] = useState(false)
+
+  // Batch import historique - NOUVEAU
+  var [batchImportOpen, setBatchImportOpen] = useState(false)
+  var [batchValidationOpen, setBatchValidationOpen] = useState(false)
+  var [currentBatchId, setCurrentBatchId] = useState(null)
 
   var [drinkEdit, setDrinkEdit] = useState(null)
 
@@ -189,7 +196,6 @@ export default function FoodCostTab(props) {
       var vs = Object.values(groupedList[gi].variants)
       var vi
       for (vi = 0; vi < vs.length; vi++) {
-        // KPIs basés uniquement sur recettes vendables (pas les préparations maison)
         if (!isPrepCat(vs[vi].categorie)) allVariants.push(vs[vi])
       }
     }
@@ -514,6 +520,7 @@ export default function FoodCostTab(props) {
           <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
           <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewDrinkModal({name:'',supplier_name:'',purchase_price_ht:0,selling_price_ttc:0})}}>+ Boisson</button>
           <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Importer facture</button>
+          <button className="btn btn-sm" style={{background:'#191923',color:'#FFEB5A',fontWeight:900}} onClick={function(){setBatchImportOpen(true)}}>📦 Import en masse</button>
         </div>
       </div>
 
@@ -536,7 +543,6 @@ export default function FoodCostTab(props) {
             {id:'mini',label:'🥨 Minis'},
             {id:'salade',label:'🥗 Salades'},
             {id:'accompagnement',label:'🍟 Accomp.'},
-            {id:'supplements',label:'💸 Suppléments'},
             {id:'boisson',label:'🥤 Boissons'},
             {id:'preparations',label:'🧪 Préparations'}
           ].map(function(cat){
@@ -548,10 +554,6 @@ export default function FoodCostTab(props) {
                   if (!isPrepCat(vv.categorie)) count++
                 } else if (cat.id === 'preparations') {
                   if (isPrepCat(vv.categorie)) count++
-                } else if (cat.id === 'supplements') {
-                  if (Number(vv.prix_vente_ttc) === 1 && vv.categorie === 'accompagnement') count++
-                } else if (cat.id === 'accompagnement') {
-                  if (vv.categorie === 'accompagnement' && Number(vv.prix_vente_ttc) !== 1) count++
                 } else if ((vv.categorie || '') === cat.id) {
                   count++
                 }
@@ -643,14 +645,7 @@ export default function FoodCostTab(props) {
                 label: '🍟 Accompagnements',
                 color: '#191923',
                 showWhen: ['tous','accompagnement'],
-                filter: function(v){ return v.categorie === 'accompagnement' && Number(v.prix_vente_ttc) !== 1 }
-              },
-              {
-                key: 'supplements',
-                label: '💸 Suppléments',
-                color: '#FF82D7',
-                showWhen: ['tous','supplements'],
-                filter: function(v){ return v.categorie === 'accompagnement' && Number(v.prix_vente_ttc) === 1 }
+                filter: function(v){ return v.categorie === 'accompagnement' }
               },
               {
                 key: 'boissons_maison',
@@ -740,7 +735,7 @@ export default function FoodCostTab(props) {
             })
           })()}
 
-          {/* BOISSONS REVENTE — affichées quand filtre "tous" ou "boisson" (pas en preparations) */}
+          {/* BOISSONS REVENTE */}
           {(fcCatFilter === 'tous' || fcCatFilter === 'boisson') && drinks.map(function(d){
             var tvaR = tvaToRatio(d.tva_rate)
             if (tvaR === 0) tvaR = 0.20
@@ -812,7 +807,6 @@ export default function FoodCostTab(props) {
               <button className="btn btn-sm" style={{background:'#FFE5E5',color:'#CC0066',fontWeight:900}} onClick={function(){deleteRecipeParent(parent.parent_slug, parent.name)}}>🗑️ Supprimer</button>
             </div>
 
-            {/* MODAL ÉDITION META */}
             {editingMeta && editingMeta.recipe_id === v.id && (
               <div style={{background:'#F8F9FF',borderRadius:12,padding:16,marginBottom:12,border:'2px solid #005FFF'}}>
                 <div style={{fontWeight:900,fontSize:13,textTransform:'uppercase',marginBottom:10,color:'#005FFF'}}>✏️ Modifier la recette</div>
@@ -849,7 +843,6 @@ export default function FoodCostTab(props) {
               </div>
             )}
 
-            {/* Toggle variantes */}
             {variantsList.length > 1 && (
               <div style={{display:'flex',gap:0,marginBottom:16,background:'#F5F5F5',borderRadius:10,padding:4}}>
                 {variantsList.map(function(vv){
@@ -863,7 +856,6 @@ export default function FoodCostTab(props) {
               </div>
             )}
 
-            {/* PRIX CONSEILLE - caché pour préparations maison */}
             {!isPrep && (
               <div style={{background:'#FF82D7',borderRadius:12,padding:16,marginBottom:12,border:'2px solid #fff'}}>
                 <div style={{fontFamily:"'Yellowtail',cursive",fontSize:18,color:'#191923',marginBottom:8}}>💡 Prix conseillé</div>
@@ -881,7 +873,6 @@ export default function FoodCostTab(props) {
               </div>
             )}
 
-            {/* RECAP — adapté pour préparations */}
             {isPrep ? (
               <div style={{background:'#fff',borderRadius:12,padding:16,border:'2px solid #A06CD5',marginBottom:12}}>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
@@ -930,7 +921,6 @@ export default function FoodCostTab(props) {
               </div>
             )}
 
-            {/* INGREDIENTS */}
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
               <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:.5,opacity:.5}}>Ingrédients ({v.ingredients.length})</div>
               <button className="btn btn-sm btn-y" style={{fontSize:10,fontWeight:900}} onClick={function(){
@@ -1142,7 +1132,6 @@ export default function FoodCostTab(props) {
         )
       })()}
 
-
       {/* ========== MODAL NOUVELLE RECETTE ========== */}
       {newRecipeModal && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:300,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={function(){setNewRecipeModal(null)}}>
@@ -1257,6 +1246,29 @@ export default function FoodCostTab(props) {
       )}
 
       {ingPopup && <IngredientPopup ing={ingPopup} onClose={function(){setIngPopup(null)}} />}
+
+      {/* ========== BATCH IMPORT HISTORIQUE ========== */}
+      <BatchInvoiceImport
+        isOpen={batchImportOpen}
+        onClose={function(){ setBatchImportOpen(false) }}
+        onSuccess={function(batchId){
+          setCurrentBatchId(batchId)
+          setBatchImportOpen(false)
+          setBatchValidationOpen(true)
+        }}
+        toast={toast}
+      />
+
+      <BatchValidation
+        isOpen={batchValidationOpen}
+        batchId={currentBatchId}
+        onClose={function(){
+          setBatchValidationOpen(false)
+          setCurrentBatchId(null)
+          loadData()
+        }}
+        toast={toast}
+      />
     </div>
   )
 }
