@@ -4,8 +4,6 @@ import { createClient } from '@supabase/supabase-js'
 import IngredientPopup from './IngredientPopup'
 import FoodCostInvoiceWizard from './FoodCostInvoiceWizard'
 import ProductRecipeAssignment from './ProductRecipeAssignment'
-import BatchInvoiceImport from './BatchInvoiceImport'
-import BatchValidation from './BatchValidation'
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
@@ -56,11 +54,6 @@ export default function FoodCostTab(props) {
   var [newDrinkModal, setNewDrinkModal] = useState(null)
 
   var [fcInvoiceModal, setFcInvoiceModal] = useState(false)
-
-  // Batch import historique - NOUVEAU
-  var [batchImportOpen, setBatchImportOpen] = useState(false)
-  var [batchValidationOpen, setBatchValidationOpen] = useState(false)
-  var [currentBatchId, setCurrentBatchId] = useState(null)
 
   var [drinkEdit, setDrinkEdit] = useState(null)
 
@@ -520,7 +513,7 @@ export default function FoodCostTab(props) {
           <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
           <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewDrinkModal({name:'',supplier_name:'',purchase_price_ht:0,selling_price_ttc:0})}}>+ Boisson</button>
           <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Importer facture</button>
-          <button className="btn btn-sm" style={{background:'#191923',color:'#FFEB5A',fontWeight:900}} onClick={function(){setBatchImportOpen(true)}}>📦 Import en masse</button>
+ <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Importer facture</button>
         </div>
       </div>
 
@@ -1247,28 +1240,3 @@ export default function FoodCostTab(props) {
 
       {ingPopup && <IngredientPopup ing={ingPopup} onClose={function(){setIngPopup(null)}} />}
 
-      {/* ========== BATCH IMPORT HISTORIQUE ========== */}
-      <BatchInvoiceImport
-        isOpen={batchImportOpen}
-        onClose={function(){ setBatchImportOpen(false) }}
-        onSuccess={function(batchId){
-          setCurrentBatchId(batchId)
-          setBatchImportOpen(false)
-          setBatchValidationOpen(true)
-        }}
-        toast={toast}
-      />
-
-      <BatchValidation
-        isOpen={batchValidationOpen}
-        batchId={currentBatchId}
-        onClose={function(){
-          setBatchValidationOpen(false)
-          setCurrentBatchId(null)
-          loadData()
-        }}
-        toast={toast}
-      />
-    </div>
-  )
-}
