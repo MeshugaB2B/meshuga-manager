@@ -1,17 +1,15 @@
 // src/app/api/import-invoice/batch/route.ts
-// Import en masse de factures historiques
-// - Accepte N fichiers PDF en base64
-// - Dédup par hash SHA-256 + match (supplier + invoice_number + invoice_date)
-// - OCR Claude Sonnet 4.6 avec règles métier Meshuga injectées
-// - Insère dans pending_invoices avec is_historical=true + batch_id
-// - Limite : 10 fichiers OCR en parallèle pour respecter rate limit Anthropic
+// VERSION 2 — Prompt OCR amélioré (vraies anomalies seulement)
+// - Détection avoirs plus précise
+// - Vérifications cohérentes ne sont PAS des anomalies
+// - Règles métier Meshuga injectées
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
 export const runtime = 'nodejs'
-export const maxDuration = 300 // 5 minutes max par batch
+export const maxDuration = 300
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -21,7 +19,7 @@ function sb() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE)
 }
 
-// ============= PROMPT OCR ENRICHI MESHUGA =============
+// ============= PROMPT OCR ENRICHI MESHUGA (V2) =============
 const OCR_PROMPT = `Tu es un expert OCR de factures fournisseurs pour le restaurant Meshuga Crazy Deli (Paris).
 
 Analyse le PDF fourni et extrais les informations en JSON STRICT (aucun texte hors JSON).
@@ -47,68 +45,61 @@ Analyse le PDF fourni et extrais les informations en JSON STRICT (aucun texte ho
       "tva_rate": pourcentage TVA
     }
   ],
-  "anomalies": ["liste des anomalies détectées"]
+  "anomalies": ["UNIQUEMENT les vrais problèmes - voir règles ci-dessous"]
 }
 
-# RÈGLES MÉTIER CRITIQUES À RESPECTER
+# CE QUI EST UNE ANOMALIE (à signaler)
+- Prix manifestement aberrant (ex: pain hot dog à 8€HT)
+- Quantité = 0 mais ligne facturée avec montant
+- Date manquante ou clairement incohérente
+- TVA totalement absente sur une ligne avec montant
+- Total facture ne correspond pas à la somme des lignes (écart > 1€)
+- Produit dont le nom est illisible ou tronqué
+- Ligne avec montant mais sans description
 
-## Détection avoir/note de crédit
-- Cherche les mots-clés : "AVOIR", "NOTE DE CRÉDIT", "CRÉDIT", "REMBOURSEMENT", "RETOUR"
+# CE QUI N'EST PAS UNE ANOMALIE (ne PAS mentionner)
+- TVA calculée cohérente avec le document : NE PAS LE DIRE, c'est juste OK
+- Total TTC cohérent avec HT + TVA : NE PAS LE DIRE, c'est juste OK
+- Mention "PORT" ou "MANUTENTION" avec montant vide : NE PAS LE DIRE, c'est normal (souvent gratuit)
+- Quantité élevée si le nom du produit explique (ex: "133kg saucisse" pour Norbert qui livre en gros pour Meshuga deli : NORMAL)
+- Conditionnement particulier (lots, packs) : NE PAS LE DIRE, c'est normal
+
+# DÉTECTION AVOIR
+- Mots-clés : "AVOIR", "NOTE DE CRÉDIT", "CRÉDIT", "REMBOURSEMENT", "RETOUR"
 - Préfixe numéro pièce : "AV-", "NC-", "CR-"
 - Montants négatifs ou mention "à déduire"
-→ Si oui : document_type = "avoir"
+- Si oui → document_type = "avoir"
 
-## Episaveurs (CRITIQUE — règle Quantité livrée)
+# RÈGLES MÉTIER PAR FOURNISSEUR
+
+## Episaveurs (CRITIQUE - règle Quantité livrée)
 - TOUJOURS lire la colonne "Quantité livrée" pour quantity_delivered
 - NE JAMAIS prendre le pack_label comme quantité
-- BCL = 1 bocal (pas un pack même si "x6" dans le label)
-- BT = N bouteilles individuelles
-- BTE = 1 boîte
-- CAR = 1 carton
-- Le "x6", "x12" dans l'intitulé = descriptif marketing, JAMAIS la quantité réelle
-- Exemple : "Cornichons bcl 1600Gx6" + livré "1 BCL" → quantity_delivered=1, quantity_unit="BCL", pack_label="1600g"
+- BCL = 1 bocal | BT = N bouteilles | BTE = 1 boîte | CAR = 1 carton
+- "x6", "x12" dans intitulé = marketing, JAMAIS la quantité réelle
+- Ex: "Cornichons bcl 1600Gx6" + livré "1 BCL" = quantity_delivered=1, pack_label="1600g"
 
 ## Monarque (pains)
-- Factures TOUJOURS en lots
-- Patterns : "xN" ou "N tranches" indiquent le nombre d'unités
-- TVA = 5,5% (vérifier)
-- 3 produits Pain distincts : "Pain hot dog", "Pain lobster roll", "Pain mini"
-- Poids unitaires indicatifs (90g, 1140g) = info, pas quantité
+- Factures TOUJOURS en lots ("xN" ou "N tranches" = nb unités)
+- TVA = 5,5%
+- 3 produits : "Pain hot dog", "Pain lobster roll", "Pain mini"
+- Poids unitaires (90g, 1140g) = info, pas quantité
 
 ## Foodflow (légumes)
 - Cébette = 1 botte (~100g), pas 1kg
-- Sucrine = 1 barquette de 6 unités (~3€HT/barquette)
-- American cheese = paquet de 84 tranches à 7€HT
-- Bien différencier botte/barquette/kg
+- Sucrine = 1 barquette de 6 unités
+- American cheese = paquet 84 tranches à 7€HT
 
 ## Norbert (boucherie)
-- Viande au kg ou en pièces — vérifier l'unité
-- Côtes/portions parfois en U
-
-## Marina Sea Food (poisson)
-- Au kg, parfois sous-vide
-
-## Rouquette (épicerie)
-- Multi-produits, packs fréquents
-- Lire les conditionnements
+- Viande au kg ou en pièces — bien identifier l'unité
+- Quantités élevées (50-200kg) = NORMAL pour ce fournisseur
 
 ## DS Service (packaging)
-- À l'unité ou par carton de N
-- Pot 60ml : carton de 2500 = 36,50€HT (0,0146€/U)
-- Couvercle 60ml : carton de 2500 = 29,90€HT (0,01196€/U)
+- Pot 60ml : carton 2500 = 36,50€HT
+- Couvercle 60ml : carton 2500 = 29,90€HT
 
-## HPS (consommables)
-- Gants, essuie-tout, produits ménagers
-
-## Jacquier
-- Fruits/légumes complémentaires
-
-# ANOMALIES À SIGNALER
-- Prix manifestement aberrant (ex: pain hot dog à 8€HT)
-- Quantité = 0 mais ligne facturée
-- Date manquante ou incohérente
-- TVA absente ou bizarre
-- Total ligne ≠ qty × prix unitaire
+## Autres (Marina, Rouquette, HPS, Jacquier)
+- Lire les unités attentivement (kg, L, U, pack)
 
 Retourne UNIQUEMENT le JSON, aucun texte autour.`
 
@@ -128,18 +119,8 @@ async function callClaudeOCR(pdfBase64: string): Promise<any> {
         {
           role: 'user',
           content: [
-            {
-              type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/pdf',
-                data: pdfBase64
-              }
-            },
-            {
-              type: 'text',
-              text: OCR_PROMPT
-            }
+            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+            { type: 'text', text: OCR_PROMPT }
           ]
         }
       ]
@@ -153,11 +134,8 @@ async function callClaudeOCR(pdfBase64: string): Promise<any> {
 
   const data = await response.json()
   const text = data.content?.[0]?.text || ''
-  
-  // Extraire le JSON (au cas où Claude met des backticks)
   const jsonMatch = text.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error('Pas de JSON dans la réponse Claude')
-  
   try {
     return JSON.parse(jsonMatch[0])
   } catch (e: any) {
@@ -165,19 +143,14 @@ async function callClaudeOCR(pdfBase64: string): Promise<any> {
   }
 }
 
-// ============= Mapper fournisseur extrait → supplier_id DB =============
+// ============= Mapper fournisseur =============
 async function mapSupplierToId(fournisseurName: string): Promise<{ id: string | null, name: string | null }> {
   const client = sb()
   const normalized = (fournisseurName || '').toLowerCase().trim()
-  
-  // Match exact ou approximatif sur le nom
   const { data: suppliers } = await client.from('suppliers').select('id, name')
   if (!suppliers) return { id: null, name: null }
   
-  // 1. Match exact (insensible à la casse)
   let match = suppliers.find(s => (s.name || '').toLowerCase() === normalized)
-  
-  // 2. Match partiel (le nom DB contenu dans le nom extrait ou vice-versa)
   if (!match) {
     match = suppliers.find(s => {
       const sName = (s.name || '').toLowerCase()
@@ -185,20 +158,12 @@ async function mapSupplierToId(fournisseurName: string): Promise<{ id: string | 
     })
   }
   
-  // 3. Match par alias connus
   const aliases: Record<string, string> = {
-    'norbert': 'norbert',
-    'foodflow': 'foodflow',
-    'monarque': 'monarque',
-    'marina': 'marina sea food',
-    'marina sea food': 'marina sea food',
-    'rouquette': 'rouquette',
-    'episaveurs': 'episaveurs',
-    'pomona': 'episaveurs',
-    'ds service': 'ds service',
-    'ds': 'ds service',
-    'hps': 'hps',
-    'jacquier': 'jacquier'
+    'norbert': 'norbert', 'foodflow': 'foodflow', 'monarque': 'monarque',
+    'marina': 'marina sea food', 'marina sea food': 'marina sea food',
+    'rouquette': 'rouquette', 'episaveurs': 'episaveurs', 'pomona': 'episaveurs',
+    'ds service': 'ds service', 'ds': 'ds service',
+    'hps': 'hps', 'jacquier': 'jacquier'
   }
   
   if (!match) {
@@ -213,53 +178,32 @@ async function mapSupplierToId(fournisseurName: string): Promise<{ id: string | 
   return { id: match?.id || null, name: match?.name || null }
 }
 
-// ============= Traitement d'1 fichier =============
+// ============= Process 1 fichier =============
 async function processSingleFile(
   file: { name: string, base64: string },
   batchId: string,
   forcedSupplierId: string | null,
   forcedSupplierName: string | null
-): Promise<{
-  status: 'imported' | 'duplicate' | 'error',
-  invoice_id?: string,
-  is_credit_note?: boolean,
-  reason?: string,
-  details?: any
-}> {
+): Promise<any> {
   const client = sb()
-  
-  // 1. Hash SHA-256
   const buffer = Buffer.from(file.base64, 'base64')
   const pdfHash = crypto.createHash('sha256').update(buffer).digest('hex')
   
-  // 2. Check duplicate par hash uniquement (à ce stade on n'a pas encore les autres infos)
-  const { data: existingByHash } = await client
-    .from('pending_invoices')
-    .select('id')
-    .eq('pdf_hash', pdfHash)
-    .limit(1)
-  
+  // Check duplicate hash
+  const { data: existingByHash } = await client.from('pending_invoices').select('id').eq('pdf_hash', pdfHash).limit(1)
   if (existingByHash && existingByHash.length > 0) {
-    return {
-      status: 'duplicate',
-      reason: 'same_pdf_hash',
-      details: { existing_id: existingByHash[0].id }
-    }
+    return { status: 'duplicate', reason: 'same_pdf_hash', details: { file: file.name, existing_id: existingByHash[0].id } }
   }
   
-  // 3. OCR Claude
+  // OCR
   let ocrData: any
   try {
     ocrData = await callClaudeOCR(file.base64)
   } catch (e: any) {
-    return {
-      status: 'error',
-      reason: 'ocr_failed',
-      details: { error: e.message, file: file.name }
-    }
+    return { status: 'error', reason: 'ocr_failed', details: { error: e.message, file: file.name } }
   }
   
-  // 4. Résoudre supplier_id
+  // Resolve supplier
   let supplierId = forcedSupplierId
   let supplierName = forcedSupplierName
   if (!supplierId && ocrData.fournisseur) {
@@ -268,130 +212,96 @@ async function processSingleFile(
     supplierName = mapped.name
   }
   
-  // 5. Check duplicate métier (supplier + invoice_number + date)
+  // Check duplicate métier
   if (supplierId && ocrData.invoice_number && ocrData.invoice_date) {
-    const { data: existingByMeta } = await client
-      .from('pending_invoices')
-      .select('id')
-      .eq('supplier_id', supplierId)
-      .eq('invoice_number', ocrData.invoice_number)
-      .eq('invoice_date', ocrData.invoice_date)
-      .limit(1)
-    
+    const { data: existingByMeta } = await client.from('pending_invoices').select('id')
+      .eq('supplier_id', supplierId).eq('invoice_number', ocrData.invoice_number).eq('invoice_date', ocrData.invoice_date).limit(1)
     if (existingByMeta && existingByMeta.length > 0) {
-      return {
-        status: 'duplicate',
-        reason: 'same_supplier_invoice_date',
-        details: { existing_id: existingByMeta[0].id }
-      }
+      return { status: 'duplicate', reason: 'same_supplier_invoice_date', details: { file: file.name, existing_id: existingByMeta[0].id } }
     }
   }
   
-  // 6. Préparer les anomalies
-  const anomalies: string[] = ocrData.anomalies || []
+  // Anomalies (filtrer les vraies + ajouter les techniques)
+  const anomalies: string[] = Array.isArray(ocrData.anomalies) ? ocrData.anomalies.filter((a: string) => {
+    const lower = (a || '').toLowerCase()
+    // Filtrer les fausses anomalies (vérifications cohérentes)
+    if (lower.includes('cohérent')) return false
+    if (lower.includes('coherent')) return false
+    if (lower.includes('correct')) return false
+    if (lower.includes('ok')) return false
+    if (lower.includes('vide/absent')) return false
+    if (lower.includes('port') && lower.includes('vide')) return false
+    return true
+  }) : []
+  
   if (!supplierId) anomalies.push('Fournisseur non identifié dans la base')
   if (!ocrData.invoice_number) anomalies.push('Numéro de facture manquant')
   if (!ocrData.invoice_date) anomalies.push('Date de facture manquante')
   if (!ocrData.lines || ocrData.lines.length === 0) anomalies.push('Aucune ligne produit détectée')
   
-  // 7. Insert dans pending_invoices
   const isCreditNote = ocrData.document_type === 'avoir'
   
-  const { data: inserted, error: insertErr } = await client
-    .from('pending_invoices')
-    .insert({
-      source: 'batch_historical',
-      file_name: file.name,
-      pdf_base64: file.base64,
-      pdf_hash: pdfHash,
-      batch_id: batchId,
-      is_historical: true,
-      is_credit_note: isCreditNote,
-      related_invoice_number: ocrData.related_invoice_number || null,
-      extracted_data: ocrData,
-      fournisseur_extracted: ocrData.fournisseur_raw || ocrData.fournisseur || null,
-      supplier_id: supplierId,
-      invoice_date: ocrData.invoice_date || null,
-      invoice_number: ocrData.invoice_number || null,
-      total_ht: ocrData.total_ht || null,
-      total_ttc: ocrData.total_ttc || null,
-      nb_lines: ocrData.lines?.length || 0,
-      has_anomaly: anomalies.length > 0,
-      anomaly_reasons: anomalies,
-      status: 'pending'
-    })
-    .select('id')
-    .single()
+  // Insert
+  const { data: inserted, error: insertErr } = await client.from('pending_invoices').insert({
+    source: 'batch_historical',
+    file_name: file.name,
+    pdf_base64: file.base64,
+    pdf_hash: pdfHash,
+    batch_id: batchId,
+    is_historical: true,
+    is_credit_note: isCreditNote,
+    related_invoice_number: ocrData.related_invoice_number || null,
+    extracted_data: ocrData,
+    fournisseur_extracted: ocrData.fournisseur_raw || ocrData.fournisseur || null,
+    supplier_id: supplierId,
+    invoice_date: ocrData.invoice_date || null,
+    invoice_number: ocrData.invoice_number || null,
+    total_ht: ocrData.total_ht || null,
+    total_ttc: ocrData.total_ttc || null,
+    nb_lines: ocrData.lines?.length || 0,
+    has_anomaly: anomalies.length > 0,
+    anomaly_reasons: anomalies,
+    status: 'pending'
+  }).select('id').single()
   
   if (insertErr) {
-    return {
-      status: 'error',
-      reason: 'db_insert_failed',
-      details: { error: insertErr.message, file: file.name }
-    }
+    return { status: 'error', reason: 'db_insert_failed', details: { error: insertErr.message, file: file.name } }
   }
   
-  return {
-    status: 'imported',
-    invoice_id: inserted.id,
-    is_credit_note: isCreditNote
-  }
+  return { status: 'imported', invoice_id: inserted.id, is_credit_note: isCreditNote, details: { file: file.name } }
 }
 
 // ============= POST handler =============
 export async function POST(req: NextRequest) {
-  if (!ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY non configurée' }, { status: 500 })
-  }
-  if (!SUPABASE_SERVICE_ROLE) {
-    return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurée' }, { status: 500 })
-  }
+  if (!ANTHROPIC_API_KEY) return NextResponse.json({ error: 'ANTHROPIC_API_KEY non configurée' }, { status: 500 })
+  if (!SUPABASE_SERVICE_ROLE) return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurée' }, { status: 500 })
   
   let body: any
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Body JSON invalide' }, { status: 400 })
-  }
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'Body JSON invalide' }, { status: 400 }) }
   
   const files = body.files as Array<{ name: string, base64: string }>
   const forcedSupplierId = body.supplier_id_forced || null
   
-  if (!Array.isArray(files) || files.length === 0) {
-    return NextResponse.json({ error: 'Aucun fichier fourni' }, { status: 400 })
-  }
-  if (files.length > 100) {
-    return NextResponse.json({ error: 'Maximum 100 fichiers par batch' }, { status: 400 })
-  }
+  if (!Array.isArray(files) || files.length === 0) return NextResponse.json({ error: 'Aucun fichier fourni' }, { status: 400 })
+  if (files.length > 100) return NextResponse.json({ error: 'Maximum 100 fichiers par batch' }, { status: 400 })
   
   const client = sb()
-  
-  // Récupérer le nom du fournisseur forcé si applicable
   let forcedSupplierName: string | null = null
   if (forcedSupplierId) {
     const { data } = await client.from('suppliers').select('name').eq('id', forcedSupplierId).single()
     forcedSupplierName = data?.name || null
   }
   
-  // 1. Créer le batch
-  const { data: batch, error: batchErr } = await client
-    .from('historical_import_batches')
-    .insert({
-      supplier_id: forcedSupplierId,
-      supplier_name: forcedSupplierName,
-      total_files: files.length,
-      status: 'processing'
-    })
-    .select('id')
-    .single()
+  const { data: batch, error: batchErr } = await client.from('historical_import_batches').insert({
+    supplier_id: forcedSupplierId,
+    supplier_name: forcedSupplierName,
+    total_files: files.length,
+    status: 'processing'
+  }).select('id').single()
   
-  if (batchErr || !batch) {
-    return NextResponse.json({ error: 'Création batch impossible : ' + (batchErr?.message || '') }, { status: 500 })
-  }
+  if (batchErr || !batch) return NextResponse.json({ error: 'Création batch impossible : ' + (batchErr?.message || '') }, { status: 500 })
   
   const batchId = batch.id
-  
-  // 2. Traitement par lots de 5 en parallèle (rate limit Anthropic)
   const BATCH_SIZE = 5
   const results: Array<any> = []
   
@@ -399,63 +309,43 @@ export async function POST(req: NextRequest) {
     const slice = files.slice(i, i + BATCH_SIZE)
     const sliceResults = await Promise.all(
       slice.map(f => processSingleFile(f, batchId, forcedSupplierId, forcedSupplierName)
-        .catch(e => ({
-          status: 'error' as const,
-          reason: 'unexpected',
-          details: { error: e.message, file: f.name }
-        }))
+        .catch(e => ({ status: 'error', reason: 'unexpected', details: { error: e.message, file: f.name } }))
       )
     )
     results.push(...sliceResults)
-    
-    // Update compteur intermédiaire
-    const processedSoFar = i + slice.length
-    await client
-      .from('historical_import_batches')
-      .update({ processed_files: processedSoFar })
-      .eq('id', batchId)
+    await client.from('historical_import_batches').update({ processed_files: i + slice.length }).eq('id', batchId)
   }
   
-  // 3. Stats finales
   const imported = results.filter(r => r.status === 'imported')
   const invoices = imported.filter(r => !r.is_credit_note).length
   const creditNotes = imported.filter(r => r.is_credit_note).length
   const duplicates = results.filter(r => r.status === 'duplicate').length
   const errors = results.filter(r => r.status === 'error')
   
-  // 4. Calculer la plage de dates
   const importedIds = imported.map(r => r.invoice_id).filter(Boolean)
   let dateStart = null
   let dateEnd = null
   if (importedIds.length > 0) {
-    const { data: dates } = await client
-      .from('pending_invoices')
-      .select('invoice_date')
-      .in('id', importedIds)
-      .not('invoice_date', 'is', null)
-      .order('invoice_date', { ascending: true })
+    const { data: dates } = await client.from('pending_invoices').select('invoice_date')
+      .in('id', importedIds).not('invoice_date', 'is', null).order('invoice_date', { ascending: true })
     if (dates && dates.length > 0) {
       dateStart = dates[0].invoice_date
       dateEnd = dates[dates.length - 1].invoice_date
     }
   }
   
-  // 5. Update batch final
-  await client
-    .from('historical_import_batches')
-    .update({
-      processed_files: files.length,
-      invoices_count: invoices,
-      credit_notes_count: creditNotes,
-      duplicates_count: duplicates,
-      errors_count: errors.length,
-      errors_log: errors.map(e => ({ file: e.details?.file, reason: e.reason, error: e.details?.error })),
-      status: errors.length === 0 ? 'completed' : (imported.length > 0 ? 'partial_error' : 'completed'),
-      date_range_start: dateStart,
-      date_range_end: dateEnd,
-      completed_at: new Date().toISOString()
-    })
-    .eq('id', batchId)
+  await client.from('historical_import_batches').update({
+    processed_files: files.length,
+    invoices_count: invoices,
+    credit_notes_count: creditNotes,
+    duplicates_count: duplicates,
+    errors_count: errors.length,
+    errors_log: errors.map(e => ({ file: e.details?.file, reason: e.reason, error: e.details?.error })),
+    status: errors.length === 0 ? 'completed' : (imported.length > 0 ? 'partial_error' : 'completed'),
+    date_range_start: dateStart,
+    date_range_end: dateEnd,
+    completed_at: new Date().toISOString()
+  }).eq('id', batchId)
   
   return NextResponse.json({
     batch_id: batchId,
