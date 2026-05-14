@@ -513,7 +513,6 @@ export default function FoodCostTab(props) {
           <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
           <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewDrinkModal({name:'',supplier_name:'',purchase_price_ht:0,selling_price_ttc:0})}}>+ Boisson</button>
           <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Importer facture</button>
- <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Importer facture</button>
         </div>
       </div>
 
