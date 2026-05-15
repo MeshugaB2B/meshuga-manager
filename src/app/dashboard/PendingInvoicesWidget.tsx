@@ -131,8 +131,9 @@ export default function PendingInvoicesWidget(props: {
         <button
           className="btn btn-sm"
           style={{
-            background: '#191923',
-            color: '#FFEB5A',
+            background: '#FFEB5A',
+            color: '#191923',
+            border: '2px solid #191923',
             fontWeight: 900,
             fontSize: 11,
             padding: '6px 10px'
