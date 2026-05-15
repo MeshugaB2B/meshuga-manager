@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import ArticleDetailModal from './ArticleDetailModal'
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
@@ -85,12 +86,6 @@ export default function FoodCostAlertsWidget() {
 
   function openDetail(item) {
     setSelectedItem(item)
-    sb().from('product_prices').select('master_unit_price, invoice_date, pack_label')
-      .eq('product_id', item.id).order('invoice_date', {ascending: true})
-      .then(function(r) {
-        var hist = (r.data || []).map(function(h){ return {price: h.master_unit_price, invoice_date: h.invoice_date, pack_label: h.pack_label} })
-        setPriceHistory(hist)
-      })
   }
 
   function createTask(item) {
@@ -109,43 +104,6 @@ export default function FoodCostAlertsWidget() {
       }).catch(function(){})
       alert('Tâche créée + notification envoyée')
     })
-  }
-
-  function renderChart(history) {
-    if (!history || history.length < 2) return null
-    var vals = history.map(function(h) { return Number(h.price) })
-    var minV = Math.min.apply(null, vals) * 0.9
-    var maxV = Math.max.apply(null, vals) * 1.1
-    var range = maxV - minV || 1
-    var w = 400, h = 160, pad = 40
-    var chartW = w - pad * 2, chartH = h - pad * 2
-    var points = history.map(function(p, i) {
-      var x = pad + (i / (history.length - 1)) * chartW
-      var y = pad + chartH - ((Number(p.price) - minV) / range) * chartH
-      return {x: x, y: y, price: Number(p.price), date: p.invoice_date}
-    })
-    var polyStr = points.map(function(p) { return p.x + ',' + p.y }).join(' ')
-    var areaStr = polyStr + ' ' + (pad + chartW) + ',' + (pad + chartH) + ' ' + pad + ',' + (pad + chartH)
-    var first = vals[0]
-    var last = vals[vals.length - 1]
-    var trending = last > first ? '#CC0066' : '#009D3A'
-    return (
-      <svg viewBox={"0 0 " + w + " " + h} style={{width:'100%',height:'auto',marginTop:12}}>
-        <polygon points={areaStr} fill={trending} opacity="0.1" />
-        <polyline points={polyStr} fill="none" stroke={trending} strokeWidth="2.5" />
-        {points.map(function(p, i) {
-          var d = new Date(p.date)
-          var label = d.toLocaleDateString('fr-FR', {day:'2-digit', month:'short'})
-          return (
-            <g key={i}>
-              <circle cx={p.x} cy={p.y} r="5" fill="#FFEB5A" stroke="#191923" strokeWidth="2" />
-              <text x={p.x} y={p.y - 10} textAnchor="middle" style={{fontSize:9,fontWeight:900,fill:'#191923',fontFamily:'Arial Narrow'}}>{fmtPrice(p.price)}€</text>
-              <text x={p.x} y={h - 4} textAnchor="middle" style={{fontSize:8,fill:'#888',fontFamily:'Arial Narrow'}}>{label}</text>
-            </g>
-          )
-        })}
-      </svg>
-    )
   }
 
   if (loading) return null
@@ -220,53 +178,11 @@ export default function FoodCostAlertsWidget() {
         </div>
       </div>
 
-      {selectedItem && (
-        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}} onClick={function(){setSelectedItem(null)}}>
-          <div style={{background:'#fff',borderRadius:14,maxWidth:600,width:'100%',padding:20,maxHeight:'90vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
-              <div>
-                <div style={{fontFamily:'Yellowtail',fontSize:22,color:'#191923'}}>{selectedItem.name}</div>
-                <div style={{fontSize:12,color:'#FF82D7',fontWeight:700}}>{selectedItem.supplier}</div>
-              </div>
-              <button type="button" onClick={function(){setSelectedItem(null)}} style={{background:'transparent',border:'none',fontSize:20,cursor:'pointer',color:'#888'}}>✕</button>
-            </div>
-
-            <div style={{display:'flex',gap:8,marginBottom:12}}>
-              <div style={{flex:1,background:'#F5F5F5',borderRadius:8,padding:12,textAlign:'center'}}>
-                <div style={{fontSize:10,color:'#888'}}>Avant</div>
-                <div style={{fontSize:20,fontWeight:900}}>{fmtPrice(selectedItem.oldPrice)} €</div>
-              </div>
-              <div style={{flex:1,background:selectedItem.changePct > 0 ? '#FFE0E0' : '#E8FFE8',borderRadius:8,padding:12,textAlign:'center'}}>
-                <div style={{fontSize:10,color:'#888'}}>Actuel</div>
-                <div style={{fontSize:20,fontWeight:900}}>{fmtPrice(selectedItem.newPrice)} €</div>
-              </div>
-              <div style={{flex:1,background:selectedItem.changePct > 0 ? '#CC0066' : '#009D3A',borderRadius:8,padding:12,textAlign:'center'}}>
-                <div style={{fontSize:11,color:'rgba(255,255,255,0.7)'}}>Variation</div>
-                <div style={{fontSize:20,fontWeight:900,color:'#fff'}}>{selectedItem.changePct > 0 ? '+' : ''}{selectedItem.changePct.toFixed(1)}%</div>
-                <div style={{fontSize:10,color:'rgba(255,255,255,0.7)'}}>{selectedItem.prevDate} → {selectedItem.lastDate}</div>
-              </div>
-            </div>
-
-            {renderChart(priceHistory)}
-
-            <div style={{fontSize:11,fontWeight:900,color:'#888',textTransform:'uppercase',marginTop:12,marginBottom:6,letterSpacing:0.5}}>Recettes impactées</div>
-            {selectedItem.recipes.length > 0 ? selectedItem.recipes.map(function(r,i) {
-              return (
-                <div key={i} style={{padding:'6px 10px',background:'#FAFAFA',borderRadius:6,marginBottom:3,fontSize:11,display:'flex',justifyContent:'space-between'}}>
-                  <span style={{fontWeight:700,color:'#191923'}}>{r.name}</span>
-                  <span style={{color:'#888'}}>{r.foodCostPct ? r.foodCostPct + '% FC' : ''}</span>
-                </div>
-              )
-            }) : <div style={{fontSize:11,color:'#888',padding:8,textAlign:'center'}}>Aucune recette utilise ce produit</div>}
-
-            {selectedItem.changePct > 0 && (
-              <button type="button" onClick={function(){createTask(selectedItem)}} style={{marginTop:16,width:'100%',padding:'10px 0',fontSize:13,fontWeight:900,borderRadius:20,border:'2px solid #CC0066',background:'#FFE0E0',color:'#CC0066',cursor:'pointer',textTransform:'uppercase',fontFamily:'Arial Narrow, Arial, sans-serif'}}>
-                Créer tâche : renégocier
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      <ArticleDetailModal
+        isOpen={!!selectedItem}
+        onClose={function(){ setSelectedItem(null); setPriceHistory([]) }}
+        productId={selectedItem ? selectedItem.id : null}
+      />
     </div>
   )
 }
