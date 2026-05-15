@@ -1,18 +1,15 @@
 // src/app/api/zelty-z-import/route.ts
 // =============================================================================
-// Route d'import des Z de caisse Zelty
+// Route d'import des Z de caisse Zelty - V6 ULTRA TOLERANTE
 // 
-// Workflow : Email Zelty (00:01) → Zapier → POST sur cette route
+// Accepte n'importe quel format en entrée :
+//   - JSON propre : { "email_subject": "...", "email_body": "...", "pdf_attachment_base64": "..." }
+//   - JSON cassé : { "email_subject": "...", ... avec retours ligne, guillemets, etc.
+//   - Texte brut : tout le body est traité comme du texte à analyser
+//   - HTML brut : Claude se débrouille
 // 
-// Payload attendu (Zapier envoie le mail parsé) :
-// {
-//   "email_subject": "Z de caisse - Meshuga - 14/05/2026",
-//   "email_body": "<texte du corps email avec les chiffres>",
-//   "pdf_attachment_base64": "<optionnel, le PDF si Zapier le forwarde>",
-//   "received_at": "2026-05-15T00:01:23Z"
-// }
-// 
-// Sécurité : clé API simple via header X-API-Key
+// Stratégie : on lit tout le body en TEXT, on tente un parse JSON, si ça échoue
+// on traite tout comme du texte et on passe le tout à Claude OCR.
 // =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -24,18 +21,22 @@ export const maxDuration = 60
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
-// Auth désactivée temporairement (à activer plus tard si besoin)
 
 function sb() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE)
 }
 
-// ============= PROMPT OCR ZELTY Z =============
+// ============= PROMPT OCR Z =============
 const Z_OCR_PROMPT = `Tu es un expert OCR de Z de caisse Zelty pour Meshuga Crazy Deli (3 rue Vavin, Paris 6e).
 
-Analyse le PDF du Z de caisse fourni et extrais en JSON STRICT.
+Le contenu fourni ci-dessous peut être :
+- Le corps email d'un Z de caisse Zelty
+- Du texte brut, du HTML, du JSON cassé, ou n'importe quel format
+- Avec ou sans pièce jointe PDF
 
-# FORMAT DE SORTIE (clés en minuscules, snake_case)
+Trouve les chiffres du Z et extrais en JSON STRICT.
+
+# FORMAT DE SORTIE
 {
   "z_date": "YYYY-MM-DD",
   "ca_ttc": nombre,
@@ -67,81 +68,72 @@ Analyse le PDF du Z de caisse fourni et extrais en JSON STRICT.
     "tabesto": nombre,
     "autre": nombre
   },
-  "anomalies": ["liste UNIQUEMENT des vraies anomalies métier"]
+  "anomalies": []
 }
 
-# FORMAT TYPE DU Z MESHUGA
-Le Z est structuré en sections : CA / TVA / CA par mode / Statistiques / Détails tickets / Règlements
-
-# RÈGLES CRITIQUES
+# REGLES CRITIQUES
 
 ## Date
 - "Date des commandes : 14/5/26" → z_date = "2026-05-14"
-- Format français DD/M/YY ou DD/MM/YYYY à convertir en ISO
+- Si tu trouves une date format français (DD/M/YY ou DD/MM/YYYY), convertis en ISO YYYY-MM-DD
+- IMPORTANT : si le mail a été forwardé/transféré, IGNORE la date du forward et utilise la date du Z d'origine (section "Date des commandes")
 
 ## CA et tickets
-- "Nombre de commandes" = nb_tickets (PAS le nombre d'articles)
-- "Nombre d'articles" = nb_articles (séparé)
+- "Nombre de commandes" = nb_tickets
+- "Nombre d'articles" = nb_articles
 - "Commande moyenne" = ticket_moyen
-- Couverts à 0 = NORMAL (non saisis), PAS une anomalie
+- Couverts à 0 = NORMAL, PAS d'anomalie
 
-## Canaux (section "CA par mode")
+## Canaux ("CA par mode")
 - "Sur place X" → canaux.sur_place = montant, canaux_nb_tickets.sur_place = X
-- "Emporté X" → canaux.emporter = montant
-- "Livraison X" → canaux.livraison = montant
-- Si un canal n'apparaît pas, mettre 0
+- "Emporté X" → canaux.emporter
+- "Livraison X" → canaux.livraison
+- Si absent, mettre 0
 
-## Paiements (section "Règlements" ou "Règlements réels")
-- "Espèces X" → paiements.especes
-- "CB" / "Carte bancaire" → paiements.cb
-- "Deliveroo X" → paiements.deliveroo
-- "UberEats X" / "Uber Eats" → paiements.uber_eats
-- "Tabesto X" → paiements.tabesto (IMPORTANT : Tabesto = borne self-service, mode de paiement à part)
-- "Tickets restaurant" / "Ticket resto" → paiements.tickets_resto
-- "Edenred" / "Swile" / "Pluxee" / "Up" → mode tickets resto (séparer si listés distinctement)
-- "Chèque" → paiements.cheque
-- Si paiement non listé ci-dessus → paiements.autre
+## Paiements ("Règlements")
+- "Espèces X" → especes
+- "Deliveroo X" → deliveroo
+- "UberEats X" → uber_eats
+- "Tabesto X" → tabesto (borne self-service Meshuga)
+- "CB" / "Carte" → cb
+- "Tickets restaurant" / "Edenred" / "Swile" / "Pluxee" → tickets_resto
+- Sinon → autre
 
-## Anomalies VRAIES (à signaler)
-- CA TTC manquant ou nul
-- Écart > 1€ entre Total règlements et CA TTC
-- Date illisible ou incohérente
-- TVA qui ne correspond pas à 10% du HT
+## Anomalies VRAIES
+- Aucune si Z parfait (laisser anomalies: [])
+- Écart > 1€ entre Total règlements et CA TTC = anomalie
 
-## Anomalies FAUSSES (à NE PAS signaler)
-- Couverts = 0 (normal car non saisis)
-- Tickets annulés à 0
+## Anomalies FAUSSES (ne PAS signaler)
+- Couverts = 0
 - Fonds de caisse = 0
+- Tickets annulés = 0
 
-# CONSIGNES
-- Tous les montants sont en EUROS (€)
-- Tous les montants extraits sont en valeurs absolues (positives)
-- Mettre 0 (pas null) pour un canal/paiement absent
-- Si écart d'arrondi <0,10€ entre total règlements et CA TTC → OK, pas d'anomalie
+# IMPORTANT
+- Tous les montants en EUROS, valeurs positives
+- Mettre 0 (pas null) si absent
+- Ignore tout le HTML, headers email, signatures
+- Concentre-toi uniquement sur les chiffres du Z
 
-Retourne UNIQUEMENT le JSON, aucun texte avant ou après.`
+Retourne UNIQUEMENT le JSON, AUCUN texte avant ou après.`
 
 // ============= OCR via Claude =============
-async function callClaudeOCR(emailBody: string, pdfBase64?: string): Promise<any> {
+async function callClaudeOCR(textContent: string, pdfBase64?: string): Promise<any> {
   const content: any[] = []
   
   if (pdfBase64) {
-    // Sanity check : vérifier que c'est bien du base64 valide (au moins 100 chars, commence par JVBE = PDF magic en b64)
-    const isValidB64 = typeof pdfBase64 === 'string' 
-      && pdfBase64.length > 100 
-      && /^[A-Za-z0-9+/=]+$/.test(pdfBase64.replace(/\s/g, ''))
-    
+    const cleanB64 = pdfBase64.replace(/\s/g, '')
+    const isValidB64 = cleanB64.length > 100 && /^[A-Za-z0-9+/=]+$/.test(cleanB64)
     if (isValidB64) {
       content.push({
         type: 'document',
-        source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64.replace(/\s/g, '') }
+        source: { type: 'base64', media_type: 'application/pdf', data: cleanB64 }
       })
     }
   }
   
   content.push({
     type: 'text',
-    text: Z_OCR_PROMPT + '\n\n# CORPS DE L\'EMAIL\n\n' + emailBody
+    text: Z_OCR_PROMPT + '\n\n# CONTENU A ANALYSER\n\n' + textContent
   })
   
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -174,59 +166,96 @@ async function callClaudeOCR(emailBody: string, pdfBase64?: string): Promise<any
   }
 }
 
-// ============= POST handler =============
+// ============= Helper : extraire un PDF base64 si présent =============
+async function tryExtractPdfBase64(value: any): Promise<string | null> {
+  if (!value || typeof value !== 'string') return null
+  // Si c'est une URL, on la télécharge
+  if (value.startsWith('http')) {
+    try {
+      const r = await fetch(value)
+      if (!r.ok) return null
+      const buf = await r.arrayBuffer()
+      return Buffer.from(buf).toString('base64')
+    } catch {
+      return null
+    }
+  }
+  // Sinon c'est peut-être déjà du base64
+  const clean = value.replace(/\s/g, '')
+  if (clean.length > 100 && /^[A-Za-z0-9+/=]+$/.test(clean)) {
+    return clean
+  }
+  return null
+}
+
+// ============= POST handler ULTRA TOLERANT =============
 export async function POST(req: NextRequest) {
   if (!ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY non configurée' }, { status: 500 })
   }
   
-  let body: any
+  // STRATEGIE : lire le body en TEXT brut, tenter un parse JSON, sinon traiter comme texte
+  let rawText = ''
   try {
-    body = await req.json()
+    rawText = await req.text()
   } catch {
-    return NextResponse.json({ error: 'Body JSON invalide' }, { status: 400 })
+    return NextResponse.json({ error: 'Impossible de lire le body de la requête' }, { status: 400 })
   }
   
-  const emailBody = body.email_body || body.body || ''
-  const emailSubject = body.email_subject || body.subject || ''
-  let pdfBase64 = body.pdf_attachment_base64 || body.pdf || null
+  if (!rawText || rawText.trim().length === 0) {
+    return NextResponse.json({ error: 'Body vide' }, { status: 400 })
+  }
   
-  // Si pdfBase64 est en fait une URL (cas Zapier qui passe l'URL d'attachement),
-  // on télécharge le PDF et on le convertit en base64
-  if (pdfBase64 && typeof pdfBase64 === 'string' && pdfBase64.startsWith('http')) {
-    try {
-      const pdfResp = await fetch(pdfBase64)
-      if (!pdfResp.ok) throw new Error('HTTP ' + pdfResp.status)
-      const buf = await pdfResp.arrayBuffer()
-      const b64 = Buffer.from(buf).toString('base64')
-      pdfBase64 = b64
-    } catch (e: any) {
-      // Si le téléchargement échoue, on continue sans le PDF (juste avec le body)
-      console.error('Failed to fetch PDF from URL:', e?.message)
-      pdfBase64 = null
+  // Tenter parse JSON
+  let textContent = ''
+  let emailSubject = ''
+  let pdfBase64: string | null = null
+  
+  try {
+    const body = JSON.parse(rawText)
+    // JSON OK : extraire les champs connus
+    emailSubject = body.email_subject || body.subject || ''
+    textContent = body.email_body || body.body || ''
+    
+    // Tenter d'extraire le PDF
+    const pdfCandidate = body.pdf_attachment_base64 || body.pdf_attachment_url || body.pdf || body.attachment || ''
+    if (pdfCandidate) {
+      pdfBase64 = await tryExtractPdfBase64(pdfCandidate)
     }
+    
+    // Si pas de body trouvé, fallback : utiliser tout le JSON comme texte
+    if (!textContent && !pdfBase64) {
+      textContent = rawText
+    }
+  } catch {
+    // JSON cassé : tout le body est traité comme texte brut
+    textContent = rawText
   }
   
-  if (!emailBody && !pdfBase64) {
-    return NextResponse.json({ error: 'email_body ou pdf_attachment_base64 requis' }, { status: 400 })
+  if (!textContent && !pdfBase64) {
+    return NextResponse.json({ error: 'Aucun contenu exploitable' }, { status: 400 })
   }
   
   // OCR
   let ocrData: any
   try {
-    ocrData = await callClaudeOCR(emailBody, pdfBase64)
+    ocrData = await callClaudeOCR(textContent, pdfBase64 || undefined)
   } catch (e: any) {
     return NextResponse.json({ error: 'OCR failed: ' + e.message }, { status: 500 })
   }
   
   // Validation date
   if (!ocrData.z_date) {
-    return NextResponse.json({ error: 'Date du Z non détectée par l\'OCR', ocr_data: ocrData }, { status: 422 })
+    return NextResponse.json({ 
+      error: 'Date du Z non détectée par l\'OCR', 
+      ocr_data: ocrData,
+      hint: 'Vérifier que le contenu envoyé contient bien un Z de caisse Zelty'
+    }, { status: 422 })
   }
   
   const client = sb()
   
-  // Anti-doublon : un seul Z par jour
+  // Anti-doublon
   const { data: existing } = await client
     .from('daily_z_reports')
     .select('id')
@@ -238,11 +267,12 @@ export async function POST(req: NextRequest) {
       status: 'duplicate',
       message: 'Un Z existe déjà pour cette date',
       existing_id: existing[0].id,
-      z_date: ocrData.z_date
+      z_date: ocrData.z_date,
+      ocr_data: ocrData
     }, { status: 200 })
   }
   
-  // Anomalies basiques
+  // Anomalies
   const anomalies: string[] = Array.isArray(ocrData.anomalies) ? ocrData.anomalies : []
   if (!ocrData.ca_ttc || ocrData.ca_ttc <= 0) anomalies.push('CA TTC manquant ou nul')
   if (!ocrData.nb_tickets || ocrData.nb_tickets <= 0) anomalies.push('Nombre de tickets manquant ou nul')
@@ -263,7 +293,7 @@ export async function POST(req: NextRequest) {
       paiements: ocrData.paiements || {},
       source: 'zapier',
       raw_email_subject: emailSubject,
-      raw_email_body: emailBody.substring(0, 10000), // limite stockage
+      raw_email_body: textContent.substring(0, 10000),
       pdf_base64: pdfBase64,
       ocr_data: ocrData,
       has_anomaly: anomalies.length > 0,
@@ -290,16 +320,13 @@ export async function POST(req: NextRequest) {
   })
 }
 
-// ============= GET handler (pour tester rapidement) =============
+// ============= GET handler (test rapide) =============
 export async function GET() {
   return NextResponse.json({
     endpoint: '/api/zelty-z-import',
     method: 'POST',
+    version: 'v6-ultra-tolerant',
     auth: 'Aucune (provisoire)',
-    payload_example: {
-      email_subject: 'Z de caisse - 14/05/2026',
-      email_body: '<corps email avec chiffres>',
-      pdf_attachment_base64: '<optionnel>'
-    }
+    note: 'Accepte n\'importe quel format : JSON propre, JSON cassé, texte brut, HTML'
   })
 }
