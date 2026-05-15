@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { RECIPES_DATA } from './data'
+import ArticleDetailModal from './ArticleDetailModal'
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
@@ -10,6 +11,7 @@ function sb() {
 export default function PriceAlertsWidget() {
   var [alerts, setAlerts] = useState([])
   var [loading, setLoading] = useState(true)
+  var [modalProductId, setModalProductId] = useState(null)
 
   useEffect(function() { loadAlerts() }, [])
 
@@ -52,6 +54,7 @@ export default function PriceAlertsWidget() {
         if (Math.abs(changePct) < 0.5) return
         var recipes = getRecipesForProduct(p.name)
         changes.push({
+          productId: p.id,
           name: p.name,
           supplier: supMap[p.supplier_id],
           unit: p.unit,
@@ -93,7 +96,7 @@ export default function PriceAlertsWidget() {
             var color = a.changePct > 15 ? '#CC0066' : a.changePct > 5 ? '#E67300' : '#B8920A'
             var bg = a.changePct > 15 ? '#FFE0E0' : a.changePct > 5 ? '#FFF0E0' : '#FFF9D0'
             return (
-              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'8px 10px',borderRadius:8,marginBottom:4,background:bg,border:'1px solid ' + color}}>
+              <div key={i} onClick={function(){setModalProductId(a.productId)}} style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'8px 10px',borderRadius:8,marginBottom:4,background:bg,border:'1px solid ' + color, cursor:'pointer', transition:'transform 0.1s'}} onMouseDown={function(e){e.currentTarget.style.transform='scale(0.98)'}} onMouseUp={function(e){e.currentTarget.style.transform=''}} onMouseLeave={function(e){e.currentTarget.style.transform=''}}>
                 <div style={{flex:1}}>
                   <div style={{display:'flex',alignItems:'center',gap:6}}>
                     <span style={{fontWeight:900,fontSize:13,color:'#191923'}}>{a.name}</span>
@@ -121,7 +124,7 @@ export default function PriceAlertsWidget() {
         <div>
           {baisse.map(function(a, i) {
             return (
-              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 10px',borderRadius:8,marginBottom:4,background:'#E8FFE8',border:'1px solid #009D3A'}}>
+              <div key={i} onClick={function(){setModalProductId(a.productId)}} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 10px',borderRadius:8,marginBottom:4,background:'#E8FFE8',border:'1px solid #009D3A', cursor:'pointer', transition:'transform 0.1s'}} onMouseDown={function(e){e.currentTarget.style.transform='scale(0.98)'}} onMouseUp={function(e){e.currentTarget.style.transform=''}} onMouseLeave={function(e){e.currentTarget.style.transform=''}}>
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
                   <span style={{fontWeight:900,fontSize:13}}>{a.name}</span>
                   <span style={{fontSize:10,color:'#888'}}>{a.supplier}</span>
@@ -135,6 +138,11 @@ export default function PriceAlertsWidget() {
           })}
         </div>
       )}
+      <ArticleDetailModal
+        isOpen={!!modalProductId}
+        onClose={function(){ setModalProductId(null) }}
+        productId={modalProductId}
+      />
     </div>
   )
 }
