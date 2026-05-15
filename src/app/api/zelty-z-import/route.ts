@@ -24,7 +24,7 @@ export const maxDuration = 60
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
-const ZAPIER_API_KEY = process.env.ZAPIER_API_KEY || 'meshuga-zelty-secret-2026'
+// Auth désactivée temporairement (à activer plus tard si besoin)
 
 function sb() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE)
@@ -135,12 +135,6 @@ async function callClaudeOCR(emailBody: string, pdfBase64?: string): Promise<any
 
 // ============= POST handler =============
 export async function POST(req: NextRequest) {
-  // Sécurité : vérifier la clé API
-  const apiKey = req.headers.get('x-api-key') || req.headers.get('X-API-Key')
-  if (apiKey !== ZAPIER_API_KEY) {
-    return NextResponse.json({ error: 'Clé API invalide ou manquante (header X-API-Key)' }, { status: 401 })
-  }
-  
   if (!ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY non configurée' }, { status: 500 })
   }
@@ -244,7 +238,7 @@ export async function GET() {
   return NextResponse.json({
     endpoint: '/api/zelty-z-import',
     method: 'POST',
-    auth: 'Header X-API-Key required',
+    auth: 'Aucune (provisoire)',
     payload_example: {
       email_subject: 'Z de caisse - 14/05/2026',
       email_body: '<corps email avec chiffres>',
