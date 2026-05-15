@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import AchatsTab from './AchatsTab'
+import ArticlesTab from './ArticlesTab'
 import FoodCostHistoryTab from './FoodCostHistoryTab'
 import ShoppingListTab from './ShoppingListTab'
 import FoodCostInvoiceWizard from './FoodCostInvoiceWizard'
@@ -13,6 +14,7 @@ import PendingInvoicesWidget from './PendingInvoicesWidget'
 //
 // Wrapper qui regroupe tout ce qui concerne les achats fournisseurs :
 // - Catalogue (= AchatsTab) : fournisseurs, comparateur, vue détail produit
+// - Articles (= ArticlesTab) : vue analytique générique multi-fournisseurs avec graphique évolution
 // - Imports : historique des factures + alias mémorisés + anomalies
 // - Liste de courses : placeholder pour proposition Emy (à venir)
 //
@@ -22,7 +24,7 @@ import PendingInvoicesWidget from './PendingInvoicesWidget'
 
 export default function PurchasesTab(props) {
   var toast = props.toast || function(m){ console.log(m) }
-  var [subView, setSubView] = useState('catalogue') // 'catalogue' | 'imports' | 'shopping'
+  var [subView, setSubView] = useState('catalogue') // 'catalogue' | 'articles' | 'imports' | 'shopping'
 
   // États pour les modals d'import
   var [invoiceWizardOpen, setInvoiceWizardOpen] = useState(false)
@@ -82,7 +84,7 @@ export default function PurchasesTab(props) {
             🛒 Achats
           </h2>
           <div style={{fontSize: 13, opacity: 0.65, marginTop: 4}}>
-            Fournisseurs · Catalogue produits · Historique des factures · Liste de courses
+            Fournisseurs · Catalogue produits · Articles génériques · Historique factures · Liste de courses
           </div>
         </div>
 
@@ -126,6 +128,9 @@ export default function PurchasesTab(props) {
         <button onClick={function(){setSubView('catalogue')}} style={pillStyle(subView === 'catalogue')}>
           📦 Catalogue
         </button>
+        <button onClick={function(){setSubView('articles')}} style={pillStyle(subView === 'articles')}>
+          📊 Articles
+        </button>
         <button onClick={function(){setSubView('imports')}} style={pillStyle(subView === 'imports')}>
           📄 Imports
         </button>
@@ -137,6 +142,9 @@ export default function PurchasesTab(props) {
       {/* Contenu */}
       {subView === 'catalogue' && (
         <AchatsTab toast={toast} />
+      )}
+      {subView === 'articles' && (
+        <ArticlesTab toast={toast} />
       )}
       {subView === 'imports' && (
         <FoodCostHistoryTab toast={toast} />
