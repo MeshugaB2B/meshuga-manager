@@ -31,36 +31,29 @@ function sb() {
 }
 
 // ============= PROMPT OCR ZELTY Z =============
-const Z_OCR_PROMPT = `Tu es un expert OCR de Z de caisse pour le restaurant Meshuga Crazy Deli (Zelty).
+const Z_OCR_PROMPT = `Tu es un expert OCR de Z de caisse Zelty pour Meshuga Crazy Deli (3 rue Vavin, Paris 6e).
 
-Analyse le contenu fourni (corps email + PDF si présent) et extrais en JSON STRICT.
+Analyse le PDF du Z de caisse fourni et extrais en JSON STRICT.
 
-# FORMAT DE SORTIE
+# FORMAT DE SORTIE (clés en minuscules, snake_case)
 {
   "z_date": "YYYY-MM-DD",
   "ca_ttc": nombre,
   "ca_ht": nombre,
   "tva_montant": nombre,
   "nb_tickets": entier,
+  "nb_articles": entier,
   "nb_couverts": entier,
   "ticket_moyen": nombre,
   "canaux": {
     "sur_place": nombre,
     "emporter": nombre,
-    "livraison": nombre,
-    "click_collect": nombre,
-    "uber_eats": nombre,
-    "deliveroo": nombre,
-    "autre": nombre
+    "livraison": nombre
   },
   "canaux_nb_tickets": {
     "sur_place": entier,
     "emporter": entier,
-    "livraison": entier,
-    "click_collect": entier,
-    "uber_eats": entier,
-    "deliveroo": entier,
-    "autre": entier
+    "livraison": entier
   },
   "paiements": {
     "cb": nombre,
@@ -71,21 +64,62 @@ Analyse le contenu fourni (corps email + PDF si présent) et extrais en JSON STR
     "swile": nombre,
     "uber_eats": nombre,
     "deliveroo": nombre,
+    "tabesto": nombre,
     "autre": nombre
   },
-  "anomalies": ["liste des vraies anomalies, par exemple total qui ne match pas"]
+  "anomalies": ["liste UNIQUEMENT des vraies anomalies métier"]
 }
 
-# RÈGLES
-- z_date = jour du service (généralement la veille de l'envoi du mail)
-- Tous les montants en HT et TTC selon les libellés
-- Mettre à 0 (zero) un canal/paiement non présent
-- Si "Total HT" et "Total TTC" donnés, vérifier cohérence (écart <1€ = OK)
-- Si pas de répartition par canal détaillée, mettre tout dans "sur_place"
-- Tickets Restaurant inclut : Swile, Edenred, Pluxee (chèque déjeuner), Up
-- Ne pas confondre "ticket de caisse" (= une vente) avec "ticket resto" (= mode paiement)
+# FORMAT TYPE DU Z MESHUGA
+Le Z est structuré en sections : CA / TVA / CA par mode / Statistiques / Détails tickets / Règlements
 
-Retourne UNIQUEMENT le JSON, aucun texte autour.`
+# RÈGLES CRITIQUES
+
+## Date
+- "Date des commandes : 14/5/26" → z_date = "2026-05-14"
+- Format français DD/M/YY ou DD/MM/YYYY à convertir en ISO
+
+## CA et tickets
+- "Nombre de commandes" = nb_tickets (PAS le nombre d'articles)
+- "Nombre d'articles" = nb_articles (séparé)
+- "Commande moyenne" = ticket_moyen
+- Couverts à 0 = NORMAL (non saisis), PAS une anomalie
+
+## Canaux (section "CA par mode")
+- "Sur place X" → canaux.sur_place = montant, canaux_nb_tickets.sur_place = X
+- "Emporté X" → canaux.emporter = montant
+- "Livraison X" → canaux.livraison = montant
+- Si un canal n'apparaît pas, mettre 0
+
+## Paiements (section "Règlements" ou "Règlements réels")
+- "Espèces X" → paiements.especes
+- "CB" / "Carte bancaire" → paiements.cb
+- "Deliveroo X" → paiements.deliveroo
+- "UberEats X" / "Uber Eats" → paiements.uber_eats
+- "Tabesto X" → paiements.tabesto (IMPORTANT : Tabesto = borne self-service, mode de paiement à part)
+- "Tickets restaurant" / "Ticket resto" → paiements.tickets_resto
+- "Edenred" / "Swile" / "Pluxee" / "Up" → mode tickets resto (séparer si listés distinctement)
+- "Chèque" → paiements.cheque
+- Si paiement non listé ci-dessus → paiements.autre
+
+## Anomalies VRAIES (à signaler)
+- CA TTC manquant ou nul
+- Écart > 1€ entre Total règlements et CA TTC
+- Date illisible ou incohérente
+- TVA qui ne correspond pas à 10% du HT
+
+## Anomalies FAUSSES (à NE PAS signaler)
+- Couverts = 0 (normal car non saisis)
+- Tickets annulés à 0
+- Fonds de caisse = 0
+
+# CONSIGNES
+- Tous les montants sont en EUROS (€)
+- Tous les montants extraits sont en valeurs absolues (positives)
+- Mettre 0 (pas null) pour un canal/paiement absent
+- Si écart d'arrondi <0,10€ entre total règlements et CA TTC → OK, pas d'anomalie
+
+Retourne UNIQUEMENT le JSON, aucun texte avant ou après.`
 
 // ============= OCR via Claude =============
 async function callClaudeOCR(emailBody: string, pdfBase64?: string): Promise<any> {
@@ -199,7 +233,7 @@ export async function POST(req: NextRequest) {
       ca_ht: ocrData.ca_ht || null,
       tva_montant: ocrData.tva_montant || null,
       nb_tickets: ocrData.nb_tickets || null,
-      nb_couverts: ocrData.nb_couverts || null,
+      nb_couverts: ocrData.nb_couverts || 0,
       ticket_moyen: ocrData.ticket_moyen || (ocrData.ca_ttc && ocrData.nb_tickets ? ocrData.ca_ttc / ocrData.nb_tickets : null),
       canaux: ocrData.canaux || {},
       canaux_nb_tickets: ocrData.canaux_nb_tickets || {},
