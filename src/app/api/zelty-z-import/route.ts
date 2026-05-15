@@ -126,10 +126,17 @@ async function callClaudeOCR(emailBody: string, pdfBase64?: string): Promise<any
   const content: any[] = []
   
   if (pdfBase64) {
-    content.push({
-      type: 'document',
-      source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 }
-    })
+    // Sanity check : vérifier que c'est bien du base64 valide (au moins 100 chars, commence par JVBE = PDF magic en b64)
+    const isValidB64 = typeof pdfBase64 === 'string' 
+      && pdfBase64.length > 100 
+      && /^[A-Za-z0-9+/=]+$/.test(pdfBase64.replace(/\s/g, ''))
+    
+    if (isValidB64) {
+      content.push({
+        type: 'document',
+        source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64.replace(/\s/g, '') }
+      })
+    }
   }
   
   content.push({
@@ -182,7 +189,23 @@ export async function POST(req: NextRequest) {
   
   const emailBody = body.email_body || body.body || ''
   const emailSubject = body.email_subject || body.subject || ''
-  const pdfBase64 = body.pdf_attachment_base64 || body.pdf || null
+  let pdfBase64 = body.pdf_attachment_base64 || body.pdf || null
+  
+  // Si pdfBase64 est en fait une URL (cas Zapier qui passe l'URL d'attachement),
+  // on télécharge le PDF et on le convertit en base64
+  if (pdfBase64 && typeof pdfBase64 === 'string' && pdfBase64.startsWith('http')) {
+    try {
+      const pdfResp = await fetch(pdfBase64)
+      if (!pdfResp.ok) throw new Error('HTTP ' + pdfResp.status)
+      const buf = await pdfResp.arrayBuffer()
+      const b64 = Buffer.from(buf).toString('base64')
+      pdfBase64 = b64
+    } catch (e: any) {
+      // Si le téléchargement échoue, on continue sans le PDF (juste avec le body)
+      console.error('Failed to fetch PDF from URL:', e?.message)
+      pdfBase64 = null
+    }
+  }
   
   if (!emailBody && !pdfBase64) {
     return NextResponse.json({ error: 'email_body ou pdf_attachment_base64 requis' }, { status: 400 })
