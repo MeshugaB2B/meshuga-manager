@@ -84,21 +84,46 @@ Analyse le PDF fourni et extrais les informations en JSON STRICT (aucun texte ho
 - TVA = 5,5%
 - 3 produits : "Pain hot dog", "Pain lobster roll", "Pain mini"
 - Poids unitaires (90g, 1140g) = info, pas quantité
+- Codes références (LR14, LR1100, etc.) qui changent = NORMAL, ne pas signaler
+- Notes BL sur retours/déductions = NORMAL, traité en interne, NE PAS signaler comme anomalie
+- Lignes "Règlement" sans montant = NORMAL, info comptable, NE PAS signaler
 
 ## Foodflow (légumes)
 - Cébette = 1 botte (~100g), pas 1kg
-- Sucrine = 1 barquette de 6 unités
+- Sucrine = 1 barquette de 6 unités (~3€HT/barquette)
 - American cheese = paquet 84 tranches à 7€HT
+- Prix qui changent entre commandes sur la même facture = NORMAL, ne PAS signaler comme anomalie (juste extraire le prix moyen pondéré)
 
 ## Norbert (boucherie)
 - Viande au kg ou en pièces — bien identifier l'unité
 - Quantités élevées (50-200kg) = NORMAL pour ce fournisseur
 
 ## DS Service (packaging)
-- Pot 60ml : carton 2500 = 36,50€HT
-- Couvercle 60ml : carton 2500 = 29,90€HT
+- Pot à sauce 60ml (T200P) : carton 2500 = 36,50€HT depuis fév 2025 (ancien tarif 42,29€HT en 2024)
+- Couvercle 60ml (PL2P) : carton 2500 = 29,90€HT depuis fév 2025 (ancien tarif 34,45€HT en 2024)
+- NE PAS signaler les anciens prix 2024 comme anomalies, c'est l'historique normal
+- Pot rond SOLO 16Oz : 54,71€HT/colis 500
+- Pot rond SOLO 24Oz : 55,90€HT/colis 500
+- Date d'échéance bizarre = NORMAL, ne pas signaler
 
-## Autres (Marina, Rouquette, HPS, Jacquier)
+## Halles Paris Sud (HPS)
+- Alias accepté : "HPS" = "Halles Paris Sud" (même fournisseur)
+- **Pomme de terre Agria (et autres légumes vendus en sac)** : le prix unitaire affiché EST LE PRIX AU KG, jamais le prix au sac. Un sac de 25kg coûte ~15-18€ HT. Si tu vois "0,63€" avec "Sac 25 kg" et quantité "2 (50 kg)" → 0,63€/kg × 50kg = 31,50€ ligne, c'est NORMAL.
+- **Sucrine Cœur** : facturée en barquettes de 6 unités. Prix ~4,22€HT/barquette. Si tu vois "Sucrine Cœur Bqt 10u" avec conditionnement "Barquette 6 Unités" et prix unitaire 4,22€ → la quantité (10) = 10 BARQUETTES, pas 10 unités individuelles. Le libellé "10u" est trompeur.
+- **"Autre taxe"** (0,30-0,80€) : éco-contribution / éco-emballage CITEO, NORMALE, NE PAS signaler comme anomalie
+- **Écart base TVA vs Total HT** correspondant à l'autre taxe : NORMAL, NE PAS signaler
+- Légers écarts d'arrondis sur prix unit × quantité (qq centimes) : NORMAL, ne pas signaler
+
+## La Crémerie Parisienne
+- Franco de port ≈ 100€ HT
+- Si commande < 100€ HT → frais de port 10€ HT (TVA 20%) appliqués, c'est NORMAL
+- Ne PAS signaler les frais de port comme anomalie
+
+## Marina Sea Food (poisson)
+- Au kg, parfois sous-vide
+- Livraisons à des adresses différentes (cadeaux/personnel) = NORMAL, ne pas signaler
+
+## Rouquette / Jacquier
 - Lire les unités attentivement (kg, L, U, pack)
 
 Retourne UNIQUEMENT le JSON, aucun texte autour.`
