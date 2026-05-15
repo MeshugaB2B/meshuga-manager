@@ -6,6 +6,7 @@ import ShoppingListTab from './ShoppingListTab'
 import FoodCostInvoiceWizard from './FoodCostInvoiceWizard'
 import BatchInvoiceImport from './BatchInvoiceImport'
 import BatchValidation from './BatchValidation'
+import PendingInvoicesWidget from './PendingInvoicesWidget'
 
 // =============================================================================
 // PurchasesTab — onglet top "Achats 🛒"
@@ -103,8 +104,9 @@ export default function PurchasesTab(props) {
           <button
             className="btn btn-sm"
             style={{
-              background: '#191923',
-              color: '#FFEB5A',
+              background: '#FFEB5A',
+              color: '#191923',
+              border: '2px solid #191923',
               fontWeight: 900,
               fontSize: 12,
               padding: '10px 14px'
@@ -115,6 +117,9 @@ export default function PurchasesTab(props) {
           </button>
         </div>
       </div>
+
+      {/* Widget Factures fournisseurs en attente */}
+      <PendingInvoicesWidget toast={props.toast} onGoToImports={function(){ setSubView('imports') }} />
 
       {/* Sous-navigation */}
       <div style={subNavWrap}>
