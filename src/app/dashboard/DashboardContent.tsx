@@ -16,7 +16,6 @@ import RhTab from './RhTab'
 import LegalTab from './LegalTab'
 import WeatherWidget from './WeatherWidget'
 import FoodCostAlertWidget from './FoodCostAlertWidget'
-import PendingInvoicesWidget from './PendingInvoicesWidget'
 import ZdeCaisseWidget from './ZdeCaisseWidget'
 import { G } from './styles'
 import { LOGO_PINK, LOGO_YELLOW, STAMP_YELLOW, STAMP_PINK } from './logos'
@@ -958,13 +957,11 @@ function DashboardImpl() {
                 {isEmy && <button className="btn btn-p btn-sm" onClick={function(){openModal('cr',{})}}>+ Nouveau CR</button>}
               </div>
 
+              <ZdeCaisseWidget toast={toast} />
+
               <WeatherWidget />
 
               <FoodCostAlertWidget />
-
-              <PendingInvoicesWidget toast={toast} onGoToImports={function(){ setPage("purchases") }} />
-
-              <ZdeCaisseWidget toast={toast} />
 
               {priceAlerts.length > 0 && (
                 <div style={{background:"#FFFFFF",border:"2px solid #FF3B30",borderLeft:"6px solid #FF3B30",borderRadius:8,padding:"10px 14px",marginBottom:12,boxShadow:"2px 2px 0 #191923"}}>
