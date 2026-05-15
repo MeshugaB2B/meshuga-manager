@@ -181,7 +181,7 @@ function ZdeCaisseWidget({ toast, onGoToZHistory }: Props) {
         {onGoToZHistory && (
           <button
             onClick={onGoToZHistory}
-            style={{ background: '#191923', color: '#FFEB5A', border: 'none', borderRadius: 6, padding: '4px 10px', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}
+            style={{ background: '#FFEB5A', color: '#191923', border: '2px solid #191923', borderRadius: 6, padding: '4px 10px', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}
           >
             Historique →
           </button>
@@ -274,12 +274,12 @@ function ZdeCaisseWidget({ toast, onGoToZHistory }: Props) {
               var v = entry[1] as number
               var pct = zToday.ca_ttc ? ((v / zToday.ca_ttc) * 100).toFixed(0) : '0'
               return (
-                <div key={k} style={{ background: '#191923', color: '#FFEB5A', borderRadius: 6, padding: '6px 10px', flex: '1 1 140px', minWidth: 140 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700 }}>{labelPaiement(k)}</div>
-                  <div style={{ fontSize: 14, fontWeight: 900, marginTop: 2 }}>
+                <div key={k} style={{ background: '#FFE5F4', border: '1px solid #191923', borderRadius: 6, padding: '6px 10px', flex: '1 1 140px', minWidth: 140 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#191923' }}>{labelPaiement(k)}</div>
+                  <div style={{ fontSize: 14, fontWeight: 900, color: '#191923', marginTop: 2 }}>
                     {v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
                   </div>
-                  <div style={{ fontSize: 10, opacity: 0.8, marginTop: 1 }}>
+                  <div style={{ fontSize: 10, color: '#666', marginTop: 1 }}>
                     {pct}% du CA
                   </div>
                 </div>
