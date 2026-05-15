@@ -317,6 +317,27 @@ function ArticleDetail(props: any) {
       })
   }, [props.articleId])
 
+  // ⚠️ IMPORTANT : tous les hooks DOIVENT être appelés avant tout return conditionnel
+  // (Rules of Hooks). chartData est calculé ici, même si data est encore null.
+  var chartData = useMemo(function() {
+    if (!data) return []
+    var pbs = data.pricesBySupplier || {}
+    var allPoints: any[] = []
+    Object.keys(pbs).forEach(function(s) {
+      ;(pbs[s] || []).forEach(function(p: any) {
+        allPoints.push({
+          date: p.date,
+          dateLabel: formatDateShort(p.date),
+          supplier: s,
+          [s]: p.price,
+          fullPoint: p
+        })
+      })
+    })
+    allPoints.sort(function(a, b){ return new Date(a.date).getTime() - new Date(b.date).getTime() })
+    return allPoints
+  }, [data])
+
   if (loading) {
     return (
       <div style={{textAlign: 'center', padding: 60, opacity: 0.6}}>
@@ -338,25 +359,6 @@ function ArticleDetail(props: any) {
   var a = data.article
   var pricesBySupplier = data.pricesBySupplier || {}
   var suppliers = Object.keys(pricesBySupplier)
-
-  // Préparer données pour le graphique Recharts (1 ligne par date)
-  var chartData = useMemo(function() {
-    var allPoints: any[] = []
-    suppliers.forEach(function(s) {
-      pricesBySupplier[s].forEach(function(p: any) {
-        allPoints.push({
-          date: p.date,
-          dateLabel: formatDateShort(p.date),
-          supplier: s,
-          [s]: p.price,
-          fullPoint: p
-        })
-      })
-    })
-    // Trier par date
-    allPoints.sort(function(a, b){ return new Date(a.date).getTime() - new Date(b.date).getTime() })
-    return allPoints
-  }, [data])
 
   // Custom tooltip pour afficher détail au hover
   function CustomTooltip(t: any) {
