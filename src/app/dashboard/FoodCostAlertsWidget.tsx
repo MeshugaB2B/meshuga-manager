@@ -10,15 +10,15 @@ function sb() {
 function fmtPrice(v) {
   if (v === null || v === undefined || isNaN(Number(v))) return '—'
   var n = Number(v)
-  // 2 décimales par défaut, 3 si prix entre 0.001 et 0.10, 4 si < 0.001
-  if (Math.abs(n) >= 0.10) return n.toFixed(2)
+  // TOUJOURS 3 décimales pour détecter les variations au centime près
+  // (4 décimales si prix < 0.001 € pour éviter l'arrondi à 0)
   if (Math.abs(n) >= 0.001) return n.toFixed(3)
   return n.toFixed(4)
 }
 
 // =============================================================================
 // FoodCostAlertsWidget v2 — "Suivi des prix d'achat"
-// Source : vue v_price_variations (compare 2 derniers prix master_unit_price)
+// Source : vue v_price_variations_clean (compare prix pondéré par facture, anti-aberration)
 // PLUS de baseline Excel — uniquement données factures réelles
 // =============================================================================
 
@@ -31,9 +31,9 @@ export default function FoodCostAlertsWidget() {
   useEffect(function() { loadChanges() }, [])
 
   function loadChanges() {
-    // Charger directement depuis v_price_variations (compare 2 derniers prix par produit)
+    // Charger depuis v_price_variations_clean (prix pondéré par facture entière, pas par ligne)
     Promise.all([
-      sb().from('v_price_variations').select('*').not('variation_pct', 'is', null).order('variation_pct', {ascending: false}),
+      sb().from('v_price_variations_clean').select('*').not('variation_pct', 'is', null).order('variation_pct', {ascending: false}),
       sb().from('recipe_ingredients').select('article, recipe_id, product_id'),
       sb().from('recipes').select('id, name, food_cost_pct, prix_vente_ttc')
     ]).then(function(results) {
@@ -65,7 +65,7 @@ export default function FoodCostAlertsWidget() {
       // ═══════════════════════════════════════════════════════
       var MAX_PCT_UP = 500
       var MIN_PCT_DOWN = -90
-      var MIN_PCT_NOISE = 2
+      var MIN_PCT_NOISE = 20  // ne montre que variations >= 20% (signaux forts)
       
       var allChanges = []
       var seen = {}
