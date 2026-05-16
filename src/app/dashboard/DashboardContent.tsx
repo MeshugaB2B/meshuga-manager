@@ -5,6 +5,7 @@ import FoodCostTab from './FoodCostTab'
 import PurchasesTab from './PurchasesTab'
 import PilotageTab from './PilotageTab'
 import FoodCostAlertsWidget from './FoodCostAlertsWidget'
+import InvoicesReceivedWidget from './InvoicesReceivedWidget'
 import NotifsTab from './NotifsTab'
 import JournalTab from './JournalTab'
 import InstaTab from './InstaTab'
@@ -1039,6 +1040,9 @@ function DashboardImpl() {
 
               {/* FOOD COST ALERTS */}
                 <FoodCostAlertsWidget />
+
+              {/* FACTURES REÇUES (Zapier email + Pennylane API + Manuel) */}
+                <InvoicesReceivedWidget />
 
                             {/* TACHES DU JOUR */}
               <div className="card" style={{marginBottom:10,borderLeft:'4px solid #FF82D7'}}>
