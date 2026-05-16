@@ -57,14 +57,27 @@ export default function FoodCostAlertsWidget() {
         return found
       }
 
+      // ═══════════════════════════════════════════════════════
+      // FILTRES ANTI-ABERRATION (règle d'or Edward)
+      // - Variations > +500% = bug pack/unité (ex: carton OCR'd qty=1)
+      // - Variations < -90% = bug pack/unité aussi
+      // - Variations < 2% = bruit, ignorer
+      // ═══════════════════════════════════════════════════════
+      var MAX_PCT_UP = 500
+      var MIN_PCT_DOWN = -90
+      var MIN_PCT_NOISE = 2
+      
       var allChanges = []
       var seen = {}
       variations.forEach(function(v) {
         // Garder 1 seule entrée par produit (la plus récente = la première vu l'ordre)
         if (seen[v.product_id]) return
         seen[v.product_id] = true
-        // Filtrer les variations < 2%
-        if (Math.abs(Number(v.variation_pct)) < 2) return
+        var pct = Number(v.variation_pct)
+        // Filtres anti-aberration
+        if (pct > MAX_PCT_UP) return
+        if (pct < MIN_PCT_DOWN) return
+        if (Math.abs(pct) < MIN_PCT_NOISE) return
         allChanges.push({
           id: v.product_id,
           name: v.product_name,
