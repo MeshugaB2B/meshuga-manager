@@ -178,6 +178,20 @@ NOTE : Si tu vois "mini" dans un intitulé Monarque → c'est un Pain mini disti
       .from('products')
       .select('id, name, unit, current_price, supplier_id, auto_match_blocked')
     
+    // 3bis) CHARGEMENT DES RÈGLES DE CONDITIONNEMENT (rempart anti-aberration)
+    // Pour chaque produit récurrent, on a une règle qui définit :
+    //   - master_qty_per_pack (la VRAIE quantité dans 1 unité facturée)
+    //   - expected_price_min/max (bornes de validation prix)
+    // Si une règle existe pour un produit matché, on FORCE master_qty_per_pack
+    // et on VALIDE que master_unit_price est dans les bornes.
+    // Hors bornes → on bloque l'auto-commit et on flag pour validation manuelle.
+    var { data: packRules } = await supabase
+      .from('supplier_product_pack_rules')
+      .select('product_id, master_qty_per_pack, master_unit, expected_price_min, expected_price_max, notes')
+      .eq('is_active', true)
+    var rulesByProductId: any = {}
+    ;(packRules || []).forEach(function(r: any) { rulesByProductId[r.product_id] = r })
+    
     var invoiceDate = parsed.date || new Date().toISOString().split('T')[0]
 
     for (var i = 0; i < (parsed.lignes || []).length; i++) {
@@ -234,7 +248,47 @@ NOTE : Si tu vois "mini" dans un intitulé Monarque → c'est un Pain mini disti
       }
 
       if (bestMatch && bestScore >= 60) {
-        var chgPct = bestMatch.current_price > 0 ? ((newPrice - bestMatch.current_price) / bestMatch.current_price * 100) : 0
+        // ═══════════════════════════════════════════════════════════════
+        // RÈGLE D'OR EDWARD : ne JAMAIS se fier à l'intitulé pour la quantité
+        // Si une règle de conditionnement existe pour ce produit, on l'applique
+        // en priorité pour FORCER master_qty_per_pack et VALIDER master_unit_price.
+        // ═══════════════════════════════════════════════════════════════
+        var rule = rulesByProductId[bestMatch.id]
+        var finalMasterQty = ligne.master_qty_per_pack
+        var finalUnitPrice = newPrice
+        var packPriceHt = Number(ligne.pack_price_ht) || 0
+        var rule_applied = false
+        var rule_violation: string | null = null
+        
+        if (rule && packPriceHt > 0) {
+          // Une règle existe : on force master_qty_per_pack canonique
+          // et on recalcule master_unit_price = pack_price_ht / master_qty_per_pack
+          // 
+          // IMPORTANT : la quantité_livrée peut être > 1 (plusieurs unités commandées)
+          // Dans ce cas, le pack_price_ht est déjà = prix_unitaire × quantité_livrée
+          // donc on calcule unit_price = pack_price_ht / (qty_livrée × master_qty_canonique)
+          var qtyLivree = Number(ligne.quantite_livree) || 1
+          var canonicalQty = Number(rule.master_qty_per_pack)
+          
+          if (canonicalQty > 0) {
+            finalMasterQty = canonicalQty * qtyLivree
+            finalUnitPrice = packPriceHt / finalMasterQty
+            rule_applied = true
+            
+            // Validation : le prix calculé doit être dans les bornes attendues
+            var minBound = Number(rule.expected_price_min) * 0.5
+            var maxBound = Number(rule.expected_price_max) * 2
+            if (finalUnitPrice < minBound || finalUnitPrice > maxBound) {
+              rule_violation = '⛔ Prix hors bornes pour ' + bestMatch.name + 
+                ' : ' + finalUnitPrice.toFixed(3) + '€/' + (rule.master_unit || 'U') + 
+                ' (attendu ' + Number(rule.expected_price_min).toFixed(2) + 
+                '-' + Number(rule.expected_price_max).toFixed(2) + '€)'
+              anomalies.push(rule_violation)
+            }
+          }
+        }
+        
+        var chgPct = bestMatch.current_price > 0 ? ((finalUnitPrice - bestMatch.current_price) / bestMatch.current_price * 100) : 0
         
         // Détection anomalie avec seuil personnalisé par fournisseur
         if (chgPct > alertThreshold) {
@@ -252,15 +306,17 @@ NOTE : Si tu vois "mini" dans un intitulé Monarque → c'est un Pain mini disti
           matched_id: bestMatch.id,
           score: bestScore,
           old_price: bestMatch.current_price,
-          new_price: newPrice,
+          new_price: finalUnitPrice,
           change_pct: chgPct,
           quantite_livree: ligne.quantite_livree,
           code_livraison: ligne.code_livraison,
-          master_qty_per_pack: ligne.master_qty_per_pack,
-          pack_price_ht: ligne.pack_price_ht,
+          master_qty_per_pack: finalMasterQty,
+          pack_price_ht: packPriceHt,
           unite: ligne.unite,
           categorie: ligne.categorie,
-          conditionnement: ligne.conditionnement
+          conditionnement: ligne.conditionnement,
+          rule_applied: rule_applied,
+          rule_violation: rule_violation
         })
       } else if (bestMatch && bestScore >= 30) {
         var otherSuggestions = (allMatches || []).filter(function(am: any) { return am.id !== bestMatch.id }).slice(0, 3).map(function(am: any) { return {name: am.name, id: am.id} })
