@@ -2,6 +2,17 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
+function todayISO() {
+  // Date du jour au format YYYY-MM-DD, dans la timezone Europe/Paris
+  // pour rester cohérent même si le navigateur est en UTC
+  var d = new Date()
+  var paris = new Intl.DateTimeFormat('en-CA', { 
+    timeZone: 'Europe/Paris', 
+    year: 'numeric', month: '2-digit', day: '2-digit' 
+  })
+  return paris.format(d) // format YYYY-MM-DD
+}
+
 function sb() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -28,7 +39,7 @@ export default function WeatherWidget(props) {
   function loadForecast() {
     setLoading(true)
     var c = sb()
-    c.from('weather_forecast').select('*').order('date', { ascending: true }).then(function(res){
+    c.from('weather_forecast').select('*').gte('date', todayISO()).order('date', { ascending: true }).then(function(res){
       var data = res.data || []
       setForecast(data)
       setLoading(false)
@@ -50,7 +61,7 @@ export default function WeatherWidget(props) {
     fetch('/api/weather/refresh', { method: 'POST' }).then(function(r){
       if (r.ok) {
         var c = sb()
-        c.from('weather_forecast').select('*').order('date', { ascending: true }).then(function(res){
+        c.from('weather_forecast').select('*').gte('date', todayISO()).order('date', { ascending: true }).then(function(res){
           setForecast(res.data || [])
           setRefreshing(false)
         })
