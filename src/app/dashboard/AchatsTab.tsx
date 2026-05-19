@@ -366,10 +366,10 @@ export default function AchatsTab(props) {
     return false
   }
 
-  // Comparateur : articles qui ont 2+ products
+  // Comparateur : articles qui ont 2+ products (uniquement actifs)
   var comparisons = []
   articles.forEach(function(art) {
-    var artProducts = products.filter(function(p) { return p.article_id === art.id })
+    var artProducts = products.filter(function(p) { return p.article_id === art.id && p.is_active !== false })
     if (artProducts.length < 2) return
     var withSupplier = artProducts.map(function(p) {
       var sup = suppliers.filter(function(s) { return s.id === p.supplier_id })[0]
@@ -398,6 +398,8 @@ export default function AchatsTab(props) {
     if (prod && prod.article_id) usedArticleIds[prod.article_id] = 1
   })
   var orphanProducts = products.filter(function(p) {
+    // 🔥 Exclure les produits archivés (is_active = false)
+    if (p.is_active === false) return false
     // Catégories qui ne devraient jamais apparaître comme orphelins (overhead naturel)
     if (p.category === 'boisson' || p.category === 'drink') return false
     if (p.category === 'packaging') return false
