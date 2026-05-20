@@ -97,6 +97,25 @@ function buildFilename(emp: any, amendmentNumber: number, amendmentType: string)
   return 'Avenant-' + amendmentNumber + '-' + (typeLabels[amendmentType] || 'avenant') + '-' + slug((emp.prenom || '') + '-' + (emp.nom || ''))
 }
 
+// 🔥 Calcule la date du lendemain au format YYYY-MM-DD (pour prolongation Extra)
+function getLendemain(dateStr: string): string {
+  if (!dateStr) return ''
+  var d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() + 1)
+  var y = d.getFullYear()
+  var m = String(d.getMonth() + 1).padStart(2, '0')
+  var day = String(d.getDate()).padStart(2, '0')
+  return y + '-' + m + '-' + day
+}
+
+// 🔥 Calcule nombre de jours entre 2 dates ISO YYYY-MM-DD
+function diffJours(d1: string, d2: string): number {
+  if (!d1 || !d2) return 0
+  var a = new Date(d1 + 'T00:00:00').getTime()
+  var b = new Date(d2 + 'T00:00:00').getTime()
+  return Math.round((b - a) / (1000 * 60 * 60 * 24))
+}
+
 export default function AmendmentModal(props: Props) {
   var c = props.contract
   var emp = props.employee
@@ -107,7 +126,7 @@ export default function AmendmentModal(props: Props) {
   var [motifLibre, setMotifLibre] = useState<string>('')
   var [submitting, setSubmitting] = useState(false)
   
-  var [newDateFin, setNewDateFin] = useState<string>(c.date_fin || '')
+  var [newDateFin, setNewDateFin] = useState<string>(c.date_fin ? getLendemain(c.date_fin) : '')
   var [newSalaireBrutMensuel, setNewSalaireBrutMensuel] = useState<string>(c.salaire_brut_mensuel ? String(c.salaire_brut_mensuel) : '')
   var [newTauxHoraire, setNewTauxHoraire] = useState<string>(c.taux_horaire_brut ? String(c.taux_horaire_brut) : '')
   var [newHeuresHebdo, setNewHeuresHebdo] = useState<string>(c.heures_hebdo ? String(c.heures_hebdo) : '')
@@ -118,7 +137,7 @@ export default function AmendmentModal(props: Props) {
   // 🔥 Vacations supplémentaires (Extra)
   var [newVacations, setNewVacations] = useState<any[]>([])
   var [addingVacation, setAddingVacation] = useState<{date: string, debut: string, fin: string}>({
-    date: '', debut: '18:00', fin: '23:00'
+    date: c.date_fin ? getLendemain(c.date_fin) : '', debut: '18:00', fin: '23:00'
   })
   
   // Preview + iframe
@@ -172,7 +191,8 @@ export default function AmendmentModal(props: Props) {
       next.sort(function(a: any, b: any) { return (a.date_vacation || '').localeCompare(b.date_vacation || '') })
       return next
     })
-    setAddingVacation({ date: '', debut: '18:00', fin: '23:00' })
+    // Suggérer le lendemain comme prochaine date à saisir
+    setAddingVacation({ date: getLendemain(addingVacation.date), debut: '18:00', fin: '23:00' })
   }
   
   function removeVacation(idx: number) {
@@ -291,8 +311,19 @@ export default function AmendmentModal(props: Props) {
   
   var canGoToForm = !!amendmentType
   var motifOK = !!finalMotif && finalMotif.trim().length >= (isLibreMode ? 10 : 1)
+  
+  // 🔥 Validation continuité : pour Extra prolongation, les nouvelles vacations doivent toutes être dans la continuité
+  var continuiteRespectee = true
+  if (amendmentType === 'prolongation_duree' && isExtra && newVacations.length > 0 && c.date_fin) {
+    var sortedNew = newVacations.slice().sort(function(a: any, b: any) { return (a.date_vacation || '').localeCompare(b.date_vacation || '') })
+    // La 1ère nouvelle vacation doit être au plus tard le lendemain de date_fin
+    var firstNewDate = sortedNew[0].date_vacation
+    var gapFirst = diffJours(c.date_fin, firstNewDate)
+    if (gapFirst > 1) continuiteRespectee = false
+  }
+  
   var canPreview = false
-  if (amendmentType === 'prolongation_duree') canPreview = !!newDateFin && motifOK
+  if (amendmentType === 'prolongation_duree') canPreview = !!newDateFin && motifOK && continuiteRespectee
   else if (amendmentType === 'augmentation_salaire') canPreview = (!!newSalaireBrutMensuel || !!newTauxHoraire) && motifOK
   else if (amendmentType === 'modification_horaires') canPreview = (!!newHeuresHebdo || !!newHeuresMensuelles || newVacations.length > 0) && motifOK
   else if (amendmentType === 'changement_poste') canPreview = (!!newFonction || !!newClassification) && motifOK
@@ -425,10 +456,13 @@ export default function AmendmentModal(props: Props) {
                     </label>
                     <div style={{fontSize:11,color:'#888',marginBottom:6}}>
                       Date de fin actuelle : <strong>{c.date_fin ? new Date(c.date_fin).toLocaleDateString('fr-FR') : '—'}</strong>
+                      {c.date_fin && (
+                        <> · Prolongation à compter du <strong style={{color: MESHUGA.pinkBorder}}>{new Date(getLendemain(c.date_fin)).toLocaleDateString('fr-FR')}</strong> (lendemain — continuité requise)</>
+                      )}
                     </div>
                     <input type="date" value={newDateFin}
                       onChange={function(e){ setNewDateFin(e.target.value) }}
-                      min={c.date_fin || effectiveDate}
+                      min={c.date_fin ? getLendemain(c.date_fin) : effectiveDate}
                       style={{padding:'9px 12px',fontSize:13,border:'1.5px solid ' + MESHUGA.pink,borderRadius:6,width:'100%'}}/>
                   </div>
                   
@@ -438,8 +472,12 @@ export default function AmendmentModal(props: Props) {
                       <div style={{fontSize:13,fontWeight:900,color: MESHUGA.pinkBorder, marginBottom:8}}>
                         📅 Vacations supplémentaires à ajouter
                       </div>
-                      <div style={{fontSize:11,color:'#666',marginBottom:10}}>
-                        Ajoute les nouvelles vacations (date + heure début + heure fin) qui correspondent à la prolongation. Elles seront ajoutées au planning existant et apparaîtront dans le PDF.
+                      <div style={{fontSize:11,color:'#666',marginBottom:10,lineHeight:1.5}}>
+                        Ajoute les nouvelles vacations qui correspondent à la prolongation (date + heure début + heure fin). Elles seront ajoutées au planning existant.
+                        <br/>
+                        <span style={{color: MESHUGA.pinkBorder, fontWeight:700}}>
+                          ⚖️ Règle juridique : la 1ère vacation doit être au plus tard le <strong>{c.date_fin ? new Date(getLendemain(c.date_fin)).toLocaleDateString('fr-FR') : '—'}</strong> (lendemain de la fin actuelle) pour assurer la continuité du contrat. Sinon, c'est un nouveau contrat.
+                        </span>
                       </div>
                       
                       {newVacations.length > 0 && (
@@ -463,7 +501,7 @@ export default function AmendmentModal(props: Props) {
                         <div>
                           <div style={{fontSize:10,fontWeight:900,marginBottom:2,color:'#666'}}>Date</div>
                           <input type="date" value={addingVacation.date}
-                            min={c.date_fin || effectiveDate}
+                            min={c.date_fin ? getLendemain(c.date_fin) : effectiveDate}
                             onChange={function(e){ setAddingVacation(Object.assign({}, addingVacation, { date: e.target.value })) }}
                             style={{padding:'6px 8px',fontSize:12,border:'1.5px solid '+MESHUGA.pink,borderRadius:5,width:'100%'}}/>
                         </div>
@@ -483,6 +521,35 @@ export default function AmendmentModal(props: Props) {
                           disabled={!addingVacation.date || !addingVacation.debut || !addingVacation.fin}
                           style={{padding:'8px 12px',background: MESHUGA.yellow,border:'2px solid '+MESHUGA.black,borderRadius:5,fontSize:11,fontWeight:900,cursor:'pointer',color: MESHUGA.black,boxShadow: '1px 1px 0 '+MESHUGA.black}}>+ Ajouter</button>
                       </div>
+                      
+                      {/* 🔥 Alerte rouge si gap > 1 jour entre la date saisie et la dernière date du planning */}
+                      {(function() {
+                        if (!addingVacation.date || !c.date_fin) return null
+                        // Dernière date connue = max(date_fin contrat, dernière nouvelle vacation ajoutée)
+                        var lastKnownDate = c.date_fin
+                        if (newVacations.length > 0) {
+                          var sortedVacs = newVacations.slice().sort(function(a:any,b:any){ return (b.date_vacation || '').localeCompare(a.date_vacation || '') })
+                          if (sortedVacs[0].date_vacation > lastKnownDate) lastKnownDate = sortedVacs[0].date_vacation
+                        }
+                        var gap = diffJours(lastKnownDate, addingVacation.date)
+                        if (gap > 1) {
+                          return (
+                            <div style={{
+                              marginTop:8,padding:'10px 12px',
+                              background:'#FFE5E5',
+                              border:'2px solid #CC0066',
+                              borderRadius:6,fontSize:11,color:'#CC0066',fontWeight:700
+                            }}>
+                              ⚠️ <strong>Rupture de continuité détectée</strong> ({gap} jours d'écart depuis la dernière vacation)<br/>
+                              <span style={{fontWeight:400}}>
+                                Un avenant suppose une <strong>prolongation continue</strong>. La nouvelle date doit être au plus tard le {new Date(getLendemain(lastKnownDate)).toLocaleDateString('fr-FR')} (lendemain).<br/>
+                                Si tu veux une nouvelle période plus tard → <strong>crée un nouveau contrat</strong>, pas un avenant.
+                              </span>
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
                     </div>
                   )}
                 </>
