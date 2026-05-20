@@ -389,6 +389,93 @@ export default function EmployeeDetail(props) {
     }
   }
 
+  // 🔥 === Régénère le PDF d'un avenant de modification contractuelle (table hr_contract_amendments) ===
+  async function regenerateAmendmentContractuelPdf(amendment: any) {
+    try {
+      var res = await fetch("/api/hr/contracts/" + amendment.contract_id + "/amendment?amendment_id=" + amendment.id, {
+        method: "GET"
+      })
+      if (!res.ok) {
+        var errMsg = "Erreur HTTP " + res.status
+        try {
+          var errData = await res.json()
+          if (errData && errData.error) errMsg = errData.error
+        } catch (e) {}
+        throw new Error(errMsg)
+      }
+      var html = await res.text()
+      // Ouvrir dans un nouvel onglet avec write() pour que les styles s'appliquent
+      var win = window.open("", "_blank")
+      if (win) {
+        win.document.open()
+        win.document.write(html)
+        win.document.close()
+        // Donner le focus et lancer l'impression après un court délai
+        setTimeout(function() {
+          try { win.focus(); win.print() } catch (e) {}
+        }, 500)
+      } else {
+        alert("Le navigateur a bloqué l'ouverture du PDF. Autorise les pop-ups pour ce site.")
+      }
+    } catch (err: any) {
+      alert("Erreur régénération PDF avenant : " + (err.message || err))
+    }
+  }
+
+  // 🔥 === Supprime un avenant ET fait le rollback de la modification ===
+  async function deleteAmendmentWithRollback(amendment: any) {
+    var typeLabels: any = {
+      prolongation_duree: "Prolongation de durée",
+      augmentation_salaire: "Modification rémunération",
+      modification_horaires: "Modification horaires",
+      changement_poste: "Changement de poste",
+      autre: "Autre modification"
+    }
+    var label = typeLabels[amendment.amendment_type] || "Avenant"
+    
+    var rollbackInfo = ""
+    if (amendment.changes && typeof amendment.changes === 'object') {
+      var fields = Object.keys(amendment.changes)
+      if (fields.length > 0) {
+        rollbackInfo = "\n\nLe rollback va remettre les anciennes valeurs :\n" + fields.map(function(k) {
+          var ch = amendment.changes[k]
+          return "  • " + k + " : " + (ch.after == null ? "—" : ch.after) + " → " + (ch.before == null ? "—" : ch.before)
+        }).join("\n")
+      }
+    }
+    
+    var msg = "Supprimer l'avenant n°" + amendment.amendment_number + " (" + label + ") ?" + rollbackInfo
+    if (amendment.amendment_type === "prolongation_duree") {
+      msg += "\n\n⚠️ Les vacations supplémentaires ajoutées au-delà de l'ancienne date de fin seront aussi supprimées."
+    }
+    msg += "\n\nCette action est irréversible."
+    
+    if (!confirm(msg)) return
+    
+    try {
+      var res = await fetch("/api/hr/contracts/" + amendment.contract_id + "/amendment?amendment_id=" + amendment.id, {
+        method: "DELETE"
+      })
+      if (!res.ok) {
+        var errMsg = "Erreur HTTP " + res.status
+        try {
+          var errData = await res.json()
+          if (errData && errData.error) errMsg = errData.error
+        } catch (e) {}
+        throw new Error(errMsg)
+      }
+      var data = await res.json()
+      var successMsg = "Avenant supprimé ✓"
+      if (data.vacations_deleted && data.vacations_deleted > 0) {
+        successMsg += " (et " + data.vacations_deleted + " vacation" + (data.vacations_deleted > 1 ? "s" : "") + " supprimée" + (data.vacations_deleted > 1 ? "s" : "") + ")"
+      }
+      if (props.onSaved) props.onSaved(successMsg)
+      load()
+    } catch (err: any) {
+      alert("Erreur suppression avenant : " + (err.message || err))
+    }
+  }
+
   // === Upload de l'avenant SIGNÉ (différent du upload contrat signé) ===
   function triggerAvenantSignedUpload(c) {
     setUploadingAvenantFor(c)
@@ -1274,6 +1361,39 @@ export default function EmployeeDetail(props) {
                     }}>
                       {a.status === "signed" ? "SIGNÉ" : a.status === "finalized" ? "FINALISÉ" : "BROUILLON"}
                     </span>
+                    {/* 🔥 Boutons d'action sur chaque avenant */}
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      <button
+                        onClick={function() { regenerateAmendmentContractuelPdf(a) }}
+                        title="Régénérer le PDF de l'avenant (et lancer l'impression)"
+                        style={{
+                          padding: "5px 10px",
+                          background: "#FFEB5A",
+                          border: "2px solid #191923",
+                          borderRadius: 4,
+                          fontSize: 11,
+                          fontWeight: 900,
+                          cursor: "pointer",
+                          color: "#191923",
+                          boxShadow: "1px 1px 0 #191923"
+                        }}>🖨️ PDF</button>
+                      {a.status !== "signed" && (
+                        <button
+                          onClick={function() { deleteAmendmentWithRollback(a) }}
+                          title="Supprimer l'avenant et annuler la modification (rollback)"
+                          style={{
+                            padding: "5px 10px",
+                            background: "#CC0066",
+                            border: "2px solid #191923",
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 900,
+                            cursor: "pointer",
+                            color: "white",
+                            boxShadow: "1px 1px 0 #191923"
+                          }}>🗑️</button>
+                      )}
+                    </div>
                   </div>
                 )
               })}
