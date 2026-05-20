@@ -1,12 +1,47 @@
 // Builder du template HTML pour un avenant
-// Réutilise les blocs partagés de contractBuilders.tsx (CSS, header, signatures)
+// Réutilise les blocs partagés de contractBuilders.tsx (CSS, header, wrap)
+// Signatures custom : utilise amendment.signature_date (pas contract.date_signature du contrat initial)
 
-import { esc, buildSharedHeader, buildSharedSignatures, buildSharedCss, wrapHtml } from "./contractBuilders"
+import { esc, buildSharedHeader, buildSharedCss, wrapHtml } from "./contractBuilders"
 
+// Format date FR long ("vendredi 22 mai 2026")
 function fmtDateFR(d: any) {
   if (!d) return "—"
-  var dt = new Date(d)
+  var dt = new Date(String(d).slice(0, 10) + 'T12:00:00')
+  if (isNaN(dt.getTime())) return "—"
   return dt.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+}
+
+// 🔥 Signatures spéciales pour l'avenant : utilise la date de signature de l'AVENANT
+// (pas celle du contrat initial)
+function buildAvenantSignatures(contract: any, emp: any, signatureDate: string, salarieRole: string): string {
+  var civilite = emp.civilite || "Madame"
+  var feminin = (civilite === "Madame" || civilite === "Mademoiselle")
+  var dateSig = signatureDate
+    ? new Date(String(signatureDate).slice(0, 10) + 'T12:00:00').toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+    : "[date à compléter]"
+  var ville = contract.ville_signature || "Paris"
+
+  return ''
+    + '<section class="sig-section">'
+    + '<h2 class="yt">Signatures</h2>'
+    + '<div class="rule"></div>'
+    + '<div class="fait-banner">Fait à <strong>' + esc(ville) + '</strong>, en deux exemplaires originaux dont un remis à chacune des Parties, le <strong>' + esc(dateSig) + '</strong>.<span class="small">Chaque page doit être paraphée par les deux Parties.</span></div>'
+    + '<div class="sig-grid">'
+    + '<div class="sig-block">'
+    + '<div class="sig-head">Pour l\'Employeur</div>'
+    + '<div class="sig-id"><div class="name">AEGIA FOOD</div><div class="role">SAS AEGIA, Présidente<br>représentée par Edward TOURET, Président</div></div>'
+    + '<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé »</div>'
+    + '<div class="sig-foot" style="display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-family:Yellowtail,cursive;font-size:14px;color:#FF82D7">cachet</span><span style="opacity:.5">·</span><span style="font-style:italic">SAS AEGIA</span></div>'
+    + '</div>'
+    + '<div class="sig-block">'
+    + '<div class="sig-head">' + (feminin ? "La Salariée" : "Le Salarié") + '</div>'
+    + '<div class="sig-id"><div class="name">' + esc(emp.prenom || "") + ' ' + esc((emp.nom || "").toUpperCase()) + '</div><div class="role">' + esc(salarieRole || "&nbsp;") + '</div></div>'
+    + '<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé »</div>'
+    + '<div class="sig-foot">Date : __ / __ / ____</div>'
+    + '</div>'
+    + '</div></section>'
+    + '</div></body></html>'
 }
 
 function fmtDateShortFR(d: any) {
@@ -257,8 +292,9 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   
   var body = preambule + articles
   
-  // Signatures : 3ème argument = fonction du salarié (pas un mot-clé), comme dans buildExtraContract
-  var signatures = buildSharedSignatures(contract, emp, contract.fonction || "")
+  // 🔥 Signatures custom : utilise la date de signature de L'AVENANT (pas du contrat initial)
+  // amendment.signature_date est ajouté par le modal et l'API
+  var signatures = buildAvenantSignatures(contract, emp, amendment.signature_date, contract.fonction || "")
   
   return wrapHtml({
     titre: "Avenant " + amendmentNumStr + " Meshuga — " + (emp ? (emp.prenom + " " + emp.nom) : "—"),
