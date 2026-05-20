@@ -35,8 +35,30 @@ export default function AchatsTab(props) {
   var [editingPriceId, setEditingPriceId] = useState(null)
   var [editingPriceVal, setEditingPriceVal] = useState('')
   var [savingPrice, setSavingPrice] = useState(false)
+  // 🔥 Modal de visualisation facture
+  var [pdfViewer, setPdfViewer] = useState(null) // { filename, fournisseur, date, productName }
+  // 🔥 Modal de comparaison côte-à-côte des factures
+  var [compareModal, setCompareModal] = useState(null) // { article, products: [{filename, date, ...}, ...] }
 
   useEffect(function() { loadData() }, [])
+
+  // 🔥 Fermeture modals avec ESC
+  useEffect(function() {
+    function handleEsc(e) {
+      if (e.key === 'Escape') {
+        if (pdfViewer) setPdfViewer(null)
+        else if (compareModal) setCompareModal(null)
+      }
+    }
+    if (pdfViewer || compareModal) {
+      window.addEventListener('keydown', handleEsc)
+      document.body.style.overflow = 'hidden'
+    }
+    return function() {
+      window.removeEventListener('keydown', handleEsc)
+      document.body.style.overflow = ''
+    }
+  }, [pdfViewer, compareModal])
 
   function loadData() {
     setLoading(true)
@@ -367,13 +389,35 @@ export default function AchatsTab(props) {
   }
 
   // Comparateur : articles qui ont 2+ products (uniquement actifs)
+  // 🔥 Pour chaque product, récupérer la dernière facture (date + filename)
+  var lastInvoiceByProduct = {}
+  prices.forEach(function(pp) {
+    if (!pp.product_id) return
+    var existing = lastInvoiceByProduct[pp.product_id]
+    if (!existing || (pp.invoice_date && pp.invoice_date > existing.date)) {
+      lastInvoiceByProduct[pp.product_id] = {
+        date: pp.invoice_date,
+        filename: pp.invoice_filename || null
+      }
+    }
+  })
   var comparisons = []
   articles.forEach(function(art) {
     var artProducts = products.filter(function(p) { return p.article_id === art.id && p.is_active !== false })
     if (artProducts.length < 2) return
     var withSupplier = artProducts.map(function(p) {
       var sup = suppliers.filter(function(s) { return s.id === p.supplier_id })[0]
-      return { name: p.name, price: Number(p.current_price), supplier: sup ? sup.name : '?', is_active: p.is_active, unit: p.unit, id: p.id }
+      var lastInv = lastInvoiceByProduct[p.id] || { date: null, filename: null }
+      return { 
+        name: p.name, 
+        price: Number(p.current_price), 
+        supplier: sup ? sup.name : '?', 
+        is_active: p.is_active, 
+        unit: p.unit, 
+        id: p.id,
+        last_invoice_date: lastInv.date,
+        last_invoice_filename: lastInv.filename
+      }
     }).filter(function(x){ return x.price > 0 }).sort(function(a, b) { return a.price - b.price })
     if (withSupplier.length < 2) return
     var unitsSeen = {}
@@ -618,19 +662,65 @@ export default function AchatsTab(props) {
           </div>
           <div style={{fontSize:11,color:'#888',marginBottom:8}}>{comparisons.length} ingrédient{comparisons.length>1?'s':''} disponible{comparisons.length>1?'s':''} chez plusieurs fournisseurs · triés par économie potentielle</div>
           {comparisons.slice(0, 10).map(function(c, i) {
+            // Compter combien de produits ont une facture cliquable
+            var withFile = c.products.filter(function(p){ return p.last_invoice_filename })
             return (
               <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:'1px solid #F0F0F0',fontSize:13,gap:8,flexWrap:'wrap'}}>
                 <span style={{fontWeight:900,minWidth:120}}>{c.article}</span>
                 <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                   {c.products.map(function(p, pi) {
-                    return <span key={pi} style={{fontSize:12,fontWeight:p.is_active?900:400,color:pi===0?'#009D3A':'#191923'}}>
-                      {p.supplier}: {p.price.toFixed(2)}€/{p.unit}{p.is_active ? ' ★' : ''}
-                    </span>
+                    var dateLabel = p.last_invoice_date ? new Date(p.last_invoice_date).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'2-digit'}) : 'Jamais facturé'
+                    var hasFile = !!p.last_invoice_filename
+                    return (
+                      <span 
+                        key={pi}
+                        title={'Dernière facture : ' + dateLabel + (hasFile ? ' · Cliquer pour ouvrir' : '')}
+                        onClick={function(){
+                          if (hasFile) {
+                            setPdfViewer({
+                              filename: p.last_invoice_filename,
+                              fournisseur: p.supplier,
+                              date: p.last_invoice_date,
+                              productName: c.article,
+                              price: p.price,
+                              unit: p.unit
+                            })
+                          }
+                        }}
+                        style={{
+                          fontSize:12,
+                          fontWeight:p.is_active?900:400,
+                          color:pi===0?'#009D3A':'#191923',
+                          cursor: hasFile ? 'pointer' : 'help',
+                          textDecoration: hasFile ? 'underline dotted' : 'none',
+                          textDecorationColor: '#bbb'
+                        }}>
+                        {p.supplier}: {p.price.toFixed(2)}€/{p.unit}{p.is_active ? ' ★' : ''}
+                      </span>
+                    )
                   })}
                   {c.sameUnit ? (
                     <span style={{fontSize:11,fontWeight:900,color:'#009D3A',background:'#E8FFE8',padding:'2px 8px',borderRadius:10}}>-{c.saving}%</span>
                   ) : (
                     <span style={{fontSize:10,fontWeight:700,color:'#A05A00',background:'#FFF6E5',padding:'2px 8px',borderRadius:10}}>⚠️ unités ≠</span>
+                  )}
+                  {/* 🔥 Bouton "Comparer les factures" si au moins 2 products ont un filename */}
+                  {withFile.length >= 2 && (
+                    <button 
+                      onClick={function(){ setCompareModal({ article: c.article, products: c.products.filter(function(p){return p.last_invoice_filename}) }) }}
+                      title="Comparer les factures côte-à-côte"
+                      style={{
+                        background:'#FFEB5A',
+                        border:'1.5px solid #191923',
+                        color:'#191923',
+                        padding:'2px 8px',
+                        borderRadius:10,
+                        fontSize:10,
+                        fontWeight:900,
+                        cursor:'pointer'
+                      }}>
+                      📑 Comparer
+                    </button>
                   )}
                 </div>
               </div>
@@ -806,6 +896,89 @@ export default function AchatsTab(props) {
                 {assignSaving ? '⏳ ...' : '✓ Affecter'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔥 MODAL PDF VIEWER (clic sur un prix) */}
+      {pdfViewer && (
+        <div 
+          onClick={function(e){ if(e.target === e.currentTarget) setPdfViewer(null) }}
+          style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',flexDirection:'column'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 20px',background:'#191923',color:'white',borderBottom:'3px solid #FFEB5A'}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:900,fontSize:14}}>📄 {pdfViewer.productName} — {pdfViewer.fournisseur}</div>
+              <div style={{fontSize:11,opacity:0.7,display:'flex',gap:8}}>
+                <span>{pdfViewer.date ? new Date(pdfViewer.date).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}) : 'Date inconnue'}</span>
+                <span style={{fontWeight:900}}>{pdfViewer.price.toFixed(3)}€/{pdfViewer.unit}</span>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <a 
+                href={'/api/invoice-pdf?filename=' + encodeURIComponent(pdfViewer.filename)}
+                download={pdfViewer.filename}
+                style={{background:'transparent',color:'white',border:'1.5px solid #fff',padding:'6px 12px',borderRadius:6,fontSize:11,fontWeight:900,textDecoration:'none'}}>
+                ⬇ Télécharger
+              </a>
+              <button 
+                onClick={function(){setPdfViewer(null)}}
+                title="Fermer (Échap)"
+                style={{background:'#CC0066',color:'white',border:'none',width:44,height:44,borderRadius:8,fontSize:24,fontWeight:900,cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,0.4)',lineHeight:1}}>
+                ✕
+              </button>
+            </div>
+          </div>
+          <iframe 
+            src={'/api/invoice-pdf?filename=' + encodeURIComponent(pdfViewer.filename)}
+            style={{flex:1,border:'none',background:'white'}}
+            title="Aperçu facture" />
+          <div style={{padding:'8px 20px',background:'#191923',color:'#888',fontSize:10,textAlign:'center'}}>
+            Échap ou ✕ pour fermer · Cliquer hors du PDF aussi
+          </div>
+        </div>
+      )}
+
+      {/* 🔥 MODAL COMPARAISON FACTURES CÔTE-À-CÔTE (clic sur 📑 Comparer) */}
+      {compareModal && (
+        <div 
+          onClick={function(e){ if(e.target === e.currentTarget) setCompareModal(null) }}
+          style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.9)',zIndex:9999,display:'flex',flexDirection:'column'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 20px',background:'#191923',color:'white',borderBottom:'3px solid #FF82D7'}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:900,fontSize:15}}>📑 Comparaison factures : <span style={{color:'#FFEB5A'}}>{compareModal.article}</span></div>
+              <div style={{fontSize:11,opacity:0.7}}>
+                {compareModal.products.length} fournisseur{compareModal.products.length>1?'s':''} comparé{compareModal.products.length>1?'s':''}
+              </div>
+            </div>
+            <button 
+              onClick={function(){setCompareModal(null)}}
+              title="Fermer (Échap)"
+              style={{background:'#CC0066',color:'white',border:'none',width:44,height:44,borderRadius:8,fontSize:24,fontWeight:900,cursor:'pointer',boxShadow:'0 2px 8px rgba(0,0,0,0.4)',lineHeight:1}}>
+              ✕
+            </button>
+          </div>
+          <div style={{flex:1,display:'flex',background:'#222',overflow:'hidden'}}>
+            {compareModal.products.map(function(p, idx) {
+              return (
+                <div key={p.id} style={{flex:1,display:'flex',flexDirection:'column',borderRight: idx < compareModal.products.length-1 ? '2px solid #FFEB5A' : 'none'}}>
+                  <div style={{padding:'8px 12px',background:'#2a2a2a',color:'white',fontSize:12,borderBottom:'1px solid #444'}}>
+                    <div style={{fontWeight:900}}>{p.supplier}</div>
+                    <div style={{display:'flex',gap:8,fontSize:10,opacity:0.8,marginTop:2}}>
+                      <span>{p.last_invoice_date ? new Date(p.last_invoice_date).toLocaleDateString('fr-FR') : '—'}</span>
+                      <span style={{color:idx===0?'#5FE89F':'#FFEB5A',fontWeight:900}}>{p.price.toFixed(3)}€/{p.unit}</span>
+                      {idx===0 && <span style={{background:'#009D3A',color:'white',padding:'1px 6px',borderRadius:6,fontSize:9,fontWeight:900}}>★ MEILLEUR PRIX</span>}
+                    </div>
+                  </div>
+                  <iframe 
+                    src={'/api/invoice-pdf?filename=' + encodeURIComponent(p.last_invoice_filename)}
+                    style={{flex:1,border:'none',background:'white'}}
+                    title={'Facture ' + p.supplier} />
+                </div>
+              )
+            })}
+          </div>
+          <div style={{padding:'8px 20px',background:'#191923',color:'#888',fontSize:10,textAlign:'center'}}>
+            Comparez les conditionnements (poche, colis, sachet) pour valider l'écart de prix · Échap pour fermer
           </div>
         </div>
       )}
