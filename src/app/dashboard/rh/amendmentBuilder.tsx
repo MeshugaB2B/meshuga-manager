@@ -1,7 +1,7 @@
 // Builder du template HTML pour un avenant
 // Réutilise les blocs partagés de contractBuilders.tsx (CSS, header, signatures)
 
-import { esc, buildSharedHeader, buildSharedSignatures, wrapHtml } from "./contractBuilders"
+import { esc, buildSharedHeader, buildSharedSignatures, buildSharedCss, wrapHtml } from "./contractBuilders"
 
 function fmtDateFR(d: any) {
   if (!d) return "—"
@@ -257,15 +257,12 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   
   var body = preambule + articles
   
-  // Signatures (réutilise le bloc partagé du contrat extra)
-  var salarieRole = isExtra ? "extra" : (contract.type ? contract.type.replace("cdi_", "") : "salarié")
-  var signatures = buildSharedSignatures(contract, emp, salarieRole)
+  // Signatures : 3ème argument = fonction du salarié (pas un mot-clé), comme dans buildExtraContract
+  var signatures = buildSharedSignatures(contract, emp, contract.fonction || "")
   
   return wrapHtml({
-    title: "Avenant " + amendmentNumStr + " - " + (emp ? (emp.prenom + " " + emp.nom) : "—"),
-    logoUri: logoUri,
-    header: header,
-    body: body,
-    signatures: signatures
+    titre: "Avenant " + amendmentNumStr + " Meshuga — " + (emp ? (emp.prenom + " " + emp.nom) : "—"),
+    css: buildSharedCss(logoUri),
+    body: header + body + signatures
   })
 }
