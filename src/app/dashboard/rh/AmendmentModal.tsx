@@ -126,6 +126,8 @@ export default function AmendmentModal(props: Props) {
   var [step, setStep] = useState<'type' | 'form' | 'preview'>('type')
   var [amendmentType, setAmendmentType] = useState<string>('')
   var [effectiveDate, setEffectiveDate] = useState<string>(new Date().toISOString().slice(0, 10))
+  // 🔥 Date de signature de l'avenant (distincte de contract.date_signature du contrat initial)
+  var [signatureDate, setSignatureDate] = useState<string>(new Date().toISOString().slice(0, 10))
   var [motifPreset, setMotifPreset] = useState<string>('')
   var [motifLibre, setMotifLibre] = useState<string>('')
   var [submitting, setSubmitting] = useState(false)
@@ -166,6 +168,14 @@ export default function AmendmentModal(props: Props) {
     setMotifPreset('')
     setMotifLibre('')
   }, [amendmentType])
+  
+  // 🔥 Pour Extra prolongation : force effectiveDate = lendemain de la date_fin (continuité juridique)
+  useEffect(function() {
+    if (amendmentType === 'prolongation_duree' && c.type === 'extra' && c.date_fin) {
+      var lendemain = getLendemain(c.date_fin)
+      if (lendemain) setEffectiveDate(lendemain)
+    }
+  }, [amendmentType, c.type, c.date_fin])
   
   // 🔥 Injection HTML dans iframe (comme ContractPreviewModal)
   useEffect(function() {
@@ -209,12 +219,19 @@ export default function AmendmentModal(props: Props) {
     var payload: any = {
       amendment_type: amendmentType,
       effective_date: effectiveDate,
+      signature_date: signatureDate,
       motif: finalMotif
     }
     if (includePreview) payload.preview = true
     
     if (amendmentType === 'prolongation_duree') {
-      payload.new_date_fin = newDateFin
+      // Pour Extra : new_date_fin = dernière vacation (le serveur le force aussi, mais on l'envoie cohérent)
+      if (isExtra && newVacations.length > 0) {
+        var sortedNew = newVacations.slice().sort(function(a:any,b:any){ return (b.date_vacation||'').localeCompare(a.date_vacation||'') })
+        payload.new_date_fin = sortedNew[0].date_vacation
+      } else {
+        payload.new_date_fin = newDateFin
+      }
       if (newVacations.length > 0) {
         payload.new_vacations = newVacations
         payload.replace_vacations = false  // AJOUT
@@ -327,7 +344,14 @@ export default function AmendmentModal(props: Props) {
   }
   
   var canPreview = false
-  if (amendmentType === 'prolongation_duree') canPreview = !!newDateFin && motifOK && continuiteRespectee
+  if (amendmentType === 'prolongation_duree') {
+    if (isExtra) {
+      // Extra : la nouvelle date de fin est calculée auto → on exige juste 1 vacation min
+      canPreview = newVacations.length > 0 && motifOK && continuiteRespectee
+    } else {
+      canPreview = !!newDateFin && motifOK && continuiteRespectee
+    }
+  }
   else if (amendmentType === 'augmentation_salaire') canPreview = (!!newSalaireBrutMensuel || !!newTauxHoraire) && motifOK
   else if (amendmentType === 'modification_horaires') canPreview = (!!newHeuresHebdo || !!newHeuresMensuelles || newVacations.length > 0) && motifOK
   else if (amendmentType === 'changement_poste') canPreview = (!!newFonction || !!newClassification) && motifOK
@@ -446,29 +470,83 @@ export default function AmendmentModal(props: Props) {
               <div style={{marginBottom:14}}>
                 <label style={{display:'block',fontSize:12,fontWeight:900,marginBottom:4, color: MESHUGA.pinkBorder}}>
                   Date d'effet de l'avenant *
+                  {amendmentType === 'prolongation_duree' && isExtra && (
+                    <span style={{fontWeight:400, fontSize:11, color:'#888', marginLeft:8}}>🔒 verrouillé (lendemain du contrat initial)</span>
+                  )}
                 </label>
-                <input type="date" value={effectiveDate}
-                  onChange={function(e){ setEffectiveDate(e.target.value) }}
+                {amendmentType === 'prolongation_duree' && isExtra ? (
+                  <>
+                    <input type="date" value={effectiveDate}
+                      readOnly disabled
+                      title="Pour une prolongation d'extra, la date d'effet est obligatoirement le lendemain de la date de fin du contrat initial (continuité juridique)"
+                      style={{padding:'9px 12px',fontSize:13,border:'1.5px solid #DDD',borderRadius:6,width:'100%',background:'#F5F5F5',color:'#666',cursor:'not-allowed'}}/>
+                    <div style={{fontSize:11, color:'#888', marginTop:4, fontStyle:'italic'}}>
+                      ⚖️ Continuité juridique requise : l'avenant prend effet le lendemain de la date de fin du contrat initial ({c.date_fin ? new Date(String(c.date_fin).slice(0,10) + 'T12:00:00').toLocaleDateString('fr-FR') : '—'}).
+                    </div>
+                  </>
+                ) : (
+                  <input type="date" value={effectiveDate}
+                    onChange={function(e){ setEffectiveDate(e.target.value) }}
+                    style={{padding:'9px 12px',fontSize:13,border:'1.5px solid ' + MESHUGA.pink,borderRadius:6,width:'100%',background:'white'}}/>
+                )}
+              </div>
+              
+              {/* 🔥 Date de signature de l'avenant (toujours visible, modifiable) */}
+              <div style={{marginBottom:14}}>
+                <label style={{display:'block',fontSize:12,fontWeight:900,marginBottom:4, color: MESHUGA.pinkBorder}}>
+                  Date de signature de l'avenant *
+                </label>
+                <div style={{fontSize:11,color:'#888',marginBottom:6}}>
+                  Jour où tu signes physiquement l'avenant avec le salarié (différent de la date de signature du contrat initial).
+                </div>
+                <input type="date" value={signatureDate}
+                  onChange={function(e){ setSignatureDate(e.target.value) }}
                   style={{padding:'9px 12px',fontSize:13,border:'1.5px solid ' + MESHUGA.pink,borderRadius:6,width:'100%',background:'white'}}/>
               </div>
               
               {amendmentType === 'prolongation_duree' && (
                 <>
-                  <div style={{marginBottom:14}}>
-                    <label style={{display:'block',fontSize:12,fontWeight:900,marginBottom:4, color: MESHUGA.pinkBorder}}>
-                      Nouvelle date de fin *
-                    </label>
-                    <div style={{fontSize:11,color:'#888',marginBottom:6}}>
-                      Date de fin actuelle : <strong>{c.date_fin ? new Date(c.date_fin).toLocaleDateString('fr-FR') : '—'}</strong>
-                      {c.date_fin && (
-                        <> · Prolongation à compter du <strong style={{color: MESHUGA.pinkBorder}}>{new Date(getLendemain(c.date_fin)).toLocaleDateString('fr-FR')}</strong> (lendemain — continuité requise)</>
+                  {/* Champ "Nouvelle date de fin" : MASQUÉ pour Extra (recalculé auto depuis les vacations) */}
+                  {!isExtra && (
+                    <div style={{marginBottom:14}}>
+                      <label style={{display:'block',fontSize:12,fontWeight:900,marginBottom:4, color: MESHUGA.pinkBorder}}>
+                        Nouvelle date de fin *
+                      </label>
+                      <div style={{fontSize:11,color:'#888',marginBottom:6}}>
+                        Date de fin actuelle : <strong>{c.date_fin ? new Date(String(c.date_fin).slice(0,10) + 'T12:00:00').toLocaleDateString('fr-FR') : '—'}</strong>
+                        {c.date_fin && (
+                          <> · Prolongation à compter du <strong style={{color: MESHUGA.pinkBorder}}>{new Date(getLendemain(c.date_fin) + 'T12:00:00').toLocaleDateString('fr-FR')}</strong> (lendemain — continuité requise)</>
+                        )}
+                      </div>
+                      <input type="date" value={newDateFin}
+                        onChange={function(e){ setNewDateFin(e.target.value) }}
+                        min={c.date_fin ? getLendemain(c.date_fin) : effectiveDate}
+                        style={{padding:'9px 12px',fontSize:13,border:'1.5px solid ' + MESHUGA.pink,borderRadius:6,width:'100%'}}/>
+                    </div>
+                  )}
+                  
+                  {/* Pour Extra : info affichée à la place + nouvelle date de fin calculée auto */}
+                  {isExtra && (
+                    <div style={{marginBottom:14, padding:'10px 12px', background:'#FFFBE0', border:'2px solid '+MESHUGA.yellow, borderRadius:6, fontSize:12}}>
+                      <div style={{fontWeight:900, color: MESHUGA.pinkBorder, marginBottom:4}}>
+                        📐 Nouvelle date de fin calculée automatiquement
+                      </div>
+                      <div style={{color:'#666'}}>
+                        Pour un avenant de prolongation Extra, la nouvelle date de fin est <strong>automatiquement</strong> définie comme la date de la dernière vacation ajoutée. Ajoute simplement les vacations ci-dessous.
+                      </div>
+                      {newVacations.length > 0 && (
+                        <div style={{marginTop:6, padding:'6px 10px', background:'white', border:'1px solid '+MESHUGA.pink, borderRadius:4}}>
+                          ➜ Nouvelle date de fin : <strong style={{color: MESHUGA.pinkBorder}}>
+                            {(function(){
+                              var sorted = newVacations.slice().sort(function(a:any,b:any){ return (b.date_vacation||'').localeCompare(a.date_vacation||'') })
+                              var last = sorted[0] && sorted[0].date_vacation
+                              return last ? new Date(last + 'T12:00:00').toLocaleDateString('fr-FR') : '—'
+                            })()}
+                          </strong>
+                        </div>
                       )}
                     </div>
-                    <input type="date" value={newDateFin}
-                      onChange={function(e){ setNewDateFin(e.target.value) }}
-                      min={c.date_fin ? getLendemain(c.date_fin) : effectiveDate}
-                      style={{padding:'9px 12px',fontSize:13,border:'1.5px solid ' + MESHUGA.pink,borderRadius:6,width:'100%'}}/>
-                  </div>
+                  )}
                   
                   {/* 🔥 BLOC VACATIONS pour Extra */}
                   {isExtra && (
