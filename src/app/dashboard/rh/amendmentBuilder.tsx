@@ -14,12 +14,14 @@ function fmtDateFR(d: any) {
 
 // 🔥 Signatures spéciales pour l'avenant : utilise la date de signature de l'AVENANT
 // (pas celle du contrat initial)
+// Si signatureDate est vide/null/undefined → fallback sur la date du jour (jour d'impression)
 function buildAvenantSignatures(contract: any, emp: any, signatureDate: string, salarieRole: string): string {
   var civilite = emp.civilite || "Madame"
   var feminin = (civilite === "Madame" || civilite === "Mademoiselle")
-  var dateSig = signatureDate
-    ? new Date(String(signatureDate).slice(0, 10) + 'T12:00:00').toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
-    : "[date à compléter]"
+  
+  // 🔥 Fallback : si pas de signature_date, utiliser la date du jour
+  var effectiveSigDate = signatureDate || new Date().toISOString().slice(0, 10)
+  var dateSig = new Date(String(effectiveSigDate).slice(0, 10) + 'T12:00:00').toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
   var ville = contract.ville_signature || "Paris"
 
   return ''
