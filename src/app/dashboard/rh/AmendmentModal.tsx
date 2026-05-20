@@ -100,7 +100,10 @@ function buildFilename(emp: any, amendmentNumber: number, amendmentType: string)
 // 🔥 Calcule la date du lendemain au format YYYY-MM-DD (pour prolongation Extra)
 function getLendemain(dateStr: string): string {
   if (!dateStr) return ''
-  var d = new Date(dateStr + 'T00:00:00')
+  // Normaliser : ne garder que la partie YYYY-MM-DD si on a un timestamptz
+  var iso = String(dateStr).slice(0, 10)
+  var d = new Date(iso + 'T12:00:00')  // midi UTC pour éviter tout shift timezone
+  if (isNaN(d.getTime())) return ''
   d.setDate(d.getDate() + 1)
   var y = d.getFullYear()
   var m = String(d.getMonth() + 1).padStart(2, '0')
@@ -111,8 +114,9 @@ function getLendemain(dateStr: string): string {
 // 🔥 Calcule nombre de jours entre 2 dates ISO YYYY-MM-DD
 function diffJours(d1: string, d2: string): number {
   if (!d1 || !d2) return 0
-  var a = new Date(d1 + 'T00:00:00').getTime()
-  var b = new Date(d2 + 'T00:00:00').getTime()
+  var a = new Date(String(d1).slice(0, 10) + 'T12:00:00').getTime()
+  var b = new Date(String(d2).slice(0, 10) + 'T12:00:00').getTime()
+  if (isNaN(a) || isNaN(b)) return 0
   return Math.round((b - a) / (1000 * 60 * 60 * 24))
 }
 
