@@ -24,6 +24,7 @@ import DocumentsManager from "./DocumentsManager"
 import OffboardingWizard from "./OffboardingWizard"
 import WorkStoppageWizard from "./WorkStoppageWizard"
 import RegularizationWizard from "./RegularizationWizard"
+import AmendmentModal from "./AmendmentModal"
 import {
   NATIONALITES,
   getContractTypeMeta,
@@ -56,6 +57,9 @@ export default function EmployeeDetail(props) {
   var [editingStoppage, setEditingStoppage] = useState(null)
   var [reEmploying, setReEmploying] = useState(false)
   var [generatingAmendmentFor, setGeneratingAmendmentFor] = useState(null)
+  // 🔥 Modal pour avenant de MODIFICATION CONTRACTUELLE (différent du bouton "Régénérer avenant" qui gère les clauses RGPD/HACCP)
+  var [amendmentModalFor, setAmendmentModalFor] = useState(null)
+  var [contractAmendments, setContractAmendments] = useState([])
   var signedFileInputRef = useRef(null)
   var avenantSignedInputRef = useRef(null)
   var welcomePackFileInputRef = useRef(null)
@@ -141,9 +145,22 @@ export default function EmployeeDetail(props) {
         docsByContract[doc.contract_id].push(doc)
       }
       setContractDocs(docsByContract)
+      
+      // 🔥 Charge l'historique des avenants (modifications contractuelles)
+      try {
+        var resAmends = await supabase
+          .from("hr_contract_amendments")
+          .select("*")
+          .in("contract_id", contractIds)
+          .order("amendment_number", { ascending: true })
+        if (resAmends.data) setContractAmendments(resAmends.data)
+      } catch (e) {
+        // non-fatal
+      }
     } else {
       setWelcomePackDocs([])
       setContractDocs({})
+      setContractAmendments([])
     }
 
     // Charge les arrêts de travail
@@ -1173,6 +1190,14 @@ export default function EmployeeDetail(props) {
                               onClick={function () { triggerSignedUpload(c) }}
                             >📥 Uploader contrat signé</button>
                           ) : null}
+                          {/* 🔥 Bouton "Modifier le contrat" = avenant de MODIFICATION CONTRACTUELLE */}
+                          {/* (Distinct de l'avenant de mise à jour des clauses RGPD/HACCP qui est dans la section suivante) */}
+                          <button
+                            className="btn btn-sm"
+                            style={{ background: "#FFEB5A", border: "2px solid #191923", fontWeight: 900 }}
+                            onClick={function () { setAmendmentModalFor(c) }}
+                            title="Faire un avenant pour modifier le contrat (durée, salaire, horaires, fonction...)"
+                          >🛠️ Modifier le contrat</button>
                           <button
                             className="btn btn-sm btn-red"
                             onClick={function () { deleteContract(c) }}
@@ -1187,6 +1212,74 @@ export default function EmployeeDetail(props) {
             </div>
           )}
         </div>
+
+        {/* 🔥 === BLOC HISTORIQUE DES AVENANTS (modifications contractuelles) === */}
+        {contractAmendments.length > 0 ? (
+          <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
+            <div className="ct">📜 Historique des avenants ({contractAmendments.length})</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {contractAmendments.map(function(a) {
+                var typeLabels: any = {
+                  prolongation_duree: { icon: "📅", label: "Prolongation de durée" },
+                  augmentation_salaire: { icon: "💰", label: "Modification rémunération" },
+                  modification_horaires: { icon: "🕐", label: "Modification horaires" },
+                  changement_poste: { icon: "👔", label: "Changement de poste" },
+                  autre: { icon: "📝", label: "Autre modification" }
+                }
+                var meta = typeLabels[a.amendment_type] || typeLabels.autre
+                var contractRef = contracts.filter(function(c: any){ return c.id === a.contract_id })[0]
+                var contractLabel = contractRef ? (
+                  contractRef.type === "extra" ? "CDD Extra" : (contractRef.type || "").replace("cdi_", "CDI ")
+                ) : ""
+                return (
+                  <div key={a.id} style={{
+                    background: "#FAFAFA",
+                    border: "1px solid #DDD",
+                    borderRadius: 6,
+                    padding: "8px 12px",
+                    fontSize: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    flexWrap: "wrap"
+                  }}>
+                    <span style={{ fontSize: 16 }}>{meta.icon}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 900 }}>
+                        Avenant n°{a.amendment_number} — {meta.label}
+                        {contractLabel && (
+                          <span style={{ fontWeight: 400, color: "#888", marginLeft: 6 }}>· {contractLabel}</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#666" }}>
+                        Effet : {a.effective_date ? new Date(a.effective_date).toLocaleDateString("fr-FR") : "—"}
+                        {a.motif ? (" · " + a.motif) : ""}
+                      </div>
+                      {a.changes ? (
+                        <div style={{ fontSize: 10, color: "#888", marginTop: 4, fontFamily: "monospace" }}>
+                          {Object.keys(a.changes).map(function(k) {
+                            var ch = a.changes[k]
+                            return k + " : " + (ch.before == null ? "—" : ch.before) + " → " + (ch.after == null ? "—" : ch.after)
+                          }).join(" · ")}
+                        </div>
+                      ) : null}
+                    </div>
+                    <span style={{
+                      padding: "2px 8px",
+                      background: a.status === "signed" ? "#16A34A" : a.status === "finalized" ? "#FFA500" : "#999",
+                      color: "white",
+                      borderRadius: 10,
+                      fontSize: 10,
+                      fontWeight: 900
+                    }}>
+                      {a.status === "signed" ? "SIGNÉ" : a.status === "finalized" ? "FINALISÉ" : "BROUILLON"}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {/* === BLOC ARRÊTS DE TRAVAIL === */}
         <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
@@ -1391,6 +1484,20 @@ export default function EmployeeDetail(props) {
             setShowStoppageWizard(false)
             setEditingStoppage(null)
             if (props.onSaved) props.onSaved(msg || "Arrêt enregistré")
+            load()
+          }}
+        />
+      ) : null}
+
+      {/* 🔥 === MODAL AVENANT (modification contractuelle) === */}
+      {amendmentModalFor && emp ? (
+        <AmendmentModal
+          contract={amendmentModalFor}
+          employee={emp}
+          onClose={function () { setAmendmentModalFor(null) }}
+          onSaved={function (msg) {
+            setAmendmentModalFor(null)
+            if (props.onSaved) props.onSaved(msg)
             load()
           }}
         />
