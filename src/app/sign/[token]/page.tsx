@@ -348,7 +348,7 @@ var pageWrapStyle: any = {
   minHeight: "100vh",
   background: JAUNE,
   padding: "24px 16px",
-  fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
+  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
   color: NOIR,
   display: "flex",
   alignItems: "flex-start",
@@ -369,17 +369,19 @@ var headerStyle: any = {
   borderBottom: "1px solid #F5F5F5",
 }
 var h1Style: any = {
-  margin: "0 0 16px 0",
-  fontSize: 24,
-  lineHeight: 1.3,
+  margin: "0 0 20px 0",
+  fontSize: 17,
+  lineHeight: 1.5,
   color: NOIR,
-  fontWeight: 700,
+  fontWeight: 400,
+  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
 }
 var pStyle: any = {
-  margin: "0 0 16px 0",
+  margin: "0 0 14px 0",
   fontSize: 15,
   lineHeight: 1.6,
   color: NOIR,
+  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
 }
 var ulStyle: any = {
   listStyle: "none",
