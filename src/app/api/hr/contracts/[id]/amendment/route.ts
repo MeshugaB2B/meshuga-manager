@@ -111,7 +111,23 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     }
     var currentContract = contractRes.data
     
-    var empRes = await sb.from('hr_employees').select('*').eq('id', currentContract.employee_id).single()
+    // 🔥 Sprint C2B fix : résoudre employee_id via cycle_id si manquant
+    // (cas Emy, Darell, Partheepan dont employee_id est NULL en base)
+    var employeeIdForLookup = currentContract.employee_id
+    if (!employeeIdForLookup && currentContract.cycle_id) {
+      var cycleRes = await sb.from('hr_employment_cycles')
+        .select('employee_id')
+        .eq('id', currentContract.cycle_id)
+        .single()
+      if (cycleRes.data && cycleRes.data.employee_id) {
+        employeeIdForLookup = cycleRes.data.employee_id
+      }
+    }
+    if (!employeeIdForLookup) {
+      return NextResponse.json({ error: 'Salarié introuvable (ni employee_id ni cycle_id valide sur le contrat)' }, { status: 404 })
+    }
+    
+    var empRes = await sb.from('hr_employees').select('*').eq('id', employeeIdForLookup).single()
     if (empRes.error || !empRes.data) {
       return NextResponse.json({ error: 'Salarié introuvable' }, { status: 404 })
     }
@@ -380,7 +396,22 @@ export async function GET(req: Request, ctx: { params: { id: string } }) {
     }
     var contract = contractRes.data
     
-    var empRes = await sb.from('hr_employees').select('*').eq('id', contract.employee_id).single()
+    // 🔥 Sprint C2B fix : résoudre employee_id via cycle_id si manquant
+    var employeeIdForLookup2 = contract.employee_id
+    if (!employeeIdForLookup2 && contract.cycle_id) {
+      var cycleRes2 = await sb.from('hr_employment_cycles')
+        .select('employee_id')
+        .eq('id', contract.cycle_id)
+        .single()
+      if (cycleRes2.data && cycleRes2.data.employee_id) {
+        employeeIdForLookup2 = cycleRes2.data.employee_id
+      }
+    }
+    if (!employeeIdForLookup2) {
+      return NextResponse.json({ error: 'Salarié introuvable (ni employee_id ni cycle_id valide sur le contrat)' }, { status: 404 })
+    }
+    
+    var empRes = await sb.from('hr_employees').select('*').eq('id', employeeIdForLookup2).single()
     if (empRes.error || !empRes.data) {
       return NextResponse.json({ error: 'Salarié introuvable' }, { status: 404 })
     }
