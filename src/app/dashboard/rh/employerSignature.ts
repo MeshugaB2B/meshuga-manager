@@ -152,16 +152,20 @@ export function renderEmployerSignatureBlock(sig: EmployerSignature | null): str
   // === Bloc audit (mandat actif) ===
   var dActivated = fmtDate(sig.activated_at)
   var hashShort = sig.consent_hash ? sig.consent_hash.slice(0, 16) : "—"
-  var pngClean = stripDataUri(sig.png_base64)
 
   var sigSpace = ''
-    + '<div class="sig-space" style="padding:8px 12px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px">'
-    + '<span style="font-size:8.5px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.5px;text-align:center">Signature électronique apposée par mandat permanent</span>'
-    + '<img src="data:image/png;base64,' + pngClean + '" alt="Signature ' + esc(sig.full_name) + '" style="max-height:62px;max-width:92%;object-fit:contain;display:block;margin:2px 0" />'
-    + '<div style="font-size:7.5px;color:#888;font-style:italic;line-height:1.4;text-align:center;margin-top:2px">'
-    + 'Mandat activé le <strong style="color:#666">' + esc(dActivated) + '</strong> · IP <strong style="color:#666">' + esc(sig.ip) + '</strong> (' + esc(sig.country) + ')'
-    + '<br>Hash SHA-256 : <span style="font-family:monospace;font-size:7px;color:#666">' + esc(hashShort) + '…</span>'
-    + '<br>Conforme art. 1367 Code civil &amp; règlement eIDAS UE 910/2014'
+    + '<div class="sig-space" style="padding:10px 14px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px">'
+    + '<span style="font-size:8.5px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.5px;text-align:center;margin-bottom:2px">Signature électronique apposée par mandat permanent</span>'
+    // 🔥 Signature Yellowtail rose centrée (rendu via Google Fonts chargée dans wrapHtml)
+    // Plus léger et plus net que le PNG, parfaitement centré
+    + '<span style="font-family:Yellowtail,cursive;font-size:44px;color:#FF82D7;line-height:1.1;display:block;text-align:center;margin:4px 0 8px;letter-spacing:0.5px">' + esc(sig.full_name) + '</span>'
+    + '<div style="font-size:7.5px;color:#888;font-style:italic;line-height:1.55;text-align:center;margin-top:2px">'
+    + '<strong style="color:#666;font-style:normal">Mandat permanent activé le ' + esc(dActivated) + '</strong> · IP <strong style="color:#666;font-style:normal">' + esc(sig.ip) + '</strong> (' + esc(sig.country) + ')'
+    + '<br>Hash SHA-256 du consentement : <span style="font-family:monospace;font-size:7px;color:#666;font-style:normal">' + esc(hashShort) + '…</span>'
+    + '<br><span style="font-style:normal;color:#777">Signature électronique simple au sens de l\'art. 1367 du Code civil</span>'
+    + '<br><span style="font-style:normal;color:#777">et du règlement eIDAS UE n° 910/2014, art. 25.</span>'
+    + '<br><span style="font-style:normal;color:#777">Force probante équivalente à la signature manuscrite (art. 1366 C. civ.).</span>'
+    + '<br><span style="font-style:normal;color:#777">Audit trail horodaté conservé.</span>'
     + '</div>'
     + '</div>'
 
