@@ -572,13 +572,14 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
   addressLine = addressLine.trim() || "—"
 
   // Type de contrat (accordé au genre)
-  // Note : `type` est l'identifiant interne (cdi_cadre, cdi_caissier, cdi_cuisinier, extra).
+  // Note : `type` est l'identifiant interne (cdi_cadre, cdi_agent_maitrise, cdi_caissier, cdi_cuisinier, extra).
   // La vérité sur le statut cadre/non-cadre est dans `statut_cadre`.
   var statutCadre = (contract.statut_cadre || "").toLowerCase().trim()
   var isCadreReel = statutCadre === "cadre"
   var typeLabels = {
     "extra": "CDD d'usage (Extra)",
     "cdi_cadre": isCadreReel ? "CDI Cadre" : "CDI " + g("Agent de maîtrise", "Agent de maîtrise"),
+    "cdi_agent_maitrise": "CDI " + g("Agent de maîtrise", "Agent de maîtrise"),
     "cdi_cuisinier": "CDI " + g("Cuisinier", "Cuisinière"),
     "cdi_caissier": "CDI " + g("Caissier", "Caissière")
   }
