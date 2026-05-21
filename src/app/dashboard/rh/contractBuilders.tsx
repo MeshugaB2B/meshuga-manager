@@ -17,9 +17,17 @@
 //   buildSharedSignatures()  - bloc signatures (paramétré par labels)
 //   build*Contract(c, emp)   - 4 builders spécialisés
 //   buildContract(c, emp)    - dispatcher selon c.type
+//
+// 🔥 Sprint Y1 — Signature électronique custom :
+//   Tous les builders acceptent un paramètre optionnel `employerSig` (EmployerSignature | null)
+//   - Si fourni → bloc signature Edward stylisé + cartouche audit
+//   - Si null/absent → fallback bloc "cachet · SAS AEGIA" classique
+//   → 100% rétro-compatible avec les appels existants
 // ============================================================
 
 import { MESHUGA_LEGAL, formatDateFr, formatEuros, numToFrenchWords } from "./rhConstants"
+import { renderEmployerSignatureBlock, renderEmployeeSignatureBlockEmpty } from "./employerSignature"
+import type { EmployerSignature } from "./employerSignature"
 
 // === Helper : safe() — protège contre null/undefined ===
 function safe(s) {
@@ -199,13 +207,23 @@ export function buildSharedHeader(opts) {
 // ============================================================
 // Bloc signatures partagé
 // ============================================================
-export function buildSharedSignatures(c, emp, salarieRole) {
+// 🔥 Sprint Y1 : 4ème paramètre `employerSig` optionnel pour injecter la
+// signature électronique pré-enregistrée d'Edward.
+// Si non fourni → bloc fallback "cachet · SAS AEGIA" (comportement historique).
+export function buildSharedSignatures(c, emp, salarieRole, employerSig?: EmployerSignature | null) {
   var civilite = emp.civilite || "Madame"
   var feminin = (civilite === "Madame" || civilite === "Mademoiselle")
   var dateSig = c.date_signature
     ? new Date(c.date_signature).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
     : "[date à compléter]"
   var ville = c.ville_signature || "Paris"
+
+  // 🔥 Bloc signature Employeur : rendu via helper
+  // Contient .sig-id + .sig-space + .sig-foot (la .sig-head est rendue séparément ci-dessous)
+  var employerBlock = renderEmployerSignatureBlock(employerSig || null)
+
+  // Bloc signature Salarié : zone vide en attendant signature électronique
+  var employeeBlock = renderEmployeeSignatureBlockEmpty(emp.prenom || "", emp.nom || "", salarieRole, feminin)
 
   return ''
     + '<section class="sig-section">'
@@ -215,15 +233,10 @@ export function buildSharedSignatures(c, emp, salarieRole) {
     + '<div class="sig-grid">'
     + '<div class="sig-block">'
     + '<div class="sig-head">Pour l\'Employeur</div>'
-    + '<div class="sig-id"><div class="name">AEGIA FOOD</div><div class="role">SAS AEGIA, Présidente<br>représentée par Edward TOURET, Président</div></div>'
-    + '<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé »</div>'
-    + '<div class="sig-foot" style="display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-family:Yellowtail,cursive;font-size:14px;color:#FF82D7">cachet</span><span style="opacity:.5">·</span><span style="font-style:italic">SAS AEGIA</span></div>'
+    + employerBlock
     + '</div>'
     + '<div class="sig-block">'
-    + '<div class="sig-head">' + (feminin ? "La Salariée" : "Le Salarié") + '</div>'
-    + '<div class="sig-id"><div class="name">' + esc(emp.prenom || "") + ' ' + esc((emp.nom || "").toUpperCase()) + '</div><div class="role">' + esc(salarieRole || "&nbsp;") + '</div></div>'
-    + '<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé »</div>'
-    + '<div class="sig-foot">Date : __ / __ / ____</div>'
+    + employeeBlock
     + '</div>'
     + '</div></section>'
     + '</div></body></html>'
@@ -263,7 +276,7 @@ function renderMissionsBlocks(blocks) {
 // ============================================================
 // 1. BUILDER : Contrat d'EXTRA (CDD d'usage)
 // ============================================================
-export function buildExtraContract(c, emp, vacs, logoUri) {
+export function buildExtraContract(c, emp, vacs, logoUri, employerSig?: EmployerSignature | null) {
   var safeVacs = vacs || []
   var totalMin = 0
   safeVacs.forEach(function (v) { totalMin += (v.duree_minutes || 0) })
@@ -380,7 +393,7 @@ export function buildExtraContract(c, emp, vacs, logoUri) {
     + '<div class="body"><p>Pour l\'exécution des présentes, les Parties élisent domicile en leurs adresses respectives mentionnées en tête du contrat.</p>'
     + '<p>Tout litige relatif à l\'exécution du présent contrat relèvera de la compétence du Conseil de Prud\'hommes de Paris, sous réserve des règles d\'ordre public en matière de compétence territoriale.</p></div>'
 
-  var signatures = buildSharedSignatures(c, emp, c.fonction || "")
+  var signatures = buildSharedSignatures(c, emp, c.fonction || "", employerSig || null)
 
   return wrapHtml({
     titre: "Contrat extra Meshuga — " + (emp.prenom || "") + " " + (emp.nom || ""),
@@ -392,7 +405,7 @@ export function buildExtraContract(c, emp, vacs, logoUri) {
 // ============================================================
 // 2. BUILDER : CDI Responsable / Manager (template Emy, postes à responsabilités)
 // ============================================================
-export function buildCdiCadreContract(c, emp, logoUri) {
+export function buildCdiCadreContract(c, emp, logoUri, employerSig?: EmployerSignature | null) {
   // Données dérivées
   var dateEmbauche = c.date_embauche
     ? new Date(c.date_embauche).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
@@ -628,7 +641,7 @@ export function buildCdiCadreContract(c, emp, logoUri) {
     + '<p>Toute modification du présent contrat ne pourra résulter que d\'un avenant écrit signé des deux Parties.</p>'
     + '</div>'
 
-  var signatures = buildSharedSignatures(c, emp, fonction)
+  var signatures = buildSharedSignatures(c, emp, fonction, employerSig || null)
 
   return wrapHtml({
     titre: "Contrat CDI Meshuga — " + (emp.prenom || "") + " " + (emp.nom || ""),
@@ -640,21 +653,21 @@ export function buildCdiCadreContract(c, emp, logoUri) {
 // ============================================================
 // 3. BUILDER : CDI Cuisinier(ère) — version simplifiée 18 articles
 // ============================================================
-export function buildCdiCuisinierContract(c, emp, logoUri) {
-  return buildCdiSimpleContract(c, emp, logoUri, "cuisinier")
+export function buildCdiCuisinierContract(c, emp, logoUri, employerSig?: EmployerSignature | null) {
+  return buildCdiSimpleContract(c, emp, logoUri, "cuisinier", employerSig || null)
 }
 
 // ============================================================
 // 4. BUILDER : CDI Caissier(ère) — version simplifiée 18 articles
 // ============================================================
-export function buildCdiCaissierContract(c, emp, logoUri) {
-  return buildCdiSimpleContract(c, emp, logoUri, "caissier")
+export function buildCdiCaissierContract(c, emp, logoUri, employerSig?: EmployerSignature | null) {
+  return buildCdiSimpleContract(c, emp, logoUri, "caissier", employerSig || null)
 }
 
 // ============================================================
 // Builder commun "CDI simple" (cuisinier, caissier) — sans intéressement, sans mobilité
 // ============================================================
-function buildCdiSimpleContract(c, emp, logoUri, profil) {
+function buildCdiSimpleContract(c, emp, logoUri, profil, employerSig?: EmployerSignature | null) {
   var dateEmbauche = c.date_embauche
     ? new Date(c.date_embauche).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
     : "[date d'embauche à compléter]"
@@ -808,7 +821,7 @@ function buildCdiSimpleContract(c, emp, logoUri, profil) {
     + '<p>Élection de domicile aux adresses respectives. Litige relevant du Conseil de Prud\'hommes de Paris.</p>'
     + '</div>'
 
-  var signatures = buildSharedSignatures(c, emp, fonction)
+  var signatures = buildSharedSignatures(c, emp, fonction, employerSig || null)
 
   return wrapHtml({
     titre: "Contrat CDI Meshuga — " + (emp.prenom || "") + " " + (emp.nom || ""),
@@ -820,7 +833,8 @@ function buildCdiSimpleContract(c, emp, logoUri, profil) {
 // ============================================================
 // DISPATCHER : retourne le bon builder selon c.type
 // ============================================================
-export function buildContract(c, emp, vacs, logoUri) {
+// 🔥 Sprint Y1 : 5ème paramètre `employerSig` optionnel propagé à tous les builders
+export function buildContract(c, emp, vacs, logoUri, employerSig?: EmployerSignature | null) {
   if (!c || !emp) return ''
   var t = c.type || "extra"
   // Détection du genre : féminin si civilité Madame/Mademoiselle
@@ -828,10 +842,10 @@ export function buildContract(c, emp, vacs, logoUri) {
   var isFemale = (civ === "Madame" || civ === "Mademoiselle")
   // Génération du HTML brut
   var html
-  if (t === "cdi_cadre") html = buildCdiCadreContract(c, emp, logoUri)
-  else if (t === "cdi_cuisinier") html = buildCdiCuisinierContract(c, emp, logoUri)
-  else if (t === "cdi_caissier") html = buildCdiCaissierContract(c, emp, logoUri)
-  else html = buildExtraContract(c, emp, vacs, logoUri)
+  if (t === "cdi_cadre") html = buildCdiCadreContract(c, emp, logoUri, employerSig || null)
+  else if (t === "cdi_cuisinier") html = buildCdiCuisinierContract(c, emp, logoUri, employerSig || null)
+  else if (t === "cdi_caissier") html = buildCdiCaissierContract(c, emp, logoUri, employerSig || null)
+  else html = buildExtraContract(c, emp, vacs, logoUri, employerSig || null)
   // Application de la transformation genrée
   return genderize(html, isFemale)
 }
