@@ -793,6 +793,8 @@ function WelcomePackPreview(props) {
   var [emp, setEmp] = useState(null)
   var [contract, setContract] = useState(null)
   var [loaded, setLoaded] = useState(false)
+  // 🔥 Sprint Y1 : signature électronique pré-enregistrée d'Edward (mandat permanent)
+  var [employerSig, setEmployerSig] = useState(null)
   var iframeRef = useRef(null)
 
   useEffect(function () {
@@ -814,15 +816,32 @@ function WelcomePackPreview(props) {
     run()
   }, [])
 
+  // 🔥 Sprint Y1 : Charger la signature pré-enregistrée d'Edward (mandat permanent)
+  useEffect(function () {
+    fetch("/api/employer-signature")
+      .then(function (r) { return r.ok ? r.json() : null })
+      .then(function (sig) {
+        if (sig && sig.active === true) {
+          setEmployerSig(sig)
+        } else {
+          setEmployerSig(null)
+        }
+      })
+      .catch(function () { setEmployerSig(null) })
+  }, [])
+
   useEffect(function () {
     if (!loaded || !iframeRef.current) return
     var doc = iframeRef.current.contentDocument
     if (!doc) return
-    var html = buildWelcomePack(emp || {}, contract || {}, LOGO_PINK)
+    // 🔥 Sprint Y1 : 4e paramètre employerSig (mandat permanent Edward)
+    // Si null → bloc employeur vide comme avant
+    // Si actif → date + Lu et approuvé + signature Yellowtail + cartouche audit
+    var html = buildWelcomePack(emp || {}, contract || {}, LOGO_PINK, employerSig)
     doc.open()
     doc.write(html)
     doc.close()
-  }, [loaded])
+  }, [loaded, employerSig])
 
   function printNow() {
     if (!iframeRef.current) return
