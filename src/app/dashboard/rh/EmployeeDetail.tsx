@@ -25,6 +25,7 @@ import OffboardingWizard from "./OffboardingWizard"
 import WorkStoppageWizard from "./WorkStoppageWizard"
 import RegularizationWizard from "./RegularizationWizard"
 import AmendmentModal from "./AmendmentModal"
+import HistoricalDocumentUploadModal from "./HistoricalDocumentUploadModal"
 import {
   NATIONALITES,
   getContractTypeMeta,
@@ -59,6 +60,8 @@ export default function EmployeeDetail(props) {
   var [generatingAmendmentFor, setGeneratingAmendmentFor] = useState(null)
   // 🔥 Modal pour avenant de MODIFICATION CONTRACTUELLE (différent du bouton "Régénérer avenant" qui gère les clauses RGPD/HACCP)
   var [amendmentModalFor, setAmendmentModalFor] = useState(null)
+  // 🔥 Sprint R : modal d'import historique multi-pages + OCR auto
+  var [histUploadFor, setHistUploadFor] = useState(null)
   var [contractAmendments, setContractAmendments] = useState([])
   var signedFileInputRef = useRef(null)
   var avenantSignedInputRef = useRef(null)
@@ -1131,8 +1134,12 @@ export default function EmployeeDetail(props) {
                       var docs = contractDocs[c.id] || []
                       // TOUS les avenants signés (un salarié peut en avoir plusieurs au fil du temps)
                       var avenantsSignes = docs.filter(function (d) { return d.doc_type === "avenant" })
+                      // 🔥 Sprint R : tri antéchronologique par DATE DU DOCUMENT (signature OCR),
+                      // fallback sur uploaded_at si document_date manque.
                       avenantsSignes.sort(function (a, b) {
-                        return new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+                        var da = a.document_date || a.uploaded_at
+                        var db = b.document_date || b.uploaded_at
+                        return new Date(db).getTime() - new Date(da).getTime()
                       })
                       // L'avenant brouillon en cours (s'il existe)
                       var avenantBrouillon = docs.filter(function (d) {
@@ -1173,10 +1180,16 @@ export default function EmployeeDetail(props) {
                             var label = avenantsSignes.length > 1
                               ? ("✅ Avenant signé n°" + (avenantsSignes.length - idx))
                               : "✅ Avenant signé"
+                            // 🔥 Sprint R : afficher la DATE DU DOCUMENT (OCR) en priorité
+                            var displayDate = av.document_date || av.uploaded_at
+                            var dateLabel = av.document_date ? "signé le " : "uploadé le "
                             return (
                               <div key={av.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: "1px dashed #DDD", opacity: isMostRecent ? 1 : 0.65 }}>
                                 <span style={{ fontSize: 12, fontWeight: 700, color: isMostRecent ? "#16A34A" : "#666" }}>{label}</span>
-                                <span style={{ fontSize: 10, color: "#666" }}>· {fmtDate(av.uploaded_at)}{!isMostRecent ? " (archivé)" : ""}</span>
+                                <span style={{ fontSize: 10, color: "#666" }}>· {dateLabel}{fmtDate(displayDate)}{!isMostRecent ? " (archivé)" : ""}</span>
+                                {av.document_description ? (
+                                  <span style={{ fontSize: 10, color: "#888", fontStyle: "italic", flexBasis: "100%", marginTop: 2 }}>↳ {av.document_description}</span>
+                                ) : null}
                                 <button
                                   className="btn btn-sm btn-y"
                                   style={{ marginLeft: "auto" }}
@@ -1238,9 +1251,12 @@ export default function EmployeeDetail(props) {
                             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0" }}>
                               <span style={{ fontSize: 12, fontWeight: 700, color: "#191923" }}>📜 Contrat originel</span>
                               <span style={{ fontSize: 10, color: "#666" }}>
-                                · signé le {fmtDate(contratOriginel.uploaded_at)}
+                                · signé le {fmtDate(contratOriginel.document_date || contratOriginel.uploaded_at)}
                                 {(c.date_embauche || c.date_debut) ? (" · effet " + fmtDate(c.date_embauche || c.date_debut)) : ""}
                               </span>
+                              {contratOriginel.document_description ? (
+                                <span style={{ fontSize: 10, color: "#888", fontStyle: "italic", flexBasis: "100%", marginTop: 2 }}>↳ {contratOriginel.document_description}</span>
+                              ) : null}
                               <button
                                 className="btn btn-sm btn-y"
                                 style={{ marginLeft: "auto" }}
@@ -1285,6 +1301,13 @@ export default function EmployeeDetail(props) {
                             onClick={function () { setAmendmentModalFor(c) }}
                             title="Faire un avenant pour modifier le contrat (durée, salaire, horaires, fonction...)"
                           >🛠️ Modifier le contrat</button>
+                          {/* 🔥 Sprint R : Bouton "Importer doc historique" — pour avenants/contrats déjà signés en papier */}
+                          <button
+                            className="btn btn-sm"
+                            style={{ background: "rgba(255,130,215,0.2)", border: "1.5px solid #FF82D7", color: "#191923", fontWeight: 700 }}
+                            onClick={function () { setHistUploadFor(c) }}
+                            title="Importer un avenant ou autre document historique (photos multi-pages → PDF + OCR auto)"
+                          >📥 Importer doc historique</button>
                           <button
                             className="btn btn-sm btn-red"
                             onClick={function () { deleteContract(c) }}
@@ -1617,6 +1640,23 @@ export default function EmployeeDetail(props) {
           onClose={function () { setAmendmentModalFor(null) }}
           onSaved={function (msg) {
             setAmendmentModalFor(null)
+            if (props.onSaved) props.onSaved(msg)
+            load()
+          }}
+        />
+      ) : null}
+
+      {/* 🔥 Sprint R === MODAL IMPORT HISTORIQUE (multi-photos + OCR auto) === */}
+      {histUploadFor && emp ? (
+        <HistoricalDocumentUploadModal
+          contractId={histUploadFor.id}
+          contractLabel={
+            (histUploadFor.fonction || "Contrat") + " — " +
+            (emp.prenom || "") + " " + (emp.nom || "")
+          }
+          onClose={function () { setHistUploadFor(null) }}
+          onSuccess={function (msg) {
+            setHistUploadFor(null)
             if (props.onSaved) props.onSaved(msg)
             load()
           }}
