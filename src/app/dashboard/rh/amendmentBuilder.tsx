@@ -362,6 +362,26 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
       + '</div>'
     artCounter++
 
+    // 🔥 NOUVEL ARTICLE — HYGIÈNE HACCP & RELEVÉS OBLIGATOIRES
+    articles += ''
+      + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Respect des protocoles HACCP et relevés obligatoires</span></div>'
+      + '<div class="body">'
+      + '<p>Le/La Salarié(e) reconnaît avoir pris connaissance du <strong>Plan de Maîtrise Sanitaire (PMS) Meshuga</strong>, consultable dans le classeur récapitulatif présent au restaurant, et s\'engage à en respecter strictement chaque protocole.</p>'
+      + '<p><strong>(a) Relevés obligatoires de températures (fiche F1).</strong> Le/La Salarié(e) effectue, <strong>deux fois par jour minimum (matin et soir)</strong>, le relevé des températures suivantes&nbsp;: <strong>armoire froide ≤ 4 °C</strong>, <strong>congélateur ≤ -18 °C</strong>, <strong>plats chauds en distribution ≥ 63 °C</strong>. Ces relevés sont datés, signés et archivés.</p>'
+      + '<p><strong>(b) Autres fiches HACCP obligatoires.</strong> Le/La Salarié(e) renseigne également à chaque service&nbsp;:</p>'
+      + '<ul style="margin: 6px 0 10px 20px; padding: 0;">'
+      +   '<li><strong>Fiche F2 — Réception marchandises</strong> : à chaque livraison (fournisseur, date, température produit, conformité visuelle)&nbsp;;</li>'
+      +   '<li><strong>Fiche F3 — Huiles de friture</strong> : contrôle visuel quotidien, vidange selon usage&nbsp;;</li>'
+      +   '<li><strong>Fiche F6 — Nettoyage matériel</strong> : émargement après nettoyage plancha, friteuse, plan de travail, vaisselle&nbsp;;</li>'
+      +   '<li><strong>Fiche F7 — Nettoyage locaux</strong> : sols, sanitaires, vitrines, 1× / jour minimum&nbsp;;</li>'
+      +   '<li><strong>Fiche F8 — Traçabilité produits</strong> : étiquetage de tout produit ouvert avec date d\'ouverture et DLC secondaire.</li>'
+      + '</ul>'
+      + '<p><strong>(c) Règles d\'hygiène individuelle.</strong> Le/La Salarié(e) s\'engage à respecter en permanence les règles d\'hygiène applicables au secteur de la restauration&nbsp;: lavage des mains (arrivée, après pause, après toilettes, après contact cru/déchets), <strong>tenue complète</strong> (uniforme, charlotte, gants nitrile, chaussures de sécurité), pas de bijoux/ongles longs/vernis/téléphone sur le plan de travail, <strong>marche en avant</strong> (crus → préparation → cuisson → distribution).</p>'
+      + '<p><strong>(d) Sanctions et conformité.</strong> Conformément aux <strong>Règlements (CE) 178/2002 et 852/2004</strong> dits « paquet hygiène » et à l\'<strong>arrêté du 21 décembre 2009</strong>, le non-renseignement systématique des fiches obligatoires expose l\'établissement à des sanctions DDPP pouvant aller jusqu\'à la <strong>fermeture administrative</strong>. Tout manquement individuel répété pourra faire l\'objet d\'une procédure disciplinaire en application des articles L1331-1 et L1332-1 à L1332-5 du Code du travail.</p>'
+      + '<p><strong>(e) Formation HACCP.</strong> L\'employeur assure que l\'établissement compte en permanence au moins un membre du personnel ayant suivi la <strong>formation hygiène alimentaire HACCP</strong> conformément au décret n° 2011-731 du 24 juin 2011. La formation peut être proposée au/à la Salarié(e) selon les besoins du service.</p>'
+      + '</div>'
+    artCounter++
+
     // ARTICLE 7 — CONFIDENTIALITÉ
     articles += ''
       + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Obligation de confidentialité et de loyauté</span></div>'
