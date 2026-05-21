@@ -1073,7 +1073,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
           'Je ' + g("soussigné", "soussignée") + ' <b>' + esc(nomComplet) + '</b> reconnais avoir reçu en main propre, à la date de signature ci-dessous&nbsp;:' +
         '</p>' +
         '<div style="margin-top: 3mm; font-size: 11pt; line-height: 1.55;">' +
-          '<div><span class="cb">' + checkBox(false) + '</span>Le présent <b>dossier de bienvenue Meshuga</b> (6 pages dont engagement signé)</div>' +
+          '<div><span class="cb">' + checkBox(false) + '</span>Le présent <b>dossier de bienvenue Meshuga</b> (13 pages dont engagement signé)</div>' +
           '<div><span class="cb">' + checkBox(false) + '</span>Mon <b>contrat de travail</b> signé en double exemplaire</div>' +
           '<div><span class="cb">' + checkBox(false) + '</span>Information sur la <b>convention collective</b> CCN 1501 et son lieu de consultation</div>' +
           '<div><span class="cb">' + checkBox(false) + '</span>Information sur la <b>vidéosurveillance</b> et mes droits RGPD</div>' +
@@ -1093,7 +1093,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
         '</p>' +
         '<ol style="margin: 2mm 0 2mm 16px; padding: 0; font-size: 11pt; line-height: 1.55;">' +
           '<li><b>avoir lu attentivement</b> le présent dossier dans son intégralité&nbsp;;</li>' +
-          '<li><b>avoir compris</b> les règles d\'hygiène (HACCP, allergènes, marche en avant), les consignes de sécurité (EPI, incendie, droit de retrait), le cadre social (CCN 1501, harcèlement, non-discrimination, vidéosurveillance, RGPD) et le régime disciplinaire&nbsp;;</li>' +
+          '<li><b>avoir compris</b> les règles d\'hygiène (HACCP, allergènes, marche en avant), les consignes de sécurité (EPI, incendie, droit de retrait), la <b>durée du travail</b>, les <b>règles de rémunération et d\'avantages</b>, la <b>règle anti-accumulation des congés payés</b>, le cadre social (CCN 1501, harcèlement, non-discrimination, vidéosurveillance, RGPD), la <b>charte numérique et droit à la déconnexion</b>, les règles de <b>tenue et comportement</b>, ainsi que le régime disciplinaire&nbsp;;</li>' +
           '<li>avoir été ' + g("informé", "informée") + ' des canaux d\'alerte (référent harcèlement, inspection, médecine, défenseur des droits) et de mes <b>droits</b> (DUERP, CCN, CNIL, retrait, RGPD)&nbsp;;</li>' +
           '<li><b>m\'engager</b> à respecter rigoureusement ces règles et à signaler immédiatement à l\'employeur tout manquement, danger ou situation problématique&nbsp;;</li>' +
           '<li>accepter sans réserve la <b>mise sous vidéosurveillance</b> de l\'établissement aux finalités déclarées (sécurité, lutte contre le vol, traçabilité HACCP) et reconnaître avoir été ' + g("informé", "informée") + ' préalablement (L1222-4 Code du travail · art. 13 RGPD).</li>' +
@@ -1185,6 +1185,358 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
       '</div>' +
       '</section>'
 
+  // ============================================================
+  // 🆕 PAGE SOMMAIRE + BIENVENUE MESHUGA
+  // ============================================================
+  var pageSommaire =
+    '<section class="chapter">' +
+        '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
+          '<h2 class="yt">Bienvenue chez Meshuga</h2>' +
+        '</div>' +
+        '<div class="rule" style="margin: 3mm 0 5mm 0;"></div>' +
+
+        '<p style="font-size: 11pt; margin: 0 0 4mm 0; line-height: 1.6;">' +
+          'Cher ' + g('nouveau membre', 'nouvelle membre') + ' de l\'équipe Meshuga, ' +
+          'ce dossier de bienvenue a été conçu pour t\'accompagner pas à pas dès ton arrivée. ' +
+          'Il rassemble tout ce que tu dois savoir pour bien démarrer&nbsp;: <b>règles internes, droits, devoirs, sécurité, hygiène, cadre légal, rémunération et avantages</b>.' +
+        '</p>' +
+
+        '<p style="font-size: 11pt; margin: 0 0 5mm 0; line-height: 1.6;">' +
+          'Chez Meshuga, nous travaillons dans le respect du <b>Code du travail</b>, de la <b>Convention Collective Nationale de la Restauration Rapide (IDCC 1501)</b> et des <b>réglementations sanitaires (paquet hygiène CE 178/2002 et 852/2004)</b>. ' +
+          'Ce document a une valeur contractuelle&nbsp;: en le signant, tu reconnais en avoir pris connaissance.' +
+        '</p>' +
+
+        '<h3 class="bc pink" style="font-size: 11pt;">Notre ADN</h3>' +
+        '<div style="background: rgba(255,130,215,0.08); border-left: 4px solid #FF82D7; padding: 12px 16px; margin: 3mm 0 5mm 0; font-size: 11pt; line-height: 1.6;">' +
+          '<b>Meshuga</b>, c\'est un deli new-yorkais en plein cœur du 6ème, créé en 2021 par Edward Touret. ' +
+          'Notre exigence est <b>simple et absolue</b>&nbsp;: <b>produits de qualité, sourcing rigoureux, propreté irréprochable, accueil chaleureux</b>. ' +
+          'Ces 4 piliers structurent toute notre activité quotidienne et sont attendus de chaque membre de l\'équipe, sans exception.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="font-size: 11pt;">Sommaire du dossier</h3>' +
+        '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 8mm; font-size: 10.5pt; margin-top: 3mm; line-height: 1.7;">' +
+          '<div><b style="color: #FF82D7;">1.</b> Couverture</div>' +
+          '<div><b style="color: #FF82D7;">8.</b> Sécurité au travail</div>' +
+          '<div><b style="color: #FF82D7;">2.</b> Bienvenue & sommaire</div>' +
+          '<div><b style="color: #FF82D7;">9.</b> Cadre social & légal</div>' +
+          '<div><b style="color: #FF82D7;">3.</b> Fiche salarié</div>' +
+          '<div><b style="color: #FF82D7;">10.</b> Vidéosurveillance & RGPD</div>' +
+          '<div><b style="color: #FF82D7;">4.</b> Durée du travail & repos</div>' +
+          '<div><b style="color: #FF82D7;">11.</b> Charte numérique</div>' +
+          '<div><b style="color: #FF82D7;">5.</b> Rémunération & avantages</div>' +
+          '<div><b style="color: #FF82D7;">12.</b> Tenue & comportement</div>' +
+          '<div><b style="color: #FF82D7;">6.</b> Congés payés (règles strictes)</div>' +
+          '<div><b style="color: #FF82D7;">13.</b> Engagement & signatures</div>' +
+          '<div><b style="color: #FF82D7;">7.</b> Hygiène & HACCP</div>' +
+        '</div>' +
+
+        '<p style="font-size: 10pt; margin: 5mm 0 0 0; line-height: 1.5; opacity: 0.7; font-style: italic;">' +
+          'Document remis lors de ton arrivée, à conserver précieusement. Une version signée est archivée dans ton dossier RH.' +
+        '</p>' +
+
+      '</section>'
+
+  // ============================================================
+  // 🆕 PAGE DURÉE DU TRAVAIL & REPOS
+  // ============================================================
+  var pageDureeTravail =
+    '<section class="chapter">' +
+        '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
+          '<h2 class="yt">Durée du travail & repos</h2>' +
+        '</div>' +
+        '<div class="rule" style="margin: 3mm 0;"></div>' +
+
+        '<h3 class="bc pink" style="font-size: 11pt;">Durée légale & horaires</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L3121-27 à L3121-44 du Code du travail · CCN 1501 art. 30</div>' +
+          'La durée légale du travail effectif est fixée à <b>35 heures par semaine</b> (151,67 h/mois en moyenne lissée). ' +
+          'Les horaires individuels sont précisés au contrat de travail. Toute modification durable nécessite un avenant signé.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Heures supplémentaires (CDI)</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L3121-28 à L3121-39 du Code du travail · CCN 1501 art. 31</div>' +
+          '<b>Toute heure supplémentaire doit être expressément demandée et validée par l\'employeur.</b> ' +
+          'Aucune heure supplémentaire effectuée sans accord préalable ne pourra être payée comme telle. ' +
+          'Majoration légale&nbsp;: <b>+25% de la 36ème à la 43ème heure</b>, <b>+50% au-delà de la 43ème heure</b>. ' +
+          'Contingent annuel d\'heures supplémentaires&nbsp;: <b>220 heures par an</b> (article D3121-24).' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Pauses & coupures</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Article L3121-16 du Code du travail · CCN 1501</div>' +
+          'Toute période de travail effectif d\'au moins <b>6 heures consécutives</b> ouvre droit à une <b>pause minimale de 20 minutes</b>. ' +
+          'Cette pause est <b>non rémunérée</b> sauf disposition plus favorable. ' +
+          'Chez Meshuga, le <b>repas pris sur place</b> peut constituer la pause si l\'organisation du service le permet.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Repos quotidien & hebdomadaire</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L3131-1, L3132-1 et L3132-2 du Code du travail</div>' +
+          '<b>Repos quotidien</b>&nbsp;: <b>11 heures consécutives</b> minimum entre deux journées de travail.<br/>' +
+          '<b>Repos hebdomadaire</b>&nbsp;: <b>24 heures + 11 heures de repos quotidien = 35 heures consécutives</b> minimum par semaine (jour de repos hebdomadaire, généralement dimanche en France mais adapté à l\'activité restauration).' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Jours fériés & dimanches</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L3133-1 à L3133-12 · L3132-12 du Code du travail · CCN 1501 art. 34</div>' +
+          '<b>1er Mai</b>&nbsp;: jour férié chômé et payé. Travail interdit sauf nécessité de service (alors majoré de 100%). ' +
+          '<b>Autres jours fériés</b>&nbsp;: peuvent être travaillés selon nécessité de service. ' +
+          'En restauration, le <b>travail du dimanche</b> est autorisé (dérogation permanente — article R3132-5). ' +
+          'La CCN 1501 prévoit des modalités spécifiques de récupération.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Modification du planning</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">CCN 1501 — délai de prévenance</div>' +
+          'Toute modification du planning de travail est communiquée <b>au moins 7 jours calendaires à l\'avance</b>, sauf urgence justifiée (absence salarié, surcroît exceptionnel d\'activité). ' +
+          'Dans ces cas, l\'employeur s\'engage à concerter avec ' + g('le salarié', 'la salariée') + ' pour trouver une solution acceptable.' +
+        '</div>' +
+
+      '</section>'
+
+  // ============================================================
+  // 🆕 PAGE RÉMUNÉRATION & AVANTAGES
+  // ============================================================
+  var pageRemuneration =
+    '<section class="chapter">' +
+        '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
+          '<h2 class="yt">Rémunération & avantages</h2>' +
+        '</div>' +
+        '<div class="rule" style="margin: 3mm 0;"></div>' +
+
+        '<h3 class="bc pink" style="font-size: 11pt;">Ton salaire</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L3221-1 et suivants du Code du travail · CCN 1501 grille salariale</div>' +
+          'Ton <b>salaire brut mensuel</b>, ton <b>taux horaire</b> et ta <b>classification</b> (niveau, échelon) sont précisés dans ton <b>contrat de travail</b>. ' +
+          'Le salaire ne peut être inférieur au <b>SMIC</b> ni au minimum conventionnel de la CCN 1501 selon ton niveau de classification. ' +
+          'Toute revalorisation fait l\'objet d\'un <b>avenant écrit</b>.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Versement & bulletin de paie</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L3242-1 et R3243-1 du Code du travail</div>' +
+          '<b>Versement</b>&nbsp;: le salaire est versé une fois par mois, <b>autour du 5 du mois suivant</b> par virement bancaire sur le compte que tu as fourni. ' +
+          '<b>Bulletin de paie</b>&nbsp;: remis chaque mois (papier ou électronique avec ton accord). Il fait foi du salaire perçu, des congés acquis et du solde restant. ' +
+          '<b>Conservation</b>&nbsp;: garde-le sans limite de durée (utile pour retraite, prêts, droits sociaux).' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Repas pris sur place (avantage en nature)</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Arrêté du 10 décembre 2002 · Article L3231-2 du Code du travail · CCN 1501 art. 35</div>' +
+          'Tu bénéficies d\'<b>un repas Meshuga gratuit par service travaillé</b> (boissons non alcoolisées incluses). ' +
+          'Cet avantage en nature est <b>évalué selon le barème URSSAF</b> (4,15 € HT/repas en 2026, soit 4,98 € TTC) et figure sur ton bulletin de paie comme tel. ' +
+          'Il est imposable et soumis à cotisations sociales conformément à la législation.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Prise en charge des transports</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L3261-2 à L3261-5 et R3261-1 à R3261-10 du Code du travail</div>' +
+          'L\'employeur prend obligatoirement en charge <b>50% du coût des titres d\'abonnement</b> aux transports publics (Navigo, métro, bus, train) sur présentation des justificatifs. ' +
+          'La prise en charge figure sur le bulletin de paie. ' +
+          'Pour bénéficier de ce remboursement, transmets ton justificatif d\'abonnement à l\'employeur dans le mois suivant l\'achat.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Mutuelle obligatoire</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Article L911-7 du Code de la Sécurité sociale · CCN 1501 art. 41</div>' +
+          'Une <b>complémentaire santé collective</b> est mise en place dans l\'entreprise. ' +
+          '<b>L\'adhésion est obligatoire</b> sauf cas de dispense prévus par la loi (couverture par un parent assuré, CDD court de moins de 12 mois, etc.). ' +
+          '<b>L\'employeur prend en charge au minimum 50% de la cotisation.</b> ' +
+          'Notice d\'information remise sous 30 jours.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Retraite & prévoyance</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L911-1 et suivants du Code de la Sécurité sociale</div>' +
+          '<b>Retraite complémentaire</b>&nbsp;: KLESIA (cotisations AGIRC-ARRCO obligatoires figurant sur le bulletin de paie).<br/>' +
+          '<b>Prévoyance</b>&nbsp;: Gan Eurocourtage Vie (incapacité, invalidité, décès — garanties détaillées dans la notice remise sous 30 jours).' +
+        '</div>' +
+
+      '</section>'
+
+  // ============================================================
+  // 🆕 PAGE CONGÉS PAYÉS — RÈGLE STRICTE
+  // ============================================================
+  var pageConges =
+    '<section class="chapter">' +
+        '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
+          '<h2 class="yt">Congés payés</h2>' +
+        '</div>' +
+        '<div class="rule" style="margin: 3mm 0;"></div>' +
+
+        '<p style="font-size: 11pt; margin: 0 0 4mm 0; line-height: 1.55;">' +
+          '<b>Le droit aux congés est un droit fondamental</b> du salarié&nbsp;: tu dois pouvoir effectivement te reposer chaque année. ' +
+          'Cette page t\'explique <b>tes droits, tes obligations et la règle anti-accumulation appliquée chez Meshuga</b>.' +
+        '</p>' +
+
+        '<h3 class="bc pink" style="font-size: 11pt;">Acquisition des congés</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L3141-3 à L3141-5 du Code du travail · CCN 1501 art. 33</div>' +
+          'Tu acquiers <b>2,5 jours ouvrables de congés payés par mois de travail effectif</b>, soit <b>30 jours ouvrables (5 semaines) par an</b>. ' +
+          'Les périodes de congés payés, maternité/paternité, arrêts maladie professionnelle, arrêts pour AT/MP, et certains autres absences assimilées génèrent également des congés (loi DDADUE du 22 avril 2024).' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Période de référence & période de prise</h3>' +
+        '<div style="background: rgba(255,130,215,0.08); border-left: 4px solid #FF82D7; padding: 12px 16px; margin: 3mm 0; font-size: 11pt; line-height: 1.6;">' +
+          '<b>Période de référence (acquisition)</b>&nbsp;: du <b>1er juin N</b> au <b>31 mai N+1</b>.<br/>' +
+          '<b>Période de prise (utilisation)</b>&nbsp;: du <b>1er juin N+1</b> au <b>31 mai N+2</b>.<br/>' +
+          '<i>Exemple&nbsp;: les congés acquis entre le 1er juin 2026 et le 31 mai 2027 doivent être pris entre le 1er juin 2027 et le 31 mai 2028.</i>' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">⚠ Règle Meshuga — anti-accumulation des congés</h3>' +
+        '<div style="background: rgba(255,235,90,0.25); border-left: 4px solid #FFEB5A; padding: 14px 18px; margin: 3mm 0; font-size: 11pt; line-height: 1.6;">' +
+          '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; color: #191923; margin-bottom: 3mm;">⚖ Règle stricte applicable à tous les salariés Meshuga</div>' +
+          '<b>(1) Obligation de poser tes congés sur la période de prise.</b> Les congés sont un droit ET un devoir — ils doivent être pris pour ton repos effectif et ta santé.<br/><br/>' +
+          '<b>(2) Étalement annuel.</b> Tu t\'engages à <b>étaler la prise de tes congés tout au long de l\'année</b> et à <b>en poser régulièrement</b>, dans le respect des nécessités de service. Le cumul excessif n\'est pas autorisé.<br/><br/>' +
+          '<b>(3) Délai de prévenance.</b> Toute demande de congé doit être adressée à l\'employeur <b>au moins 1 mois avant la date souhaitée</b> (sauf urgence justifiée). L\'employeur répond sous 8 jours.<br/><br/>' +
+          '<b>(4) Validation employeur.</b> L\'employeur peut, dans l\'intérêt du service, refuser, déplacer ou modifier une demande. Le refus est motivé. En cas de conflits de demandes, l\'ordre des départs tient compte de l\'ancienneté, des charges de famille, des contraintes des conjoints.<br/><br/>' +
+          '<b>(5) Conséquences en cas de non-prise.</b> Les congés non posés au <b>31 mai de la période de prise</b> sont, en principe, <b>définitivement perdus</b>, sauf cas où l\'impossibilité de les prendre résulte de&nbsp;:<br/>' +
+          '&nbsp;&nbsp;• un <b>arrêt maladie</b>, accident du travail, ou maladie professionnelle pendant la période de prise (loi DDADUE 2024)&nbsp;;<br/>' +
+          '&nbsp;&nbsp;• un <b>congé maternité, paternité, adoption ou parental</b>&nbsp;;<br/>' +
+          '&nbsp;&nbsp;• une <b>impossibilité du fait de l\'employeur</b> (refus, charge de travail rendant impossible la prise).' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Information périodique sur ton solde</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Cass. Soc. 13 novembre 2025 n° 24-14084 · Cass. Soc. 10 septembre 2025 n° 23-22732</div>' +
+          'L\'employeur s\'engage à <b>t\'informer régulièrement</b> de ton solde de congés et de la date limite de prise&nbsp;:<br/>' +
+          '<b>(1)</b> Le <b>solde actualisé figure chaque mois sur ton bulletin de paie</b>&nbsp;;<br/>' +
+          '<b>(2)</b> Une <b>communication formelle individuelle</b> te sera envoyée chaque <b>1er avril</b> par email (avec accusé) si ton solde est supérieur à 5 jours, te rappelant la date limite du 31 mai&nbsp;;<br/>' +
+          '<b>(3)</b> En cas de retour d\'arrêt long, l\'employeur t\'informe dans le mois suivant la reprise de ton solde et de la date limite de report.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Indemnité compensatrice</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Article L3141-28 du Code du travail</div>' +
+          'En cas de <b>rupture du contrat</b> (démission, licenciement, fin de CDD…), tu perçois une <b>indemnité compensatrice de congés payés</b> correspondant aux congés acquis non pris à la date de sortie. ' +
+          'Cette indemnité est calculée selon la règle du <b>10ème du salaire brut</b> ou du <b>maintien de salaire</b>, la plus favorable.' +
+        '</div>' +
+
+      '</section>'
+
+  // ============================================================
+  // 🆕 PAGE CHARTE NUMÉRIQUE & DROIT À LA DÉCONNEXION
+  // ============================================================
+  var pageCharteNum =
+    '<section class="chapter">' +
+        '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
+          '<h2 class="yt">Charte numérique</h2>' +
+        '</div>' +
+        '<div class="rule" style="margin: 3mm 0;"></div>' +
+
+        '<h3 class="bc pink" style="font-size: 11pt;">Téléphone personnel en service</h3>' +
+        '<div style="background: rgba(255,235,90,0.25); border-left: 4px solid #FFEB5A; padding: 12px 16px; margin: 3mm 0; font-size: 11pt; line-height: 1.6;">' +
+          '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; color: #191923; margin-bottom: 3mm;">📵 Règle Meshuga</div>' +
+          'Pendant ton temps de travail effectif, le téléphone personnel doit être <b>rangé dans la poche, le vestiaire ou hors du plan de travail</b>. ' +
+          'Son usage est <b>strictement réservé à la pause</b>, hors zone cuisine&nbsp;:<br/><br/>' +
+          '<b>• En cuisine&nbsp;:</b> téléphone interdit sur le plan de travail (HACCP — contamination croisée, hygiène des mains).<br/>' +
+          '<b>• À la caisse&nbsp;:</b> téléphone non visible des clients, posé sous le comptoir éteint ou en silencieux.<br/>' +
+          '<b>• En pause&nbsp;:</b> usage libre dans l\'espace de pause ou à l\'extérieur.<br/><br/>' +
+          '<b>Exception</b>&nbsp;: appel familial urgent → demande à l\'employeur, qui appréciera.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Email professionnel & outils numériques</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles L1121-1 et L1222-4 du Code du travail · Cass. Soc. 2 octobre 2001 n° 99-42942 (arrêt Nikon)</div>' +
+          'Si un compte email professionnel @meshuga.fr ou un accès logiciel t\'est attribué&nbsp;:<br/>' +
+          '<b>(1) Usage professionnel</b>&nbsp;: l\'outil est destiné à l\'activité Meshuga uniquement. L\'usage personnel doit rester <b>marginal et raisonnable</b>.<br/>' +
+          '<b>(2) Confidentialité des messages "personnel"</b>&nbsp;: un message clairement identifié comme <b>"personnel"</b> dans son objet est protégé par la jurisprudence Nikon. L\'employeur ne peut y accéder sans présence du salarié.<br/>' +
+          '<b>(3) Sécurité</b>&nbsp;: mot de passe fort obligatoire, jamais partagé. Verrouillage de la session quand tu quittes ton poste.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Réseaux sociaux & confidentialité Meshuga</h3>' +
+        '<div style="background: rgba(255,130,215,0.08); border-left: 4px solid #FF82D7; padding: 12px 16px; margin: 3mm 0; font-size: 11pt; line-height: 1.6;">' +
+          '<b>Interdit sans accord écrit de l\'employeur</b>&nbsp;:<br/>' +
+          '• Photos ou vidéos de l\'intérieur de l\'établissement, de la cuisine ou des équipes&nbsp;;<br/>' +
+          '• Photos ou vidéos de clients (droit à l\'image — article 9 du Code civil)&nbsp;;<br/>' +
+          '• Publications mentionnant des informations internes&nbsp;: recettes, fournisseurs, prix, chiffres d\'affaires, tensions internes.<br/><br/>' +
+          '<b>Autorisé librement</b>&nbsp;: photos prises en pause de tes plats Meshuga, déjà visibles publiquement dans la salle (en mettant le nom de l\'établissement en tag).<br/><br/>' +
+          '<b>En cas de doute, demande à l\'employeur avant de publier.</b> Toute publication portant préjudice à l\'image de Meshuga peut donner lieu à sanction disciplinaire.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Droit à la déconnexion</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Article L2242-17, 7° du Code du travail (loi Travail 8 août 2016)</div>' +
+          '<b>Tu disposes d\'un droit absolu à la déconnexion en dehors de tes heures de travail.</b><br/>' +
+          'Concrètement&nbsp;:<br/>' +
+          '• Tu n\'es <b>jamais tenu</b> de répondre à un email, SMS ou appel professionnel en dehors de tes heures de travail, jours de repos, RTT, congés ou arrêts maladie.<br/>' +
+          '• L\'employeur s\'engage à <b>limiter strictement</b> les sollicitations en dehors des plages de travail&nbsp;: uniquement en cas d\'urgence opérationnelle réelle (sinistre, fermeture, problème grave).<br/>' +
+          '• Aucune sanction ne pourra être prise au motif que tu n\'as pas répondu à une sollicitation hors temps de travail.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Signature électronique</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Articles 1366 et 1367 du Code civil · Règlement eIDAS UE 910/2014 art. 25</div>' +
+          'Tes documents contractuels Meshuga (contrat, avenants, dossier de bienvenue) peuvent être signés <b>électroniquement</b>. ' +
+          'La signature électronique simple a la <b>même force probante</b> que la signature manuscrite (art. 1366 C. civ.). ' +
+          'Tu reçois un lien sécurisé par email, signes en quelques clics, et le PDF signé est archivé dans ton dossier RH avec son audit trail (IP, horodatage, hash d\'intégrité). Un exemplaire signé t\'est systématiquement renvoyé par email.' +
+        '</div>' +
+
+      '</section>'
+
+  // ============================================================
+  // 🆕 PAGE TENUE & COMPORTEMENT
+  // ============================================================
+  var pageTenue =
+    '<section class="chapter">' +
+        '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
+          '<h2 class="yt">Tenue & comportement</h2>' +
+        '</div>' +
+        '<div class="rule" style="margin: 3mm 0;"></div>' +
+
+        '<h3 class="bc pink" style="font-size: 11pt;">Uniforme Meshuga (fourni gratuitement)</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Article R4321-4 du Code du travail · Cass. Soc. 21 mai 2008 n° 06-44948 (temps d\'habillage)</div>' +
+          '<b>Tu portes obligatoirement l\'uniforme Meshuga complet pendant tout le service.</b> Il t\'est <b>fourni gratuitement</b> par l\'employeur (haut, bas, tablier, charlotte, chaussures de sécurité), conformément aux obligations en matière d\'EPI et d\'hygiène alimentaire. ' +
+          'L\'uniforme te sera remis dès ton arrivée. Tout équipement endommagé ou usé est remplacé gratuitement par l\'employeur.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Temps d\'habillage et de déshabillage</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Article L3121-3 du Code du travail</div>' +
+          'L\'habillage et le déshabillage en uniforme se font sur place, dans le vestiaire. ' +
+          'Ce temps est <b>compris dans le temps de travail effectif</b> à hauteur de <b>5 minutes au début et 5 minutes à la fin de chaque service</b>, conformément à l\'usage et à la jurisprudence applicable au secteur de la restauration.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Hygiène corporelle</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Règlement (CE) 852/2004 paquet hygiène · Code du travail R4225-2</div>' +
+          'En restauration, l\'hygiène corporelle est une <b>obligation professionnelle</b>&nbsp;:<br/>' +
+          '• Cheveux propres, attachés et couverts par la charlotte&nbsp;;<br/>' +
+          '• Mains propres, ongles courts et sans vernis ni faux-ongles&nbsp;;<br/>' +
+          '• Pas de bijoux visibles aux mains/poignets (sauf alliance lisse)&nbsp;;<br/>' +
+          '• Maquillage discret, parfum léger ou absent (HACCP — contamination olfactive plats)&nbsp;;<br/>' +
+          '• Tenue propre lavée régulièrement (l\'employeur prend en charge l\'entretien si tu portes ton uniforme à laver à domicile, modalités à convenir).' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Comportement vis-à-vis des clients</h3>' +
+        '<div style="background: rgba(255,130,215,0.08); border-left: 4px solid #FF82D7; padding: 12px 16px; margin: 3mm 0; font-size: 11pt; line-height: 1.6;">' +
+          '<b>L\'accueil client est au cœur de Meshuga.</b> Chaque membre de l\'équipe est ' + g('attendu', 'attendue') + ' :<br/><br/>' +
+          '• <b>Bonjour, sourire, contact visuel</b> à l\'entrée de chaque client&nbsp;;<br/>' +
+          '• <b>Langage professionnel</b>&nbsp;: vouvoiement par défaut, tutoiement uniquement avec accord explicite du client&nbsp;;<br/>' +
+          '• <b>Patience face aux réclamations</b>&nbsp;: écouter, ne jamais s\'emporter, faire intervenir Edward ou Emy si besoin&nbsp;;<br/>' +
+          '• <b>Aucun jugement</b> sur l\'apparence, l\'origine, l\'orientation, le handicap, la situation économique du client&nbsp;;<br/>' +
+          '• <b>Aucune photo ni partage</b> sur les clients (article 9 du Code civil — droit à l\'image).' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Comportement au sein de l\'équipe</h3>' +
+        '<div style="background: rgba(255,130,215,0.08); border-left: 4px solid #FF82D7; padding: 12px 16px; margin: 3mm 0; font-size: 11pt; line-height: 1.6;">' +
+          '• <b>Respect mutuel absolu</b>&nbsp;: pas d\'insulte, pas d\'humour discriminatoire, pas de cri.<br/>' +
+          '• <b>Transmission des consignes</b>&nbsp;: passe-relais clair en fin de service, traçabilité écrite si besoin (cahier de service).<br/>' +
+          '• <b>Gestion des tensions</b>&nbsp;: si conflit, en parler en aparté à Edward ou Emy. Pas de règlement de compte devant les clients ou collègues.<br/>' +
+          '• <b>Solidarité</b>&nbsp;: en cas de coup de feu, on s\'entraide. Personne ne reste seul sur un poste en difficulté.' +
+        '</div>' +
+
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Confidentialité — clause de loyauté</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Article L1222-1 du Code du travail · obligation de loyauté</div>' +
+          'Pendant la durée de ton contrat et après sa rupture, tu t\'engages à <b>ne pas divulguer à des tiers</b> les informations confidentielles dont tu as connaissance dans le cadre de ton activité&nbsp;: <b>recettes Meshuga, fournisseurs et conditions tarifaires, chiffres d\'affaires, listes clients B2B, données salariés, plans stratégiques</b>. ' +
+          'Cette obligation est <b>essentielle</b> pour la pérennité de l\'activité et la protection de l\'équipe. Toute violation peut engager ta responsabilité.' +
+        '</div>' +
+
+      '</section>'
+
   // ===== ASSEMBLAGE FINAL =====
   var html =
     '<!DOCTYPE html>' +
@@ -1198,12 +1550,18 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     '<body>' +
       page1 +
       '<main class=\"flow\">' +
-        page2 +
-        page3 +
-        page4 +
-        page5 +
-        page5b +
-        page6 +
+        pageSommaire +       // 🆕 Page 2 : Bienvenue + sommaire
+        page2 +              // Page 3 : Fiche salarié
+        pageDureeTravail +   // 🆕 Page 4 : Durée du travail & repos
+        pageRemuneration +   // 🆕 Page 5 : Rémunération & avantages
+        pageConges +         // 🆕 Page 6 : Congés payés (règle stricte)
+        page3 +              // Page 7 : Hygiène & HACCP
+        page4 +              // Page 8 : Sécurité au travail
+        page5 +              // Page 9 : Cadre social & légal
+        page5b +             // Page 10 : Vidéosurveillance & RGPD
+        pageCharteNum +      // 🆕 Page 11 : Charte numérique
+        pageTenue +          // 🆕 Page 12 : Tenue & comportement
+        page6 +              // Page 13 : Engagement & signatures
       '</main>' +
     '</body>' +
     '</html>'
