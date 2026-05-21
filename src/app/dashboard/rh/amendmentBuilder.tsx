@@ -121,6 +121,7 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   var contractTypeLabel = "Contrat de travail"
   if (contract.type === "extra") contractTypeLabel = "Contrat de travail d'extra (CDD d'usage)"
   else if (contract.type === "cdi_cadre") contractTypeLabel = "Contrat de travail à durée indéterminée (Cadre)"
+  else if (contract.type === "cdi_agent_maitrise") contractTypeLabel = "Contrat de travail à durée indéterminée (Agent de maîtrise)"
   else if (contract.type === "cdi_cuisinier") contractTypeLabel = "Contrat de travail à durée indéterminée (Cuisinier)"
   else if (contract.type === "cdi_caissier") contractTypeLabel = "Contrat de travail à durée indéterminée (Caissier/ère)"
   
