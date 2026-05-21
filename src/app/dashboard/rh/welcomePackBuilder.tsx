@@ -1212,35 +1212,27 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
           '<h2 class="yt">Bienvenue chez Meshuga</h2>' +
         '</div>' +
-        '<div class="rule" style="margin: 3mm 0 5mm 0;"></div>' +
+        '<div class="rule" style="margin: 3mm 0 4mm 0;"></div>' +
 
-        '<p style="font-size: 11pt; margin: 0 0 4mm 0; line-height: 1.6;">' +
-          'Cher ' + g('nouveau membre', 'nouvelle membre') + ' de l\'équipe Meshuga, ' +
-          'ce dossier de bienvenue a été conçu pour t\'accompagner pas à pas dès ton arrivée. ' +
-          'Il rassemble tout ce que tu dois savoir pour bien démarrer&nbsp;: <b>règles internes, droits, devoirs, sécurité, hygiène, cadre légal, rémunération et avantages</b>.' +
+        '<p style="font-size: 11pt; margin: 0 0 4mm 0; line-height: 1.55;">' +
+          'Cher ' + g('nouveau membre', 'nouvelle membre') + ' de l\'équipe, ce dossier rassemble <b>tout ce que tu dois savoir pour bien démarrer</b> chez Meshuga&nbsp;: règles internes, droits, devoirs, sécurité, hygiène, cadre légal, rémunération et avantages. ' +
+          'Il s\'inscrit dans le respect du <b>Code du travail</b>, de la <b>CCN Restauration Rapide IDCC 1501</b>, et du <b>paquet hygiène CE 178/2002 et 852/2004</b>. ' +
+          '<b>En le signant, tu reconnais en avoir pris connaissance.</b>' +
         '</p>' +
 
-        '<p style="font-size: 11pt; margin: 0 0 5mm 0; line-height: 1.6;">' +
-          'Chez Meshuga, nous travaillons dans le respect du <b>Code du travail</b>, de la <b>Convention Collective Nationale de la Restauration Rapide (IDCC 1501)</b> et des <b>réglementations sanitaires (paquet hygiène CE 178/2002 et 852/2004)</b>. ' +
-          'Ce document a une valeur contractuelle&nbsp;: en le signant, tu reconnais en avoir pris connaissance.' +
-        '</p>' +
-
-        '<h3 class="bc pink" style="font-size: 11pt;">Notre ADN</h3>' +
-        '<div style="background: rgba(255,130,215,0.08); border-left: 4px solid #FF82D7; padding: 12px 16px; margin: 3mm 0 5mm 0; font-size: 11pt; line-height: 1.6;">' +
-          '<b>Meshuga</b>, c\'est un deli new-yorkais en plein cœur du 6ème, créé en 2021 par Edward Touret. ' +
-          'Notre exigence est <b>simple et absolue</b>&nbsp;: <b>produits de qualité, sourcing rigoureux, propreté irréprochable, accueil chaleureux</b>. ' +
-          'Ces 4 piliers structurent toute notre activité quotidienne et sont attendus de chaque membre de l\'équipe, sans exception.' +
+        '<h3 class="bc pink" style="font-size: 11pt; margin-top: 2mm;">Notre ADN</h3>' +
+        '<div style="background: rgba(255,130,215,0.08); border-left: 4px solid #FF82D7; padding: 8px 14px; margin: 2mm 0 4mm 0; font-size: 11pt; line-height: 1.5;">' +
+          'Deli new-yorkais en plein cœur du 6ème, créé en 2021. Notre exigence&nbsp;: <b>produits de qualité, sourcing rigoureux, propreté irréprochable, accueil chaleureux</b>. Quatre piliers attendus de chacun, sans exception.' +
         '</div>' +
 
-        // 🔥 Edward 21/05 : encart libre consultation classeur restaurant
-        '<h3 class="bc pink" style="font-size: 11pt;">📚 Classeur récapitulatif au restaurant</h3>' +
-        '<div style="background: rgba(255,235,90,0.25); border-left: 4px solid #FFEB5A; padding: 12px 16px; margin: 3mm 0 5mm 0; font-size: 11pt; line-height: 1.6;">' +
-          'Tous les <b>documents légaux, de sécurité, et procédures internes en version complète et développée</b> sont rassemblés dans un <b>classeur unique mis à disposition de l\'équipe au restaurant</b>. Tu peux le consulter à tout moment.<br/><br/>' +
-          'Il contient notamment&nbsp;: <b>DUERP</b> (Document Unique d\'Évaluation des Risques Professionnels), <b>registre du personnel</b>, <b>convention collective CCN 1501 intégrale</b>, <b>plan de nettoyage détaillé</b>, <b>fiches HACCP</b>, <b>protocoles d\'hygiène</b>, <b>plan d\'évacuation incendie</b>, <b>fiches de données de sécurité produits ménagers</b>, <b>attestations de conformité</b>, <b>affichages obligatoires</b> et <b>certificats des intervenants</b> (médecine du travail EFFICIENCE, prévoyance Gan, retraite Klesia, dératiseur La Science).' +
+        // Encart libre consultation classeur restaurant (compacté)
+        '<h3 class="bc pink" style="font-size: 11pt; margin-top: 2mm;">📚 Classeur récapitulatif au restaurant</h3>' +
+        '<div style="background: rgba(255,235,90,0.25); border-left: 4px solid #FFEB5A; padding: 8px 14px; margin: 2mm 0 4mm 0; font-size: 11pt; line-height: 1.5;">' +
+          'Tous les <b>documents légaux et de sécurité en version complète</b> (DUERP, registre du personnel, CCN 1501 intégrale, fiches HACCP, PMS, plan d\'évacuation, fiches de données de sécurité, attestations, affichages obligatoires) sont rassemblés dans un <b>classeur à disposition de l\'équipe au restaurant</b>, consultable à tout moment.' +
         '</div>' +
 
-        '<h3 class="bc pink" style="font-size: 11pt;">Sommaire du dossier</h3>' +
-        '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 8mm; font-size: 10.5pt; margin-top: 3mm; line-height: 1.7;">' +
+        '<h3 class="bc pink" style="font-size: 11pt; margin-top: 2mm;">Sommaire du dossier</h3>' +
+        '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0 8mm; font-size: 10pt; margin-top: 2mm; line-height: 1.55;">' +
           '<div><b style="color: #FF82D7;">1.</b> Couverture</div>' +
           '<div><b style="color: #FF82D7;">8.</b> Sécurité au travail</div>' +
           '<div><b style="color: #FF82D7;">2.</b> Bienvenue & sommaire</div>' +
@@ -1255,10 +1247,6 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
           '<div><b style="color: #FF82D7;">13.</b> Engagement & signatures</div>' +
           '<div><b style="color: #FF82D7;">7.</b> Hygiène & HACCP</div>' +
         '</div>' +
-
-        '<p style="font-size: 10pt; margin: 5mm 0 0 0; line-height: 1.5; opacity: 0.7; font-style: italic;">' +
-          'Document remis lors de ton arrivée, à conserver précieusement. Une version signée est archivée dans ton dossier RH.' +
-        '</p>' +
 
       '</section>'
 
