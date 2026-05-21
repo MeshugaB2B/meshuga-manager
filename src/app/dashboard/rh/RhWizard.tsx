@@ -141,6 +141,10 @@ export default function RhWizard(props) {
   var [previewHtml, setPreviewHtml] = useState("")
   var [employees, setEmployees] = useState([])
 
+  // 🔥 Sprint Y1 : signature électronique pré-enregistrée d'Edward (mandat permanent)
+  // Chargée au mount via /api/employer-signature → injectée dans le PDF généré
+  var [employerSig, setEmployerSig] = useState(null)
+
   // ===== Salarié =====
   var [empMode, setEmpMode] = useState(existing && existing.employee_id ? "existing" : "new")
   var [selectedEmpId, setSelectedEmpId] = useState(existing ? existing.employee_id : "")
@@ -165,6 +169,21 @@ export default function RhWizard(props) {
     supabase.from("hr_employees").select("*").order("nom").then(function (r) {
       setEmployees(r.data || [])
     })
+  }, [])
+
+  // ===== 🔥 Sprint Y1 : Charger la signature pré-enregistrée d'Edward =====
+  // Mandat permanent — fetché 1 fois au mount, injecté dans le PDF généré
+  useEffect(function () {
+    fetch("/api/employer-signature")
+      .then(function (r) { return r.ok ? r.json() : null })
+      .then(function (sig) {
+        if (sig && sig.active === true) {
+          setEmployerSig(sig)
+        } else {
+          setEmployerSig(null)
+        }
+      })
+      .catch(function () { setEmployerSig(null) })
   }, [])
 
   // ===== Pré-remplir si édition d'un contrat existant =====
@@ -339,7 +358,10 @@ export default function RhWizard(props) {
 
   // ===== Génération preview =====
   function generatePreview() {
-    var html = buildContract(contract, emp, vacations, LOGO_PINK)
+    // 🔥 Sprint Y1 : 5ème paramètre employerSig (mandat permanent Edward)
+    // Si null → fallback "cachet · SAS AEGIA" (bloc historique)
+    // Si actif → signature Yellowtail rose + cartouche audit
+    var html = buildContract(contract, emp, vacations, LOGO_PINK, employerSig)
     setPreviewHtml(html)
   }
 
