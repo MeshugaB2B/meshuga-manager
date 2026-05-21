@@ -690,10 +690,8 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // Conteneur de contenu (post-couverture) : flux naturel, Chrome paginera tout seul
     ".flow { width: 100%; }" +
     // Chapitre = un h2 Yellowtail + son contenu. break-before:page démarre chaque chapitre sur une nouvelle page.
-    // 🔥 Edward 21/05 : on enchaîne les chapitres pour réduire les blancs. Seules les sections-clés démarrent sur une nouvelle page (classe .force-page).
-    ".chapter { break-before: auto; page-break-before: auto; margin-top: 8mm; }" +
-    ".chapter:first-of-type { break-before: avoid; page-break-before: avoid; margin-top: 0; }" +
-    ".chapter.force-page { break-before: page; page-break-before: always; margin-top: 0; }" +
+    ".chapter { break-before: page; page-break-before: always; }" +
+    ".chapter:first-of-type { break-before: avoid; page-break-before: avoid; }" +
     "h2.yt { font-family: 'Yellowtail', cursive; color: #FF82D7; font-weight: 400; font-size: 36pt; line-height: 1.2; padding-bottom: 3mm; margin-bottom: 5mm; border-bottom: 3px solid #FF82D7; break-after: avoid; page-break-after: avoid; }" +
     "h3.bc { font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-weight: 800; font-size: 13pt; text-transform: uppercase; letter-spacing: 1px; color: #FF82D7; margin-top: 8mm; margin-bottom: 3mm; break-after: avoid; page-break-after: avoid; }" +
     "h3.bc.pink { color: #FF82D7; }" +
@@ -793,7 +791,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
   }
 
   var page2 =
-    '<section class="chapter force-page">' +
+    '<section class="chapter">' +
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
           '<h2 class="yt">' + g("Fiche du salarié", "Fiche de la salariée") + '</h2>' +
         '</div>' +
@@ -1083,7 +1081,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
 
   // ===== PAGE 6 — ENGAGEMENT DE LECTURE & SIGNATURE =====
   var page6 =
-    '<section class="chapter force-page">' +
+    '<section class="chapter">' +
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
           '<h2 class="yt">Engagement & signatures</h2>' +
         '</div>' +
@@ -1210,7 +1208,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
   // 🆕 PAGE SOMMAIRE + BIENVENUE MESHUGA
   // ============================================================
   var pageSommaire =
-    '<section class="chapter force-page">' +
+    '<section class="chapter">' +
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
           '<h2 class="yt">Bienvenue chez Meshuga</h2>' +
         '</div>' +
@@ -1387,7 +1385,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
   // 🆕 PAGE CONGÉS PAYÉS — RÈGLE STRICTE
   // ============================================================
   var pageConges =
-    '<section class="chapter force-page">' +
+    '<section class="chapter">' +
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
           '<h2 class="yt">Congés payés</h2>' +
         '</div>' +
