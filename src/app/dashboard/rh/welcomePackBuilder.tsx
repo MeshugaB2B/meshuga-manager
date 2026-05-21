@@ -2,6 +2,8 @@
 // welcomePackBuilder.tsx
 // ============================================================
 import { ALL_MESHUGA_FONTFACES } from "@/lib/fonts"
+// 🔥 Sprint Y1 : type de la signature électronique pré-enregistrée d'Edward
+import type { EmployerSignature } from "./employerSignature"
 
 // Génère le HTML complet (4 pages A4) du Dossier de bienvenue Meshuga.
 // Reproduction fidèle du PDF Python livré côté Storage.
@@ -501,7 +503,7 @@ var STAMP_YELLOW = "data:image/png;base64," +
   "buZrUwLMQ8YWarfgMzRE1+Hij4fsY9ZurOmBLdzf6Qr8R+ohE1i2h2nbhyq8hTeybmjdLJeH" +
   "y0Omqtogx3MlOf8HiQ1yHlqS50IAAAAASUVORK5CYII="
 
-export function buildWelcomePack(emp, contract, logoUri) {
+export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerSignature | null) {
   emp = emp || {}
   contract = contract || {}
 
@@ -1116,21 +1118,64 @@ export function buildWelcomePack(emp, contract, logoUri) {
             '<div style="margin-top: 2mm; font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; font-size: 11pt; text-align: center;">' + esc(nomComplet) + '</div>' +
           '</div>' +
           // Bloc droit : L'employeur (noir charbon)
-          '<div style="border: 2.5px solid #191923; border-radius: 6px; padding: 4mm; background: rgba(25,25,35,0.025); position: relative;">' +
+          // 🔥 Sprint Y1 : si employerSig actif → date + Lu et approuvé + signature pré-remplies + cartouche audit
+          //                 sinon → bloc vide comme avant (rétro-compatible)
+          (function() {
+            var sigActive = employerSig && employerSig.active === true && employerSig.png_base64
+            var sigFullName = sigActive ? (employerSig.full_name || 'Edward Touret') : 'Edward TOURET'
+            var sigDate = sigActive ? todayFr() : ''
+            var sigActivatedDate = ''
+            var sigIp = sigActive ? (employerSig.ip || '') : ''
+            var sigCountry = sigActive ? (employerSig.country || '') : ''
+            var sigHashShort = sigActive && employerSig.consent_hash ? employerSig.consent_hash.slice(0, 16) : ''
+            if (sigActive && employerSig.activated_at) {
+              try {
+                var dAct = new Date(employerSig.activated_at)
+                if (!isNaN(dAct.getTime())) {
+                  var ddA = String(dAct.getDate())
+                  if (ddA.length < 2) ddA = '0' + ddA
+                  var mmA = String(dAct.getMonth() + 1)
+                  if (mmA.length < 2) mmA = '0' + mmA
+                  sigActivatedDate = ddA + '/' + mmA + '/' + dAct.getFullYear()
+                }
+              } catch (e) {}
+            }
+            return '<div style="border: 2.5px solid #191923; border-radius: 6px; padding: 4mm; background: rgba(25,25,35,0.025); position: relative;">' +
             '<div style="position: absolute; top: -3mm; left: 4mm; background: #FFFFFF; padding: 0 5px; font-family: Yellowtail, cursive; color: #191923; font-size: 13pt; line-height: 1;">L\'employeur</div>' +
             '<div style="display: grid; grid-template-columns: auto 1fr; gap: 1mm 4mm; font-size: 11pt; margin-top: 3mm;">' +
               '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Date</div>' +
-              '<div style="border-bottom: 1px solid #191923; min-height: 4mm;">' + '</div>' +
+              '<div style="border-bottom: 1px solid #191923; min-height: 4mm; font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700;">' + esc(sigDate) + '</div>' +
               '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Lieu</div>' +
-              '<div style="border-bottom: 1px solid #191923; min-height: 4mm;">Paris</div>' +
+              '<div style="border-bottom: 1px solid #191923; min-height: 4mm; font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700;">Paris</div>' +
               '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm; grid-column: 1 / 3; font-size: 11pt;">Mention manuscrite&nbsp;: «&nbsp;<span style="color: #191923;">Lu et approuvé</span>&nbsp;»</div>' +
-              '<div style="border-bottom: 1px solid #191923; min-height: 5mm; grid-column: 1 / 3;"></div>' +
-              '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm; grid-column: 1 / 3;">Signature & cachet</div>' +
-              '<div style="border-bottom: 1px solid #191923; min-height: 14mm; grid-column: 1 / 3;"></div>' +
+              (sigActive
+                ? '<div style="border-bottom: 1px solid #191923; min-height: 5mm; grid-column: 1 / 3; font-family: Yellowtail, cursive; color: #FF82D7; font-size: 16pt; line-height: 1.1; padding-bottom: 1mm;">Lu et approuvé</div>'
+                : '<div style="border-bottom: 1px solid #191923; min-height: 5mm; grid-column: 1 / 3;"></div>'
+              ) +
+              '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm; grid-column: 1 / 3;">Signature ' + (sigActive ? 'électronique' : '& cachet') + '</div>' +
+              (sigActive
+                ? '<div style="border-bottom: 1px solid #191923; min-height: 14mm; grid-column: 1 / 3; display: flex; align-items: center; justify-content: center; padding: 2mm 0;"><span style="font-family: Yellowtail, cursive; color: #FF82D7; font-size: 28pt; line-height: 1; letter-spacing: 0.5px;">' + esc(sigFullName) + '</span></div>'
+                : '<div style="border-bottom: 1px solid #191923; min-height: 14mm; grid-column: 1 / 3;"></div>'
+              ) +
             '</div>' +
-            '<div style="margin-top: 2mm; font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; font-size: 11pt; text-align: center;">Edward TOURET</div>' +
+            '<div style="margin-top: 2mm; font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; font-size: 11pt; text-align: center;">' + esc(sigActive ? sigFullName : 'Edward TOURET') + '</div>' +
             '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-size: 11pt; text-align: center; opacity: 0.7; letter-spacing: 0.5px;">Président · SAS AEGIA FOOD</div>' +
-          '</div>' +
+            // 🔥 Cartouche audit : visible uniquement si mandat actif
+            (sigActive
+              ? '<div style="margin-top: 3mm; padding-top: 2mm; border-top: 1px dashed rgba(25,25,35,0.25); font-size: 8.5pt; line-height: 1.5; color: #777777; font-style: italic; text-align: center;">' +
+                'Signature électronique apposée par <b style="font-style: normal; color: #555;">mandat permanent</b>' +
+                (sigActivatedDate ? ' activé le <b style="font-style: normal; color: #555;">' + esc(sigActivatedDate) + '</b>' : '') +
+                (sigIp ? ' · IP <b style="font-style: normal; color: #555;">' + esc(sigIp) + '</b>' + (sigCountry ? ' (' + esc(sigCountry) + ')' : '') : '') +
+                (sigHashShort ? '<br>Hash SHA-256 du consentement&nbsp;: <span style="font-family: monospace; font-style: normal; color: #555;">' + esc(sigHashShort) + '…</span>' : '') +
+                '<br><span style="font-style: normal;">Signature électronique simple au sens de l\'art. 1367 du Code civil</span>' +
+                '<br><span style="font-style: normal;">et du règlement eIDAS UE n° 910/2014, art. 25.</span>' +
+                '<br><span style="font-style: normal;">Force probante équivalente à la signature manuscrite (art. 1366 C. civ.).</span>' +
+                '<br><span style="font-style: normal;">Audit trail horodaté conservé.</span>' +
+                '</div>'
+              : ''
+            ) +
+            '</div>'
+          })() +
         '</div>' +
 
         '<p style="margin-top: 4mm; font-size: 11pt; opacity: 0.55; font-style: italic; line-height: 1.55; text-align: center;">' +
