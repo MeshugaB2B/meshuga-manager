@@ -435,10 +435,17 @@ export var CONTRACT_TYPES = [
     color: "#FF82D7"
   },
   {
-    key: "cdi_cadre",
-    label: "CDI Responsable / Manager",
-    sublabel: "Niveau IV à V · postes à responsabilités",
+    key: "cdi_agent_maitrise",
+    label: "CDI Agent de maîtrise",
+    sublabel: "Niveau IV · responsable opérationnel",
     icon: "🎯",
+    color: "#FFEB5A"
+  },
+  {
+    key: "cdi_cadre",
+    label: "CDI Cadre",
+    sublabel: "Niveau V · direction / encadrement supérieur (forfait jours, AGIRC)",
+    icon: "👔",
     color: "#FFEB5A"
   }
 ]
