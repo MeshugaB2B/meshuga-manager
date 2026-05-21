@@ -1160,9 +1160,9 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
             '</div>' +
             '<div style="margin-top: 2mm; font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; font-size: 11pt; text-align: center;">' + esc(sigActive ? sigFullName : 'Edward TOURET') + '</div>' +
             '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-size: 11pt; text-align: center; opacity: 0.7; letter-spacing: 0.5px;">Président · SAS AEGIA FOOD</div>' +
-            // 🔥 Cartouche audit : visible uniquement si mandat actif (Helvetica, foncé, structure label/valeur, aligné à gauche)
+            // 🔥 Cartouche audit : visible uniquement si mandat actif (Helvetica, foncé, structure label/valeur, aligné à gauche, italique pour homogénéité avec le contrat)
             (sigActive
-              ? '<div style="margin-top: 3mm; padding-top: 2mm; border-top: 1px dashed rgba(25,25,35,0.25); font-family: \'Helvetica Neue\', Helvetica, Arial, sans-serif; font-size: 8.5pt; line-height: 1.65; color: #555; text-align: left;">' +
+              ? '<div style="margin-top: 3mm; padding-top: 2mm; border-top: 1px dashed rgba(25,25,35,0.25); font-family: \'Helvetica Neue\', Helvetica, Arial, sans-serif; font-size: 8pt; line-height: 1.7; color: #555; text-align: left; font-style: italic;">' +
                 '<div><b style="color: #2c2c2c; font-weight: 600;">Mandat permanent&nbsp;:</b> activé' + (sigActivatedDate ? ' le ' + esc(sigActivatedDate) : '') + '</div>' +
                 (sigIp ? '<div><b style="color: #2c2c2c; font-weight: 600;">IP&nbsp;:</b> ' + esc(sigIp) + (sigCountry ? ' (' + esc(sigCountry) + ')' : '') + '</div>' : '') +
                 (sigHashShort ? '<div><b style="color: #2c2c2c; font-weight: 600;">Hash SHA-256&nbsp;:</b> <span style="font-family: \'SF Mono\', \'Consolas\', \'Courier New\', monospace; font-size: 8pt;">' + esc(sigHashShort) + '…</span></div>' : '') +
