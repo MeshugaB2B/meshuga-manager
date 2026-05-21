@@ -690,8 +690,10 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // Conteneur de contenu (post-couverture) : flux naturel, Chrome paginera tout seul
     ".flow { width: 100%; }" +
     // Chapitre = un h2 Yellowtail + son contenu. break-before:page démarre chaque chapitre sur une nouvelle page.
-    ".chapter { break-before: page; page-break-before: always; }" +
-    ".chapter:first-of-type { break-before: avoid; page-break-before: avoid; }" +
+    // 🔥 Edward 21/05 : on enchaîne les chapitres pour réduire les blancs. Seules les sections-clés démarrent sur une nouvelle page (classe .force-page).
+    ".chapter { break-before: auto; page-break-before: auto; margin-top: 8mm; }" +
+    ".chapter:first-of-type { break-before: avoid; page-break-before: avoid; margin-top: 0; }" +
+    ".chapter.force-page { break-before: page; page-break-before: always; margin-top: 0; }" +
     "h2.yt { font-family: 'Yellowtail', cursive; color: #FF82D7; font-weight: 400; font-size: 36pt; line-height: 1.2; padding-bottom: 3mm; margin-bottom: 5mm; border-bottom: 3px solid #FF82D7; break-after: avoid; page-break-after: avoid; }" +
     "h3.bc { font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-weight: 800; font-size: 13pt; text-transform: uppercase; letter-spacing: 1px; color: #FF82D7; margin-top: 8mm; margin-bottom: 3mm; break-after: avoid; page-break-after: avoid; }" +
     "h3.bc.pink { color: #FF82D7; }" +
@@ -791,7 +793,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
   }
 
   var page2 =
-    '<section class="chapter">' +
+    '<section class="chapter force-page">' +
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
           '<h2 class="yt">' + g("Fiche du salarié", "Fiche de la salariée") + '</h2>' +
         '</div>' +
@@ -958,6 +960,25 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
           '<li><b>DLC / DLUO</b> vérifiées à chaque utilisation. Tout produit douteux est jeté et signalé.</li>' +
         '</ul>' +
 
+        // 🔥 Edward 21/05 : nouvelle section Nettoyage & Relevés
+        '<h3 class="bc pink" style="margin-top: 4mm; font-size: 11pt;">Nettoyage & relevés obligatoires</h3>' +
+        '<div class="legal-box">' +
+          '<div class="ref">Règlements (CE) 178/2002 et 852/2004 (paquet hygiène) · Arrêté du 21 décembre 2009 · DDPP Paris</div>' +
+          'Les <b>fiches de nettoyage, de températures et de traçabilité HACCP</b> sont <b>affichées au restaurant</b> aux emplacements dédiés (cuisine, espace de stockage froid, zone de plonge). ' +
+          'Leur renseignement est <b>obligatoire à chaque service</b> et constitue la preuve documentée du respect des protocoles d\'hygiène en cas de contrôle DDPP.' +
+        '</div>' +
+        '<ul class="tidy" style="margin: 3mm 0; font-size: 11pt;">' +
+          '<li><b>Fiche températures (F1)</b> — relevés <b>2× / jour</b> (matin et soir) : armoire froide ≤ 4 °C, congélateur ≤ −18 °C, plats chauds en distribution ≥ 63 °C.</li>' +
+          '<li><b>Fiche réception marchandises (F2)</b> — à chaque livraison : fournisseur, date, température du produit à réception, conformité visuelle.</li>' +
+          '<li><b>Fiche huiles de friture (F3)</b> — contrôle visuel quotidien, vidange selon usage (Quatra).</li>' +
+          '<li><b>Fiche nettoyage matériel (F6)</b> — émargement après chaque opération : plancha, friteuse, plan de travail, vaisselle.</li>' +
+          '<li><b>Fiche nettoyage locaux (F7)</b> — sols, sanitaires, vitrines : 1× / jour minimum.</li>' +
+          '<li><b>Fiche traçabilité produits (F8)</b> — étiquetage de tout produit ouvert avec date d\'ouverture et DLC secondaire.</li>' +
+        '</ul>' +
+        '<p style="font-size: 11pt; margin: 3mm 0 0 0; line-height: 1.55; font-style: italic;">' +
+          '<b>⚠ En cas de doute sur une fiche, demande immédiatement à Edward.</b> Le non-renseignement systématique peut entraîner la fermeture administrative en cas de contrôle. La version complète du <b>Plan de Maîtrise Sanitaire (PMS)</b> est consultable dans le classeur récapitulatif du restaurant.' +
+        '</p>' +
+
       '</div>' +
     '</section>'
 
@@ -1062,7 +1083,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
 
   // ===== PAGE 6 — ENGAGEMENT DE LECTURE & SIGNATURE =====
   var page6 =
-    '<section class="chapter">' +
+    '<section class="chapter force-page">' +
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
           '<h2 class="yt">Engagement & signatures</h2>' +
         '</div>' +
@@ -1189,7 +1210,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
   // 🆕 PAGE SOMMAIRE + BIENVENUE MESHUGA
   // ============================================================
   var pageSommaire =
-    '<section class="chapter">' +
+    '<section class="chapter force-page">' +
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
           '<h2 class="yt">Bienvenue chez Meshuga</h2>' +
         '</div>' +
@@ -1211,6 +1232,13 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
           '<b>Meshuga</b>, c\'est un deli new-yorkais en plein cœur du 6ème, créé en 2021 par Edward Touret. ' +
           'Notre exigence est <b>simple et absolue</b>&nbsp;: <b>produits de qualité, sourcing rigoureux, propreté irréprochable, accueil chaleureux</b>. ' +
           'Ces 4 piliers structurent toute notre activité quotidienne et sont attendus de chaque membre de l\'équipe, sans exception.' +
+        '</div>' +
+
+        // 🔥 Edward 21/05 : encart libre consultation classeur restaurant
+        '<h3 class="bc pink" style="font-size: 11pt;">📚 Classeur récapitulatif au restaurant</h3>' +
+        '<div style="background: rgba(255,235,90,0.25); border-left: 4px solid #FFEB5A; padding: 12px 16px; margin: 3mm 0 5mm 0; font-size: 11pt; line-height: 1.6;">' +
+          'Tous les <b>documents légaux, de sécurité, et procédures internes en version complète et développée</b> sont rassemblés dans un <b>classeur unique mis à disposition de l\'équipe au restaurant</b>. Tu peux le consulter à tout moment.<br/><br/>' +
+          'Il contient notamment&nbsp;: <b>DUERP</b> (Document Unique d\'Évaluation des Risques Professionnels), <b>registre du personnel</b>, <b>convention collective CCN 1501 intégrale</b>, <b>plan de nettoyage détaillé</b>, <b>fiches HACCP</b>, <b>protocoles d\'hygiène</b>, <b>plan d\'évacuation incendie</b>, <b>fiches de données de sécurité produits ménagers</b>, <b>attestations de conformité</b>, <b>affichages obligatoires</b> et <b>certificats des intervenants</b> (médecine du travail EFFICIENCE, prévoyance Gan, retraite Klesia, dératiseur La Science).' +
         '</div>' +
 
         '<h3 class="bc pink" style="font-size: 11pt;">Sommaire du dossier</h3>' +
@@ -1359,7 +1387,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
   // 🆕 PAGE CONGÉS PAYÉS — RÈGLE STRICTE
   // ============================================================
   var pageConges =
-    '<section class="chapter">' +
+    '<section class="chapter force-page">' +
         '<div style="display: flex; align-items: baseline; justify-content: space-between;">' +
           '<h2 class="yt">Congés payés</h2>' +
         '</div>' +
