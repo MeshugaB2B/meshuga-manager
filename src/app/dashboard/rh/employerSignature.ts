@@ -155,17 +155,17 @@ export function renderEmployerSignatureBlock(sig: EmployerSignature | null): str
 
   var sigSpace = ''
     + '<div class="sig-space" style="padding:10px 14px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px">'
-    + '<span style="font-size:8.5px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.5px;text-align:center;margin-bottom:2px">Signature électronique apposée par mandat permanent</span>'
+    + '<span style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:8.5px;color:#2c2c2c;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;text-align:center;margin-bottom:2px">Signature électronique apposée par mandat permanent</span>'
     // 🔥 Signature Yellowtail rose centrée (rendu via Google Fonts chargée dans wrapHtml)
-    // Plus léger et plus net que le PNG, parfaitement centré
     + '<span style="font-family:Yellowtail,cursive;font-size:44px;color:#FF82D7;line-height:1.1;display:block;text-align:center;margin:4px 0 8px;letter-spacing:0.5px">' + esc(sig.full_name) + '</span>'
-    + '<div style="font-size:7.5px;color:#888;font-style:italic;line-height:1.55;text-align:center;margin-top:2px">'
-    + '<strong style="color:#666;font-style:normal">Mandat permanent activé le ' + esc(dActivated) + '</strong> · IP <strong style="color:#666;font-style:normal">' + esc(sig.ip) + '</strong> (' + esc(sig.country) + ')'
-    + '<br>Hash SHA-256 du consentement : <span style="font-family:monospace;font-size:7px;color:#666;font-style:normal">' + esc(hashShort) + '…</span>'
-    + '<br><span style="font-style:normal;color:#777">Signature électronique simple au sens de l\'art. 1367 du Code civil</span>'
-    + '<br><span style="font-style:normal;color:#777">et du règlement eIDAS UE n° 910/2014, art. 25.</span>'
-    + '<br><span style="font-style:normal;color:#777">Force probante équivalente à la signature manuscrite (art. 1366 C. civ.).</span>'
-    + '<br><span style="font-style:normal;color:#777">Audit trail horodaté conservé.</span>'
+    // 🔥 Cartouche audit : Helvetica Neue, structure label/valeur, couleurs foncées, aligné à gauche
+    + '<div style="align-self:stretch;font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:8px;color:#555;line-height:1.7;text-align:left;margin-top:2px">'
+    + '<div><strong style="color:#2c2c2c;font-weight:600">Mandat permanent :</strong> activé le ' + esc(dActivated) + '</div>'
+    + '<div><strong style="color:#2c2c2c;font-weight:600">IP :</strong> ' + esc(sig.ip) + ' (' + esc(sig.country) + ')</div>'
+    + '<div><strong style="color:#2c2c2c;font-weight:600">Hash SHA-256 :</strong> <span style="font-family:\'SF Mono\',\'Consolas\',\'Courier New\',monospace;font-size:7.5px;color:#555">' + esc(hashShort) + '…</span></div>'
+    + '<div><strong style="color:#2c2c2c;font-weight:600">Référence légale :</strong> art. 1367 C. civ. + eIDAS UE 910/2014, art. 25</div>'
+    + '<div><strong style="color:#2c2c2c;font-weight:600">Force probante :</strong> équivalente à la signature manuscrite (art. 1366 C. civ.)</div>'
+    + '<div><strong style="color:#2c2c2c;font-weight:600">Audit trail :</strong> horodaté et conservé</div>'
     + '</div>'
     + '</div>'
 
