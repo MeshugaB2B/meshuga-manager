@@ -22,6 +22,7 @@ function getAvailableTypes(contractType: string) {
     return [
       { key: 'prolongation_duree', label: 'Prolongation de la durée', icon: '📅', desc: 'Reporter la date de fin + ajouter des vacations' },
       { key: 'modification_horaires', label: 'Modification des horaires', icon: '🕐', desc: 'Remplacer le planning des vacations' },
+      { key: 'regularisation_welcome_pack', label: 'Mise en conformité réglementaire', icon: '⚖', desc: 'Régularisation : congés, hygiène HACCP, RGPD, vidéo, harcèlement, tenue, charte numérique' },
       { key: 'autre', label: 'Autre modification', icon: '📝', desc: 'Texte libre' }
     ]
   }
@@ -29,6 +30,7 @@ function getAvailableTypes(contractType: string) {
     { key: 'augmentation_salaire', label: 'Modification de la rémunération', icon: '💰', desc: 'Augmentation salaire / taux horaire' },
     { key: 'modification_horaires', label: 'Modification des horaires', icon: '🕐', desc: 'Hausse ou baisse de la durée du travail' },
     { key: 'changement_poste', label: 'Changement de poste', icon: '👔', desc: 'Nouvelle fonction, classification, missions' },
+    { key: 'regularisation_welcome_pack', label: 'Mise en conformité réglementaire', icon: '⚖', desc: 'Régularisation : congés, hygiène HACCP, RGPD, vidéo, harcèlement, tenue, charte numérique' },
     { key: 'autre', label: 'Autre modification', icon: '📝', desc: 'Texte libre (mobilité, adresse, etc.)' }
   ]
 }
@@ -77,6 +79,15 @@ function getPredefinedMotifs(amendmentType: string) {
       "Autre (texte libre)"
     ]
   }
+  if (amendmentType === 'regularisation_welcome_pack') {
+    return [
+      "Mise en conformité réglementaire suite à évolution jurisprudentielle (loi DDADUE 2024, Cass. Soc. 2025)",
+      "Annexion du Dossier de bienvenue Meshuga et formalisation des règles internes",
+      "Régularisation des dossiers RH historiques (clauses congés, hygiène HACCP, RGPD, vidéo, harcèlement)",
+      "Mise à jour suite à mise en place de la signature électronique conforme eIDAS",
+      "Autre (texte libre)"
+    ]
+  }
   return []
 }
 
@@ -92,6 +103,7 @@ function buildFilename(emp: any, amendmentNumber: number, amendmentType: string)
     augmentation_salaire: 'augmentation-salaire',
     modification_horaires: 'modification-horaires',
     changement_poste: 'changement-poste',
+    regularisation_welcome_pack: 'regularisation',
     autre: 'modification'
   }
   return 'Avenant-' + amendmentNumber + '-' + (typeLabels[amendmentType] || 'avenant') + '-' + slug((emp.prenom || '') + '-' + (emp.nom || ''))
@@ -355,6 +367,7 @@ export default function AmendmentModal(props: Props) {
   else if (amendmentType === 'augmentation_salaire') canPreview = (!!newSalaireBrutMensuel || !!newTauxHoraire) && motifOK
   else if (amendmentType === 'modification_horaires') canPreview = (!!newHeuresHebdo || !!newHeuresMensuelles || newVacations.length > 0) && motifOK
   else if (amendmentType === 'changement_poste') canPreview = (!!newFonction || !!newClassification) && motifOK
+  else if (amendmentType === 'regularisation_welcome_pack') canPreview = motifOK
   else if (amendmentType === 'autre') canPreview = motifOK
   
   return (
