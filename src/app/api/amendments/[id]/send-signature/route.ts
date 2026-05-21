@@ -32,14 +32,14 @@ function getServerClient() {
 }
 
 // === Helper : libellé du type d'avenant ===
-function getAmendmentTypeLabel(typeAvenant: string): string {
-  var t = (typeAvenant || "").toLowerCase()
-  if (t === "regularisation_welcome_pack") return "Avenant de régularisation"
-  if (t === "salaire") return "Avenant — modification de rémunération"
-  if (t === "duree_travail") return "Avenant — modification de la durée du travail"
-  if (t === "poste") return "Avenant — changement de poste"
-  if (t === "lieu_travail") return "Avenant — changement de lieu de travail"
-  if (t === "transformation_cdi") return "Avenant — transformation en CDI"
+function getAmendmentTypeLabel(amendmentType: string): string {
+  var t = (amendmentType || "").toLowerCase()
+  if (t === "regularisation_welcome_pack") return "Avenant — Mise en conformité réglementaire"
+  if (t === "augmentation_salaire") return "Avenant — Modification de la rémunération"
+  if (t === "modification_horaires") return "Avenant — Modification des horaires"
+  if (t === "changement_poste") return "Avenant — Changement de poste"
+  if (t === "prolongation_duree") return "Avenant — Prolongation de la durée"
+  if (t === "autre") return "Avenant au contrat de travail"
   return "Avenant au contrat de travail"
 }
 
@@ -80,7 +80,7 @@ export async function POST(
   // === 3. Récupérer l'avenant ===
   var resAmendment = await supabase
     .from("hr_contract_amendments")
-    .select("id, contract_id, type_avenant, signature_status")
+    .select("id, contract_id, amendment_type, signature_status")
     .eq("id", amendmentId)
     .maybeSingle()
 
@@ -173,7 +173,7 @@ export async function POST(
   }
 
   // === 10. Email content ===
-  var docLabel = getAmendmentTypeLabel(amendment.type_avenant || "")
+  var docLabel = getAmendmentTypeLabel(amendment.amendment_type || "")
   var siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://meshuga-manager.vercel.app"
   var signatureUrl = siteUrl.replace(/\/+$/, "") + "/sign/" + token
 
@@ -191,6 +191,7 @@ export async function POST(
   // === 11. Envoyer ===
   var sendResult = await sendBrevoEmail({
     to: [{ email: recipientEmail, name: empStatus.prenom + " " + empStatus.nom }],
+    bcc: [{ email: "edward@meshuga.fr", name: "Edward Touret" }],  // 🔥 Copie cachée pour vérification + archivage
     subject: emailContent.subject,
     htmlContent: emailContent.htmlContent,
     textContent: emailContent.textContent,
