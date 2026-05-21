@@ -73,11 +73,28 @@ export async function POST(req: Request) {
     if (contractErr || !contract) {
       return NextResponse.json({ error: 'contrat introuvable' }, { status: 404 })
     }
-    if (!contract.cycle_id || !contract.employee_id) {
+    // 🔥 Edward 21/05 : si employee_id manque mais cycle_id présent → on résout via la table cycles.
+    // Inversement : si cycle_id manque mais employee_id présent → erreur (on ne peut pas inventer un cycle).
+    if (!contract.cycle_id) {
       return NextResponse.json(
-        { error: 'contrat sans cycle_id/employee_id — état incohérent' },
+        { error: 'contrat sans cycle_id — état incohérent' },
         { status: 400 }
       )
+    }
+    if (!contract.employee_id) {
+      // Résoudre employee_id via le cycle
+      var { data: cycleRow, error: cycleErr } = await admin
+        .from('hr_employment_cycles')
+        .select('employee_id')
+        .eq('id', contract.cycle_id)
+        .single()
+      if (cycleErr || !cycleRow || !cycleRow.employee_id) {
+        return NextResponse.json(
+          { error: 'employee_id introuvable via cycle_id — état incohérent' },
+          { status: 400 }
+        )
+      }
+      contract.employee_id = cycleRow.employee_id
     }
 
     var slug = slugify(label || doc_type)
