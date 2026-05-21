@@ -28,6 +28,8 @@
 // ⚠️ NE PAS importer côté client (BREVO_API_KEY doit rester serveur).
 // ============================================================
 
+import { MESHUGA_LOGO_PINK_DATA_URI } from "./meshugaLogo"
+
 // === Type des paramètres d'envoi ===
 export interface BrevoSendParams {
   to: Array<{ email: string; name?: string }>
@@ -51,7 +53,7 @@ export interface BrevoSendResult {
 
 // === Sender par défaut (Meshuga) ===
 var DEFAULT_SENDER = {
-  email: "events@meshuga.fr",
+  email: "hello@meshuga.fr",
   name: "Meshuga RH",
 }
 
@@ -203,34 +205,61 @@ export function buildSignatureRequestEmail(
     : '<p style="margin: 8px 0 16px 0; color: #191923; font-size: 15px;">Votre <strong>' + escHtml(docLabel) + '</strong></p>'
 
   var htmlContent =
-    '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"/></head>' +
+    '<!DOCTYPE html>' +
+    '<html lang="fr" xmlns:o="urn:schemas-microsoft-com:office:office">' +
+    '<head>' +
+    '<meta charset="utf-8"/>' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0"/>' +
+    '<meta name="x-apple-disable-message-reformatting"/>' +
+    '<meta http-equiv="X-UA-Compatible" content="IE=edge"/>' +
+    '<title>' + escHtml(subject) + '</title>' +
+    // Reset email + media query mobile (Gmail mobile et Apple Mail supportent)
+    '<style>' +
+    '  body, table, td, p, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100% }' +
+    '  table { border-collapse:collapse !important }' +
+    '  img { -ms-interpolation-mode:bicubic; border:0; outline:none; display:block }' +
+    '  body { margin:0 !important; padding:0 !important; width:100% !important }' +
+    '  @media screen and (max-width: 600px) {' +
+    '    .container { width:100% !important; max-width:100% !important }' +
+    '    .px-32 { padding-left:20px !important; padding-right:20px !important }' +
+    '    .py-32 { padding-top:24px !important; padding-bottom:24px !important }' +
+    '    .h1 { font-size:20px !important }' +
+    '    .body-text { font-size:15px !important }' +
+    '    .cta-btn { padding:14px 24px !important; font-size:15px !important }' +
+    '    .logo-img { width:180px !important; height:auto !important }' +
+    '  }' +
+    '</style>' +
+    '</head>' +
     '<body style="margin:0;padding:0;background:#FFEB5A;font-family:Arial,Helvetica,sans-serif;color:#191923">' +
-    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#FFEB5A;padding:24px 0">' +
-    '<tr><td align="center">' +
-    '<table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;background:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.08)">' +
 
-    // Header rose Meshuga
-    '<tr><td style="background:#FF82D7;padding:32px 32px 28px 32px;text-align:center">' +
-    '<div style="font-family:Georgia,serif;font-size:42px;line-height:1;color:#FFFFFF;font-style:italic">Meshuga</div>' +
-    '<div style="margin-top:6px;font-size:11px;letter-spacing:2px;color:#FFFFFF;text-transform:uppercase;font-weight:700">Crazy Deli</div>' +
+    // Wrapper pleine largeur fond jaune
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FFEB5A">' +
+    '<tr><td align="center" style="padding:24px 12px">' +
+
+    // Card centrale : max-width 600px, width 100% pour le responsive
+    '<table role="presentation" class="container" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:12px;overflow:hidden">' +
+
+    // Header BLANC avec logotype rose centré (pas de "Crazy Deli")
+    '<tr><td align="center" class="py-32" style="padding:36px 32px 28px 32px;background:#FFFFFF;border-bottom:1px solid #F5F5F5">' +
+    '<img src="' + MESHUGA_LOGO_PINK_DATA_URI + '" width="200" height="54" alt="Meshuga" class="logo-img" style="display:block;width:200px;max-width:80%;height:auto;border:0;outline:none;margin:0 auto"/>' +
     '</td></tr>' +
 
     // Corps
-    '<tr><td style="padding:32px 32px 16px 32px">' +
-    '<h1 style="margin:0 0 16px 0;font-size:22px;color:#191923;font-weight:700;line-height:1.3">' + escHtml(greetingFull) + ',</h1>' +
-    '<p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#191923">' +
+    '<tr><td class="px-32 py-32" style="padding:28px 32px 16px 32px">' +
+    '<h1 class="h1" style="margin:0 0 16px 0;font-size:22px;color:#191923;font-weight:700;line-height:1.3">' + escHtml(greetingFull) + ',</h1>' +
+    '<p class="body-text" style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#191923">' +
     'Vous recevez ce message pour effectuer la signature électronique ' +
     (bundle ? 'de <strong>2 documents</strong> :' : 'du document suivant :') +
     '</p>' +
     docsList +
 
-    '<p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#191923">' +
+    '<p class="body-text" style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#191923">' +
     'La signature se fait en quelques minutes depuis votre téléphone ou ordinateur. Aucune impression ni signature manuscrite n\'est nécessaire.' +
     '</p>' +
 
-    // CTA bouton
-    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:16px 0 24px 0"><tr><td align="center">' +
-    '<a href="' + escAttr(params.signatureUrl) + '" style="display:inline-block;background:#FF82D7;color:#FFFFFF;text-decoration:none;padding:16px 32px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.5px">Signer mes documents →</a>' +
+    // CTA bouton (responsive)
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0 24px 0"><tr><td align="center">' +
+    '<a href="' + escAttr(params.signatureUrl) + '" class="cta-btn" style="display:inline-block;background:#FF82D7;color:#FFFFFF;text-decoration:none;padding:16px 32px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.5px;font-family:Arial,Helvetica,sans-serif">Signer mes documents →</a>' +
     '</td></tr></table>' +
 
     '<p style="margin:24px 0 8px 0;font-size:13px;line-height:1.5;color:#666">' +
@@ -240,22 +269,21 @@ export function buildSignatureRequestEmail(
     '<a href="' + escAttr(params.signatureUrl) + '" style="color:#FF82D7">' + escHtml(params.signatureUrl) + '</a>' +
     '</p>' +
 
-    '<p style="margin:24px 0 0 0;font-size:15px;line-height:1.6;color:#191923">' +
+    '<p class="body-text" style="margin:24px 0 0 0;font-size:15px;line-height:1.6;color:#191923">' +
     'Pour toute question, vous pouvez me contacter directement.' +
     '</p>' +
-    '<p style="margin:16px 0 0 0;font-size:15px;line-height:1.6;color:#191923">' +
+    '<p class="body-text" style="margin:16px 0 0 0;font-size:15px;line-height:1.6;color:#191923">' +
     'Bien à vous,<br>' +
     '<strong>' + escHtml(senderName) + '</strong><br>' +
     '<span style="color:#666;font-size:13px">Président · SAS AEGIA FOOD</span>' +
     '</p>' +
     '</td></tr>' +
 
-    // Footer
-    '<tr><td style="padding:24px 32px;background:#FAFAFA;border-top:1px solid #EEEEEE;text-align:center">' +
+    // Footer (sans "Crazy Deli")
+    '<tr><td class="px-32" style="padding:20px 32px;background:#FAFAFA;border-top:1px solid #EEEEEE;text-align:center">' +
     '<p style="margin:0;font-size:11px;line-height:1.5;color:#999">' +
-    'Cet email vous a été envoyé par <strong>Meshuga Crazy Deli</strong>.<br>' +
-    'Signature électronique conforme art. 1367 C. civ. + eIDAS UE 910/2014.<br>' +
-    '3 rue Vavin, 75006 Paris · SIREN 904 639 531' +
+    '<strong>Meshuga</strong> · 3 rue Vavin, 75006 Paris · SIREN 904 639 531<br>' +
+    'Signature électronique conforme art. 1367 C. civ. + eIDAS UE 910/2014.' +
     '</p>' +
     '</td></tr>' +
 
@@ -276,7 +304,7 @@ export function buildSignatureRequestEmail(
     senderName + "\n" +
     "Président · SAS AEGIA FOOD\n\n" +
     "---\n" +
-    "Meshuga Crazy Deli · 3 rue Vavin, 75006 Paris\n" +
+    "Meshuga · 3 rue Vavin, 75006 Paris\n" +
     "Signature électronique conforme art. 1367 C. civ. + eIDAS UE 910/2014."
 
   return { subject: subject, htmlContent: htmlContent, textContent: textContent }
