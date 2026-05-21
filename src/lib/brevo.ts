@@ -223,7 +223,7 @@ export function buildSignatureRequestEmail(
     '    .container { width:100% !important; max-width:100% !important }' +
     '    .px-32 { padding-left:20px !important; padding-right:20px !important }' +
     '    .py-32 { padding-top:24px !important; padding-bottom:24px !important }' +
-    '    .h1 { font-size:20px !important }' +
+    '    .h1 { font-size:16px !important }' +
     '    .body-text { font-size:15px !important }' +
     '    .cta-btn { padding:14px 24px !important; font-size:15px !important }' +
     '    .logo-img { width:180px !important; height:auto !important }' +
@@ -246,7 +246,7 @@ export function buildSignatureRequestEmail(
 
     // Corps
     '<tr><td class="px-32 py-32" style="padding:28px 32px 16px 32px">' +
-    '<h1 class="h1" style="margin:0 0 16px 0;font-size:22px;color:#191923;font-weight:700;line-height:1.3">' + escHtml(greetingFull) + ',</h1>' +
+    '<h1 class="h1" style="margin:0 0 20px 0;font-size:17px;color:#191923;font-weight:400;line-height:1.5">' + escHtml(greetingFull) + ',</h1>' +
     '<p class="body-text" style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#191923">' +
     'Vous recevez ce message pour effectuer la signature électronique ' +
     (bundle ? 'de <strong>2 documents</strong> :' : 'du document suivant :') +
