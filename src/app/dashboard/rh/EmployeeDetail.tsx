@@ -26,6 +26,7 @@ import WorkStoppageWizard from "./WorkStoppageWizard"
 import RegularizationWizard from "./RegularizationWizard"
 import AmendmentModal from "./AmendmentModal"
 import HistoricalDocumentUploadModal from "./HistoricalDocumentUploadModal"
+import SendSignatureModal from "./SendSignatureModal"
 import {
   NATIONALITES,
   getContractTypeMeta,
@@ -62,6 +63,9 @@ export default function EmployeeDetail(props) {
   var [amendmentModalFor, setAmendmentModalFor] = useState(null)
   // 🔥 Sprint R : modal d'import historique multi-pages + OCR auto
   var [histUploadFor, setHistUploadFor] = useState(null)
+  // 🔥 Sprint C2B : modal d'envoi signature électronique
+  // payload : { documentType: 'contract'|'amendment', documentId, documentLabel, amendmentData? }
+  var [sendSignaturePayload, setSendSignaturePayload] = useState(null)
   var [contractAmendments, setContractAmendments] = useState([])
   var signedFileInputRef = useRef(null)
   var avenantSignedInputRef = useRef(null)
@@ -1200,29 +1204,77 @@ export default function EmployeeDetail(props) {
                           })}
 
                           {/* Avenant brouillon en cours (à signer) */}
-                          {avenantBrouillon ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: "1px dashed #DDD" }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: "#FF82D7" }}>📝 Avenant en cours</span>
-                              <span style={{ fontSize: 10, color: "#666", fontStyle: "italic" }}>· à faire signer</span>
-                              <div style={{ marginLeft: "auto", display: "flex", gap: 4, flexWrap: "wrap" }}>
-                                <button
-                                  className="btn btn-sm btn-y"
-                                  onClick={function () { openContractDoc(avenantBrouillon) }}
-                                >📄 Ouvrir</button>
-                                <button
-                                  className="btn btn-sm"
-                                  onClick={function () { triggerAvenantSignedUpload(c) }}
-                                  title="Uploader le PDF/scan de l'avenant signé par le salarié"
-                                >📥 Uploader signé</button>
-                                <button
-                                  className="btn btn-sm"
-                                  disabled={isGenerating}
-                                  onClick={function () { if (confirm("Régénérer l'avenant ? La version brouillon actuelle sera remplacée.")) generateAmendment(c) }}
-                                  title="Régénérer le brouillon (l'ancien sera remplacé, les avenants déjà signés ne sont pas touchés)"
-                                >{isGenerating ? "⏳ Génération..." : "🔄 Régénérer"}</button>
+                          {avenantBrouillon ? (() => {
+                            // 🔥 Sprint C2B : retrouver l'amendment lié pour récup signature_status
+                            var pendingAmendment = (contractAmendments || []).filter(function (a) {
+                              return a.contract_id === c.id && !a.signed_at
+                            }).sort(function (a, b) {
+                              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                            })[0]
+                            var sigStatus = pendingAmendment ? pendingAmendment.signature_status : "unsent"
+                            // Badge statut signature
+                            var statusBadge = null
+                            if (sigStatus === "sent") {
+                              statusBadge = <span style={{ fontSize: 10, fontWeight: 700, background: "#FFEB5A", color: "#191923", padding: "2px 6px", borderRadius: 3 }}>📧 Envoyé</span>
+                            } else if (sigStatus === "viewed") {
+                              statusBadge = <span style={{ fontSize: 10, fontWeight: 700, background: "#FFEB5A", color: "#191923", padding: "2px 6px", borderRadius: 3 }}>👁 Vu</span>
+                            } else if (sigStatus === "signed") {
+                              statusBadge = <span style={{ fontSize: 10, fontWeight: 700, background: "#16A34A", color: "#FFFFFF", padding: "2px 6px", borderRadius: 3 }}>✅ Signé</span>
+                            }
+                            // Le bouton "Envoyer pour signature" n'apparaît que si unsent (1er envoi)
+                            // En cas de sent/viewed, on l'enlève pour éviter les renvois accidentels (option : relance dans une prochaine itération)
+                            var canSend = pendingAmendment && (sigStatus === "unsent" || sigStatus === "expired" || sigStatus === "declined")
+                            // Libellé du document pour la modal
+                            var docLabel = "Avenant"
+                            if (pendingAmendment) {
+                              var typeLabels: any = {
+                                regularisation_welcome_pack: "Avenant — Mise en conformité réglementaire",
+                                augmentation_salaire: "Avenant — Modification de la rémunération",
+                                modification_horaires: "Avenant — Modification des horaires",
+                                changement_poste: "Avenant — Changement de poste",
+                                prolongation_duree: "Avenant — Prolongation de la durée",
+                                autre: "Avenant"
+                              }
+                              docLabel = typeLabels[pendingAmendment.amendment_type] || "Avenant"
+                            }
+                            return (
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: "1px dashed #DDD" }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: "#FF82D7" }}>📝 Avenant en cours</span>
+                                {statusBadge ? statusBadge : <span style={{ fontSize: 10, color: "#666", fontStyle: "italic" }}>· à faire signer</span>}
+                                <div style={{ marginLeft: "auto", display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                  <button
+                                    className="btn btn-sm btn-y"
+                                    onClick={function () { openContractDoc(avenantBrouillon) }}
+                                  >📄 Ouvrir</button>
+                                  {canSend ? (
+                                    <button
+                                      className="btn btn-sm"
+                                      style={{ background: "#FF82D7", color: "#FFFFFF", border: "1.5px solid #FF82D7", fontWeight: 700 }}
+                                      onClick={function () {
+                                        setSendSignaturePayload({
+                                          documentType: "amendment",
+                                          documentId: pendingAmendment.id,
+                                          documentLabel: docLabel,
+                                        })
+                                      }}
+                                      title="Envoyer cet avenant au salarié par email pour signature électronique"
+                                    >📧 Envoyer pour signature</button>
+                                  ) : null}
+                                  <button
+                                    className="btn btn-sm"
+                                    onClick={function () { triggerAvenantSignedUpload(c) }}
+                                    title="Uploader le PDF/scan de l'avenant signé par le salarié (signature papier)"
+                                  >📥 Uploader signé</button>
+                                  <button
+                                    className="btn btn-sm"
+                                    disabled={isGenerating}
+                                    onClick={function () { if (confirm("Régénérer l'avenant ? La version brouillon actuelle sera remplacée.")) generateAmendment(c) }}
+                                    title="Régénérer le brouillon (l'ancien sera remplacé, les avenants déjà signés ne sont pas touchés)"
+                                  >{isGenerating ? "⏳ Génération..." : "🔄 Régénérer"}</button>
+                                </div>
                               </div>
-                            </div>
-                          ) : null}
+                            )
+                          })() : null}
 
                           {/* Pas de brouillon en cours : toujours offrir la génération
                               (qu'il y ait déjà un avenant signé obsolète ou rien du tout) */}
@@ -1657,6 +1709,29 @@ export default function EmployeeDetail(props) {
           onClose={function () { setHistUploadFor(null) }}
           onSuccess={function (msg) {
             setHistUploadFor(null)
+            if (props.onSaved) props.onSaved(msg)
+            load()
+          }}
+        />
+      ) : null}
+
+      {/* 🔥 Sprint C2B === MODAL ENVOI POUR SIGNATURE ÉLECTRONIQUE === */}
+      {sendSignaturePayload && emp ? (
+        <SendSignatureModal
+          documentType={sendSignaturePayload.documentType}
+          documentId={sendSignaturePayload.documentId}
+          documentLabel={sendSignaturePayload.documentLabel}
+          employee={{
+            id: emp.id,
+            prenom: emp.prenom || "",
+            nom: emp.nom || "",
+            email: emp.email || null,
+            civilite: emp.civilite || null,
+            welcome_pack_signed: emp.welcome_pack_signed === true,
+          }}
+          onClose={function () { setSendSignaturePayload(null) }}
+          onSent={function (msg) {
+            setSendSignaturePayload(null)
             if (props.onSaved) props.onSaved(msg)
             load()
           }}
