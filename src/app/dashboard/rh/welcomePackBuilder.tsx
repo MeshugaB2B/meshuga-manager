@@ -1160,17 +1160,15 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
             '</div>' +
             '<div style="margin-top: 2mm; font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; font-size: 11pt; text-align: center;">' + esc(sigActive ? sigFullName : 'Edward TOURET') + '</div>' +
             '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-size: 11pt; text-align: center; opacity: 0.7; letter-spacing: 0.5px;">Président · SAS AEGIA FOOD</div>' +
-            // 🔥 Cartouche audit : visible uniquement si mandat actif
+            // 🔥 Cartouche audit : visible uniquement si mandat actif (Helvetica, foncé, structure label/valeur, aligné à gauche)
             (sigActive
-              ? '<div style="margin-top: 3mm; padding-top: 2mm; border-top: 1px dashed rgba(25,25,35,0.25); font-size: 8.5pt; line-height: 1.5; color: #777777; font-style: italic; text-align: center;">' +
-                'Signature électronique apposée par <b style="font-style: normal; color: #555;">mandat permanent</b>' +
-                (sigActivatedDate ? ' activé le <b style="font-style: normal; color: #555;">' + esc(sigActivatedDate) + '</b>' : '') +
-                (sigIp ? ' · IP <b style="font-style: normal; color: #555;">' + esc(sigIp) + '</b>' + (sigCountry ? ' (' + esc(sigCountry) + ')' : '') : '') +
-                (sigHashShort ? '<br>Hash SHA-256 du consentement&nbsp;: <span style="font-family: monospace; font-style: normal; color: #555;">' + esc(sigHashShort) + '…</span>' : '') +
-                '<br><span style="font-style: normal;">Signature électronique simple au sens de l\'art. 1367 du Code civil</span>' +
-                '<br><span style="font-style: normal;">et du règlement eIDAS UE n° 910/2014, art. 25.</span>' +
-                '<br><span style="font-style: normal;">Force probante équivalente à la signature manuscrite (art. 1366 C. civ.).</span>' +
-                '<br><span style="font-style: normal;">Audit trail horodaté conservé.</span>' +
+              ? '<div style="margin-top: 3mm; padding-top: 2mm; border-top: 1px dashed rgba(25,25,35,0.25); font-family: \'Helvetica Neue\', Helvetica, Arial, sans-serif; font-size: 8.5pt; line-height: 1.65; color: #555; text-align: left;">' +
+                '<div><b style="color: #2c2c2c; font-weight: 600;">Mandat permanent&nbsp;:</b> activé' + (sigActivatedDate ? ' le ' + esc(sigActivatedDate) : '') + '</div>' +
+                (sigIp ? '<div><b style="color: #2c2c2c; font-weight: 600;">IP&nbsp;:</b> ' + esc(sigIp) + (sigCountry ? ' (' + esc(sigCountry) + ')' : '') + '</div>' : '') +
+                (sigHashShort ? '<div><b style="color: #2c2c2c; font-weight: 600;">Hash SHA-256&nbsp;:</b> <span style="font-family: \'SF Mono\', \'Consolas\', \'Courier New\', monospace; font-size: 8pt;">' + esc(sigHashShort) + '…</span></div>' : '') +
+                '<div><b style="color: #2c2c2c; font-weight: 600;">Référence légale&nbsp;:</b> art. 1367 C. civ. + eIDAS UE 910/2014, art. 25</div>' +
+                '<div><b style="color: #2c2c2c; font-weight: 600;">Force probante&nbsp;:</b> équivalente à la signature manuscrite (art. 1366 C. civ.)</div>' +
+                '<div><b style="color: #2c2c2c; font-weight: 600;">Audit trail&nbsp;:</b> horodaté et conservé</div>' +
                 '</div>'
               : ''
             ) +
