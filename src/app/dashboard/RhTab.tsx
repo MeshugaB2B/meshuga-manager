@@ -800,15 +800,49 @@ function WelcomePackPreview(props) {
   useEffect(function () {
     var run = async function () {
       var resE = await supabase.from("hr_employees").select("*").eq("id", props.employeeId).single()
-      var resC = await supabase
+      // 🔥 Edward 21/05 : Fix critique — récup contrats via employee_id ET cycle_id
+      // (les contrats peuvent être liés via l'un ou l'autre selon l'historique de création).
+      // Puis priorité absolue à is_current=true pour ne pas tomber sur un contrat obsolète.
+      var resDirect = await supabase
         .from("hr_contracts")
         .select("*")
         .eq("employee_id", props.employeeId)
-        .order("created_at", { ascending: false })
-      // Priorité : non-archivé le plus récent, sinon le tout dernier
-      var contractsArr = resC.data || []
-      var active = contractsArr.filter(function (c) { return c.status !== "archived" })
-      var pick = active.length > 0 ? active[0] : (contractsArr[0] || null)
+      // Trouver tous les cycle_id du salarié
+      var resCycles = await supabase
+        .from("hr_employment_cycles")
+        .select("id")
+        .eq("employee_id", props.employeeId)
+      var cycleIds = (resCycles.data || []).map(function (cy) { return cy.id })
+      var resViaCycle = { data: [] }
+      if (cycleIds.length > 0) {
+        resViaCycle = await supabase
+          .from("hr_contracts")
+          .select("*")
+          .in("cycle_id", cycleIds)
+      }
+      // Fusionner + dédoublonner par id
+      var allContracts = [].concat(resDirect.data || [], resViaCycle.data || [])
+      var seen = {}
+      var contractsArr = []
+      for (var k = 0; k < allContracts.length; k++) {
+        var cc = allContracts[k]
+        if (cc && cc.id && !seen[cc.id]) {
+          seen[cc.id] = true
+          contractsArr.push(cc)
+        }
+      }
+      // Priorité de sélection : is_current=true > status non-archived > plus récent
+      contractsArr.sort(function (a, b) {
+        if (a.is_current === true && b.is_current !== true) return -1
+        if (a.is_current !== true && b.is_current === true) return 1
+        var aArchived = a.status === "archived" ? 1 : 0
+        var bArchived = b.status === "archived" ? 1 : 0
+        if (aArchived !== bArchived) return aArchived - bArchived
+        var ta = a.created_at ? new Date(a.created_at).getTime() : 0
+        var tb = b.created_at ? new Date(b.created_at).getTime() : 0
+        return tb - ta
+      })
+      var pick = contractsArr[0] || null
       setEmp(resE.data || {})
       setContract(pick)
       setLoaded(true)
