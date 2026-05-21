@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { buildAvenant } from '@/app/dashboard/rh/amendmentBuilder'
+import { loadEmployerSignature } from '@/app/dashboard/rh/employerSignature'
 import { LOGO_PINK } from '@/app/dashboard/logos'
 
 export var runtime = 'nodejs'
@@ -188,7 +189,9 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       motif: motif,
       created_at: new Date().toISOString()
     }
-    var html = buildAvenant(amendmentSnapshot, futureContract, emp, vacsForRendering, LOGO_PINK, previousValues)
+    // 🔥 Charger la signature pré-enregistrée d'Edward (mandat permanent)
+    var employerSig = await loadEmployerSignature()
+    var html = buildAvenant(amendmentSnapshot, futureContract, emp, vacsForRendering, LOGO_PINK, previousValues, employerSig)
     
     // 8) PREVIEW : retourne juste le HTML
     if (preview) {
@@ -434,7 +437,9 @@ export async function GET(req: Request, ctx: { params: { id: string } }) {
       })
     }
     
-    var html = buildAvenant(amendment, contract, emp, vacs, LOGO_PINK, previousValues)
+    // 🔥 Charger la signature pré-enregistrée d'Edward (mandat permanent)
+    var employerSig2 = await loadEmployerSignature()
+    var html = buildAvenant(amendment, contract, emp, vacs, LOGO_PINK, previousValues, employerSig2)
     
     return new NextResponse(html, {
       status: 200,
