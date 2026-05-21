@@ -13,6 +13,8 @@ import {
   esc,
 } from '@/app/dashboard/rh/contractBuilders'
 import { LOGO_PINK } from '@/app/dashboard/logos'
+// 🔥 Sprint Y1 : signature électronique pré-enregistrée d'Edward (mandat permanent)
+import { loadEmployerSignature } from '@/app/dashboard/rh/employerSignature'
 
 export var runtime = 'nodejs'
 
@@ -75,7 +77,8 @@ function buildHtml(data: any): string {
       ville_signature: data.ville_signature || 'Paris',
     },
     emp,
-    fonction
+    fonction,
+    data.employerSig || null  // 🔥 Sprint Y1 : signature Edward (null si mandat inactif)
   )
 
   return wrapHtml({
@@ -98,6 +101,10 @@ export async function POST(req: Request) {
     var resC = await admin.from('hr_contracts').select('*').eq('id', body.contract_id).single()
     if (resC.error || !resC.data) return NextResponse.json({ error: 'contrat introuvable' }, { status: 404 })
 
+    // 🔥 Sprint Y1 : charger la signature pré-enregistrée d'Edward (mandat permanent)
+    // Si mandat inactif/absent → null → fallback "cachet · SAS AEGIA" (bloc historique)
+    var employerSig = await loadEmployerSignature()
+
     var html = buildHtml({
       employee: resE.data,
       contract: resC.data,
@@ -107,6 +114,7 @@ export async function POST(req: Request) {
       ville_signature: body.ville_signature,
       date_signature: body.date_signature,
       logoUri: LOGO_PINK,
+      employerSig: employerSig,  // 🔥 Sprint Y1 : injection signature Edward
     })
 
     // Si save=true : sauvegarder l'avenant dans Storage + créer row hr_contract_documents
