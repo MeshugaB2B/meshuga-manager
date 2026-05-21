@@ -132,6 +132,7 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
     augmentation_salaire: "Modification de la rémunération",
     modification_horaires: "Modification de la durée du travail",
     changement_poste: "Modification des fonctions",
+    regularisation_welcome_pack: "Mise en conformité réglementaire & dossier de bienvenue",
     autre: "Modification contractuelle"
   }
   var sousTitre = titleByType[amendment.amendment_type] || "Modification contractuelle"
@@ -268,6 +269,115 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
           : '')
       + '</tbody></table>'
       + (amendment.motif ? ('<p style="background:#FFF9E5;padding:10px 14px;border-left:3px solid #FFEB5A;margin:10px 0;"><em><strong>Motif / précisions :</strong> ' + esc(amendment.motif) + '</em></p>') : '')
+      + '</div>'
+    artCounter++
+  }
+  else if (amendment.amendment_type === "regularisation_welcome_pack") {
+    // ============================================================
+    // 🆕 AVENANT DE RÉGULARISATION — MISE EN CONFORMITÉ
+    // ============================================================
+    // Type d'avenant créé pour mettre à jour les contrats des salariés
+    // existants (Emy, Darell, Esther, Sivanathan, Partheepan) avec :
+    //  - le Dossier de bienvenue Meshuga (annexé)
+    //  - la règle anti-accumulation des congés payés
+    //  - l'acceptation explicite vidéosurveillance + RGPD
+    //  - la politique anti-harcèlement
+    //  - la clause de confidentialité basique
+    //  - la tenue de travail
+    // Le contrat initial reste intégralement en vigueur — l'avenant
+    // ne fait QU'AJOUTER des clauses, jamais modifier les existantes.
+    // ============================================================
+    var effDateR = fmtDateFR(amendment.effective_date)
+    
+    articles += ''
+      + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Objet de l\'avenant : mise en conformité réglementaire</span></div>'
+      + '<div class="body">'
+      + '<p>Le présent avenant a pour <strong>seul objet la mise en conformité du contrat de travail</strong> avec les évolutions réglementaires et les règles internes en vigueur chez Meshuga.</p>'
+      + '<p>Il <strong>complète</strong> le contrat initial sans en modifier les clauses essentielles (rémunération, durée, fonction, lieu de travail), qui restent inchangées.</p>'
+      + '<p>Il prend effet à compter du <strong>' + esc(effDateR) + '</strong>.</p>'
+      + '</div>'
+    artCounter++
+
+    // ARTICLE 2 — DOSSIER DE BIENVENUE
+    articles += ''
+      + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Reconnaissance du Dossier de bienvenue Meshuga</span></div>'
+      + '<div class="body">'
+      + '<p>Le/La Salarié(e) reconnaît avoir reçu, lu et compris le <strong>Dossier de bienvenue Meshuga</strong> annexé au présent avenant.</p>'
+      + '<p>Ce dossier de bienvenue, comportant <strong>13 pages</strong>, présente l\'ensemble des règles applicables au sein de l\'entreprise : durée du travail, rémunération, congés payés, hygiène, sécurité, vidéosurveillance, RGPD, charte numérique, tenue, comportement et engagement.</p>'
+      + '<p><strong>Le Dossier de bienvenue forme partie intégrante du présent avenant</strong> et fait foi en cas de litige sur les règles internes applicables.</p>'
+      + '</div>'
+    artCounter++
+
+    // ARTICLE 3 — CONGÉS PAYÉS (LA GROSSE PIÈCE)
+    articles += ''
+      + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Règles relatives aux congés payés</span></div>'
+      + '<div class="body">'
+      + '<p><strong>(a) Acquisition.</strong> Le/La Salarié(e) acquiert <strong>2,5 jours ouvrables de congés payés par mois de travail effectif</strong> (30 jours ouvrables / 5 semaines par an), conformément à l\'article L3141-3 du Code du travail.</p>'
+      + '<p><strong>(b) Période de référence et de prise.</strong></p>'
+      + '<ul style="margin: 6px 0 10px 20px; padding: 0;">'
+      +   '<li>Période de référence (acquisition) : <strong>du 1er juin N au 31 mai N+1</strong>.</li>'
+      +   '<li>Période de prise (utilisation) : <strong>du 1er juin N+1 au 31 mai N+2</strong>.</li>'
+      + '</ul>'
+      + '<p><strong>(c) Obligation de prise et étalement.</strong> Le/La Salarié(e) s\'engage à <strong>poser et prendre effectivement ses congés payés sur la période de prise</strong>, de manière <strong>étalée tout au long de l\'année</strong> et dans le respect des nécessités de service. Le cumul excessif de jours non posés est expressément <strong>contraire aux règles internes Meshuga</strong>.</p>'
+      + '<p><strong>(d) Délai de prévenance.</strong> Toute demande de congé doit être adressée à l\'employeur <strong>au moins un (1) mois avant la date souhaitée</strong> (sauf urgence justifiée). L\'employeur répond sous 8 jours.</p>'
+      + '<p><strong>(e) Validation employeur.</strong> L\'employeur conserve, dans l\'intérêt du service, le droit de refuser, déplacer ou modifier une demande, par décision motivée. L\'ordre des départs tient compte de l\'ancienneté, des charges de famille et des contraintes des conjoints, conformément à l\'article L3141-15 du Code du travail.</p>'
+      + '<p><strong>(f) Conséquences en cas de non-prise au 31 mai.</strong> Les congés non posés à l\'issue de la période de prise sont, en principe, <strong>définitivement perdus</strong>. Cette perte n\'est pas opposable au/à la Salarié(e) dans les cas suivants&nbsp;: arrêt maladie, accident du travail, maladie professionnelle (loi DDADUE n° 2024-364 du 22 avril 2024), congé maternité, paternité, adoption, parental, ou impossibilité résultant du fait de l\'employeur.</p>'
+      + '<p><strong>(g) Obligation d\'information de l\'employeur.</strong> Conformément à la jurisprudence de la Cour de cassation (Cass. Soc. 13 novembre 2025 n° 24-14084, Cass. Soc. 10 septembre 2025 n° 23-22732), l\'employeur s\'engage à informer le/la Salarié(e) :</p>'
+      + '<ul style="margin: 6px 0 10px 20px; padding: 0;">'
+      +   '<li>du solde de congés sur <strong>chaque bulletin de paie mensuel</strong>&nbsp;;</li>'
+      +   '<li>par <strong>email avec accusé chaque 1er avril</strong> si son solde excède 5 jours, avec rappel de la date limite du 31 mai&nbsp;;</li>'
+      +   '<li>en cas de retour d\'arrêt long, dans le mois suivant la reprise, de son solde et de la date limite de report.</li>'
+      + '</ul>'
+      + '<p><strong>(h) Indemnité compensatrice.</strong> En cas de rupture du contrat, une indemnité compensatrice est versée pour les congés acquis non pris, conformément à l\'article L3141-28 du Code du travail.</p>'
+      + '</div>'
+    artCounter++
+
+    // ARTICLE 4 — VIDÉOSURVEILLANCE & RGPD
+    articles += ''
+      + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Acceptation de la vidéosurveillance et information RGPD</span></div>'
+      + '<div class="body">'
+      + '<p>Le/La Salarié(e) reconnaît avoir été <strong>informé(e) préalablement et individuellement</strong>, par le Dossier de bienvenue annexé, de la mise en place du dispositif de vidéosurveillance dans l\'établissement Meshuga (3 rue Vavin, 75006 Paris), conformément aux articles L1121-1 et L1222-4 du Code du travail et à l\'article 13 du RGPD.</p>'
+      + '<p>Le/La Salarié(e) reconnaît avoir pris connaissance des <strong>finalités déclarées</strong> du dispositif (sécurité des biens et personnes, lutte contre le vol, traçabilité HACCP), des <strong>caractéristiques techniques</strong> (2 caméras, conservation locale 30 jours maximum, pas de visionnage temps réel) et de ses <strong>droits RGPD</strong> (accès, rectification, effacement, opposition, réclamation CNIL).</p>'
+      + '<p>Le/La Salarié(e) accepte ce dispositif et reconnaît qu\'il ne porte pas une atteinte disproportionnée à sa vie privée, eu égard aux finalités légitimes poursuivies et aux garanties mises en place.</p>'
+      + '</div>'
+    artCounter++
+
+    // ARTICLE 5 — POLITIQUE ANTI-HARCÈLEMENT
+    articles += ''
+      + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Politique anti-harcèlement et anti-discrimination</span></div>'
+      + '<div class="body">'
+      + '<p>Le/La Salarié(e) reconnaît avoir été informé(e) de la <strong>politique de tolérance zéro</strong> appliquée chez Meshuga en matière de harcèlement moral, harcèlement sexuel, agissements sexistes et discrimination, conformément aux articles L1152-1 et suivants, L1153-1 et suivants, et L1132-1 du Code du travail.</p>'
+      + '<p><strong>Référent harcèlement Meshuga</strong>&nbsp;: <strong>Edward TOURET</strong>, Président SAS AEGIA FOOD — edward@meshuga.fr — 06 58 58 58 01.</p>'
+      + '<p>Le/La Salarié(e) s\'engage à signaler tout fait dont il/elle serait témoin ou victime, dans l\'esprit de protection mutuelle des membres de l\'équipe. Il/Elle est informé(e) de la <strong>protection contre toute sanction</strong> en cas de signalement de bonne foi (article L1152-2 du Code du travail).</p>'
+      + '</div>'
+    artCounter++
+
+    // ARTICLE 6 — TENUE DE TRAVAIL
+    articles += ''
+      + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Tenue de travail et temps d\'habillage</span></div>'
+      + '<div class="body">'
+      + '<p>L\'employeur fournit gratuitement au/à la Salarié(e) l\'<strong>uniforme Meshuga complet</strong> (haut, bas, tablier, charlotte, chaussures de sécurité antidérapantes), conformément aux articles R4321-4 du Code du travail et au Règlement (CE) 852/2004 (paquet hygiène).</p>'
+      + '<p>Le port intégral de l\'uniforme est <strong>obligatoire pendant tout le service</strong>. Tout équipement endommagé est remplacé gratuitement.</p>'
+      + '<p>Le <strong>temps d\'habillage et de déshabillage</strong> en uniforme est compris dans le temps de travail effectif à hauteur de 5 minutes au début et 5 minutes à la fin de chaque service, conformément à l\'article L3121-3 du Code du travail.</p>'
+      + '</div>'
+    artCounter++
+
+    // ARTICLE 7 — CONFIDENTIALITÉ
+    articles += ''
+      + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Obligation de confidentialité et de loyauté</span></div>'
+      + '<div class="body">'
+      + '<p>Le/La Salarié(e) s\'engage, pendant la durée de son contrat et après sa rupture, à <strong>ne pas divulguer à des tiers ni utiliser à des fins personnelles ou concurrentielles</strong> les informations confidentielles dont il/elle aurait connaissance dans le cadre de son activité, notamment&nbsp;: <strong>recettes Meshuga, identité et conditions tarifaires des fournisseurs, chiffres d\'affaires, listes clients B2B, données salariés, plans stratégiques, processus internes</strong>.</p>'
+      + '<p>Cette obligation découle de l\'<strong>obligation générale de loyauté du salarié</strong> (article L1222-1 du Code du travail) et constitue un <strong>élément essentiel du présent avenant</strong>. Toute violation pourra engager la responsabilité civile et, le cas échéant, pénale du/de la Salarié(e).</p>'
+      + '<p>Cette clause de confidentialité ne constitue <strong>pas une clause de non-concurrence</strong> et n\'empêche pas le/la Salarié(e) d\'exercer une activité professionnelle similaire après la rupture du contrat.</p>'
+      + '</div>'
+    artCounter++
+
+    // ARTICLE 8 — CHARTE NUMÉRIQUE
+    articles += ''
+      + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Charte numérique et droit à la déconnexion</span></div>'
+      + '<div class="body">'
+      + '<p>Le/La Salarié(e) reconnaît avoir pris connaissance de la <strong>Charte numérique Meshuga</strong> figurant dans le Dossier de bienvenue annexé&nbsp;: règles d\'usage du téléphone personnel pendant le service (autorisé en pause uniquement), confidentialité des réseaux sociaux, sécurité des outils numériques.</p>'
+      + '<p>Le/La Salarié(e) est informé(e) de son <strong>droit absolu à la déconnexion</strong> en dehors de ses heures de travail, conformément à l\'article L2242-17, 7° du Code du travail. Aucune sanction ne pourra être prise au motif que le/la Salarié(e) n\'aurait pas répondu à une sollicitation hors temps de travail.</p>'
       + '</div>'
     artCounter++
   }
