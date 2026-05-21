@@ -206,6 +206,7 @@ export async function POST(
   // === 11. Envoyer l'email via Brevo ===
   var sendResult = await sendBrevoEmail({
     to: [{ email: recipientEmail, name: empStatus.prenom + " " + empStatus.nom }],
+    bcc: [{ email: "edward@meshuga.fr", name: "Edward Touret" }],  // 🔥 Copie cachée pour vérification + archivage
     subject: emailContent.subject,
     htmlContent: emailContent.htmlContent,
     textContent: emailContent.textContent,
