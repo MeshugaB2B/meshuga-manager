@@ -1,8 +1,16 @@
 // Builder du template HTML pour un avenant
 // Réutilise les blocs partagés de contractBuilders.tsx (CSS, header, wrap)
 // Signatures custom : utilise amendment.signature_date (pas contract.date_signature du contrat initial)
+//
+// 🔥 Sprint Y1 — Signature électronique custom :
+//   buildAvenant accepte un paramètre optionnel `employerSig` (EmployerSignature | null)
+//   - Si fourni → bloc signature Edward stylisé + cartouche audit
+//   - Si null/absent → fallback bloc "cachet · SAS AEGIA" classique
+//   → 100% rétro-compatible avec les appels existants
 
 import { esc, buildSharedHeader, buildSharedCss, wrapHtml } from "./contractBuilders"
+import { renderEmployerSignatureBlock, renderEmployeeSignatureBlockEmpty } from "./employerSignature"
+import type { EmployerSignature } from "./employerSignature"
 
 // Format date FR long ("vendredi 22 mai 2026")
 function fmtDateFR(d: any) {
@@ -15,7 +23,8 @@ function fmtDateFR(d: any) {
 // 🔥 Signatures spéciales pour l'avenant : utilise la date de signature de l'AVENANT
 // (pas celle du contrat initial)
 // Si signatureDate est vide/null/undefined → fallback sur la date du jour (jour d'impression)
-function buildAvenantSignatures(contract: any, emp: any, signatureDate: string, salarieRole: string): string {
+// employerSig (optionnel) → injecte la signature pré-enregistrée d'Edward
+function buildAvenantSignatures(contract: any, emp: any, signatureDate: string, salarieRole: string, employerSig?: EmployerSignature | null): string {
   var civilite = emp.civilite || "Madame"
   var feminin = (civilite === "Madame" || civilite === "Mademoiselle")
   
@@ -23,6 +32,12 @@ function buildAvenantSignatures(contract: any, emp: any, signatureDate: string, 
   var effectiveSigDate = signatureDate || new Date().toISOString().slice(0, 10)
   var dateSig = new Date(String(effectiveSigDate).slice(0, 10) + 'T12:00:00').toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
   var ville = contract.ville_signature || "Paris"
+
+  // 🔥 Bloc signature Employeur via helper (rétro-compatible)
+  var employerBlock = renderEmployerSignatureBlock(employerSig || null)
+
+  // Bloc signature Salarié : zone vide
+  var employeeBlock = renderEmployeeSignatureBlockEmpty(emp.prenom || "", emp.nom || "", salarieRole, feminin)
 
   return ''
     + '<section class="sig-section">'
@@ -32,15 +47,10 @@ function buildAvenantSignatures(contract: any, emp: any, signatureDate: string, 
     + '<div class="sig-grid">'
     + '<div class="sig-block">'
     + '<div class="sig-head">Pour l\'Employeur</div>'
-    + '<div class="sig-id"><div class="name">AEGIA FOOD</div><div class="role">SAS AEGIA, Présidente<br>représentée par Edward TOURET, Président</div></div>'
-    + '<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé »</div>'
-    + '<div class="sig-foot" style="display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-family:Yellowtail,cursive;font-size:14px;color:#FF82D7">cachet</span><span style="opacity:.5">·</span><span style="font-style:italic">SAS AEGIA</span></div>'
+    + employerBlock
     + '</div>'
     + '<div class="sig-block">'
-    + '<div class="sig-head">' + (feminin ? "La Salariée" : "Le Salarié") + '</div>'
-    + '<div class="sig-id"><div class="name">' + esc(emp.prenom || "") + ' ' + esc((emp.nom || "").toUpperCase()) + '</div><div class="role">' + esc(salarieRole || "&nbsp;") + '</div></div>'
-    + '<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé »</div>'
-    + '<div class="sig-foot">Date : __ / __ / ____</div>'
+    + employeeBlock
     + '</div>'
     + '</div></section>'
     + '</div></body></html>'
@@ -101,8 +111,9 @@ function buildPlanningTable(vacs: any[]) {
  * @param vacs      - vacations (existantes + nouvelles selon le cas)
  * @param logoUri   - logo data URI
  * @param previousValues - valeurs AVANT modification (pour diff avant/après)
+ * @param employerSig    - 🔥 Sprint Y1 : signature électronique pré-enregistrée d'Edward (optionnel)
  */
-export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[], logoUri: string, previousValues: any) {
+export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[], logoUri: string, previousValues: any, employerSig?: EmployerSignature | null) {
   var prev = previousValues || {}
   var safeVacs = vacs || []
   var amendmentNumStr = "N°" + (amendment.amendment_number || 1)
@@ -296,7 +307,8 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   
   // 🔥 Signatures custom : utilise la date de signature de L'AVENANT (pas du contrat initial)
   // amendment.signature_date est ajouté par le modal et l'API
-  var signatures = buildAvenantSignatures(contract, emp, amendment.signature_date, contract.fonction || "")
+  // employerSig (optionnel) injecte la signature pré-enregistrée d'Edward
+  var signatures = buildAvenantSignatures(contract, emp, amendment.signature_date, contract.fonction || "", employerSig || null)
   
   return wrapHtml({
     titre: "Avenant " + amendmentNumStr + " Meshuga — " + (emp ? (emp.prenom + " " + emp.nom) : "—"),
