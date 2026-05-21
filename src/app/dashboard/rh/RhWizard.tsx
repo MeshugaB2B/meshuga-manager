@@ -286,6 +286,7 @@ export default function RhWizard(props) {
     if (contract.missions_blocks && contract.missions_blocks.length) return // déjà rempli
     var defaults = []
     if (contract.type === "cdi_cadre") defaults = MISSIONS_CADRE_DEFAULT
+    else if (contract.type === "cdi_agent_maitrise") defaults = MISSIONS_CADRE_DEFAULT
     else if (contract.type === "cdi_cuisinier") defaults = MISSIONS_CUISINIER
     else if (contract.type === "cdi_caissier") defaults = MISSIONS_CAISSIER
     if (defaults.length) {
@@ -1183,7 +1184,7 @@ function Step2CdiPosition(props) {
         <label className="lbl">Fonction (intitulé du poste)</label>
         <input className="inp" value={contract.fonction}
           onChange={function (e) { setContract(Object.assign({}, contract, { fonction: e.target.value })) }}
-          placeholder={contract.type === "cdi_cadre" ? "Responsable des Opérations et du Développement" : (contract.type === "cdi_cuisinier" ? "Cuisinier(ère)" : "Caissier(ère) / Équipier(ère)")} />
+          placeholder={contract.type === "cdi_cadre" ? "Directeur(trice) / Cadre dirigeant" : (contract.type === "cdi_agent_maitrise" ? "Responsable des Opérations et du Développement" : (contract.type === "cdi_cuisinier" ? "Cuisinier(ère)" : "Caissier(ère) / Équipier(ère)"))} />
       </div>
 
       <div className="ct" style={{ marginTop: 14 }}>Classification CCN 1501</div>
@@ -1382,8 +1383,8 @@ function Step3CdiSalary(props) {
         </div>
       )}
 
-      {/* Intéressement (uniquement Cadre) */}
-      {contract.type === "cdi_cadre" && (
+      {/* Intéressement (Cadre et Agent de maîtrise) */}
+      {(contract.type === "cdi_cadre" || contract.type === "cdi_agent_maitrise") && (
         <div style={{ marginTop: 18 }}>
           <div className="ct">Intéressement variable (optionnel)</div>
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 8 }}>
