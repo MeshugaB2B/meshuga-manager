@@ -1386,13 +1386,24 @@ export default function EmployeeDetail(props) {
                   augmentation_salaire: { icon: "💰", label: "Modification rémunération" },
                   modification_horaires: { icon: "🕐", label: "Modification horaires" },
                   changement_poste: { icon: "👔", label: "Changement de poste" },
+                  regularisation_welcome_pack: { icon: "⚖", label: "Mise en conformité réglementaire" },
                   autre: { icon: "📝", label: "Autre modification" }
                 }
                 var meta = typeLabels[a.amendment_type] || typeLabels.autre
                 var contractRef = contracts.filter(function(c: any){ return c.id === a.contract_id })[0]
                 var contractLabel = contractRef ? (
-                  contractRef.type === "extra" ? "CDD Extra" : (contractRef.type || "").replace("cdi_", "CDI ")
+                  contractRef.type === "extra" ? "CDD Extra" : (contractRef.type || "").replace("cdi_", "CDI ").replace("agent_maitrise", "Agent de maîtrise")
                 ) : ""
+                // 🔥 Sprint C2B : badge signature_status + bouton Envoyer pour signature
+                var sigStatus = a.signature_status || "unsent"
+                var sigBadge: any = null
+                if (sigStatus === "sent") sigBadge = { bg: "#FFEB5A", color: "#191923", text: "📧 Envoyé" }
+                else if (sigStatus === "viewed") sigBadge = { bg: "#FFEB5A", color: "#191923", text: "👁 Vu" }
+                else if (sigStatus === "signed") sigBadge = { bg: "#16A34A", color: "#FFFFFF", text: "✅ Signé" }
+                // Conditions pour afficher le bouton d'envoi
+                var canSendForSignature = !a.signed_at && (sigStatus === "unsent" || sigStatus === "expired" || sigStatus === "declined")
+                // Libellé pour la modal
+                var amendmentDocLabel = "Avenant n°" + a.amendment_number + " — " + meta.label
                 return (
                   <div key={a.id} style={{
                     background: "#FAFAFA",
@@ -1426,21 +1437,33 @@ export default function EmployeeDetail(props) {
                         </div>
                       ) : null}
                     </div>
-                    <span style={{
-                      padding: "2px 8px",
-                      background: a.status === "signed" ? "#16A34A" : a.status === "finalized" ? "#FFA500" : "#999",
-                      color: "white",
-                      borderRadius: 10,
-                      fontSize: 10,
-                      fontWeight: 900
-                    }}>
-                      {a.status === "signed" ? "SIGNÉ" : a.status === "finalized" ? "FINALISÉ" : "BROUILLON"}
-                    </span>
+                    {/* Badge statut signature ou état avenant */}
+                    {sigBadge ? (
+                      <span style={{
+                        padding: "2px 8px",
+                        background: sigBadge.bg,
+                        color: sigBadge.color,
+                        borderRadius: 10,
+                        fontSize: 10,
+                        fontWeight: 900
+                      }}>{sigBadge.text}</span>
+                    ) : (
+                      <span style={{
+                        padding: "2px 8px",
+                        background: a.status === "signed" ? "#16A34A" : a.status === "finalized" ? "#FFA500" : "#999",
+                        color: "white",
+                        borderRadius: 10,
+                        fontSize: 10,
+                        fontWeight: 900
+                      }}>
+                        {a.status === "signed" ? "SIGNÉ" : a.status === "finalized" ? "FINALISÉ" : "BROUILLON"}
+                      </span>
+                    )}
                     {/* 🔥 Boutons d'action sur chaque avenant */}
                     <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                       <button
                         onClick={function() { regenerateAmendmentContractuelPdf(a) }}
-                        title="Régénérer le PDF de l'avenant (et lancer l'impression)"
+                        title="Régénérer le PDF de l'avenant et l'ouvrir pour impression"
                         style={{
                           padding: "5px 10px",
                           background: "#FFEB5A",
@@ -1452,7 +1475,30 @@ export default function EmployeeDetail(props) {
                           color: "#191923",
                           boxShadow: "1px 1px 0 #191923"
                         }}>🖨️ PDF</button>
-                      {a.status !== "signed" && (
+                      {/* 🔥 Sprint C2B : envoi pour signature électronique */}
+                      {canSendForSignature && (
+                        <button
+                          onClick={function() {
+                            setSendSignaturePayload({
+                              documentType: "amendment",
+                              documentId: a.id,
+                              documentLabel: amendmentDocLabel,
+                            })
+                          }}
+                          title="Envoyer cet avenant au salarié par email pour signature électronique"
+                          style={{
+                            padding: "5px 10px",
+                            background: "#FF82D7",
+                            border: "2px solid #191923",
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 900,
+                            cursor: "pointer",
+                            color: "#FFFFFF",
+                            boxShadow: "1px 1px 0 #191923"
+                          }}>📧 Envoyer pour signature</button>
+                      )}
+                      {a.status !== "signed" && !a.signed_at && (
                         <button
                           onClick={function() { deleteAmendmentWithRollback(a) }}
                           title="Supprimer l'avenant et annuler la modification (rollback)"
