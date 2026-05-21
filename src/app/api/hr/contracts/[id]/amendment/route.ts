@@ -8,6 +8,19 @@ import { LOGO_PINK } from '@/app/dashboard/logos'
 
 export var runtime = 'nodejs'
 
+// 🔥 Calcule la date du lendemain au format YYYY-MM-DD
+function getLendemain(dateStr: string): string {
+  if (!dateStr) return ''
+  var iso = String(dateStr).slice(0, 10)
+  var d = new Date(iso + 'T12:00:00')
+  if (isNaN(d.getTime())) return ''
+  d.setDate(d.getDate() + 1)
+  var y = d.getFullYear()
+  var m = String(d.getMonth() + 1).padStart(2, '0')
+  var day = String(d.getDate()).padStart(2, '0')
+  return y + '-' + m + '-' + day
+}
+
 function applyChangesToContract(amendmentType: string, payload: any, currentContract: any) {
   var updates: any = {}
   var changes: any = {}
@@ -62,8 +75,6 @@ function applyChangesToContract(amendmentType: string, payload: any, currentCont
   }
   else if (amendmentType === 'regularisation_welcome_pack') {
     // 🔥 Mise en conformité réglementaire : aucune modification de champ contractuel.
-    // L'avenant n'ajoute que des clauses (congés, hygiène HACCP, RGPD, vidéo, harcèlement, tenue, charte numérique).
-    // Pas de updates ni de changes — le PDF généré contient les 9 articles standards de régularisation.
   }
   else {
     throw new Error('amendment_type inconnu : ' + amendmentType)
@@ -101,9 +112,14 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     
     var payload = await req.json()
     var amendmentType = payload.amendment_type
-    var effectiveDate = payload.effective_date || new Date().toISOString().slice(0, 10)
     var motif = payload.motif || ''
     var preview = payload.preview === true
+    
+    // 🔥 Date de signature de l'avenant (distincte de contract.date_signature)
+    var signatureDate = payload.signature_date || new Date().toISOString().slice(0, 10)
+    
+    // effectiveDate sera potentiellement écrasée plus bas pour Extra prolongation
+    var effectiveDate = payload.effective_date || new Date().toISOString().slice(0, 10)
     
     if (!amendmentType) {
       return NextResponse.json({ error: 'amendment_type requis' }, { status: 400 })
@@ -119,7 +135,6 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     var currentContract = contractRes.data
     
     // 🔥 Sprint C2B fix : résoudre employee_id via cycle_id si manquant
-    // (cas Emy, Darell, Partheepan dont employee_id est NULL en base)
     var employeeIdForLookup = currentContract.employee_id
     if (!employeeIdForLookup && currentContract.cycle_id) {
       var cycleRes = await sb.from('hr_employment_cycles')
@@ -161,6 +176,26 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       }
     }
     
+    // 🔥 3b) RÈGLES MÉTIER pour Extra prolongation :
+    //    - effective_date FORCÉ au lendemain de la date_fin actuelle (continuité juridique)
+    //    - new_date_fin recalculé automatiquement = date de la dernière vacation
+    if (amendmentType === 'prolongation_duree' && currentContract.type === 'extra') {
+      // Force effective_date = lendemain
+      if (currentContract.date_fin) {
+        effectiveDate = getLendemain(String(currentContract.date_fin).slice(0, 10))
+      }
+      // Recalcule new_date_fin depuis la dernière vacation
+      if (vacsForRendering.length > 0) {
+        var derniereVacation = vacsForRendering.reduce(function(maxD: string, v: any) {
+          var d = String(v.date_vacation || '').slice(0, 10)
+          return d > maxD ? d : maxD
+        }, '')
+        if (derniereVacation) {
+          payload.new_date_fin = derniereVacation
+        }
+      }
+    }
+    
     // 4) Calculer les modifications
     var modResult
     try {
@@ -192,6 +227,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       amendment_number: nextNum,
       amendment_type: amendmentType,
       effective_date: effectiveDate,
+      signature_date: signatureDate,  // 🔥 date de signature de l'avenant (pas du contrat initial)
       motif: motif,
       created_at: new Date().toISOString()
     }
@@ -250,6 +286,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       amendment_number: nextNum,
       amendment_type: amendmentType,
       effective_date: effectiveDate,
+      signature_date: signatureDate,
       motif: motif,
       changes: changes,
       status: 'draft'
