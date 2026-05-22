@@ -725,11 +725,9 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // `page: cover` assigne explicitement cette div à la @page cover définie plus haut.
     ".cover { page: cover; width: 210mm; height: 297mm; background: #FF82D7; padding: 22mm; position: relative; overflow: hidden; page-break-after: always; break-after: page; display: flex; flex-direction: column; justify-content: space-between; }" +
     ".cover .bg-circle { position: absolute; border-radius: 50%; pointer-events: none; }" +
-    // 🔥 Sprint C3 v7 : paraphes en position:fixed (méthode fiable cross-version).
-    // À l'écran : invisibles. En print : ancrés dans le coin bas-droite, répétés par Chrome sur chaque page.
-    // Page signature : .final-page couvre via background blanc + z-index élevé.
-    ".paraphes-fixed { display: none; }" +
-    "@media print { .paraphes-fixed { display: block; position: fixed; bottom: 5mm; right: 10mm; z-index: 1; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; } }" +
+    // 🔥 Sprint C3 v8 : position fixed SANS @media — marche écran ET print de manière identique.
+    // Chrome répète position:fixed sur chaque page imprimée. À l'écran, flotte en bas-droite du viewport iframe.
+    ".paraphes-fixed { position: fixed; bottom: 5mm; right: 10mm; z-index: 1; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
     // Paraphes côte à côte, rapprochés, en coin bas-droite
     ".page-paraphes { display: flex; align-items: flex-end; gap: 6mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
     ".page-paraphes .paraphe-cell { text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
