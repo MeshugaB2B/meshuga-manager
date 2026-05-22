@@ -121,14 +121,12 @@ function fmtDate(iso: string): string {
 }
 
 // === Renderer du bloc signature employeur ===
-// Génère le contenu interne du <div class="sig-block"> pour la partie
-// "Pour l'Employeur" (donc à partir de .sig-id jusqu'à .sig-foot).
+// Sprint C3 v3 : bloc SYMÉTRIQUE avec le salarié — contient identité, signature
+// Yellowtail rose, mention "Lu et approuvé", date, et cartouche audit compact intégré.
+// Génère le contenu interne du <div class="sig-block"> (à partir de .sig-id).
 //
 // Si sig === null → renvoie le bloc fallback classique "cachet · SAS AEGIA"
-// Si sig présente → renvoie le bloc avec PNG signature + cartouche audit
-//
-// NB : la structure .sig-block est inchangée (rows 48px 96px minmax(160px,1fr) 40px)
-//       donc la mise en page existante n'est pas cassée.
+// Si sig présente → renvoie le bloc complet avec données du mandat permanent
 export function renderEmployerSignatureBlock(sig: EmployerSignature | null): string {
   // === Bloc .sig-id (identité juridique) — identique dans les deux cas ===
   var idBlock = ''
@@ -149,25 +147,36 @@ export function renderEmployerSignatureBlock(sig: EmployerSignature | null): str
       + '</div>'
   }
 
-  // === Bloc audit (mandat actif) ===
+  // === Bloc complet (mandat actif) ===
   var dActivated = fmtDate(sig.activated_at)
-  var hashShort = sig.consent_hash ? sig.consent_hash.slice(0, 16) : "—"
+  var hashShort = sig.consent_hash ? sig.consent_hash.slice(0, 32) : "—"
+  var mandateId = "MAND-MSH-" + (sig.activated_at ? sig.activated_at.slice(0, 10).replace(/-/g, "") : "PERM") + "-ET"
 
-  var sigSpace = ''
-    + '<div class="sig-space" style="padding:10px 14px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px">'
-    + '<span style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:8.5px;color:#2c2c2c;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;text-align:center;margin-bottom:2px">Signature électronique apposée par mandat permanent</span>'
-    // 🔥 Signature Yellowtail rose centrée (rendu via Google Fonts chargée dans wrapHtml)
-    + '<span style="font-family:Yellowtail,cursive;font-size:44px;color:#FF82D7;line-height:1.1;display:block;text-align:center;margin:4px 0 8px;letter-spacing:0.5px">' + esc(sig.full_name) + '</span>'
-    // 🔥 Cartouche audit : Helvetica Neue, structure label/valeur, couleurs foncées, aligné à gauche
-    + '<div style="align-self:stretch;font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:8px;color:#555;line-height:1.7;text-align:left;margin-top:2px">'
-    + '<div><strong style="color:#2c2c2c;font-weight:600">Mandat permanent :</strong> activé le ' + esc(dActivated) + '</div>'
-    + '<div><strong style="color:#2c2c2c;font-weight:600">IP :</strong> ' + esc(sig.ip) + ' (' + esc(sig.country) + ')</div>'
-    + '<div><strong style="color:#2c2c2c;font-weight:600">Hash SHA-256 :</strong> <span style="font-family:\'SF Mono\',\'Consolas\',\'Courier New\',monospace;font-size:7.5px;color:#555">' + esc(hashShort) + '…</span></div>'
-    + '<div><strong style="color:#2c2c2c;font-weight:600">Référence légale :</strong> art. 1367 C. civ. + eIDAS UE 910/2014, art. 25</div>'
-    + '<div><strong style="color:#2c2c2c;font-weight:600">Force probante :</strong> équivalente à la signature manuscrite (art. 1366 C. civ.)</div>'
-    + '<div><strong style="color:#2c2c2c;font-weight:600">Audit trail :</strong> horodaté et conservé</div>'
+  // Zone signature + Lu et approuvé + date
+  var signatureZone = ''
+    + '<div style="text-align:center;padding:14px 12px 10px 12px;border-bottom:1px dotted #DDD;margin-bottom:8px">'
+    + '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:8px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Signature électronique apposée par mandat permanent</div>'
+    + '<div style="font-family:Yellowtail,cursive;font-size:38px;color:#FF82D7;line-height:1;padding:6px 0">' + esc(sig.full_name) + '</div>'
+    + '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:10px;color:#191923;font-weight:700;margin-top:4px">« Lu et approuvé »</div>'
+    + '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:9px;color:#555;font-style:italic;margin-top:2px">Le ' + esc(dActivated) + ' — par mandat permanent</div>'
     + '</div>'
+
+  // Cartouche audit compact (4 sections, 1 ligne chacune)
+  var auditCompact = ''
+    + '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:8px;line-height:1.55;color:#555;padding:0 14px 8px 14px">'
+    + '<div style="font-weight:900;color:#FF82D7;font-size:7.5px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:3px;padding-bottom:1px;border-bottom:0.5px solid #FFEB5A">Identité du signataire</div>'
+    + '<div><strong style="color:#2c2c2c;font-weight:700">Nom :</strong> ' + esc(sig.full_name) + ' (' + esc(sig.quality) + ')</div>'
+    + '<div><strong style="color:#2c2c2c;font-weight:700">Identifiant :</strong> <span style="font-family:\'SF Mono\',Consolas,monospace;font-size:7px">' + esc(mandateId) + '</span></div>'
+    + '<div style="font-weight:900;color:#FF82D7;font-size:7.5px;text-transform:uppercase;letter-spacing:0.6px;margin:4px 0 3px 0;padding-bottom:1px;border-bottom:0.5px solid #FFEB5A">Chaîne de délivrance</div>'
+    + '<div><strong style="color:#2c2c2c;font-weight:700">Mandat activé le :</strong> ' + esc(dActivated) + '</div>'
+    + '<div style="font-weight:900;color:#FF82D7;font-size:7.5px;text-transform:uppercase;letter-spacing:0.6px;margin:4px 0 3px 0;padding-bottom:1px;border-bottom:0.5px solid #FFEB5A">Traçabilité technique</div>'
+    + '<div><strong style="color:#2c2c2c;font-weight:700">IP d\'activation :</strong> <span style="font-family:\'SF Mono\',Consolas,monospace;font-size:7px">' + esc(sig.ip) + '</span> (' + esc(sig.country) + ')</div>'
+    + '<div style="font-weight:900;color:#FF82D7;font-size:7.5px;text-transform:uppercase;letter-spacing:0.6px;margin:4px 0 3px 0;padding-bottom:1px;border-bottom:0.5px solid #FFEB5A">Intégrité du mandat</div>'
+    + '<div><strong style="color:#2c2c2c;font-weight:700">Hash SHA-256 :</strong> <span style="font-family:\'SF Mono\',Consolas,monospace;font-size:7px;word-break:break-all">' + esc(hashShort) + '…</span></div>'
+    + '<div style="margin-top:5px;padding-top:4px;border-top:1px dotted #DDD;font-size:7.5px;font-style:italic;color:#666">Force probante équivalente à signature manuscrite (art. 1366-1367 C. civ. + eIDAS UE 910/2014).</div>'
     + '</div>'
+
+  var sigSpace = '<div class="sig-space" style="padding:0;display:block">' + signatureZone + auditCompact + '</div>'
 
   var sigFoot = ''
     + '<div class="sig-foot" style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:9.5px">'
@@ -180,20 +189,32 @@ export function renderEmployerSignatureBlock(sig: EmployerSignature | null): str
 }
 
 // === Renderer du bloc signature salarié (en attente de signature) ===
-// Bloc fallback inchangé : zone vide pour signature manuscrite
-// Sera surchargé en Phase D quand le salarié signe via /sign/[token]
+// Sprint C3 v3 : bloc SYMÉTRIQUE avec l'employeur. Le bloc contient un marker
+// HTML unique <!--EMPLOYEE_SIGNATURE_PLACEHOLDER--> qui sera remplacé au moment
+// de la signature par le route /api/sign/[token]/submit avec les vraies données.
 export function renderEmployeeSignatureBlockEmpty(
   empPrenom: string,
   empNom: string,
   salarieRole: string,
   isFemale: boolean
 ): string {
+  // Zone signature avec placeholder (sera remplacée au submit)
+  var placeholderZone = ''
+    + '<!--EMPLOYEE_SIGNATURE_PLACEHOLDER-->'
+    + '<div style="text-align:center;padding:14px 12px 10px 12px;border-bottom:1px dotted #DDD;margin-bottom:8px;min-height:130px;display:flex;flex-direction:column;justify-content:center">'
+    + '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:8px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Signature électronique du salarié</div>'
+    + '<div style="font-family:Yellowtail,cursive;font-size:24px;color:#CCC;line-height:1;padding:6px 0;font-style:italic">en attente de signature</div>'
+    + '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:9px;color:#999;font-style:italic;margin-top:4px">Signature précédée de la mention « Lu et approuvé »</div>'
+    + '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:9px;color:#999;font-style:italic;margin-top:2px">Date : __ / __ / ____</div>'
+    + '</div>'
+    + '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:8.5px;color:#999;font-style:italic;padding:0 14px 8px 14px;text-align:center">Le cartouche d\'audit (identifiant, IP, horodatage, hash) apparaîtra ici après signature électronique du salarié.</div>'
+
   return ''
     + '<div class="sig-head">' + (isFemale ? "La Salariée" : "Le Salarié") + '</div>'
     + '<div class="sig-id">'
     + '<div class="name">' + esc(empPrenom || "") + ' ' + esc((empNom || "").toUpperCase()) + '</div>'
     + '<div class="role">' + esc(salarieRole || "&nbsp;") + '</div>'
     + '</div>'
-    + '<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé »</div>'
-    + '<div class="sig-foot">Date : __ / __ / ____</div>'
+    + '<div class="sig-space" style="padding:0;display:block">' + placeholderZone + '</div>'
+    + '<div class="sig-foot" style="font-style:italic;color:#999">En attente de signature électronique</div>'
 }
