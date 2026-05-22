@@ -138,30 +138,24 @@ export function buildSharedCss(logoDataUri) {
     + '.sig-id .role{font-size:10px;color:#666;font-style:italic;line-height:1.3}'
     + '.sig-space{flex:1;font-size:11px;color:#666;line-height:1.4}'
     + '.sig-foot{background:#FAFAFA;border-top:1px solid #DDD;padding:6px 12px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#666;font-style:italic;min-height:30px}'
-    + '@media print{@page{size:A4;margin:2.2cm 1.4cm 3.0cm 1.4cm;@top-center{content:element(running-header)}}.toolbar{display:none !important}body{margin:0 !important}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-inside:avoid;page-break-inside:avoid}.sig-block{break-inside:avoid;page-break-inside:avoid}'
-    + '.flow-table > tbody > tr > td{min-height:24cm;height:24cm}'  // 🔥 force tbody td à occuper la page A4 → pousse tfoot tout en bas
+    + '@media print{@page{size:A4;margin:2.2cm 1.4cm 2.0cm 1.4cm;@top-center{content:element(running-header)}}.toolbar{display:none !important}body{margin:0 !important}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-inside:avoid;page-break-inside:avoid}.sig-block{break-inside:avoid;page-break-inside:avoid}'
     + '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.running-header,.sig-section h2,.parties h3,.art-title,.cover .rule,.sig-section .rule,.sig-block,.note,.page-paraphes,.page-paraphes *{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}}'
     + '.running-header{position:running(running-header);display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #FF82D7;padding-bottom:6px;font-family:Arial Narrow,sans-serif;font-size:9px;color:#666}'
     + '.running-header img{height:18px;width:auto}'
     + '.running-header .tag{font-style:italic;letter-spacing:1px;text-transform:uppercase}'
-    // 🔥 Sprint C3 v6 : paraphes via TABLE TFOOT (méthode 100% fiable cross-browser).
-    // Chrome répète automatiquement <tfoot> sur chaque page imprimée. La page signatures
-    // est sortie de la table (.final-page) → pas de paraphes répétés sur celle-ci.
+    // 🔥 Sprint C3 v7 : paraphes en position:fixed (répétés sur chaque page imprimée par Chrome).
+    // À l'écran : invisibles. En print : ancrés dans le coin bas-droite.
+    // Page signature : .final-page la couvre via background blanc + z-index élevé.
     + '@page signature{size:A4;margin:2.2cm 1.4cm 1.6cm 1.4cm;@top-center{content:element(running-header)}}'
-    + '.flow-table{width:100%;border-collapse:collapse;table-layout:fixed}'
-    + '.flow-table thead{display:table-header-group}'
-    + '.flow-table tfoot{display:table-footer-group}'
-    + '.flow-table > thead > tr > td,.flow-table > tbody > tr > td,.flow-table > tfoot > tr > td{padding:0}'
-    + '.flow-table > tbody > tr > td{vertical-align:top}'
-    + '.flow-table > tfoot > tr > td{vertical-align:bottom}'  // 🔥 ancrage en bas de chaque page imprimée
-    + '.final-page{page:signature;page-break-before:always;break-before:page;width:100%}'
-    + '@media screen{.flow-table > tfoot{display:none}}'
-    // Paraphes côte à côte en bas à droite, rapprochés, ancrés à la marge bottom de la page imprimée
-    + '.page-paraphes{display:flex;justify-content:flex-end;align-items:flex-end;gap:4mm;height:18mm;padding:0 8mm 4mm 0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
-    + '.page-paraphes .paraphe-cell{text-align:center;min-width:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
-    + '.page-paraphes .paraphe-label{font-family:"BILD Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:7pt;text-transform:uppercase;letter-spacing:1.5px;color:#191923;opacity:0.55;margin-bottom:1mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
-    + '.page-paraphes .paraphe-initials{font-family:"Yellowtail",cursive;font-size:22pt;color:#FF82D7;line-height:1;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}'
-    + '.page-paraphes .paraphe-initials.pending{font-family:"Arial Narrow",sans-serif;font-style:italic;font-size:11pt;color:#BBBBBB;font-weight:400;padding-bottom:4mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
+    + '.paraphes-fixed{display:none}'
+    + '@media print{.paraphes-fixed{display:block;position:fixed;bottom:8mm;right:12mm;z-index:1;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}}'
+    + '.final-page{page:signature;page-break-before:always;break-before:page;width:100%;position:relative;background:#FFFFFF;min-height:100vh;z-index:9999}'
+    // Paraphes côte à côte, rapprochés, en coin bas-droite
+    + '.page-paraphes{display:flex;align-items:flex-end;gap:6mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
+    + '.page-paraphes .paraphe-cell{text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
+    + '.page-paraphes .paraphe-label{font-family:"Arial Narrow",sans-serif;font-weight:700;font-size:7pt;text-transform:uppercase;letter-spacing:1px;color:#191923;opacity:0.55;margin-bottom:2mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
+    + '.page-paraphes .paraphe-initials{font-family:"Yellowtail",cursive;font-size:24pt;color:#FF82D7;line-height:1;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}'
+    + '.page-paraphes .paraphe-initials.pending{font-family:"Arial Narrow",sans-serif;font-style:italic;font-size:10pt;color:#BBBBBB;font-weight:400;padding-bottom:5mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
     // 🔥 Sprint C3 v2 : cartouche audit enrichi
     + '.audit-box{margin:18px 0 0 0;padding:14px 16px;background:#FAFAFA;border:1.5px solid #FF82D7;border-radius:6px;font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;line-height:1.5;color:#191923;break-inside:avoid;page-break-inside:avoid}'
     + '.audit-box-title{font-family:"Yellowtail",cursive;font-size:18px;color:#FF82D7;margin-bottom:8px;line-height:1;display:flex;align-items:center;gap:8px}'
@@ -291,13 +285,11 @@ export function wrapHtml(opts) {
     + '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">'
     + '<style>' + css + '</style></head><body>'
 
-  // Mode v6 : wrapping table tfoot + final-page signatures hors-table
+  // Mode v6 : paraphes en position fixed (répétés sur chaque page imprimée) + final-page séparée
   if (paraphFooter || signatures) {
     return openHtml
-      + '<table class="flow-table">'
-      +   '<tfoot><tr><td>' + paraphFooter + '</td></tr></tfoot>'
-      +   '<tbody><tr><td>' + body + '</td></tr></tbody>'
-      + '</table>'
+      + (paraphFooter ? '<div class="paraphes-fixed">' + paraphFooter + '</div>' : '')
+      + body
       + (signatures ? '<div class="final-page">' + signatures + '</div>' : '')
       + '</body></html>'
   }
@@ -350,11 +342,11 @@ export function buildParaphFooter(employerInitials: string, employeeInitials: st
   return ''
     + '<div class="page-paraphes">'
     +   '<div class="paraphe-cell">'
-    +     '<div class="paraphe-label">Paraphe employeur</div>'
+    +     '<div class="paraphe-label">Employeur</div>'
     +     empCell
     +   '</div>'
     +   '<div class="paraphe-cell">'
-    +     '<div class="paraphe-label">Paraphe salarié</div>'
+    +     '<div class="paraphe-label">Salarié</div>'
     +     saCell
     +   '</div>'
     + '</div>'
