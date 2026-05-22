@@ -270,12 +270,19 @@ function injectEmployeeSignature(
 // (texte "paraphe" en italique gris). On le remplace par les vraies initiales.
 function injectEmployeeParaphes(originalHtml: string, employerInitials: string, employeeInitials: string): string {
   var newFooter = buildParaphFooter(employerInitials, employeeInitials)
-  // Remplacer le bloc <div class="paraph-footer">...</div> existant
+  // Le builder génère MAINTENANT 2 blocs consécutifs : .paraph-footer (flottant) puis .paraph-footer-inline (inline visible écran)
+  // On les remplace ENSEMBLE par les nouveaux 2 blocs avec les vraies initiales.
+  // Regex 1 : essaie de matcher les 2 blocs consécutifs (nouveau format)
+  var bothRegex = /<div class="paraph-footer">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>\s*<div class="paraph-footer-inline">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/
+  if (bothRegex.test(originalHtml)) {
+    return originalHtml.replace(bothRegex, newFooter)
+  }
+  // Regex 2 fallback : matche juste le bloc flottant (ancien format si docs déjà uploadés)
   var paraphRegex = /<div class="paraph-footer">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/
   if (paraphRegex.test(originalHtml)) {
     return originalHtml.replace(paraphRegex, newFooter)
   }
-  // Fallback : pas de bloc trouvé, on en ajoute un
+  // Fallback ultime : pas de bloc trouvé, on en ajoute un
   return originalHtml.replace(/<\/body>/i, newFooter + "</body>")
 }
 
