@@ -148,8 +148,8 @@ export function buildSharedCss(logoDataUri) {
     // Page signature : .final-page la couvre via background blanc + z-index élevé.
     + '@page signature{size:A4;margin:2.2cm 1.4cm 1.6cm 1.4cm;@top-center{content:element(running-header)}}'
     + '.paraphes-fixed{display:none}'
-    + '@media print{.paraphes-fixed{display:block;position:fixed;bottom:8mm;right:12mm;z-index:1;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}}'
-    + '.final-page{page:signature;page-break-before:always;break-before:page;width:100%;position:relative;background:#FFFFFF;min-height:100vh;z-index:9999}'
+    + '@media print{.paraphes-fixed{display:block;position:fixed;bottom:5mm;right:10mm;z-index:1;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}}'
+    + '.final-page{page:signature;page-break-before:always;break-before:page;width:100%}'
     // Paraphes côte à côte, rapprochés, en coin bas-droite
     + '.page-paraphes{display:flex;align-items:flex-end;gap:6mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
     + '.page-paraphes .paraphe-cell{text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
