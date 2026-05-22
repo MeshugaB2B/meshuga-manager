@@ -116,7 +116,11 @@ function buildPlanningTable(vacs: any[]) {
 export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[], logoUri: string, previousValues: any, employerSig?: EmployerSignature | null) {
   var prev = previousValues || {}
   var safeVacs = vacs || []
-  var amendmentNumStr = "N°" + (amendment.amendment_number || 1)
+  
+  // 🔥 Sprint C3 v3 : plus de numérotation visible "N°X" (non obligatoire légalement).
+  // On garde amendment.amendment_number en interne (BDD, traçabilité, nom de fichier)
+  // mais on l'affiche pas. On référence par "Avenant en date du X au contrat conclu le Y".
+  // La combinaison date avenant + date contrat est unique → traçabilité juridique OK.
   
   var contractTypeLabel = "Contrat de travail"
   if (contract.type === "extra") contractTypeLabel = "Contrat de travail d'extra (CDD d'usage)"
@@ -128,33 +132,56 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   var contractDate = contract.date_signature || contract.date_debut
   var contractDateStr = fmtDateShortFR(contractDate)
   
-  var titleByType: any = {
+  // Date de l'avenant (effective_date sinon signature_date sinon aujourd'hui)
+  var avenantDate = amendment.effective_date || amendment.signature_date || new Date().toISOString().slice(0, 10)
+  var avenantDateLong = new Date(String(avenantDate).slice(0, 10) + 'T12:00:00').toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+  var avenantDateShort = fmtDateShortFR(avenantDate)
+  
+  // 🔥 Sprint C3 v3 : nouveau titre/sous-titre par type
+  // Pour regularisation_welcome_pack : montre qu'on régularise TOUT le passé
+  var coverTitleByType: any = {
+    prolongation_duree: "AVENANT",
+    augmentation_salaire: "AVENANT",
+    modification_horaires: "AVENANT",
+    changement_poste: "AVENANT",
+    regularisation_welcome_pack: "AVENANT DE MISE EN CONFORMITÉ",
+    autre: "AVENANT"
+  }
+  var subtitleByType: any = {
     prolongation_duree: "Prolongation de la durée du contrat",
     augmentation_salaire: "Modification de la rémunération",
     modification_horaires: "Modification de la durée du travail",
     changement_poste: "Modification des fonctions",
-    regularisation_welcome_pack: "Mise en conformité réglementaire & dossier de bienvenue",
+    regularisation_welcome_pack: "Régularisation rétroactive complète — Conformité RH, HACCP, sociale, légale & RGPD · Nouvelles règles congés payés (loi DDADUE 2024) · Vidéosurveillance · Politique anti-harcèlement · Charte numérique & droit à la déconnexion · Tenue & hygiène · Dossier de bienvenue Meshuga (13 pages)",
     autre: "Modification contractuelle"
   }
-  var sousTitre = titleByType[amendment.amendment_type] || "Modification contractuelle"
+  var titreCover = coverTitleByType[amendment.amendment_type] || "AVENANT"
+  var sousTitre = subtitleByType[amendment.amendment_type] || "Modification contractuelle"
+  var bandeau = titreCover + " · " + avenantDateShort
   var isExtra = contract.type === "extra"
   
   var header = buildSharedHeader({
     emp: emp,
-    titreCover: "AVENANT " + amendmentNumStr,
+    titreCover: titreCover,
     sousTitreCover: sousTitre + " · " + contractTypeLabel,
-    typeBandeau: "AVENANT " + amendmentNumStr,
+    typeBandeau: bandeau,
     logoUri: logoUri
   })
   
   // ============================================================
   // PRÉAMBULE COMMUN
   // ============================================================
+  // 🔥 Sprint C3 v3 : référence par date du contrat initial + date de l'avenant
+  // (la combinaison est unique → traçabilité juridique). Plus de "porte le numéro".
+  var preambuleHeader = (amendment.amendment_type === "regularisation_welcome_pack")
+    ? '<p>Le présent <strong>avenant en date du ' + esc(avenantDateLong) + '</strong> fait suite au <strong>' + esc(contractTypeLabel) + '</strong> conclu entre les soussignés en date du <strong>' + esc(contractDateStr) + '</strong>.</p>'
+      + '<p>Il a pour objet de <strong>régulariser de manière rétroactive et complète</strong> l\'ensemble du contrat de travail en intégrant les dispositions réglementaires, sociales, légales, sanitaires (HACCP) et internes Meshuga en vigueur à ce jour, et qui n\'auraient pas été formalisées dans le contrat initial ou les éventuels avenants antérieurs.</p>'
+    : '<p>Le présent <strong>avenant en date du ' + esc(avenantDateLong) + '</strong> fait suite au <strong>' + esc(contractTypeLabel) + '</strong> conclu entre les soussignés en date du <strong>' + esc(contractDateStr) + '</strong>.</p>'
+  
   var preambule = ''
     + '<div class="art"><span class="art-num">Préambule.</span><span class="art-title">Rappel du contrat initial</span></div>'
     + '<div class="body">'
-    + '<p>Le présent avenant fait suite au <strong>' + esc(contractTypeLabel) + '</strong> conclu entre les soussignés en date du <strong>' + esc(contractDateStr) + '</strong>.</p>'
-    + '<p>Il porte le numéro <strong>' + esc(amendmentNumStr) + '</strong> dans la séquence des avenants à ce contrat.</p>'
+    + preambuleHeader
     + '</div>'
   
   // ============================================================
@@ -449,7 +476,7 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   var paraphFooter = buildParaphFooter(employerInitials, "")
   
   return wrapHtml({
-    titre: "Avenant " + amendmentNumStr + " Meshuga — " + (emp ? (emp.prenom + " " + emp.nom) : "—"),
+    titre: "Avenant Meshuga du " + esc(avenantDateShort) + " — " + (emp ? (emp.prenom + " " + emp.nom) : "—"),
     css: buildSharedCss(logoUri),
     body: header + body + signatures + paraphFooter
   })
