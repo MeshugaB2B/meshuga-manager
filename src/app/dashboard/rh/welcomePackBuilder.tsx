@@ -736,7 +736,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     ".flow-table > tfoot > tr > td { vertical-align: bottom; }" +  // 🔥 ancrage en bas de chaque page imprimée
     // 🆕 Paraphes côte à côte en bas à droite, rapprochés, hauteur fixe ancrée à la marge bottom
     ".page-paraphes { display: flex; justify-content: flex-end; align-items: flex-end; gap: 4mm; height: 18mm; padding: 0 8mm 4mm 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
-    ".page-paraphes .paraphe-cell { text-align: center; min-width: 32mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
+    ".page-paraphes .paraphe-cell { text-align: center; min-width: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
     ".page-paraphes .paraphe-label { font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 1.5px; color: #191923; opacity: 0.55; margin-bottom: 1mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
     ".page-paraphes .paraphe-initials { font-family: 'Yellowtail', cursive; font-size: 22pt; color: #FF82D7; line-height: 1; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
     ".page-paraphes .paraphe-initials.pending { font-family: 'Arial Narrow', sans-serif; font-style: italic; font-size: 11pt; color: #BBBBBB; font-weight: 400; padding-bottom: 4mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
@@ -744,8 +744,8 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     ".final-page { page: signature; page-break-before: always; break-before: page; width: 100%; }" +
     // En écran on cache le tfoot répétitif (on garde uniquement la vue continue)
     "@media screen { .flow-table > tfoot { display: none; } }" +
-    // 🆕 Masquer la toolbar à l'impression + forcer color-adjust exact sur les paraphes en print
-    "@media print { .toolbar { display: none !important; } body { margin: 0 !important; } .page-paraphes, .page-paraphes * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; } }" +
+    // 🆕 Masquer la toolbar à l'impression + forcer color-adjust exact sur les paraphes en print + min-height tbody pour ancrer tfoot en bas
+    "@media print { .toolbar { display: none !important; } body { margin: 0 !important; } .page-paraphes, .page-paraphes * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; } .flow-table > tbody > tr > td { min-height: 24cm; height: 24cm; } }" +
     // Chapitre = un h2 Yellowtail + son contenu. break-before:page démarre chaque chapitre sur une nouvelle page.
     ".chapter { break-before: page; page-break-before: always; }" +
     ".chapter:first-of-type { break-before: avoid; page-break-before: avoid; }" +
@@ -1149,7 +1149,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
           'Je ' + g("soussigné", "soussignée") + ' <b>' + esc(nomComplet) + '</b> reconnais avoir reçu en main propre, à la date de signature ci-dessous&nbsp;:' +
         '</p>' +
         '<div style="margin-top: 3mm; font-size: 11pt; line-height: 1.55;">' +
-          '<div><span class="cb">' + checkBox(false) + '</span>Le présent <b>dossier de bienvenue Meshuga</b> (13 pages dont engagement signé)</div>' +
+          '<div><span class="cb">' + checkBox(false) + '</span>Le présent <b>dossier de bienvenue Meshuga</b> (21 pages dont engagement signé)</div>' +
           '<div><span class="cb">' + checkBox(false) + '</span>Mon <b>contrat de travail</b> signé en double exemplaire</div>' +
           '<div><span class="cb">' + checkBox(false) + '</span>Information sur la <b>convention collective</b> CCN 1501 et son lieu de consultation</div>' +
           '<div><span class="cb">' + checkBox(false) + '</span>Information sur la <b>vidéosurveillance</b> et mes droits RGPD</div>' +
