@@ -147,8 +147,9 @@ export function buildSharedCss(logoDataUri) {
     // À l'écran : invisibles. En print : ancrés dans le coin bas-droite.
     // Page signature : .final-page la couvre via background blanc + z-index élevé.
     + '@page signature{size:A4;margin:2.2cm 1.4cm 1.6cm 1.4cm;@top-center{content:element(running-header)}}'
-    + '.paraphes-fixed{display:none}'
-    + '@media print{.paraphes-fixed{display:block;position:fixed;bottom:5mm;right:10mm;z-index:1;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}}'
+    // 🔥 Sprint C3 v8 : position fixed SANS @media — marche écran ET print de manière identique.
+    // Chrome répète position:fixed sur chaque page imprimée. À l\'écran, flotte en bas-droite du viewport iframe.
+    + '.paraphes-fixed{position:fixed;bottom:5mm;right:10mm;z-index:1;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
     + '.final-page{page:signature;page-break-before:always;break-before:page;width:100%}'
     // Paraphes côte à côte, rapprochés, en coin bas-droite
     + '.page-paraphes{display:flex;align-items:flex-end;gap:6mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
