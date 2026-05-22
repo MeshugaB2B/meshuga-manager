@@ -686,7 +686,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // la technique HTML standard (table avec thead/tfoot) qui répète AUTOMATIQUEMENT le footer
     // sur chaque page imprimée. Compatible 100% des browsers depuis IE6.
     "@page cover { size: A4; margin: 0; @bottom-center { content: ''; } }" +
-    "@page default { size: A4; margin: 18mm 14mm 20mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
+    "@page default { size: A4; margin: 18mm 14mm 24mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } @bottom-right { content: element(paraphes-runner); vertical-align: bottom; } }" +
     // 🆕 Page signature dédiée : pas de marge bas surdimensionnée (pas de tfoot paraphes) + même footer central
     "@page signature { size: A4; margin: 18mm 14mm 18mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
     "html, body { background: #FFFFFF; }" +
@@ -725,15 +725,16 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // `page: cover` assigne explicitement cette div à la @page cover définie plus haut.
     ".cover { page: cover; width: 210mm; height: 297mm; background: #FF82D7; padding: 22mm; position: relative; overflow: hidden; page-break-after: always; break-after: page; display: flex; flex-direction: column; justify-content: space-between; }" +
     ".cover .bg-circle { position: absolute; border-radius: 50%; pointer-events: none; }" +
-    // 🔥 Sprint C3 v8 : position fixed SANS @media — marche écran ET print de manière identique.
-    // Chrome répète position:fixed sur chaque page imprimée. À l'écran, flotte en bas-droite du viewport iframe.
-    ".paraphes-fixed { position: fixed; bottom: 5mm; right: 10mm; z-index: 1; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
+    // 🔥 Sprint C3 v10 : paraphes via CSS Paged Media @bottom-right (méthode NATIVE).
+    // L'élément .paraphes-runner est "détourné" vers la marge bottom-right de chaque page imprimée
+    // via position:running(). Page cover et signature : SANS @bottom-right → pas de paraphes dessus.
+    ".paraphes-runner { position: running(paraphes-runner); }" +
     // Paraphes côte à côte, rapprochés, en coin bas-droite
-    ".page-paraphes { display: flex; align-items: flex-end; gap: 6mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
-    ".page-paraphes .paraphe-cell { text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
-    ".page-paraphes .paraphe-label { font-family: 'Arial Narrow', sans-serif; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 1px; color: #191923; opacity: 0.55; margin-bottom: 2mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
-    ".page-paraphes .paraphe-initials { font-family: 'Yellowtail', cursive; font-size: 24pt; color: #FF82D7; line-height: 1; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
-    ".page-paraphes .paraphe-initials.pending { font-family: 'Arial Narrow', sans-serif; font-style: italic; font-size: 10pt; color: #BBBBBB; font-weight: 400; padding-bottom: 5mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
+    ".page-paraphes { display: flex; align-items: flex-end; justify-content: flex-end; gap: 5mm; }" +
+    ".page-paraphes .paraphe-cell { text-align: center; }" +
+    ".page-paraphes .paraphe-label { display: block; font-family: Arial, sans-serif; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.8px; color: #666666; margin-bottom: 1mm; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }" +
+    ".page-paraphes .paraphe-initials { display: block; font-family: 'Yellowtail', cursive; font-size: 18pt; color: #FF82D7; line-height: 1; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
+    ".page-paraphes .paraphe-initials.pending { font-family: Arial, sans-serif; font-style: italic; font-size: 9pt; color: #999999; font-weight: 400; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }" +
     // 🆕 Page finale (signatures) simplifiée : juste un page-break, pas de min-height ni z-index qui créaient une page vide parasite
     ".final-page { page: signature; page-break-before: always; break-before: page; width: 100%; }" +
     // 🆕 Masquer la toolbar à l'impression
@@ -1560,7 +1561,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
       // 🔥 Sprint C3 v7 : paraphes via position:fixed (répétés sur chaque page imprimée par Chrome).
       // Bien plus fiable que table tfoot — ancrés dans le coin bas-droite peu importe la longueur de page.
       // Page signature : .final-page la couvre via background blanc + z-index élevé.
-      '<div class="paraphes-fixed">' +
+      '<div class="paraphes-runner">' +
         '<div class="page-paraphes">' +
           '<div class="paraphe-cell">' +
             '<div class="paraphe-label">Employeur</div>' +
