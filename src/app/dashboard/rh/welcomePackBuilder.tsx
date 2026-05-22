@@ -2,7 +2,7 @@
 // welcomePackBuilder.tsx
 // ============================================================
 import { ALL_MESHUGA_FONTFACES } from "@/lib/fonts"
-import { getInitials, buildParaphFooter, esc as escFromBuilders } from "./contractBuilders"
+import { getInitials, esc as escFromBuilders } from "./contractBuilders"
 import type { EmployerSignature } from "./employerSignature"
 import { renderEmployerSignatureBlock, renderEmployeeSignatureBlockEmpty } from "./employerSignature"
 // 🔥 Sprint Y1 : type de la signature électronique pré-enregistrée d'Edward
@@ -681,10 +681,12 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
   var styles =
     ALL_MESHUGA_FONTFACES +
     "* { box-sizing: border-box; margin: 0; padding: 0; }" +
-    // @page natif Chrome : marges A4 + footer @bottom-center auto sur chaque page physique.
-    // Plus aucun footer manuel à gérer, plus aucun découpage en .page rigide.
-    "@page { size: A4; margin: 18mm 16mm 20mm 16mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 9pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
-    "@page :first { margin: 0; @bottom-center { content: ''; } }" +  // couverture sans marges/footer
+    // 🔥 Stratégie d'impression robuste : named pages + table tfoot répété en pied de chaque page.
+    // Les @page margin boxes ne sont pas fiables dans toutes les versions Chrome — on opte pour
+    // la technique HTML standard (table avec thead/tfoot) qui répète AUTOMATIQUEMENT le footer
+    // sur chaque page imprimée. Compatible 100% des browsers depuis IE6.
+    "@page cover { size: A4; margin: 0; @bottom-center { content: ''; } }" +
+    "@page default { size: A4; margin: 18mm 14mm 24mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
     "html, body { background: #FFFFFF; }" +
     "body { font-family: 'Arial Narrow', Arial, sans-serif; color: #191923; font-size: 11pt; line-height: 1.55; }" +
     // 🔥 Sprint C3 v2 : encart paraphes (mêmes styles que contracts pour cohérence)
@@ -717,11 +719,26 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     ".sig-id .role { font-size: 10px; color: #666; font-style: italic; line-height: 1.3; }" +
     ".sig-space { flex: 1; font-size: 11px; color: #666; line-height: 1.4; }" +
     ".sig-foot { background: #FAFAFA; border-top: 1px solid #DDD; padding: 6px 12px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #666; font-style: italic; min-height: 30px; }" +
-    // Couverture pleine page rose, sans marges, page-break après pour démarrer le contenu sur page 2
-    ".cover { width: 210mm; height: 297mm; background: #FF82D7; padding: 22mm; position: relative; overflow: hidden; page-break-after: always; break-after: page; display: flex; flex-direction: column; justify-content: space-between; }" +
+    // Couverture pleine page rose, sans marges, page-break après pour démarrer le contenu sur page 2.
+    // `page: cover` assigne explicitement cette div à la @page cover définie plus haut.
+    ".cover { page: cover; width: 210mm; height: 297mm; background: #FF82D7; padding: 22mm; position: relative; overflow: hidden; page-break-after: always; break-after: page; display: flex; flex-direction: column; justify-content: space-between; }" +
     ".cover .bg-circle { position: absolute; border-radius: 50%; pointer-events: none; }" +
-    // Conteneur de contenu (post-couverture) : flux naturel, Chrome paginera tout seul
-    ".flow { width: 100%; }" +
+    // 🔥 TABLE-BASED LAYOUT pour le contenu post-couverture : thead/tfoot répétés sur chaque page.
+    // Chrome (et tous les browsers) répètent automatiquement <thead> et <tfoot> en haut/bas de
+    // chaque page imprimée d'un <table>. C'est la SEULE méthode 100% fiable cross-version.
+    ".flow-table { page: default; width: 100%; border-collapse: collapse; table-layout: fixed; }" +
+    ".flow-table thead { display: table-header-group; }" +  // force répétition haut de page
+    ".flow-table tfoot { display: table-footer-group; }" +  // force répétition bas de page
+    ".flow-table > thead > tr > td, .flow-table > tbody > tr > td, .flow-table > tfoot > tr > td { padding: 0; }" +
+    ".flow-table > tbody > tr > td { vertical-align: top; }" +
+    // Paraphes en pied de page imprimée — répétés via tfoot
+    ".page-paraphes { display: flex; justify-content: space-between; align-items: flex-end; padding: 6mm 2mm 0 2mm; border-top: 1.5px solid #FF82D7; margin-top: 8mm; }" +
+    ".page-paraphes .paraphe-cell { text-align: center; min-width: 50mm; }" +
+    ".page-paraphes .paraphe-label { font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 1.5px; color: #191923; opacity: 0.55; margin-bottom: 1mm; }" +
+    ".page-paraphes .paraphe-initials { font-family: 'Yellowtail', cursive; font-size: 22pt; color: #FF82D7; line-height: 1; }" +
+    ".page-paraphes .paraphe-initials.pending { font-family: 'Arial Narrow', sans-serif; font-style: italic; font-size: 11pt; color: #BBBBBB; font-weight: 400; padding-bottom: 4mm; }" +
+    // En écran on cache le tfoot répétitif (on garde uniquement la vue continue)
+    "@media screen { .flow-table > tfoot { display: none; } }" +
     // Chapitre = un h2 Yellowtail + son contenu. break-before:page démarre chaque chapitre sur une nouvelle page.
     ".chapter { break-before: page; page-break-before: always; }" +
     ".chapter:first-of-type { break-before: avoid; page-break-before: avoid; }" +
@@ -801,7 +818,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
           '<div style="opacity: 0.9;">RCS Paris 904 639 531 — TVA FR31904639531</div>' +
           '<div style="opacity: 0.9;">CCN Restauration Rapide IDCC 1501</div>' +
         '</div>' +
-        '<img src="' + STAMP_YELLOW + '" alt="Meshuga Crazy Deli" style="display: block; width: 48mm; height: 48mm; flex-shrink: 0;" />' +
+        '<img src="' + STAMP_YELLOW + '" alt="Meshuga" style="display: block; width: 48mm; height: 48mm; flex-shrink: 0;" />' +
       '</div>' +
     '</div>'
 
@@ -876,7 +893,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     '<div style="margin-top: 4mm;">' +
       '<span class="cb">' + checkBox(emp.haccp_done) + esc(haccpDoneText || "Formation HACCP suivie") + '</span>' +
       '<span class="cb" style="margin-left: 14px;">' + checkBox(!emp.haccp_done) + esc(haccpTodoText || "À planifier auprès de CNFSE") + '</span>' +
-    '</section>'
+    '</div>'
 
   var page3 =
     '<section class="chapter">' +
@@ -1541,7 +1558,22 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
         '<button onclick="window.print()" style="font-family:\'Arial Narrow\',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding:10px 16px;border:2px solid #191923;border-radius:4px;cursor:pointer;background:#FFEB5A;color:#191923">Imprimer en PDF</button>' +
       '</div>' +
       page1 +
-      '<main class=\"flow\">' +
+      // 🔥 Table-based wrapper : tfoot répété en pied de chaque page imprimée par Chrome.
+      // C'est la SEULE technique 100% fiable cross-version pour répéter un footer sur chaque page.
+      '<table class="flow-table">' +
+        '<tfoot><tr><td>' +
+          '<div class="page-paraphes">' +
+            '<div class="paraphe-cell">' +
+              '<div class="paraphe-label">Paraphe employeur</div>' +
+              '<div class="paraphe-initials">E.T.</div>' +
+            '</div>' +
+            '<div class="paraphe-cell">' +
+              '<div class="paraphe-label">Paraphe ' + g('salarié', 'salariée') + '</div>' +
+              '<div class="paraphe-initials pending">en attente</div>' +
+            '</div>' +
+          '</div>' +
+        '</td></tr></tfoot>' +
+        '<tbody><tr><td>' +
         pageSommaire +       // 🆕 Page 2 : Bienvenue + sommaire
         page2 +              // Page 3 : Fiche salarié
         pageDureeTravail +   // 🆕 Page 4 : Durée du travail & repos
@@ -1554,13 +1586,8 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
         pageCharteNum +      // 🆕 Page 11 : Charte numérique
         pageTenue +          // 🆕 Page 12 : Tenue & comportement
         page6 +              // Page 13 : Engagement & signatures
-      '</main>' +
-      // 🔥 Sprint C3 v2 : paraphes en bas à droite de chaque page imprimée.
-      // Côté employeur rempli si employerSig actif. Côté salarié vide (rempli au moment de la signature).
-      buildParaphFooter(
-        (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : "",
-        ""  // sera remplie par /api/sign/[token]/submit/route.ts au moment de la signature
-      ) +
+        '</td></tr></tbody>' +
+      '</table>' +
     '</body>' +
     '</html>'
 
