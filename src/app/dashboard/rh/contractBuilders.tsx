@@ -139,6 +139,7 @@ export function buildSharedCss(logoDataUri) {
     + '.sig-space{flex:1;font-size:11px;color:#666;line-height:1.4}'
     + '.sig-foot{background:#FAFAFA;border-top:1px solid #DDD;padding:6px 12px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#666;font-style:italic;min-height:30px}'
     + '@media print{@page{size:A4;margin:2.2cm 1.4cm 3.0cm 1.4cm;@top-center{content:element(running-header)}}.toolbar{display:none !important}body{margin:0 !important}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-inside:avoid;page-break-inside:avoid}.sig-block{break-inside:avoid;page-break-inside:avoid}'
+    + '.flow-table > tbody > tr > td{min-height:24cm;height:24cm}'  // 🔥 force tbody td à occuper la page A4 → pousse tfoot tout en bas
     + '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.running-header,.sig-section h2,.parties h3,.art-title,.cover .rule,.sig-section .rule,.sig-block,.note,.page-paraphes,.page-paraphes *{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}}'
     + '.running-header{position:running(running-header);display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #FF82D7;padding-bottom:6px;font-family:Arial Narrow,sans-serif;font-size:9px;color:#666}'
     + '.running-header img{height:18px;width:auto}'
@@ -157,7 +158,7 @@ export function buildSharedCss(logoDataUri) {
     + '@media screen{.flow-table > tfoot{display:none}}'
     // Paraphes côte à côte en bas à droite, rapprochés, ancrés à la marge bottom de la page imprimée
     + '.page-paraphes{display:flex;justify-content:flex-end;align-items:flex-end;gap:4mm;height:18mm;padding:0 8mm 4mm 0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
-    + '.page-paraphes .paraphe-cell{text-align:center;min-width:32mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
+    + '.page-paraphes .paraphe-cell{text-align:center;min-width:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
     + '.page-paraphes .paraphe-label{font-family:"BILD Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:7pt;text-transform:uppercase;letter-spacing:1.5px;color:#191923;opacity:0.55;margin-bottom:1mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
     + '.page-paraphes .paraphe-initials{font-family:"Yellowtail",cursive;font-size:22pt;color:#FF82D7;line-height:1;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}'
     + '.page-paraphes .paraphe-initials.pending{font-family:"Arial Narrow",sans-serif;font-style:italic;font-size:11pt;color:#BBBBBB;font-weight:400;padding-bottom:4mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
