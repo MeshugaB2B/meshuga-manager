@@ -138,25 +138,24 @@ export function buildSharedCss(logoDataUri) {
     + '.sig-id .role{font-size:10px;color:#666;font-style:italic;line-height:1.3}'
     + '.sig-space{flex:1;font-size:11px;color:#666;line-height:1.4}'
     + '.sig-foot{background:#FAFAFA;border-top:1px solid #DDD;padding:6px 12px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#666;font-style:italic;min-height:30px}'
-    + '@media print{@page{size:A4;margin:2.2cm 1.4cm 2.0cm 1.4cm;@top-center{content:element(running-header)}}.toolbar{display:none !important}body{margin:0 !important}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-inside:avoid;page-break-inside:avoid}.sig-block{break-inside:avoid;page-break-inside:avoid}'
+    + '@media print{@page{size:A4;margin:2.2cm 1.4cm 2.4cm 1.4cm;@top-center{content:element(running-header)}@bottom-right{content:element(paraphes-runner);vertical-align:bottom}}.toolbar{display:none !important}body{margin:0 !important}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-inside:avoid;page-break-inside:avoid}.sig-block{break-inside:avoid;page-break-inside:avoid}'
     + '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.running-header,.sig-section h2,.parties h3,.art-title,.cover .rule,.sig-section .rule,.sig-block,.note,.page-paraphes,.page-paraphes *{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}}'
     + '.running-header{position:running(running-header);display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #FF82D7;padding-bottom:6px;font-family:Arial Narrow,sans-serif;font-size:9px;color:#666}'
     + '.running-header img{height:18px;width:auto}'
     + '.running-header .tag{font-style:italic;letter-spacing:1px;text-transform:uppercase}'
-    // 🔥 Sprint C3 v7 : paraphes en position:fixed (répétés sur chaque page imprimée par Chrome).
-    // À l'écran : invisibles. En print : ancrés dans le coin bas-droite.
-    // Page signature : .final-page la couvre via background blanc + z-index élevé.
+    // 🔥 Sprint C3 v10 : paraphes via CSS Paged Media @bottom-right (méthode NATIVE).
+    // L\'élément .paraphes-runner est "détourné" vers la marge bottom-right de chaque page imprimée
+    // via position:running(). Même technique que .running-header (qui marche déjà chez toi).
+    // Page signature : SANS @bottom-right → pas de paraphes dessus. Aucun bricolage.
     + '@page signature{size:A4;margin:2.2cm 1.4cm 1.6cm 1.4cm;@top-center{content:element(running-header)}}'
-    // 🔥 Sprint C3 v8 : position fixed SANS @media — marche écran ET print de manière identique.
-    // Chrome répète position:fixed sur chaque page imprimée. À l\'écran, flotte en bas-droite du viewport iframe.
-    + '.paraphes-fixed{position:fixed;bottom:5mm;right:10mm;z-index:1;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
+    + '.paraphes-runner{position:running(paraphes-runner)}'
     + '.final-page{page:signature;page-break-before:always;break-before:page;width:100%}'
-    // Paraphes côte à côte, rapprochés, en coin bas-droite
-    + '.page-paraphes{display:flex;align-items:flex-end;gap:6mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
-    + '.page-paraphes .paraphe-cell{text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
-    + '.page-paraphes .paraphe-label{font-family:"Arial Narrow",sans-serif;font-weight:700;font-size:7pt;text-transform:uppercase;letter-spacing:1px;color:#191923;opacity:0.55;margin-bottom:2mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
-    + '.page-paraphes .paraphe-initials{font-family:"Yellowtail",cursive;font-size:24pt;color:#FF82D7;line-height:1;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}'
-    + '.page-paraphes .paraphe-initials.pending{font-family:"Arial Narrow",sans-serif;font-style:italic;font-size:10pt;color:#BBBBBB;font-weight:400;padding-bottom:5mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}'
+    // Paraphes côte à côte, simplifiés (rendus DANS la marge bottom de @page via element())
+    + '.page-paraphes{display:flex;align-items:flex-end;justify-content:flex-end;gap:5mm}'
+    + '.page-paraphes .paraphe-cell{text-align:center}'
+    + '.page-paraphes .paraphe-label{display:block;font-family:Arial,sans-serif;font-weight:700;font-size:7pt;text-transform:uppercase;letter-spacing:0.8px;color:#666666;margin-bottom:1mm;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}'
+    + '.page-paraphes .paraphe-initials{display:block;font-family:"Yellowtail",cursive;font-size:18pt;color:#FF82D7;line-height:1;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}'
+    + '.page-paraphes .paraphe-initials.pending{font-family:Arial,sans-serif;font-style:italic;font-size:9pt;color:#999999;font-weight:400;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}'
     // 🔥 Sprint C3 v2 : cartouche audit enrichi
     + '.audit-box{margin:18px 0 0 0;padding:14px 16px;background:#FAFAFA;border:1.5px solid #FF82D7;border-radius:6px;font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;line-height:1.5;color:#191923;break-inside:avoid;page-break-inside:avoid}'
     + '.audit-box-title{font-family:"Yellowtail",cursive;font-size:18px;color:#FF82D7;margin-bottom:8px;line-height:1;display:flex;align-items:center;gap:8px}'
@@ -289,7 +288,7 @@ export function wrapHtml(opts) {
   // Mode v6 : paraphes en position fixed (répétés sur chaque page imprimée) + final-page séparée
   if (paraphFooter || signatures) {
     return openHtml
-      + (paraphFooter ? '<div class="paraphes-fixed">' + paraphFooter + '</div>' : '')
+      + (paraphFooter ? '<div class="paraphes-runner">' + paraphFooter + '</div>' : '')
       + body
       + (signatures ? '<div class="final-page">' + signatures + '</div>' : '')
       + '</body></html>'
