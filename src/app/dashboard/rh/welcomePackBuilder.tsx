@@ -2,9 +2,10 @@
 // welcomePackBuilder.tsx
 // ============================================================
 import { ALL_MESHUGA_FONTFACES } from "@/lib/fonts"
-import { getInitials, buildParaphFooter } from "./contractBuilders"
-// 🔥 Sprint Y1 : type de la signature électronique pré-enregistrée d'Edward
+import { getInitials, buildParaphFooter, esc as escFromBuilders } from "./contractBuilders"
 import type { EmployerSignature } from "./employerSignature"
+import { renderEmployerSignatureBlock, renderEmployeeSignatureBlockEmpty } from "./employerSignature"
+// 🔥 Sprint Y1 : type de la signature électronique pré-enregistrée d'Edward
 
 // Génère le HTML complet (4 pages A4) du Dossier de bienvenue Meshuga.
 // Reproduction fidèle du PDF Python livré côté Storage.
@@ -702,6 +703,20 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     ".audit-box .audit-row .v { color: #191923; }" +
     ".audit-box .audit-row .v.mono { font-family: 'SF Mono',Consolas,monospace; font-size: 8.5px; word-break: break-all; color: #555; }" +
     ".audit-box .audit-legal { margin-top: 8px; padding-top: 6px; border-top: 1px dotted #DDD; font-size: 8.5px; color: #666; font-style: italic; line-height: 1.5; }" +
+    // 🔥 Sprint C3 v5 : système de signatures identique à l'avenant (cohérence visuelle absolue)
+    ".sig-section { margin-top: 24px; padding-top: 8px; break-inside: avoid; page-break-inside: avoid; }" +
+    ".sig-section h2 { font-family: 'Yellowtail',cursive; font-size: 42px; color: #FF82D7; text-align: center; font-weight: 400; line-height: 1; margin-bottom: 8px; }" +
+    ".sig-section .rule { height: 2px; background: #FF82D7; margin: 0 0 28px; }" +
+    ".fait-banner { background: #FFFFFF; border-top: 2.5px solid #FF82D7; border-bottom: 2.5px solid #FF82D7; padding: 16px 18px; text-align: center; margin-bottom: 24px; font-size: 13.5px; color: #191923; }" +
+    ".fait-banner .small { display: block; font-size: 11px; color: #666; font-style: italic; margin-top: 6px; }" +
+    ".sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }" +
+    ".sig-block-new { display: flex; flex-direction: column; border: 2px solid #FF82D7; background: #fff; break-inside: avoid; page-break-inside: avoid; min-height: 480px; }" +
+    ".sig-head { background: #FF82D7; color: #fff; padding: 10px 16px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; }" +
+    ".sig-id { background: #FFEB5A; padding: 10px 16px; border-bottom: 2px solid #FF82D7; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; min-height: 72px; }" +
+    ".sig-id .name { font-size: 14px; font-weight: 900; color: #191923; line-height: 1.2; margin-bottom: 3px; }" +
+    ".sig-id .role { font-size: 10px; color: #666; font-style: italic; line-height: 1.3; }" +
+    ".sig-space { flex: 1; font-size: 11px; color: #666; line-height: 1.4; }" +
+    ".sig-foot { background: #FAFAFA; border-top: 1px solid #DDD; padding: 6px 12px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #666; font-style: italic; min-height: 30px; }" +
     // Couverture pleine page rose, sans marges, page-break après pour démarrer le contenu sur page 2
     ".cover { width: 210mm; height: 297mm; background: #FF82D7; padding: 22mm; position: relative; overflow: hidden; page-break-after: always; break-after: page; display: flex; flex-direction: column; justify-content: space-between; }" +
     ".cover .bg-circle { position: absolute; border-radius: 50%; pointer-events: none; }" +
@@ -1136,83 +1151,23 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
           '<li>accepter sans réserve la <b>mise sous vidéosurveillance</b> de l\'établissement aux finalités déclarées (sécurité, lutte contre le vol, traçabilité HACCP) et reconnaître avoir été ' + g("informé", "informée") + ' préalablement (L1222-4 Code du travail · art. 13 RGPD).</li>' +
         '</ol>' +
 
-        // ===== 2 BEAUX BLOCS SIGNATURES + MENTION FINALE — WRAPPER UNBREAKABLE =====
-        '<div style="margin-top: 6mm; break-inside: avoid; page-break-inside: avoid;">' +
-        '<div class="sig-block" style="display: grid; grid-template-columns: 1fr 1fr; gap: 4mm;">' +
-          // Bloc gauche : Le/La salarié·e (rose Meshuga)
-          '<div style="border: 2.5px solid #FF82D7; border-radius: 6px; padding: 4mm; background: rgba(255,130,215,0.04); position: relative;">' +
-            '<div style="position: absolute; top: -3mm; left: 4mm; background: #FFFFFF; padding: 0 5px; font-family: Yellowtail, cursive; color: #FF82D7; font-size: 13pt; line-height: 1;">' + g("Le salarié", "La salariée") + '</div>' +
-            '<div style="display: grid; grid-template-columns: auto 1fr; gap: 1mm 4mm; font-size: 11pt; margin-top: 3mm;">' +
-              '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Date</div>' +
-              '<div style="border-bottom: 1px solid #191923; min-height: 4mm;"></div>' +
-              '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Lieu</div>' +
-              '<div style="border-bottom: 1px solid #191923; min-height: 4mm;">Paris</div>' +
-              '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm; grid-column: 1 / 3; font-size: 11pt;">Mention manuscrite&nbsp;: «&nbsp;<span style="color: #FF82D7;">' + 'Lu et approuvé' + '</span>&nbsp;»</div>' +
-              '<div style="border-bottom: 1px solid #191923; min-height: 5mm; grid-column: 1 / 3;"></div>' +
-              '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm; grid-column: 1 / 3;">Signature ' + g('du salarié', 'de la salariée') + '</div>' +
-              '<div style="border-bottom: 1px solid #191923; min-height: 14mm; grid-column: 1 / 3;"></div>' +
-            '</div>' +
-            '<div style="margin-top: 2mm; font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; font-size: 11pt; text-align: center;">' + esc(nomComplet) + '</div>' +
+        // 🔥 Sprint C3 v5 : refonte cohérente avec l'avenant — utilise les mêmes helpers
+        // renderEmployerSignatureBlock (avec cartouche audit) + renderEmployeeSignatureBlockEmpty
+        // (avec marker EMPLOYEE_SIGNATURE_PLACEHOLDER pour que submit/route.ts l'injecte au moment de la signature)
+        '<section class="sig-section">' +
+        '<h2>Signatures</h2>' +
+        '<div class="rule"></div>' +
+        '<div class="fait-banner">Fait à <strong>Paris</strong>, en deux exemplaires originaux dont un remis à chacune des Parties.<span class="small">Chaque page doit être paraphée par les deux Parties.</span></div>' +
+        '<div class="sig-grid">' +
+          '<div class="sig-block-new">' +
+            '<div class="sig-head">Pour l\'Employeur</div>' +
+            renderEmployerSignatureBlock(employerSig || null) +
           '</div>' +
-          // Bloc droit : L'employeur (noir charbon)
-          // 🔥 Sprint Y1 : si employerSig actif → date + Lu et approuvé + signature pré-remplies + cartouche audit
-          //                 sinon → bloc vide comme avant (rétro-compatible)
-          (function() {
-            var sigActive = employerSig && employerSig.active === true && employerSig.png_base64
-            var sigFullName = sigActive ? (employerSig.full_name || 'Edward Touret') : 'Edward TOURET'
-            var sigDate = sigActive ? todayFr() : ''
-            var sigActivatedDate = ''
-            var sigIp = sigActive ? (employerSig.ip || '') : ''
-            var sigCountry = sigActive ? (employerSig.country || '') : ''
-            var sigHashShort = sigActive && employerSig.consent_hash ? employerSig.consent_hash.slice(0, 16) : ''
-            if (sigActive && employerSig.activated_at) {
-              try {
-                var dAct = new Date(employerSig.activated_at)
-                if (!isNaN(dAct.getTime())) {
-                  var ddA = String(dAct.getDate())
-                  if (ddA.length < 2) ddA = '0' + ddA
-                  var mmA = String(dAct.getMonth() + 1)
-                  if (mmA.length < 2) mmA = '0' + mmA
-                  sigActivatedDate = ddA + '/' + mmA + '/' + dAct.getFullYear()
-                }
-              } catch (e) {}
-            }
-            return '<div style="border: 2.5px solid #191923; border-radius: 6px; padding: 4mm; background: rgba(25,25,35,0.025); position: relative;">' +
-            '<div style="position: absolute; top: -3mm; left: 4mm; background: #FFFFFF; padding: 0 5px; font-family: Yellowtail, cursive; color: #191923; font-size: 13pt; line-height: 1;">L\'employeur</div>' +
-            '<div style="display: grid; grid-template-columns: auto 1fr; gap: 1mm 4mm; font-size: 11pt; margin-top: 3mm;">' +
-              '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Date</div>' +
-              '<div style="border-bottom: 1px solid #191923; min-height: 4mm; font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700;">' + esc(sigDate) + '</div>' +
-              '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm;">Lieu</div>' +
-              '<div style="border-bottom: 1px solid #191923; min-height: 4mm; font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700;">Paris</div>' +
-              '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm; grid-column: 1 / 3; font-size: 11pt;">Mention manuscrite&nbsp;: «&nbsp;<span style="color: #191923;">Lu et approuvé</span>&nbsp;»</div>' +
-              (sigActive
-                ? '<div style="border-bottom: 1px solid #191923; min-height: 5mm; grid-column: 1 / 3; font-family: Yellowtail, cursive; color: #FF82D7; font-size: 16pt; line-height: 1.1; padding-bottom: 1mm;">Lu et approuvé</div>'
-                : '<div style="border-bottom: 1px solid #191923; min-height: 5mm; grid-column: 1 / 3;"></div>'
-              ) +
-              '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; text-transform: uppercase; opacity: 0.65; letter-spacing: 1px; padding-top: 0.5mm; grid-column: 1 / 3;">Signature ' + (sigActive ? 'électronique' : '& cachet') + '</div>' +
-              (sigActive
-                ? '<div style="border-bottom: 1px solid #191923; min-height: 14mm; grid-column: 1 / 3; display: flex; align-items: center; justify-content: center; padding: 2mm 0;"><span style="font-family: Yellowtail, cursive; color: #FF82D7; font-size: 28pt; line-height: 1; letter-spacing: 0.5px;">' + esc(sigFullName) + '</span></div>'
-                : '<div style="border-bottom: 1px solid #191923; min-height: 14mm; grid-column: 1 / 3;"></div>'
-              ) +
-            '</div>' +
-            '<div style="margin-top: 2mm; font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-weight: 700; font-size: 11pt; text-align: center;">' + esc(sigActive ? sigFullName : 'Edward TOURET') + '</div>' +
-            '<div style="font-family: \'BILD Condensed\', \'Arial Narrow\', sans-serif; font-size: 11pt; text-align: center; opacity: 0.7; letter-spacing: 0.5px;">Président · SAS AEGIA FOOD</div>' +
-            // 🔥 Cartouche audit : visible uniquement si mandat actif
-            // Style strictement identique au contrat (employerSignature.ts) : Helvetica Neue, italique, 8px, labels gras
-            (sigActive
-              ? '<div style="margin-top: 3mm; padding-top: 2mm; border-top: 1px dashed rgba(25,25,35,0.25); align-self: stretch; font-family: \'Helvetica Neue\', Helvetica, Arial, sans-serif; font-size: 8px; line-height: 1.7; color: #555; text-align: left; font-style: italic;">' +
-                '<div><strong style="color: #2c2c2c; font-weight: 600;">Mandat permanent&nbsp;:</strong> activé' + (sigActivatedDate ? ' le ' + esc(sigActivatedDate) : '') + '</div>' +
-                (sigIp ? '<div><strong style="color: #2c2c2c; font-weight: 600;">IP&nbsp;:</strong> ' + esc(sigIp) + (sigCountry ? ' (' + esc(sigCountry) + ')' : '') + '</div>' : '') +
-                (sigHashShort ? '<div><strong style="color: #2c2c2c; font-weight: 600;">Hash SHA-256&nbsp;:</strong> <span style="font-family: \'SF Mono\', \'Consolas\', \'Courier New\', monospace; font-size: 7.5px; color: #555; font-style: normal;">' + esc(sigHashShort) + '…</span></div>' : '') +
-                '<div><strong style="color: #2c2c2c; font-weight: 600;">Référence légale&nbsp;:</strong> art. 1367 C. civ. + eIDAS UE 910/2014, art. 25</div>' +
-                '<div><strong style="color: #2c2c2c; font-weight: 600;">Force probante&nbsp;:</strong> équivalente à la signature manuscrite (art. 1366 C. civ.)</div>' +
-                '<div><strong style="color: #2c2c2c; font-weight: 600;">Audit trail&nbsp;:</strong> horodaté et conservé</div>' +
-                '</div>'
-              : ''
-            ) +
-            '</div>'
-          })() +
+          '<div class="sig-block-new">' +
+            renderEmployeeSignatureBlockEmpty(emp.prenom || '', emp.nom || '', contract.fonction || '', g('', 'e') === 'e') +
+          '</div>' +
         '</div>' +
+        '</section>' +
 
         '<p style="margin-top: 4mm; font-size: 11pt; opacity: 0.55; font-style: italic; line-height: 1.55; text-align: center;">' +
           'Document signé en double exemplaire, dont un remis ' + g("au salarié", "à la salariée") + '. Conservé dans le dossier RH pendant toute la durée du contrat et 5 ans après sortie effective (article D.1221-24 du Code du travail).' +
@@ -1580,6 +1535,11 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
       '<style>' + styles + '</style>' +
     '</head>' +
     '<body>' +
+      // 🔥 Sprint C3 v5 : toolbar d'impression cohérente avec l'avenant (rose + jaune)
+      '<div class="toolbar" style="position:sticky;top:0;z-index:50;background:#FF82D7;color:#FFFFFF;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #FFEB5A">' +
+        '<h1 style="font-family:Yellowtail,cursive;font-size:28px;color:#FFFFFF;margin:0">meshuga · dossier de bienvenue</h1>' +
+        '<button onclick="window.print()" style="font-family:\'Arial Narrow\',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding:10px 16px;border:2px solid #191923;border-radius:4px;cursor:pointer;background:#FFEB5A;color:#191923">Imprimer en PDF</button>' +
+      '</div>' +
       page1 +
       '<main class=\"flow\">' +
         pageSommaire +       // 🆕 Page 2 : Bienvenue + sommaire
