@@ -143,14 +143,25 @@ export function buildSharedCss(logoDataUri) {
     + '.running-header{position:running(running-header);display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #FF82D7;padding-bottom:6px;font-family:Arial Narrow,sans-serif;font-size:9px;color:#666}'
     + '.running-header img{height:18px;width:auto}'
     + '.running-header .tag{font-style:italic;letter-spacing:1px;text-transform:uppercase}'
-    // 🔥 Sprint C3 v2 : encart paraphes en bas à droite de chaque page (CSS print)
-    + '.paraph-footer{position:fixed;bottom:8mm;right:8mm;background:rgba(255,235,90,0.18);border:1px dashed #FF82D7;border-radius:4px;padding:4px 8px;font-family:"Arial Narrow",Arial,sans-serif;font-size:7.5px;color:#191923;line-height:1.1;z-index:9999;display:flex;gap:10px;align-items:center}'
+    // 🔥 Sprint C3 v5 : paraphes en bas à droite — visibles à l'écran ET sur CHAQUE page imprimée
+    // À l'écran : flottant en bas-droite du viewport (position:fixed) + encart inline à la fin du document (.paraph-footer-inline)
+    // À l'impression : la version inline est masquée, et .paraph-footer (position:fixed) apparaît sur CHAQUE page grâce au comportement standard CSS print de Chrome/Safari
+    + '.paraph-footer{position:fixed;bottom:8mm;right:8mm;background:rgba(255,235,90,0.92);border:1.5px solid #FF82D7;border-radius:5px;padding:5px 9px;font-family:"Arial Narrow",Arial,sans-serif;font-size:7.5px;color:#191923;line-height:1.1;z-index:9999;display:flex;gap:10px;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,0.12)}'
     + '.paraph-footer .paraph-cell{text-align:center;min-width:36px}'
     + '.paraph-footer .paraph-letters{font-family:"Yellowtail",cursive;font-size:15px;color:#FF82D7;line-height:1;margin-bottom:2px;letter-spacing:1px}'
     + '.paraph-footer .paraph-letters.empty{font-family:"Arial Narrow",Arial,sans-serif;font-size:8px;color:#999;font-style:italic;letter-spacing:0}'
     + '.paraph-footer .paraph-label{font-size:6.5px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.5px}'
-    + '.paraph-footer .paraph-sep{width:1px;height:22px;background:#FF82D7;opacity:0.35}'
-    // 🔥 Sprint C3 v2 : cartouche audit enrichi (en dernière page sous la signature)
+    + '.paraph-footer .paraph-sep{width:1px;height:22px;background:#FF82D7;opacity:0.45}'
+    // Encart inline à la fin du document (visible à l'écran seulement, en cohérence visuelle avec le footer flottant)
+    + '.paraph-footer-inline{display:none;margin:28px auto 0 auto;padding:14px 22px;background:rgba(255,235,90,0.18);border:1.5px dashed #FF82D7;border-radius:8px;max-width:380px;text-align:center;font-family:"Arial Narrow",Arial,sans-serif}'
+    + '.paraph-footer-inline .label-top{font-size:8.5px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px}'
+    + '.paraph-footer-inline .inline-row{display:flex;justify-content:center;align-items:center;gap:36px}'
+    + '.paraph-footer-inline .inline-cell{text-align:center}'
+    + '.paraph-footer-inline .inline-letters{font-family:"Yellowtail",cursive;font-size:34px;color:#FF82D7;line-height:1;letter-spacing:2px}'
+    + '.paraph-footer-inline .inline-letters.empty{font-family:"Arial Narrow",Arial,sans-serif;font-size:14px;color:#AAA;font-style:italic;letter-spacing:0}'
+    + '.paraph-footer-inline .inline-label{font-size:9px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.8px;margin-top:6px;font-weight:700}'
+    + '.paraph-footer-inline .inline-sep{width:2px;height:48px;background:#FF82D7;opacity:0.4}'
+    // 🔥 Sprint C3 v2 : cartouche audit enrichi
     + '.audit-box{margin:18px 0 0 0;padding:14px 16px;background:#FAFAFA;border:1.5px solid #FF82D7;border-radius:6px;font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;line-height:1.5;color:#191923;break-inside:avoid;page-break-inside:avoid}'
     + '.audit-box-title{font-family:"Yellowtail",cursive;font-size:18px;color:#FF82D7;margin-bottom:8px;line-height:1;display:flex;align-items:center;gap:8px}'
     + '.audit-box-title::before{content:"✓";display:inline-block;background:#16A34A;color:#fff;width:18px;height:18px;border-radius:50%;font-size:11px;text-align:center;line-height:18px;font-family:Arial,sans-serif;font-weight:900}'
@@ -160,7 +171,10 @@ export function buildSharedCss(logoDataUri) {
     + '.audit-box .audit-row .v{color:#191923}'
     + '.audit-box .audit-row .v.mono{font-family:"SF Mono",Consolas,monospace;font-size:8.5px;word-break:break-all;color:#555}'
     + '.audit-box .audit-legal{margin-top:8px;padding-top:6px;border-top:1px dotted #DDD;font-size:8.5px;color:#666;font-style:italic;line-height:1.5}'
-    + '@media print{.paraph-footer{position:fixed;-webkit-print-color-adjust:exact;print-color-adjust:exact}.audit-box,.audit-box-title{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+    // À l'écran : flottant rose visible + encart inline visible en bas du document
+    + '@media screen{.paraph-footer-inline{display:block}}'
+    // À l'impression : encart inline MASQUÉ, seul .paraph-footer (position:fixed) est répété sur chaque page
+    + '@media print{.paraph-footer-inline{display:none !important}.paraph-footer{position:fixed;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.audit-box,.audit-box-title{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
 }
 
 // ============================================================
@@ -307,13 +321,24 @@ export function getInitials(fullName: string): string {
  * @param employeeInitials - ex "ES" (ou "" si pas encore signé côté salarié)
  */
 export function buildParaphFooter(employerInitials: string, employeeInitials: string): string {
+  // Cellules pour le bloc flottant (compact)
   var empCell = employerInitials
     ? '<div class="paraph-letters">' + esc(employerInitials) + '</div>'
     : '<div class="paraph-letters empty">—</div>'
   var saCell = employeeInitials
     ? '<div class="paraph-letters">' + esc(employeeInitials) + '</div>'
     : '<div class="paraph-letters empty">paraphe</div>'
-  return ''
+
+  // Cellules pour le bloc inline en fin de doc (plus grand, plus visible)
+  var empCellInline = employerInitials
+    ? '<div class="inline-letters">' + esc(employerInitials) + '</div>'
+    : '<div class="inline-letters empty">en attente</div>'
+  var saCellInline = employeeInitials
+    ? '<div class="inline-letters">' + esc(employeeInitials) + '</div>'
+    : '<div class="inline-letters empty">en attente</div>'
+
+  // Bloc flottant en bas-droite (visible à l'écran + répété sur chaque page imprimée)
+  var floatingBlock = ''
     + '<div class="paraph-footer">'
     +   '<div class="paraph-cell">'
     +     empCell
@@ -325,6 +350,25 @@ export function buildParaphFooter(employerInitials: string, employeeInitials: st
     +     '<div class="paraph-label">Salarié</div>'
     +   '</div>'
     + '</div>'
+
+  // Bloc inline en fin de doc (visible à l'écran uniquement, masqué à l'impression)
+  var inlineBlock = ''
+    + '<div class="paraph-footer-inline">'
+    +   '<div class="label-top">Paraphes des Parties</div>'
+    +   '<div class="inline-row">'
+    +     '<div class="inline-cell">'
+    +       empCellInline
+    +       '<div class="inline-label">Employeur</div>'
+    +     '</div>'
+    +     '<div class="inline-sep"></div>'
+    +     '<div class="inline-cell">'
+    +       saCellInline
+    +       '<div class="inline-label">Salarié</div>'
+    +     '</div>'
+    +   '</div>'
+    + '</div>'
+
+  return floatingBlock + inlineBlock
 }
 
 // ============================================================
