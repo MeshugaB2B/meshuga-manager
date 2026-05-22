@@ -686,7 +686,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // la technique HTML standard (table avec thead/tfoot) qui répète AUTOMATIQUEMENT le footer
     // sur chaque page imprimée. Compatible 100% des browsers depuis IE6.
     "@page cover { size: A4; margin: 0; @bottom-center { content: ''; } }" +
-    "@page default { size: A4; margin: 18mm 14mm 30mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
+    "@page default { size: A4; margin: 18mm 14mm 20mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
     // 🆕 Page signature dédiée : pas de marge bas surdimensionnée (pas de tfoot paraphes) + même footer central
     "@page signature { size: A4; margin: 18mm 14mm 18mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
     "html, body { background: #FFFFFF; }" +
@@ -725,27 +725,21 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // `page: cover` assigne explicitement cette div à la @page cover définie plus haut.
     ".cover { page: cover; width: 210mm; height: 297mm; background: #FF82D7; padding: 22mm; position: relative; overflow: hidden; page-break-after: always; break-after: page; display: flex; flex-direction: column; justify-content: space-between; }" +
     ".cover .bg-circle { position: absolute; border-radius: 50%; pointer-events: none; }" +
-    // 🔥 TABLE-BASED LAYOUT pour le contenu post-couverture : thead/tfoot répétés sur chaque page.
-    // Chrome (et tous les browsers) répètent automatiquement <thead> et <tfoot> en haut/bas de
-    // chaque page imprimée d'un <table>. C'est la SEULE méthode 100% fiable cross-version.
-    ".flow-table { page: default; width: 100%; border-collapse: collapse; table-layout: fixed; }" +
-    ".flow-table thead { display: table-header-group; }" +  // force répétition haut de page
-    ".flow-table tfoot { display: table-footer-group; }" +  // force répétition bas de page
-    ".flow-table > thead > tr > td, .flow-table > tbody > tr > td, .flow-table > tfoot > tr > td { padding: 0; }" +
-    ".flow-table > tbody > tr > td { vertical-align: top; }" +
-    ".flow-table > tfoot > tr > td { vertical-align: bottom; }" +  // 🔥 ancrage en bas de chaque page imprimée
-    // 🆕 Paraphes côte à côte en bas à droite, rapprochés, hauteur fixe ancrée à la marge bottom
-    ".page-paraphes { display: flex; justify-content: flex-end; align-items: flex-end; gap: 4mm; height: 18mm; padding: 0 8mm 4mm 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
-    ".page-paraphes .paraphe-cell { text-align: center; min-width: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
-    ".page-paraphes .paraphe-label { font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 1.5px; color: #191923; opacity: 0.55; margin-bottom: 1mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
-    ".page-paraphes .paraphe-initials { font-family: 'Yellowtail', cursive; font-size: 22pt; color: #FF82D7; line-height: 1; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
-    ".page-paraphes .paraphe-initials.pending { font-family: 'Arial Narrow', sans-serif; font-style: italic; font-size: 11pt; color: #BBBBBB; font-weight: 400; padding-bottom: 4mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
-    // 🆕 Page finale (signatures) : page dédiée hors-table, pas de paraphes répétés
-    ".final-page { page: signature; page-break-before: always; break-before: page; width: 100%; }" +
-    // En écran on cache le tfoot répétitif (on garde uniquement la vue continue)
-    "@media screen { .flow-table > tfoot { display: none; } }" +
-    // 🆕 Masquer la toolbar à l'impression + forcer color-adjust exact sur les paraphes en print + min-height tbody pour ancrer tfoot en bas
-    "@media print { .toolbar { display: none !important; } body { margin: 0 !important; } .page-paraphes, .page-paraphes * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; } .flow-table > tbody > tr > td { min-height: 24cm; height: 24cm; } }" +
+    // 🔥 Sprint C3 v7 : paraphes en position:fixed (méthode fiable cross-version).
+    // À l'écran : invisibles. En print : ancrés dans le coin bas-droite, répétés par Chrome sur chaque page.
+    // Page signature : .final-page couvre via background blanc + z-index élevé.
+    ".paraphes-fixed { display: none; }" +
+    "@media print { .paraphes-fixed { display: block; position: fixed; bottom: 8mm; right: 12mm; z-index: 1; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; } }" +
+    // Paraphes côte à côte, rapprochés, en coin bas-droite
+    ".page-paraphes { display: flex; align-items: flex-end; gap: 6mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
+    ".page-paraphes .paraphe-cell { text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
+    ".page-paraphes .paraphe-label { font-family: 'Arial Narrow', sans-serif; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 1px; color: #191923; opacity: 0.55; margin-bottom: 2mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
+    ".page-paraphes .paraphe-initials { font-family: 'Yellowtail', cursive; font-size: 24pt; color: #FF82D7; line-height: 1; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
+    ".page-paraphes .paraphe-initials.pending { font-family: 'Arial Narrow', sans-serif; font-style: italic; font-size: 10pt; color: #BBBBBB; font-weight: 400; padding-bottom: 5mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
+    // 🆕 Page finale (signatures) : couvre les paraphes-fixed via z-index élevé + background blanc
+    ".final-page { page: signature; page-break-before: always; break-before: page; width: 100%; position: relative; background: #FFFFFF; min-height: 100vh; z-index: 9999; }" +
+    // 🆕 Masquer la toolbar à l'impression
+    "@media print { .toolbar { display: none !important; } body { margin: 0 !important; } }" +
     // Chapitre = un h2 Yellowtail + son contenu. break-before:page démarre chaque chapitre sur une nouvelle page.
     ".chapter { break-before: page; page-break-before: always; }" +
     ".chapter:first-of-type { break-before: avoid; page-break-before: avoid; }" +
@@ -1565,36 +1559,33 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
         '<button onclick="window.print()" style="font-family:\'Arial Narrow\',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding:10px 16px;border:2px solid #191923;border-radius:4px;cursor:pointer;background:#FFEB5A;color:#191923">Imprimer en PDF</button>' +
       '</div>' +
       page1 +
-      // 🔥 Table-based wrapper : tfoot répété en pied de chaque page imprimée par Chrome.
-      // C'est la SEULE technique 100% fiable cross-version pour répéter un footer sur chaque page.
-      '<table class="flow-table">' +
-        '<tfoot><tr><td>' +
-          '<div class="page-paraphes">' +
-            '<div class="paraphe-cell">' +
-              '<div class="paraphe-label">Paraphe employeur</div>' +
-              '<div class="paraphe-initials">E.T.</div>' +
-            '</div>' +
-            '<div class="paraphe-cell">' +
-              '<div class="paraphe-label">Paraphe ' + g('salarié', 'salariée') + '</div>' +
-              '<div class="paraphe-initials pending">en attente</div>' +
-            '</div>' +
+      // 🔥 Sprint C3 v7 : paraphes via position:fixed (répétés sur chaque page imprimée par Chrome).
+      // Bien plus fiable que table tfoot — ancrés dans le coin bas-droite peu importe la longueur de page.
+      // Page signature : .final-page la couvre via background blanc + z-index élevé.
+      '<div class="paraphes-fixed">' +
+        '<div class="page-paraphes">' +
+          '<div class="paraphe-cell">' +
+            '<div class="paraphe-label">Employeur</div>' +
+            '<div class="paraphe-initials">E.T.</div>' +
           '</div>' +
-        '</td></tr></tfoot>' +
-        '<tbody><tr><td>' +
-        pageSommaire +       // 🆕 Page 2 : Bienvenue + sommaire
-        page2 +              // Page 3 : Fiche salarié
-        pageDureeTravail +   // 🆕 Page 4 : Durée du travail & repos
-        pageRemuneration +   // 🆕 Page 5 : Rémunération & avantages
-        pageConges +         // 🆕 Page 6 : Congés payés (règle stricte)
-        page3 +              // Page 7 : Hygiène & HACCP
-        page4 +              // Page 8 : Sécurité au travail
-        page5 +              // Page 9 : Cadre social & légal
-        page5b +             // Page 10 : Vidéosurveillance & RGPD
-        pageCharteNum +      // 🆕 Page 11 : Charte numérique
-        pageTenue +          // 🆕 Page 12 : Tenue & comportement
-        '</td></tr></tbody>' +
-      '</table>' +
-      // 🆕 Page 13 (signatures) HORS du table : pas de tfoot répété, pas de paraphes
+          '<div class="paraphe-cell">' +
+            '<div class="paraphe-label">' + g('Salarié', 'Salariée') + '</div>' +
+            '<div class="paraphe-initials pending">en attente</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      pageSommaire +       // 🆕 Page 2 : Bienvenue + sommaire
+      page2 +              // Page 3 : Fiche salarié
+      pageDureeTravail +   // 🆕 Page 4 : Durée du travail & repos
+      pageRemuneration +   // 🆕 Page 5 : Rémunération & avantages
+      pageConges +         // 🆕 Page 6 : Congés payés (règle stricte)
+      page3 +              // Page 7 : Hygiène & HACCP
+      page4 +              // Page 8 : Sécurité au travail
+      page5 +              // Page 9 : Cadre social & légal
+      page5b +             // Page 10 : Vidéosurveillance & RGPD
+      pageCharteNum +      // 🆕 Page 11 : Charte numérique
+      pageTenue +          // 🆕 Page 12 : Tenue & comportement
+      // 🆕 Page finale (signatures) : .final-page couvre les paraphes-fixed via z-index élevé
       '<div class="final-page">' +
         page6 +
       '</div>' +
