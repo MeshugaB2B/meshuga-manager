@@ -138,29 +138,28 @@ export function buildSharedCss(logoDataUri) {
     + '.sig-id .role{font-size:10px;color:#666;font-style:italic;line-height:1.3}'
     + '.sig-space{flex:1;font-size:11px;color:#666;line-height:1.4}'
     + '.sig-foot{background:#FAFAFA;border-top:1px solid #DDD;padding:6px 12px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#666;font-style:italic;min-height:30px}'
-    + '@media print{@page{size:A4;margin:2.2cm 1.4cm 1.6cm 1.4cm;@top-center{content:element(running-header)}}.toolbar{display:none}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-inside:avoid;page-break-inside:avoid}.sig-block{break-inside:avoid;page-break-inside:avoid}'
+    + '@media print{@page{size:A4;margin:2.2cm 1.4cm 2.4cm 1.4cm;@top-center{content:element(running-header)}}.toolbar{display:none !important}body{margin:0 !important}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-inside:avoid;page-break-inside:avoid}.sig-block{break-inside:avoid;page-break-inside:avoid}'
     + '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.running-header,.sig-section h2,.parties h3,.art-title,.cover .rule,.sig-section .rule,.sig-block,.note{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
     + '.running-header{position:running(running-header);display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #FF82D7;padding-bottom:6px;font-family:Arial Narrow,sans-serif;font-size:9px;color:#666}'
     + '.running-header img{height:18px;width:auto}'
     + '.running-header .tag{font-style:italic;letter-spacing:1px;text-transform:uppercase}'
-    // 🔥 Sprint C3 v5 : paraphes en bas à droite — visibles à l'écran ET sur CHAQUE page imprimée
-    // À l'écran : flottant en bas-droite du viewport (position:fixed) + encart inline à la fin du document (.paraph-footer-inline)
-    // À l'impression : la version inline est masquée, et .paraph-footer (position:fixed) apparaît sur CHAQUE page grâce au comportement standard CSS print de Chrome/Safari
-    + '.paraph-footer{position:fixed;bottom:8mm;right:8mm;background:rgba(255,235,90,0.92);border:1.5px solid #FF82D7;border-radius:5px;padding:5px 9px;font-family:"Arial Narrow",Arial,sans-serif;font-size:7.5px;color:#191923;line-height:1.1;z-index:9999;display:flex;gap:10px;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,0.12)}'
-    + '.paraph-footer .paraph-cell{text-align:center;min-width:36px}'
-    + '.paraph-footer .paraph-letters{font-family:"Yellowtail",cursive;font-size:15px;color:#FF82D7;line-height:1;margin-bottom:2px;letter-spacing:1px}'
-    + '.paraph-footer .paraph-letters.empty{font-family:"Arial Narrow",Arial,sans-serif;font-size:8px;color:#999;font-style:italic;letter-spacing:0}'
-    + '.paraph-footer .paraph-label{font-size:6.5px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.5px}'
-    + '.paraph-footer .paraph-sep{width:1px;height:22px;background:#FF82D7;opacity:0.45}'
-    // Encart inline à la fin du document (visible à l'écran seulement, en cohérence visuelle avec le footer flottant)
-    + '.paraph-footer-inline{display:none;margin:28px auto 0 auto;padding:14px 22px;background:rgba(255,235,90,0.18);border:1.5px dashed #FF82D7;border-radius:8px;max-width:380px;text-align:center;font-family:"Arial Narrow",Arial,sans-serif}'
-    + '.paraph-footer-inline .label-top{font-size:8.5px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px}'
-    + '.paraph-footer-inline .inline-row{display:flex;justify-content:center;align-items:center;gap:36px}'
-    + '.paraph-footer-inline .inline-cell{text-align:center}'
-    + '.paraph-footer-inline .inline-letters{font-family:"Yellowtail",cursive;font-size:34px;color:#FF82D7;line-height:1;letter-spacing:2px}'
-    + '.paraph-footer-inline .inline-letters.empty{font-family:"Arial Narrow",Arial,sans-serif;font-size:14px;color:#AAA;font-style:italic;letter-spacing:0}'
-    + '.paraph-footer-inline .inline-label{font-size:9px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.8px;margin-top:6px;font-weight:700}'
-    + '.paraph-footer-inline .inline-sep{width:2px;height:48px;background:#FF82D7;opacity:0.4}'
+    // 🔥 Sprint C3 v6 : paraphes via TABLE TFOOT (méthode 100% fiable cross-browser).
+    // Chrome répète automatiquement <tfoot> sur chaque page imprimée. La page signatures
+    // est sortie de la table (.final-page) → pas de paraphes répétés sur celle-ci.
+    + '@page signature{size:A4;margin:2.2cm 1.4cm 1.6cm 1.4cm;@top-center{content:element(running-header)}}'
+    + '.flow-table{width:100%;border-collapse:collapse;table-layout:fixed}'
+    + '.flow-table thead{display:table-header-group}'
+    + '.flow-table tfoot{display:table-footer-group}'
+    + '.flow-table > thead > tr > td,.flow-table > tbody > tr > td,.flow-table > tfoot > tr > td{padding:0}'
+    + '.flow-table > tbody > tr > td{vertical-align:top}'
+    + '.final-page{page:signature;page-break-before:always;break-before:page;width:100%}'
+    + '@media screen{.flow-table > tfoot{display:none}}'
+    // Paraphes côte à côte en bas à droite, discrets (pas de fond jaune ni bordure rose)
+    + '.page-paraphes{display:flex;justify-content:flex-end;align-items:flex-end;gap:14mm;padding:4mm 6mm 2mm 0}'
+    + '.page-paraphes .paraphe-cell{text-align:center;min-width:38mm}'
+    + '.page-paraphes .paraphe-label{font-family:"BILD Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:7pt;text-transform:uppercase;letter-spacing:1.5px;color:#191923;opacity:0.55;margin-bottom:1mm}'
+    + '.page-paraphes .paraphe-initials{font-family:"Yellowtail",cursive;font-size:22pt;color:#FF82D7;line-height:1}'
+    + '.page-paraphes .paraphe-initials.pending{font-family:"Arial Narrow",sans-serif;font-style:italic;font-size:11pt;color:#BBBBBB;font-weight:400;padding-bottom:4mm}'
     // 🔥 Sprint C3 v2 : cartouche audit enrichi
     + '.audit-box{margin:18px 0 0 0;padding:14px 16px;background:#FAFAFA;border:1.5px solid #FF82D7;border-radius:6px;font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;line-height:1.5;color:#191923;break-inside:avoid;page-break-inside:avoid}'
     + '.audit-box-title{font-family:"Yellowtail",cursive;font-size:18px;color:#FF82D7;margin-bottom:8px;line-height:1;display:flex;align-items:center;gap:8px}'
@@ -171,10 +170,7 @@ export function buildSharedCss(logoDataUri) {
     + '.audit-box .audit-row .v{color:#191923}'
     + '.audit-box .audit-row .v.mono{font-family:"SF Mono",Consolas,monospace;font-size:8.5px;word-break:break-all;color:#555}'
     + '.audit-box .audit-legal{margin-top:8px;padding-top:6px;border-top:1px dotted #DDD;font-size:8.5px;color:#666;font-style:italic;line-height:1.5}'
-    // À l'écran : flottant rose visible + encart inline visible en bas du document
-    + '@media screen{.paraph-footer-inline{display:block}}'
-    // À l'impression : encart inline MASQUÉ, seul .paraph-footer (position:fixed) est répété sur chaque page
-    + '@media print{.paraph-footer-inline{display:none !important}.paraph-footer{position:fixed;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.audit-box,.audit-box-title{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+    + '@media print{.audit-box,.audit-box-title{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
 }
 
 // ============================================================
@@ -271,20 +267,41 @@ export function buildSharedSignatures(c, emp, salarieRole, employerSig?: Employe
     + employeeBlock
     + '</div>'
     + '</div></section>'
-    + '</div></body></html>'
 }
 
 // ============================================================
 // Wrapper HTML complet : <html><head>...</head><body>{header + corps + signatures}
 // ============================================================
+// 🔥 Sprint C3 v6 : `signatures` et `paraphFooter` séparés du body.
+// - body : header + corps articles (sera wrappé dans <table class="flow-table"> avec tfoot répété)
+// - signatures : section signatures (sortie de la table, dans <div class="final-page"> → pas de paraphes)
+// - paraphFooter : HTML retourné par buildParaphFooter() → injecté dans <tfoot> du table
+//
+// Fallback : si signatures/paraphFooter non fournis, comportement legacy (body brut sans wrapping)
 export function wrapHtml(opts) {
   var titre = opts.titre
   var css = opts.css
   var body = opts.body
-  return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + esc(titre) + '</title>'
+  var signatures = opts.signatures || ''
+  var paraphFooter = opts.paraphFooter || ''
+
+  var openHtml = '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + esc(titre) + '</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">'
     + '<style>' + css + '</style></head><body>'
-    + body
+
+  // Mode v6 : wrapping table tfoot + final-page signatures hors-table
+  if (paraphFooter || signatures) {
+    return openHtml
+      + '<table class="flow-table">'
+      +   '<tfoot><tr><td>' + paraphFooter + '</td></tr></tfoot>'
+      +   '<tbody><tr><td>' + body + '</td></tr></tbody>'
+      + '</table>'
+      + (signatures ? '<div class="final-page">' + signatures + '</div>' : '')
+      + '</body></html>'
+  }
+
+  // Mode legacy : body brut (compat avec appels existants qui ferment </body></html> dans body)
+  return openHtml + body
 }
 
 // ============================================================
@@ -314,61 +331,31 @@ export function getInitials(fullName: string): string {
 }
 
 /**
- * Génère l'encart paraphes en bas à droite (visible sur chaque page imprimée
- * grâce à position:fixed).
+ * Génère le contenu de la cellule <tfoot> pour les paraphes répétés sur chaque page imprimée.
+ * À insérer dans : <table class="flow-table"><tfoot><tr><td>{buildParaphFooter()}</td></tr></tfoot>...
  *
- * @param employerInitials - ex "ET" (ou "" si pas encore signé côté employeur)
- * @param employeeInitials - ex "ES" (ou "" si pas encore signé côté salarié)
+ * @param employerInitials - ex "E.T." (ou "" si pas encore signé côté employeur)
+ * @param employeeInitials - ex "E.S." (ou "" si pas encore signé côté salarié)
  */
 export function buildParaphFooter(employerInitials: string, employeeInitials: string): string {
-  // Cellules pour le bloc flottant (compact)
   var empCell = employerInitials
-    ? '<div class="paraph-letters">' + esc(employerInitials) + '</div>'
-    : '<div class="paraph-letters empty">—</div>'
+    ? '<div class="paraphe-initials">' + esc(employerInitials) + '</div>'
+    : '<div class="paraphe-initials pending">en attente</div>'
   var saCell = employeeInitials
-    ? '<div class="paraph-letters">' + esc(employeeInitials) + '</div>'
-    : '<div class="paraph-letters empty">paraphe</div>'
+    ? '<div class="paraphe-initials">' + esc(employeeInitials) + '</div>'
+    : '<div class="paraphe-initials pending">en attente</div>'
 
-  // Cellules pour le bloc inline en fin de doc (plus grand, plus visible)
-  var empCellInline = employerInitials
-    ? '<div class="inline-letters">' + esc(employerInitials) + '</div>'
-    : '<div class="inline-letters empty">en attente</div>'
-  var saCellInline = employeeInitials
-    ? '<div class="inline-letters">' + esc(employeeInitials) + '</div>'
-    : '<div class="inline-letters empty">en attente</div>'
-
-  // Bloc flottant en bas-droite (visible à l'écran + répété sur chaque page imprimée)
-  var floatingBlock = ''
-    + '<div class="paraph-footer">'
-    +   '<div class="paraph-cell">'
+  return ''
+    + '<div class="page-paraphes">'
+    +   '<div class="paraphe-cell">'
+    +     '<div class="paraphe-label">Paraphe employeur</div>'
     +     empCell
-    +     '<div class="paraph-label">Employeur</div>'
     +   '</div>'
-    +   '<div class="paraph-sep"></div>'
-    +   '<div class="paraph-cell">'
+    +   '<div class="paraphe-cell">'
+    +     '<div class="paraphe-label">Paraphe salarié</div>'
     +     saCell
-    +     '<div class="paraph-label">Salarié</div>'
     +   '</div>'
     + '</div>'
-
-  // Bloc inline en fin de doc (visible à l'écran uniquement, masqué à l'impression)
-  var inlineBlock = ''
-    + '<div class="paraph-footer-inline">'
-    +   '<div class="label-top">Paraphes des Parties</div>'
-    +   '<div class="inline-row">'
-    +     '<div class="inline-cell">'
-    +       empCellInline
-    +       '<div class="inline-label">Employeur</div>'
-    +     '</div>'
-    +     '<div class="inline-sep"></div>'
-    +     '<div class="inline-cell">'
-    +       saCellInline
-    +       '<div class="inline-label">Salarié</div>'
-    +     '</div>'
-    +   '</div>'
-    + '</div>'
-
-  return floatingBlock + inlineBlock
 }
 
 // ============================================================
@@ -511,10 +498,18 @@ export function buildExtraContract(c, emp, vacs, logoUri, employerSig?: Employer
 
   var signatures = buildSharedSignatures(c, emp, c.fonction || "", employerSig || null)
 
+  // 🔥 Sprint C3 v6 : paraphes via tfoot répété — initiales auto-extraites depuis employerSig + emp
+  var paraphFooter = buildParaphFooter(
+    (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : "",
+    "" // côté salarié : "en attente" par défaut, remplacé au moment de la signature électronique
+  )
+
   return wrapHtml({
     titre: "Contrat extra Meshuga — " + (emp.prenom || "") + " " + (emp.nom || ""),
     css: buildSharedCss(logoUri),
-    body: header + body + signatures
+    body: header + body,
+    signatures: signatures,
+    paraphFooter: paraphFooter
   })
 }
 
@@ -759,10 +754,18 @@ export function buildCdiCadreContract(c, emp, logoUri, employerSig?: EmployerSig
 
   var signatures = buildSharedSignatures(c, emp, fonction, employerSig || null)
 
+  // 🔥 Sprint C3 v6 : paraphes via tfoot répété
+  var paraphFooter = buildParaphFooter(
+    (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : "",
+    ""
+  )
+
   return wrapHtml({
     titre: "Contrat CDI Meshuga — " + (emp.prenom || "") + " " + (emp.nom || ""),
     css: buildSharedCss(logoUri),
-    body: header + body + signatures
+    body: header + body,
+    signatures: signatures,
+    paraphFooter: paraphFooter
   })
 }
 
@@ -939,10 +942,18 @@ function buildCdiSimpleContract(c, emp, logoUri, profil, employerSig?: EmployerS
 
   var signatures = buildSharedSignatures(c, emp, fonction, employerSig || null)
 
+  // 🔥 Sprint C3 v6 : paraphes via tfoot répété
+  var paraphFooter = buildParaphFooter(
+    (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : "",
+    ""
+  )
+
   return wrapHtml({
     titre: "Contrat CDI Meshuga — " + (emp.prenom || "") + " " + (emp.nom || ""),
     css: buildSharedCss(logoUri),
-    body: header + body + signatures
+    body: header + body,
+    signatures: signatures,
+    paraphFooter: paraphFooter
   })
 }
 
