@@ -153,7 +153,7 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
     augmentation_salaire: "Modification de la rémunération",
     modification_horaires: "Modification de la durée du travail",
     changement_poste: "Modification des fonctions",
-    regularisation_welcome_pack: "Intégration des évolutions législatives, conventionnelles et internes — Loi DDADUE du 22 avril 2024 (congés payés) · Politique anti-harcèlement · Vidéosurveillance & RGPD · Charte numérique & droit à la déconnexion · Hygiène HACCP & relevés obligatoires · Tenue de travail · Dossier de bienvenue Meshuga (13 pages)",
+    regularisation_welcome_pack: "Intégration des évolutions législatives, conventionnelles et internes — Loi DDADUE du 22 avril 2024 (congés payés) · Politique anti-harcèlement · Vidéosurveillance & RGPD · Charte numérique & droit à la déconnexion · Hygiène HACCP & relevés obligatoires · Tenue de travail · Dossier de bienvenue Meshuga (21 pages)",
     autre: "Modification contractuelle"
   }
   var titreCover = coverTitleByType[amendment.amendment_type] || "AVENANT"
@@ -336,7 +336,7 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
       + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Reconnaissance du Dossier de bienvenue Meshuga</span></div>'
       + '<div class="body">'
       + '<p>Le/La Salarié(e) reconnaît avoir reçu, lu et compris le <strong>Dossier de bienvenue Meshuga</strong> annexé au présent avenant.</p>'
-      + '<p>Ce dossier de bienvenue, comportant <strong>13 pages</strong>, présente l\'ensemble des règles applicables au sein de l\'entreprise : durée du travail, rémunération, congés payés, hygiène, sécurité, vidéosurveillance, RGPD, charte numérique, tenue, comportement et engagement.</p>'
+      + '<p>Ce dossier de bienvenue, comportant <strong>21 pages</strong>, présente l\'ensemble des règles applicables au sein de l\'entreprise : durée du travail, rémunération, congés payés, hygiène, sécurité, vidéosurveillance, RGPD, charte numérique, tenue, comportement et engagement.</p>'
       + '<p><strong>Le Dossier de bienvenue forme partie intégrante du présent avenant</strong> et fait foi en cas de litige sur les règles internes applicables.</p>'
       + '</div>'
     artCounter++
