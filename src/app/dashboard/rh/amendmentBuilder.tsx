@@ -53,7 +53,6 @@ function buildAvenantSignatures(contract: any, emp: any, signatureDate: string, 
     + employeeBlock
     + '</div>'
     + '</div></section>'
-    + '</div></body></html>'
 }
 
 function fmtDateShortFR(d: any) {
@@ -474,16 +473,18 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   // employerSig (optionnel) injecte la signature pré-enregistrée d'Edward
   var signatures = buildAvenantSignatures(contract, emp, amendment.signature_date, contract.fonction || "", employerSig || null)
   
-  // 🔥 Sprint C3 v2 : paraphes en bas à droite de chaque page imprimée.
-  // Côté employeur : remplies si employerSig actif. Côté salarié : remplies au moment
-  // de la signature électronique (le route /sign/[token]/submit fait un remplacement).
+  // 🔥 Sprint C3 v6 : paraphes via tfoot répété + signatures hors-table.
+  // - body : header + corps articles (sera wrappé dans <table class="flow-table"> avec tfoot répété par Chrome)
+  // - signatures : hors-table dans <div class="final-page"> → pas de paraphes sur la page signature
+  // - paraphFooter : initiales employeur auto-extraites, côté salarié "en attente" jusqu'à signature
   var employerInitials = (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : ""
-  // Zone salarié laissée vide ici (placeholder "paraphe") — le submit la remplira par les vraies initiales
   var paraphFooter = buildParaphFooter(employerInitials, "")
   
   return wrapHtml({
     titre: "Avenant Meshuga du " + esc(avenantDateShort) + " — " + (emp ? (emp.prenom + " " + emp.nom) : "—"),
     css: buildSharedCss(logoUri),
-    body: header + body + signatures + paraphFooter
+    body: header + body,
+    signatures: signatures,
+    paraphFooter: paraphFooter
   })
 }
