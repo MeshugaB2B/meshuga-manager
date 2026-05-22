@@ -686,7 +686,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // la technique HTML standard (table avec thead/tfoot) qui répète AUTOMATIQUEMENT le footer
     // sur chaque page imprimée. Compatible 100% des browsers depuis IE6.
     "@page cover { size: A4; margin: 0; @bottom-center { content: ''; } }" +
-    "@page default { size: A4; margin: 18mm 14mm 24mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
+    "@page default { size: A4; margin: 18mm 14mm 30mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
     // 🆕 Page signature dédiée : pas de marge bas surdimensionnée (pas de tfoot paraphes) + même footer central
     "@page signature { size: A4; margin: 18mm 14mm 18mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
     "html, body { background: #FFFFFF; }" +
@@ -733,18 +733,19 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     ".flow-table tfoot { display: table-footer-group; }" +  // force répétition bas de page
     ".flow-table > thead > tr > td, .flow-table > tbody > tr > td, .flow-table > tfoot > tr > td { padding: 0; }" +
     ".flow-table > tbody > tr > td { vertical-align: top; }" +
-    // 🆕 Paraphes côte à côte en bas à droite, sans ligne rose (look discret en pied de page)
-    ".page-paraphes { display: flex; justify-content: flex-end; align-items: flex-end; gap: 14mm; padding: 4mm 6mm 2mm 0; }" +
-    ".page-paraphes .paraphe-cell { text-align: center; min-width: 38mm; }" +
-    ".page-paraphes .paraphe-label { font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 1.5px; color: #191923; opacity: 0.55; margin-bottom: 1mm; }" +
-    ".page-paraphes .paraphe-initials { font-family: 'Yellowtail', cursive; font-size: 22pt; color: #FF82D7; line-height: 1; }" +
-    ".page-paraphes .paraphe-initials.pending { font-family: 'Arial Narrow', sans-serif; font-style: italic; font-size: 11pt; color: #BBBBBB; font-weight: 400; padding-bottom: 4mm; }" +
+    ".flow-table > tfoot > tr > td { vertical-align: bottom; }" +  // 🔥 ancrage en bas de chaque page imprimée
+    // 🆕 Paraphes côte à côte en bas à droite, rapprochés, hauteur fixe ancrée à la marge bottom
+    ".page-paraphes { display: flex; justify-content: flex-end; align-items: flex-end; gap: 4mm; height: 18mm; padding: 0 8mm 4mm 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
+    ".page-paraphes .paraphe-cell { text-align: center; min-width: 32mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
+    ".page-paraphes .paraphe-label { font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 1.5px; color: #191923; opacity: 0.55; margin-bottom: 1mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
+    ".page-paraphes .paraphe-initials { font-family: 'Yellowtail', cursive; font-size: 22pt; color: #FF82D7; line-height: 1; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
+    ".page-paraphes .paraphe-initials.pending { font-family: 'Arial Narrow', sans-serif; font-style: italic; font-size: 11pt; color: #BBBBBB; font-weight: 400; padding-bottom: 4mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
     // 🆕 Page finale (signatures) : page dédiée hors-table, pas de paraphes répétés
     ".final-page { page: signature; page-break-before: always; break-before: page; width: 100%; }" +
     // En écran on cache le tfoot répétitif (on garde uniquement la vue continue)
     "@media screen { .flow-table > tfoot { display: none; } }" +
-    // 🆕 Masquer la toolbar à l'impression (elle force une page vide en mode print)
-    "@media print { .toolbar { display: none !important; } body { margin: 0 !important; } }" +
+    // 🆕 Masquer la toolbar à l'impression + forcer color-adjust exact sur les paraphes en print
+    "@media print { .toolbar { display: none !important; } body { margin: 0 !important; } .page-paraphes, .page-paraphes * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; } }" +
     // Chapitre = un h2 Yellowtail + son contenu. break-before:page démarre chaque chapitre sur une nouvelle page.
     ".chapter { break-before: page; page-break-before: always; }" +
     ".chapter:first-of-type { break-before: avoid; page-break-before: avoid; }" +
