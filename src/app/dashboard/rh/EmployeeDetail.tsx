@@ -1228,7 +1228,7 @@ export default function EmployeeDetail(props) {
                             var docLabel = "Avenant"
                             if (pendingAmendment) {
                               var typeLabels: any = {
-                                regularisation_welcome_pack: "Avenant — Mise en conformité réglementaire",
+                                regularisation_welcome_pack: "Avenant d'actualisation contractuelle",
                                 augmentation_salaire: "Avenant — Modification de la rémunération",
                                 modification_horaires: "Avenant — Modification des horaires",
                                 changement_poste: "Avenant — Changement de poste",
@@ -1386,7 +1386,7 @@ export default function EmployeeDetail(props) {
                   augmentation_salaire: { icon: "💰", label: "Modification rémunération" },
                   modification_horaires: { icon: "🕐", label: "Modification horaires" },
                   changement_poste: { icon: "👔", label: "Changement de poste" },
-                  regularisation_welcome_pack: { icon: "⚖", label: "Mise en conformité réglementaire" },
+                  regularisation_welcome_pack: { icon: "⚖", label: "Actualisation contractuelle" },
                   autre: { icon: "📝", label: "Autre modification" }
                 }
                 var meta = typeLabels[a.amendment_type] || typeLabels.autre
