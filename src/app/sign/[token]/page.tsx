@@ -52,14 +52,14 @@ function getContractTypeLabel(type: string, statutCadre: string, isFemale: boole
   return "Contrat de travail"
 }
 
-function getAmendmentTypeLabel(typeAvenant: string): string {
-  var t = (typeAvenant || "").toLowerCase()
-  if (t === "regularisation_welcome_pack") return "Avenant de régularisation"
-  if (t === "salaire") return "Avenant — modification de rémunération"
-  if (t === "duree_travail") return "Avenant — modification de la durée du travail"
-  if (t === "poste") return "Avenant — changement de poste"
-  if (t === "lieu_travail") return "Avenant — changement de lieu de travail"
-  if (t === "transformation_cdi") return "Avenant — transformation en CDI"
+function getAmendmentTypeLabel(amendmentType: string): string {
+  var t = (amendmentType || "").toLowerCase()
+  if (t === "regularisation_welcome_pack") return "Avenant — Mise en conformité réglementaire"
+  if (t === "augmentation_salaire") return "Avenant — Modification de la rémunération"
+  if (t === "modification_horaires") return "Avenant — Modification des horaires"
+  if (t === "changement_poste") return "Avenant — Changement de poste"
+  if (t === "prolongation_duree") return "Avenant — Prolongation de la durée"
+  if (t === "autre") return "Avenant au contrat de travail"
   return "Avenant au contrat de travail"
 }
 
@@ -157,7 +157,7 @@ async function loadSignaturePageData(token: string): Promise<SignaturePageData> 
   var resAmendment = await supabase
     .from("hr_contract_amendments")
     .select(
-      "id, contract_id, type_avenant, signature_status, " +
+      "id, contract_id, amendment_type, signature_status, " +
       "signature_includes_welcome_pack, signature_sent_at, signature_viewed_at"
     )
     .eq("signature_token", token)
@@ -211,7 +211,7 @@ async function loadSignaturePageData(token: string): Promise<SignaturePageData> 
         .eq("id", a.id)
     }
 
-    var docLabelA = getAmendmentTypeLabel(a.type_avenant || "")
+    var docLabelA = getAmendmentTypeLabel(a.amendment_type || "")
 
     return {
       found: true,
