@@ -526,7 +526,7 @@ export async function POST(
   // === 13. Email de confirmation ===
   if (recipientEmail) {
     var docLabel = "votre avenant au contrat de travail"
-    if (amendment.amendment_type === "regularisation_welcome_pack") docLabel = "votre avenant de mise en conformité réglementaire"
+    if (amendment.amendment_type === "regularisation_welcome_pack") docLabel = "votre avenant d'actualisation contractuelle"
     else if (amendment.amendment_type === "prolongation_duree") docLabel = "votre avenant de prolongation"
     else if (amendment.amendment_type === "augmentation_salaire") docLabel = "votre avenant de modification de rémunération"
 
