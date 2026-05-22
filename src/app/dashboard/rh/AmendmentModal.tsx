@@ -22,7 +22,7 @@ function getAvailableTypes(contractType: string) {
     return [
       { key: 'prolongation_duree', label: 'Prolongation de la durée', icon: '📅', desc: 'Reporter la date de fin + ajouter des vacations' },
       { key: 'modification_horaires', label: 'Modification des horaires', icon: '🕐', desc: 'Remplacer le planning des vacations' },
-      { key: 'regularisation_welcome_pack', label: 'Mise en conformité réglementaire', icon: '⚖', desc: 'Régularisation : congés, hygiène HACCP, RGPD, vidéo, harcèlement, tenue, charte numérique' },
+      { key: 'regularisation_welcome_pack', label: 'Actualisation contractuelle', icon: '⚖', desc: 'Intégration évolutions légales et règles internes (congés, HACCP, RGPD, vidéo, anti-harcèlement, tenue, charte numérique)' },
       { key: 'autre', label: 'Autre modification', icon: '📝', desc: 'Texte libre' }
     ]
   }
@@ -30,7 +30,7 @@ function getAvailableTypes(contractType: string) {
     { key: 'augmentation_salaire', label: 'Modification de la rémunération', icon: '💰', desc: 'Augmentation salaire / taux horaire' },
     { key: 'modification_horaires', label: 'Modification des horaires', icon: '🕐', desc: 'Hausse ou baisse de la durée du travail' },
     { key: 'changement_poste', label: 'Changement de poste', icon: '👔', desc: 'Nouvelle fonction, classification, missions' },
-    { key: 'regularisation_welcome_pack', label: 'Mise en conformité réglementaire', icon: '⚖', desc: 'Régularisation : congés, hygiène HACCP, RGPD, vidéo, harcèlement, tenue, charte numérique' },
+    { key: 'regularisation_welcome_pack', label: 'Actualisation contractuelle', icon: '⚖', desc: 'Intégration évolutions légales et règles internes (congés, HACCP, RGPD, vidéo, anti-harcèlement, tenue, charte numérique)' },
     { key: 'autre', label: 'Autre modification', icon: '📝', desc: 'Texte libre (mobilité, adresse, etc.)' }
   ]
 }
@@ -81,9 +81,9 @@ function getPredefinedMotifs(amendmentType: string) {
   }
   if (amendmentType === 'regularisation_welcome_pack') {
     return [
-      "Mise en conformité réglementaire suite à évolution jurisprudentielle (loi DDADUE 2024, Cass. Soc. 2025)",
-      "Annexion du Dossier de bienvenue Meshuga et formalisation des règles internes",
-      "Régularisation des dossiers RH historiques (clauses congés, hygiène HACCP, RGPD, vidéo, harcèlement)",
+      "Actualisation contractuelle suite aux évolutions législatives récentes (loi DDADUE 2024, Cass. Soc. 2025)",
+      "Annexion du Dossier de bienvenue Meshuga et formalisation des règles internes en vigueur",
+      "Intégration des évolutions internes : congés, hygiène HACCP, RGPD, vidéosurveillance, anti-harcèlement",
       "Mise à jour suite à mise en place de la signature électronique conforme eIDAS",
       "Autre (texte libre)"
     ]
