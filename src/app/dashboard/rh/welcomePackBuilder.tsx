@@ -687,6 +687,8 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // sur chaque page imprimée. Compatible 100% des browsers depuis IE6.
     "@page cover { size: A4; margin: 0; @bottom-center { content: ''; } }" +
     "@page default { size: A4; margin: 18mm 14mm 24mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
+    // 🆕 Page signature dédiée : pas de marge bas surdimensionnée (pas de tfoot paraphes) + même footer central
+    "@page signature { size: A4; margin: 18mm 14mm 18mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
     "html, body { background: #FFFFFF; }" +
     "body { font-family: 'Arial Narrow', Arial, sans-serif; color: #191923; font-size: 11pt; line-height: 1.55; }" +
     // 🔥 Sprint C3 v2 : encart paraphes (mêmes styles que contracts pour cohérence)
@@ -731,14 +733,18 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     ".flow-table tfoot { display: table-footer-group; }" +  // force répétition bas de page
     ".flow-table > thead > tr > td, .flow-table > tbody > tr > td, .flow-table > tfoot > tr > td { padding: 0; }" +
     ".flow-table > tbody > tr > td { vertical-align: top; }" +
-    // Paraphes en pied de page imprimée — répétés via tfoot
-    ".page-paraphes { display: flex; justify-content: space-between; align-items: flex-end; padding: 6mm 2mm 0 2mm; border-top: 1.5px solid #FF82D7; margin-top: 8mm; }" +
-    ".page-paraphes .paraphe-cell { text-align: center; min-width: 50mm; }" +
+    // 🆕 Paraphes côte à côte en bas à droite, sans ligne rose (look discret en pied de page)
+    ".page-paraphes { display: flex; justify-content: flex-end; align-items: flex-end; gap: 14mm; padding: 4mm 6mm 2mm 0; }" +
+    ".page-paraphes .paraphe-cell { text-align: center; min-width: 38mm; }" +
     ".page-paraphes .paraphe-label { font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 1.5px; color: #191923; opacity: 0.55; margin-bottom: 1mm; }" +
     ".page-paraphes .paraphe-initials { font-family: 'Yellowtail', cursive; font-size: 22pt; color: #FF82D7; line-height: 1; }" +
     ".page-paraphes .paraphe-initials.pending { font-family: 'Arial Narrow', sans-serif; font-style: italic; font-size: 11pt; color: #BBBBBB; font-weight: 400; padding-bottom: 4mm; }" +
+    // 🆕 Page finale (signatures) : page dédiée hors-table, pas de paraphes répétés
+    ".final-page { page: signature; page-break-before: always; break-before: page; width: 100%; }" +
     // En écran on cache le tfoot répétitif (on garde uniquement la vue continue)
     "@media screen { .flow-table > tfoot { display: none; } }" +
+    // 🆕 Masquer la toolbar à l'impression (elle force une page vide en mode print)
+    "@media print { .toolbar { display: none !important; } body { margin: 0 !important; } }" +
     // Chapitre = un h2 Yellowtail + son contenu. break-before:page démarre chaque chapitre sur une nouvelle page.
     ".chapter { break-before: page; page-break-before: always; }" +
     ".chapter:first-of-type { break-before: avoid; page-break-before: avoid; }" +
@@ -1585,9 +1591,12 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
         page5b +             // Page 10 : Vidéosurveillance & RGPD
         pageCharteNum +      // 🆕 Page 11 : Charte numérique
         pageTenue +          // 🆕 Page 12 : Tenue & comportement
-        page6 +              // Page 13 : Engagement & signatures
         '</td></tr></tbody>' +
       '</table>' +
+      // 🆕 Page 13 (signatures) HORS du table : pas de tfoot répété, pas de paraphes
+      '<div class="final-page">' +
+        page6 +
+      '</div>' +
     '</body>' +
     '</html>'
 
