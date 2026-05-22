@@ -137,14 +137,16 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   var avenantDateLong = new Date(String(avenantDate).slice(0, 10) + 'T12:00:00').toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
   var avenantDateShort = fmtDateShortFR(avenantDate)
   
-  // 🔥 Sprint C3 v3 : nouveau titre/sous-titre par type
-  // Pour regularisation_welcome_pack : montre qu'on régularise TOUT le passé
+  // 🔥 Sprint C3 v4 : formulations juridiquement neutres (pas de "régularisation"
+  // ni "rétroactif" ni "mise en conformité" qui = aveux d'irrégularité passée).
+  // Voir Cass. soc. 30 mars 2011 n°09-66939 (pas de rétroactivité d'avenant).
+  // On parle d'"actualisation" et d'"intégration d'évolutions".
   var coverTitleByType: any = {
     prolongation_duree: "AVENANT",
     augmentation_salaire: "AVENANT",
     modification_horaires: "AVENANT",
     changement_poste: "AVENANT",
-    regularisation_welcome_pack: "AVENANT DE MISE EN CONFORMITÉ",
+    regularisation_welcome_pack: "AVENANT D'ACTUALISATION CONTRACTUELLE",
     autre: "AVENANT"
   }
   var subtitleByType: any = {
@@ -152,7 +154,7 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
     augmentation_salaire: "Modification de la rémunération",
     modification_horaires: "Modification de la durée du travail",
     changement_poste: "Modification des fonctions",
-    regularisation_welcome_pack: "Régularisation rétroactive complète — Conformité RH, HACCP, sociale, légale & RGPD · Nouvelles règles congés payés (loi DDADUE 2024) · Vidéosurveillance · Politique anti-harcèlement · Charte numérique & droit à la déconnexion · Tenue & hygiène · Dossier de bienvenue Meshuga (13 pages)",
+    regularisation_welcome_pack: "Intégration des évolutions législatives, conventionnelles et internes — Loi DDADUE du 22 avril 2024 (congés payés) · Politique anti-harcèlement · Vidéosurveillance & RGPD · Charte numérique & droit à la déconnexion · Hygiène HACCP & relevés obligatoires · Tenue de travail · Dossier de bienvenue Meshuga (13 pages)",
     autre: "Modification contractuelle"
   }
   var titreCover = coverTitleByType[amendment.amendment_type] || "AVENANT"
@@ -171,12 +173,15 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   // ============================================================
   // PRÉAMBULE COMMUN
   // ============================================================
-  // 🔥 Sprint C3 v3 : référence par date du contrat initial + date de l'avenant
-  // (la combinaison est unique → traçabilité juridique). Plus de "porte le numéro".
+  // 🔥 Sprint C3 v4 : formulations neutres "s'inscrit dans la continuité"
+  // (et non "fait suite à"), "intégrer les évolutions" (et non "régulariser"),
+  // "à compter de sa signature" (et non "rétroactif"), "complètent sans s'y
+  // substituer" (et non "qui n'auraient pas été formalisées").
   var preambuleHeader = (amendment.amendment_type === "regularisation_welcome_pack")
-    ? '<p>Le présent <strong>avenant en date du ' + esc(avenantDateLong) + '</strong> fait suite au <strong>' + esc(contractTypeLabel) + '</strong> conclu entre les soussignés en date du <strong>' + esc(contractDateStr) + '</strong>.</p>'
-      + '<p>Il a pour objet de <strong>régulariser de manière rétroactive et complète</strong> l\'ensemble du contrat de travail en intégrant les dispositions réglementaires, sociales, légales, sanitaires (HACCP) et internes Meshuga en vigueur à ce jour, et qui n\'auraient pas été formalisées dans le contrat initial ou les éventuels avenants antérieurs.</p>'
-    : '<p>Le présent <strong>avenant en date du ' + esc(avenantDateLong) + '</strong> fait suite au <strong>' + esc(contractTypeLabel) + '</strong> conclu entre les soussignés en date du <strong>' + esc(contractDateStr) + '</strong>.</p>'
+    ? '<p>Le présent <strong>avenant en date du ' + esc(avenantDateLong) + '</strong> s\'inscrit dans la continuité du <strong>' + esc(contractTypeLabel) + '</strong> conclu entre les soussignés en date du <strong>' + esc(contractDateStr) + '</strong>.</p>'
+      + '<p>Il a pour objet d\'<strong>intégrer au cadre contractuel les évolutions</strong> législatives — notamment la loi n° 2024-364 du 22 avril 2024 (loi DDADUE) transposant la directive 2003/88/CE relative à l\'aménagement du temps de travail et aux congés payés —, conventionnelles (Convention Collective Nationale de la Restauration Rapide IDCC 1501) et internes à l\'entreprise survenues depuis la conclusion du contrat initial, ainsi que de <strong>formaliser les engagements réciproques</strong> des Parties en matière d\'hygiène alimentaire (HACCP), de sécurité, de respect des règles internes et d\'utilisation des outils numériques mis à disposition.</p>'
+      + '<p>Les Parties conviennent que les dispositions du présent avenant <strong>prennent effet à compter de sa signature</strong> et <strong>complètent</strong>, sans s\'y substituer, celles du contrat initial qui demeurent applicables pour le surplus.</p>'
+    : '<p>Le présent <strong>avenant en date du ' + esc(avenantDateLong) + '</strong> s\'inscrit dans la continuité du <strong>' + esc(contractTypeLabel) + '</strong> conclu entre les soussignés en date du <strong>' + esc(contractDateStr) + '</strong>.</p>'
   
   var preambule = ''
     + '<div class="art"><span class="art-num">Préambule.</span><span class="art-title">Rappel du contrat initial</span></div>'
@@ -302,27 +307,28 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   }
   else if (amendment.amendment_type === "regularisation_welcome_pack") {
     // ============================================================
-    // 🆕 AVENANT DE RÉGULARISATION — MISE EN CONFORMITÉ
+    // 🆕 AVENANT D'ACTUALISATION CONTRACTUELLE
     // ============================================================
-    // Type d'avenant créé pour mettre à jour les contrats des salariés
-    // existants (Emy, Darell, Esther, Sivanathan, Partheepan) avec :
-    //  - le Dossier de bienvenue Meshuga (annexé)
-    //  - la règle anti-accumulation des congés payés
-    //  - l'acceptation explicite vidéosurveillance + RGPD
-    //  - la politique anti-harcèlement
-    //  - la clause de confidentialité basique
-    //  - la tenue de travail
+    // Type d'avenant créé pour ACTUALISER les contrats des salariés
+    // existants (Emy, Darell, Esther, Sivanathan, Partheepan) en intégrant
+    // les évolutions législatives + conventionnelles + internes :
+    //  - Dossier de bienvenue Meshuga (annexé)
+    //  - Nouvelles règles congés payés (loi DDADUE 2024)
+    //  - Acceptation vidéosurveillance + RGPD
+    //  - Politique anti-harcèlement
+    //  - Clause de confidentialité
+    //  - Tenue de travail
     // Le contrat initial reste intégralement en vigueur — l'avenant
-    // ne fait QU'AJOUTER des clauses, jamais modifier les existantes.
+    // complète sans s'y substituer.
     // ============================================================
     var effDateR = fmtDateFR(amendment.effective_date)
     
     articles += ''
-      + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Objet de l\'avenant : mise en conformité réglementaire</span></div>'
+      + '<div class="art"><span class="art-num">Article ' + artCounter + '.</span><span class="art-title">Objet de l\'avenant : actualisation contractuelle</span></div>'
       + '<div class="body">'
-      + '<p>Le présent avenant a pour <strong>seul objet la mise en conformité du contrat de travail</strong> avec les évolutions réglementaires et les règles internes en vigueur chez Meshuga.</p>'
-      + '<p>Il <strong>complète</strong> le contrat initial sans en modifier les clauses essentielles (rémunération, durée, fonction, lieu de travail), qui restent inchangées.</p>'
-      + '<p>Il prend effet à compter du <strong>' + esc(effDateR) + '</strong>.</p>'
+      + '<p>Le présent avenant a pour objet d\'<strong>actualiser le cadre contractuel</strong> applicable entre les Parties en y intégrant les évolutions législatives, conventionnelles et internes à l\'entreprise survenues depuis la conclusion du contrat initial.</p>'
+      + '<p>Il <strong>complète</strong> le contrat initial sans modifier ses clauses essentielles (rémunération, durée, fonction, lieu de travail), qui demeurent inchangées.</p>'
+      + '<p>Conformément aux principes généraux du droit du travail, les dispositions du présent avenant <strong>prennent effet à compter du ' + esc(effDateR) + '</strong> et s\'appliquent pour l\'avenir.</p>'
       + '</div>'
     artCounter++
 
