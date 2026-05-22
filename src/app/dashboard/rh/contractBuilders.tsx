@@ -138,19 +138,18 @@ export function buildSharedCss(logoDataUri) {
     + '.sig-id .role{font-size:10px;color:#666;font-style:italic;line-height:1.3}'
     + '.sig-space{flex:1;font-size:11px;color:#666;line-height:1.4}'
     + '.sig-foot{background:#FAFAFA;border-top:1px solid #DDD;padding:6px 12px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#666;font-style:italic;min-height:30px}'
-    + '@media print{@page{size:A4;margin:2.2cm 1.4cm 2.4cm 1.4cm;@top-center{content:element(running-header)}@bottom-right{content:element(paraphes-runner);vertical-align:bottom}}.toolbar{display:none !important}body{margin:0 !important}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-inside:avoid;page-break-inside:avoid}.sig-block{break-inside:avoid;page-break-inside:avoid}'
+    + '@media print{@page{size:A4;margin:2.2cm 1.4cm 1.4cm 1.4cm;@top-center{content:element(running-header)}}.toolbar{display:none !important}body{margin:0 !important}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-inside:avoid;page-break-inside:avoid}.sig-block{break-inside:avoid;page-break-inside:avoid}'
     + '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.running-header,.sig-section h2,.parties h3,.art-title,.cover .rule,.sig-section .rule,.sig-block,.note,.page-paraphes,.page-paraphes *{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}}'
     + '.running-header{position:running(running-header);display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #FF82D7;padding-bottom:6px;font-family:Arial Narrow,sans-serif;font-size:9px;color:#666}'
     + '.running-header img{height:18px;width:auto}'
     + '.running-header .tag{font-style:italic;letter-spacing:1px;text-transform:uppercase}'
-    // 🔥 Sprint C3 v10 : paraphes via CSS Paged Media @bottom-right (méthode NATIVE).
-    // L\'élément .paraphes-runner est "détourné" vers la marge bottom-right de chaque page imprimée
-    // via position:running(). Même technique que .running-header (qui marche déjà chez toi).
-    // Page signature : SANS @bottom-right → pas de paraphes dessus. Aucun bricolage.
-    + '@page signature{size:A4;margin:2.2cm 1.4cm 1.6cm 1.4cm;@top-center{content:element(running-header)}}'
-    + '.paraphes-runner{position:running(paraphes-runner)}'
+    // 🔥 Sprint C3 v11 : position fixed, marge @page bottom courte (1.4cm) pour rapprocher du bord physique.
+    // Chrome répète position:fixed sur chaque page imprimée par rapport à la zone imprimable.
+    // bottom: 3mm = 3mm de la zone imprimable, soit ~17mm du bord physique (zone imprimable + 14mm marge).
+    + '@page signature{size:A4;margin:2.2cm 1.4cm 1.4cm 1.4cm;@top-center{content:element(running-header)}}'
+    + '.paraphes-runner{position:fixed;bottom:3mm;right:8mm;z-index:1000;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}'
     + '.final-page{page:signature;page-break-before:always;break-before:page;width:100%}'
-    // Paraphes côte à côte, simplifiés (rendus DANS la marge bottom de @page via element())
+    // Paraphes côte à côte, simplifiés
     + '.page-paraphes{display:flex;align-items:flex-end;justify-content:flex-end;gap:5mm}'
     + '.page-paraphes .paraphe-cell{text-align:center}'
     + '.page-paraphes .paraphe-label{display:block;font-family:Arial,sans-serif;font-weight:700;font-size:7pt;text-transform:uppercase;letter-spacing:0.8px;color:#666666;margin-bottom:1mm;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}'
