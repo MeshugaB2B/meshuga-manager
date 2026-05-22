@@ -686,7 +686,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // la technique HTML standard (table avec thead/tfoot) qui répète AUTOMATIQUEMENT le footer
     // sur chaque page imprimée. Compatible 100% des browsers depuis IE6.
     "@page cover { size: A4; margin: 0; @bottom-center { content: ''; } }" +
-    "@page default { size: A4; margin: 18mm 14mm 24mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } @bottom-right { content: element(paraphes-runner); vertical-align: bottom; } }" +
+    "@page default { size: A4; margin: 18mm 14mm 14mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
     // 🆕 Page signature dédiée : pas de marge bas surdimensionnée (pas de tfoot paraphes) + même footer central
     "@page signature { size: A4; margin: 18mm 14mm 18mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
     "html, body { background: #FFFFFF; }" +
@@ -725,10 +725,8 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // `page: cover` assigne explicitement cette div à la @page cover définie plus haut.
     ".cover { page: cover; width: 210mm; height: 297mm; background: #FF82D7; padding: 22mm; position: relative; overflow: hidden; page-break-after: always; break-after: page; display: flex; flex-direction: column; justify-content: space-between; }" +
     ".cover .bg-circle { position: absolute; border-radius: 50%; pointer-events: none; }" +
-    // 🔥 Sprint C3 v10 : paraphes via CSS Paged Media @bottom-right (méthode NATIVE).
-    // L'élément .paraphes-runner est "détourné" vers la marge bottom-right de chaque page imprimée
-    // via position:running(). Page cover et signature : SANS @bottom-right → pas de paraphes dessus.
-    ".paraphes-runner { position: running(paraphes-runner); }" +
+    // 🔥 Sprint C3 v11 : position fixed, marge @page bottom courte (1.4cm).
+    ".paraphes-runner { position: fixed; bottom: 3mm; right: 8mm; z-index: 1000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
     // Paraphes côte à côte, rapprochés, en coin bas-droite
     ".page-paraphes { display: flex; align-items: flex-end; justify-content: flex-end; gap: 5mm; }" +
     ".page-paraphes .paraphe-cell { text-align: center; }" +
