@@ -17,6 +17,7 @@
 // ============================================================
 
 import { useState } from "react"
+import { MESHUGA_LOGO_PINK_DATA_URI } from "@/lib/meshugaLogo"
 
 interface Props {
   token: string
@@ -90,7 +91,7 @@ export default function SignaturePageClient(props: Props) {
           <div style={{ background: "#FAFAFA", borderLeft: "4px solid #16A34A", padding: "14px 18px", borderRadius: 6, margin: "20px 0", textAlign: "left", fontSize: 13, lineHeight: 1.6 }}>
             <div><strong>Document signé :</strong> {props.documentTypeLabel}</div>
             {props.includeWelcomePack && (
-              <div><strong>+ Dossier de bienvenue Meshuga</strong> (13 pages)</div>
+              <div><strong>+ Dossier de bienvenue Meshuga</strong> (21 pages)</div>
             )}
             <div><strong>Nom du signataire :</strong> {fullName.trim()}</div>
             <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid #EEE", fontSize: 11, color: "#666" }}>
@@ -151,7 +152,7 @@ export default function SignaturePageClient(props: Props) {
           <div style={{ background: "#FFFFFF", borderRadius: 12, padding: "18px 18px 8px 18px", marginBottom: 18, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
               <span style={{ background: "#FF82D7", color: "#FFFFFF", padding: "3px 10px", borderRadius: 4, fontSize: 12, fontWeight: 700 }}>2</span>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#191923" }}>Dossier de bienvenue Meshuga (13 pages)</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#191923" }}>Dossier de bienvenue Meshuga (21 pages)</div>
             </div>
             <p style={{ fontSize: 12, color: "#666", margin: "0 0 10px 0" }}>
               Règles internes, droits, devoirs, sécurité, hygiène, cadre légal, rémunération.
@@ -241,7 +242,7 @@ export default function SignaturePageClient(props: Props) {
                   style={{ marginTop: 3, accentColor: "#FF82D7", flexShrink: 0, width: 18, height: 18 }}
                 />
                 <span>
-                  <strong>J&apos;ai lu et j&apos;approuve</strong> l&apos;intégralité du <strong>Dossier de bienvenue Meshuga</strong> (13 pages) : règles internes, congés payés, hygiène HACCP, vidéosurveillance, RGPD, charte numérique.
+                  <strong>J&apos;ai lu et j&apos;approuve</strong> l&apos;intégralité du <strong>Dossier de bienvenue Meshuga</strong> (21 pages) : règles internes, congés payés, hygiène HACCP, vidéosurveillance, RGPD, charte numérique.
                 </span>
               </label>
             )}
@@ -292,7 +293,7 @@ export default function SignaturePageClient(props: Props) {
 
         {/* Footer */}
         <div style={{ textAlign: "center", marginTop: 24, fontSize: 11, color: "#999" }}>
-          <div style={{ fontFamily: "Yellowtail, cursive", color: "#FF82D7", fontSize: 22, lineHeight: 1, marginBottom: 4 }}>Meshuga</div>
+          <img src={MESHUGA_LOGO_PINK_DATA_URI} alt="Meshuga" style={{ height: 22, width: "auto", display: "inline-block", marginBottom: 4 }} />
           <div>SAS AEGIA FOOD · 3 rue Vavin · 75006 Paris · SIREN 904 639 531</div>
         </div>
       </div>
