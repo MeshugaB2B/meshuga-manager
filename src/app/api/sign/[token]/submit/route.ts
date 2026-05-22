@@ -165,109 +165,102 @@ async function getIpGeo(ip: string): Promise<{ city: string; region: string; cou
 }
 
 // ============================================================
-// === Cartouche audit enrichi (HTML) =========================
+// === Bloc signature salarié complet (Yellowtail + audit compact)
 // ============================================================
-function buildAuditCartouche(opts: {
+// Génère le contenu qui remplacera <!--EMPLOYEE_SIGNATURE_PLACEHOLDER--> et tout
+// le bloc placeholder qui le suit, jusqu'à la fin du sig-space.
+function buildEmployeeSignedBlock(opts: {
   signedFullName: string
+  signedAt: Date
+  signatureId: string
   recipientEmail: string
   sentAt: Date | null
   viewedAt: Date | null
-  signedAt: Date
   ip: string
   geo: { city: string; region: string; country: string; country_code: string } | null
   ua: { os: string; browser: string; device: string }
-  userAgent: string
   hash: string
   consentText: string
   includeWelcomePack: boolean
-  signatureId: string
 }): string {
   var s = opts
-  // Calculs durée
-  var sentToSigned = s.sentAt ? (s.signedAt.getTime() - s.sentAt.getTime()) : -1
-  var viewedToSigned = s.viewedAt ? (s.signedAt.getTime() - s.viewedAt.getTime()) : -1
-
   // Geo string
   var geoStr = "Non déterminée"
   if (s.geo) {
     var parts: string[] = []
     if (s.geo.city) parts.push(s.geo.city)
-    if (s.geo.region && s.geo.region !== s.geo.city) parts.push(s.geo.region)
     if (s.geo.country) parts.push(s.geo.country)
     if (parts.length > 0) geoStr = parts.join(", ")
   }
+  // Calculs durées
+  var sentToSigned = s.sentAt ? formatDuration(s.signedAt.getTime() - s.sentAt.getTime()) : null
+  var hashShort = s.hash ? s.hash.slice(0, 32) : "—"
 
-  return ''
-    + '<div class="audit-box">'
-    +   '<div class="audit-box-title">Cartouche d\'audit de signature électronique</div>'
-    +   '<h4>Identité du signataire</h4>'
-    +   '<div class="audit-row"><span class="k">Nom du signataire :</span><span class="v">' + escHtml(s.signedFullName) + '</span></div>'
-    +   '<div class="audit-row"><span class="k">Email du salarié :</span><span class="v">' + escHtml(s.recipientEmail || "—") + '</span></div>'
-    +   '<div class="audit-row"><span class="k">Identifiant signature :</span><span class="v mono">' + escHtml(s.signatureId) + '</span></div>'
-
-    +   '<h4>Chaîne de délivrance</h4>'
-    + (s.sentAt
-      ? '<div class="audit-row"><span class="k">Email envoyé le :</span><span class="v">' + escHtml(formatDateTimeFr(s.sentAt)) + ' (heure de Paris)</span></div>'
-      : '<div class="audit-row"><span class="k">Email envoyé le :</span><span class="v">—</span></div>')
-    + (s.viewedAt
-      ? '<div class="audit-row"><span class="k">Document ouvert le :</span><span class="v">' + escHtml(formatDateTimeFr(s.viewedAt)) + ' (heure de Paris)</span></div>'
-      : '<div class="audit-row"><span class="k">Document ouvert le :</span><span class="v">—</span></div>')
-    +   '<div class="audit-row"><span class="k">Document signé le :</span><span class="v">' + escHtml(formatDateTimeFr(s.signedAt)) + ' (heure de Paris)</span></div>'
-    + (sentToSigned > 0
-      ? '<div class="audit-row"><span class="k">Délai envoi → signature :</span><span class="v">' + escHtml(formatDuration(sentToSigned)) + '</span></div>'
-      : '')
-    + (viewedToSigned > 0
-      ? '<div class="audit-row"><span class="k">Temps de lecture :</span><span class="v">' + escHtml(formatDuration(viewedToSigned)) + '</span></div>'
-      : '')
-
-    +   '<h4>Traçabilité technique</h4>'
-    +   '<div class="audit-row"><span class="k">Adresse IP :</span><span class="v mono">' + escHtml(s.ip) + '</span></div>'
-    +   '<div class="audit-row"><span class="k">Localisation IP :</span><span class="v">' + escHtml(geoStr) + '</span></div>'
-    +   '<div class="audit-row"><span class="k">Système :</span><span class="v">' + escHtml(s.ua.os) + '</span></div>'
-    +   '<div class="audit-row"><span class="k">Navigateur :</span><span class="v">' + escHtml(s.ua.browser) + '</span></div>'
-    +   '<div class="audit-row"><span class="k">Type d\'appareil :</span><span class="v">' + escHtml(s.ua.device) + '</span></div>'
-    +   '<div class="audit-row"><span class="k">User-Agent complet :</span><span class="v mono">' + escHtml((s.userAgent || "").substring(0, 200)) + '</span></div>'
-
-    +   '<h4>Intégrité du document</h4>'
-    +   '<div class="audit-row"><span class="k">Empreinte SHA-256 :</span><span class="v mono">' + escHtml(s.hash) + '</span></div>'
-    +   '<div class="audit-row"><span class="k">Documents signés :</span><span class="v">' + (s.includeWelcomePack ? "Avenant + Dossier de bienvenue Meshuga (13 pages)" : "Avenant uniquement") + '</span></div>'
-    +   '<div class="audit-row"><span class="k">Consentement explicite :</span><span class="v">' + escHtml(s.consentText) + '</span></div>'
-
-    +   '<div class="audit-legal">'
-    +     'Signature électronique apposée conformément aux articles 1366 et 1367 du Code civil français et au Règlement (UE) n° 910/2014 (eIDAS). '
-    +     'L\'écrit électronique a la même force probante que l\'écrit sur support papier (art. 1366 CC). '
-    +     'Le procédé d\'identification utilisé — vérification de l\'email destinataire, capture de l\'adresse IP, de l\'horodatage et du User-Agent, calcul d\'empreinte SHA-256 du document — permet d\'authentifier le signataire et de garantir l\'intégrité du document (art. 1367 CC).'
-    +   '</div>'
+  // Zone signature (Yellowtail + Lu et approuvé + date)
+  var signatureZone = ''
+    + '<div style="text-align:center;padding:14px 12px 10px 12px;border-bottom:1px dotted #DDD;margin-bottom:8px">'
+    +   '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:8px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Signature électronique du salarié</div>'
+    +   '<div style="font-family:Yellowtail,cursive;font-size:38px;color:#FF82D7;line-height:1;padding:6px 0">' + escHtml(s.signedFullName) + '</div>'
+    +   '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:10px;color:#191923;font-weight:700;margin-top:4px">« Lu et approuvé »</div>'
+    +   '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:9px;color:#555;font-style:italic;margin-top:2px">Le ' + escHtml(formatDateTimeFr(s.signedAt)) + ' (heure de Paris)</div>'
     + '</div>'
+
+  // Cartouche audit compact (4 sections, format identique à l'employeur)
+  var auditCompact = ''
+    + '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:8px;line-height:1.55;color:#555;padding:0 14px 8px 14px">'
+    +   '<div style="font-weight:900;color:#FF82D7;font-size:7.5px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:3px;padding-bottom:1px;border-bottom:0.5px solid #FFEB5A">Identité du signataire</div>'
+    +   '<div><strong style="color:#2c2c2c;font-weight:700">Nom :</strong> ' + escHtml(s.signedFullName) + '</div>'
+    +   '<div><strong style="color:#2c2c2c;font-weight:700">Email :</strong> ' + escHtml(s.recipientEmail || "—") + '</div>'
+    +   '<div><strong style="color:#2c2c2c;font-weight:700">Identifiant :</strong> <span style="font-family:\'SF Mono\',Consolas,monospace;font-size:7px">' + escHtml(s.signatureId) + '</span></div>'
+
+    +   '<div style="font-weight:900;color:#FF82D7;font-size:7.5px;text-transform:uppercase;letter-spacing:0.6px;margin:4px 0 3px 0;padding-bottom:1px;border-bottom:0.5px solid #FFEB5A">Chaîne de délivrance</div>'
+    + (s.sentAt ? '<div><strong style="color:#2c2c2c;font-weight:700">Envoyé le :</strong> ' + escHtml(formatDateTimeFr(s.sentAt)) + '</div>' : '')
+    + (s.viewedAt ? '<div><strong style="color:#2c2c2c;font-weight:700">Ouvert le :</strong> ' + escHtml(formatDateTimeFr(s.viewedAt)) + '</div>' : '')
+    +   '<div><strong style="color:#2c2c2c;font-weight:700">Signé le :</strong> ' + escHtml(formatDateTimeFr(s.signedAt)) + '</div>'
+    + (sentToSigned ? '<div><strong style="color:#2c2c2c;font-weight:700">Délai :</strong> ' + escHtml(sentToSigned) + '</div>' : '')
+
+    +   '<div style="font-weight:900;color:#FF82D7;font-size:7.5px;text-transform:uppercase;letter-spacing:0.6px;margin:4px 0 3px 0;padding-bottom:1px;border-bottom:0.5px solid #FFEB5A">Traçabilité technique</div>'
+    +   '<div><strong style="color:#2c2c2c;font-weight:700">IP :</strong> <span style="font-family:\'SF Mono\',Consolas,monospace;font-size:7px">' + escHtml(s.ip) + '</span> (' + escHtml(geoStr) + ')</div>'
+    +   '<div><strong style="color:#2c2c2c;font-weight:700">Système :</strong> ' + escHtml(s.ua.os) + ' · ' + escHtml(s.ua.browser) + '</div>'
+    +   '<div><strong style="color:#2c2c2c;font-weight:700">Appareil :</strong> ' + escHtml(s.ua.device) + '</div>'
+
+    +   '<div style="font-weight:900;color:#FF82D7;font-size:7.5px;text-transform:uppercase;letter-spacing:0.6px;margin:4px 0 3px 0;padding-bottom:1px;border-bottom:0.5px solid #FFEB5A">Intégrité du document</div>'
+    +   '<div><strong style="color:#2c2c2c;font-weight:700">Hash SHA-256 :</strong> <span style="font-family:\'SF Mono\',Consolas,monospace;font-size:7px;word-break:break-all">' + escHtml(hashShort) + '…</span></div>'
+    +   '<div><strong style="color:#2c2c2c;font-weight:700">Documents :</strong> ' + (s.includeWelcomePack ? 'Avenant + Dossier de bienvenue' : 'Avenant') + '</div>'
+    +   '<div><strong style="color:#2c2c2c;font-weight:700">Consentement :</strong> ' + escHtml(s.consentText) + '</div>'
+
+    +   '<div style="margin-top:5px;padding-top:4px;border-top:1px dotted #DDD;font-size:7.5px;font-style:italic;color:#666">Force probante équivalente à signature manuscrite (art. 1366-1367 C. civ. + eIDAS UE 910/2014).</div>'
+    + '</div>'
+
+  return signatureZone + auditCompact
 }
 
 // ============================================================
-// === Bloc signature visuel (Yellowtail rose) ================
+// === Injection signature salarié (remplace marker + placeholder)
 // ============================================================
-function buildSignatureBlock(signedFullName: string, signedAt: Date): string {
-  return ''
-    + '<div style="text-align:center; padding: 16px 0 6px 0;">'
-    +   '<div style="font-family: Yellowtail, cursive; font-size: 42px; color: #FF82D7; line-height: 1; padding: 8px 0;">'
-    +     escHtml(signedFullName)
-    +   '</div>'
-    +   '<div style="font-size: 9px; color: #555; font-style: italic; font-family: \'Helvetica Neue\', Helvetica, Arial, sans-serif; margin-top: 2px;">'
-    +     'Signature électronique apposée le ' + escHtml(formatDateTimeFr(signedAt)) + ' (heure de Paris)'
-    +   '</div>'
-    + '</div>'
-}
+// Cible le marker <!--EMPLOYEE_SIGNATURE_PLACEHOLDER--> et tout le contenu
+// placeholder qui le suit, jusqu'au sig-foot. Remplace aussi le sig-foot
+// "En attente de signature" par "Signé électroniquement le ...".
+function injectEmployeeSignature(
+  originalHtml: string,
+  signedBlockHtml: string,
+  signedDateLabel: string
+): string {
+  var html = originalHtml
 
-// ============================================================
-// === Injection : signature + audit dans le HTML =============
-// ============================================================
-// Remplace la zone "Date : __ / __ / ____" par le bloc signature + cartouche audit.
-// Si la zone n'est pas trouvée, ajoute avant </body>.
-function injectSignatureAndAudit(originalHtml: string, signatureBlock: string, auditBox: string): string {
-  var sigPlusAudit = signatureBlock + auditBox
-  var dateLineRegex = /Date\s*:\s*_+\s*\/\s*_+\s*\/\s*_+/g
-  if (dateLineRegex.test(originalHtml)) {
-    return originalHtml.replace(dateLineRegex, sigPlusAudit)
+  // 1. Remplacer le marker + tout le contenu placeholder jusqu'à la fermeture du sig-space
+  var markerRegex = /<!--EMPLOYEE_SIGNATURE_PLACEHOLDER-->[\s\S]*?(?=<\/div>\s*<div class="sig-foot")/
+  if (markerRegex.test(html)) {
+    html = html.replace(markerRegex, signedBlockHtml)
   }
-  return originalHtml.replace(/<\/body>/i, sigPlusAudit + "</body>")
+
+  // 2. Remplacer le sig-foot "En attente de signature électronique" du bloc salarié
+  html = html.replace(
+    /<div class="sig-foot" style="font-style:italic;color:#999">En attente de signature électronique<\/div>/,
+    '<div class="sig-foot" style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:9.5px;font-weight:700;color:#16A34A">✓ Signé électroniquement le ' + escHtml(signedDateLabel) + '</div>'
+  )
+
+  return html
 }
 
 // ============================================================
@@ -410,33 +403,35 @@ export async function POST(
   var sentAtDate: Date | null = amendment.signature_sent_at ? new Date(amendment.signature_sent_at) : null
   var viewedAtDate: Date | null = amendment.signature_viewed_at ? new Date(amendment.signature_viewed_at) : null
 
-  var signatureBlock = buildSignatureBlock(signedFullName, signedAt)
-  var auditBox = buildAuditCartouche({
+  // 🔥 Sprint C3 v3 : un seul bloc complet (signature + audit compact) qui remplacera
+  // le placeholder côté salarié. Le bloc employeur (généré par renderEmployerSignatureBlock)
+  // reste tel quel — il a déjà sa propre signature et son cartouche audit symétrique.
+  var employeeSignedBlock = buildEmployeeSignedBlock({
     signedFullName: signedFullName,
+    signedAt: signedAt,
+    signatureId: signatureId,
     recipientEmail: recipientEmail,
     sentAt: sentAtDate,
     viewedAt: viewedAtDate,
-    signedAt: signedAt,
     ip: ip,
     geo: geo,
     ua: ua,
-    userAgent: userAgent,
     hash: hash,
     consentText: consentText,
     includeWelcomePack: includeWp,
-    signatureId: signatureId,
   })
+  var signedDateLabel = formatDateTimeFr(signedAt) + " (heure de Paris)"
 
-  // === 8. Injecter signature + audit en dernière page + paraphes sur chaque page ===
+  // === 8. Injecter signature salarié + paraphes sur chaque page ===
   var employerInitials = (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : "—"
   var employeeInitials = getInitials(signedFullName)
 
-  var signedAvenantHtml = injectSignatureAndAudit(avenantHtml, signatureBlock, auditBox)
+  var signedAvenantHtml = injectEmployeeSignature(avenantHtml, employeeSignedBlock, signedDateLabel)
   signedAvenantHtml = injectEmployeeParaphes(signedAvenantHtml, employerInitials, employeeInitials)
 
   var signedWelcomePackHtml = ""
   if (includeWp) {
-    signedWelcomePackHtml = injectSignatureAndAudit(welcomePackHtml, signatureBlock, auditBox)
+    signedWelcomePackHtml = injectEmployeeSignature(welcomePackHtml, employeeSignedBlock, signedDateLabel)
     signedWelcomePackHtml = injectEmployeeParaphes(signedWelcomePackHtml, employerInitials, employeeInitials)
   }
 
