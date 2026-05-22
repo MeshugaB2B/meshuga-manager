@@ -12,6 +12,7 @@
 import { createClient } from "@supabase/supabase-js"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import SignaturePageClient from "./SignaturePageClient"
+import { MESHUGA_LOGO_PINK_DATA_URI } from "@/lib/meshugaLogo"
 
 export var runtime = "nodejs"
 export var dynamic = "force-dynamic"
@@ -165,7 +166,7 @@ export default async function SignPage({ params }: { params: { token: string } }
             </p>
           )}
           <div style={{ marginTop: 30, fontSize: 11, color: "#999" }}>
-            <div style={{ fontFamily: "Yellowtail, cursive", color: "#FF82D7", fontSize: 22, lineHeight: 1, marginBottom: 4 }}>Meshuga</div>
+            <img src={MESHUGA_LOGO_PINK_DATA_URI} alt="Meshuga" style={{ height: 22, width: "auto", display: "inline-block", marginBottom: 4 }} />
             <div>SAS AEGIA FOOD &middot; 3 rue Vavin &middot; 75006 Paris</div>
           </div>
         </div>
