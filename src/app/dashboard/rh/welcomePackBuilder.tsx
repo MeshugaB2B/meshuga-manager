@@ -2,6 +2,7 @@
 // welcomePackBuilder.tsx
 // ============================================================
 import { ALL_MESHUGA_FONTFACES } from "@/lib/fonts"
+import { getInitials, buildParaphFooter } from "./contractBuilders"
 // 🔥 Sprint Y1 : type de la signature électronique pré-enregistrée d'Edward
 import type { EmployerSignature } from "./employerSignature"
 
@@ -685,6 +686,22 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     "@page :first { margin: 0; @bottom-center { content: ''; } }" +  // couverture sans marges/footer
     "html, body { background: #FFFFFF; }" +
     "body { font-family: 'Arial Narrow', Arial, sans-serif; color: #191923; font-size: 11pt; line-height: 1.55; }" +
+    // 🔥 Sprint C3 v2 : encart paraphes (mêmes styles que contracts pour cohérence)
+    ".paraph-footer { position: fixed; bottom: 8mm; right: 8mm; background: rgba(255,235,90,0.18); border: 1px dashed #FF82D7; border-radius: 4px; padding: 4px 8px; font-family: 'Arial Narrow',Arial,sans-serif; font-size: 7.5px; color: #191923; line-height: 1.1; z-index: 9999; display: flex; gap: 10px; align-items: center; }" +
+    ".paraph-footer .paraph-cell { text-align: center; min-width: 36px; }" +
+    ".paraph-footer .paraph-letters { font-family: 'Yellowtail', cursive; font-size: 15px; color: #FF82D7; line-height: 1; margin-bottom: 2px; letter-spacing: 1px; }" +
+    ".paraph-footer .paraph-letters.empty { font-family: 'Arial Narrow',Arial,sans-serif; font-size: 8px; color: #999; font-style: italic; letter-spacing: 0; }" +
+    ".paraph-footer .paraph-label { font-size: 6.5px; color: #666; font-style: italic; text-transform: uppercase; letter-spacing: 0.5px; }" +
+    ".paraph-footer .paraph-sep { width: 1px; height: 22px; background: #FF82D7; opacity: 0.35; }" +
+    // 🔥 Sprint C3 v2 : audit box (utilisé en dernière page sous la signature)
+    ".audit-box { margin: 18px 0 0 0; padding: 14px 16px; background: #FAFAFA; border: 1.5px solid #FF82D7; border-radius: 6px; font-family: 'Arial Narrow',Arial,sans-serif; font-size: 9.5px; line-height: 1.5; color: #191923; break-inside: avoid; page-break-inside: avoid; }" +
+    ".audit-box-title { font-family: 'Yellowtail',cursive; font-size: 18px; color: #FF82D7; margin-bottom: 8px; line-height: 1; }" +
+    ".audit-box h4 { font-size: 9px; font-weight: 900; color: #FF82D7; text-transform: uppercase; letter-spacing: 0.8px; margin: 8px 0 4px 0; padding-bottom: 2px; border-bottom: 0.5px solid #FFEB5A; }" +
+    ".audit-box .audit-row { display: grid; grid-template-columns: 135px 1fr; gap: 4px; margin-bottom: 2px; }" +
+    ".audit-box .audit-row .k { color: #555; font-weight: 700; }" +
+    ".audit-box .audit-row .v { color: #191923; }" +
+    ".audit-box .audit-row .v.mono { font-family: 'SF Mono',Consolas,monospace; font-size: 8.5px; word-break: break-all; color: #555; }" +
+    ".audit-box .audit-legal { margin-top: 8px; padding-top: 6px; border-top: 1px dotted #DDD; font-size: 8.5px; color: #666; font-style: italic; line-height: 1.5; }" +
     // Couverture pleine page rose, sans marges, page-break après pour démarrer le contenu sur page 2
     ".cover { width: 210mm; height: 297mm; background: #FF82D7; padding: 22mm; position: relative; overflow: hidden; page-break-after: always; break-after: page; display: flex; flex-direction: column; justify-content: space-between; }" +
     ".cover .bg-circle { position: absolute; border-radius: 50%; pointer-events: none; }" +
@@ -1578,6 +1595,12 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
         pageTenue +          // 🆕 Page 12 : Tenue & comportement
         page6 +              // Page 13 : Engagement & signatures
       '</main>' +
+      // 🔥 Sprint C3 v2 : paraphes en bas à droite de chaque page imprimée.
+      // Côté employeur rempli si employerSig actif. Côté salarié vide (rempli au moment de la signature).
+      buildParaphFooter(
+        (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : "",
+        ""  // sera remplie par /api/sign/[token]/submit/route.ts au moment de la signature
+      ) +
     '</body>' +
     '</html>'
 
