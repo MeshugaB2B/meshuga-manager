@@ -28,7 +28,7 @@ function getServerClient(): SupabaseClient | null {
 
 function getAmendmentTypeLabel(amendmentType: string): string {
   var t = (amendmentType || "").toLowerCase()
-  if (t === "regularisation_welcome_pack") return "Avenant — Mise en conformité réglementaire"
+  if (t === "regularisation_welcome_pack") return "Avenant d'actualisation contractuelle"
   if (t === "augmentation_salaire") return "Avenant — Modification de la rémunération"
   if (t === "modification_horaires") return "Avenant — Modification des horaires"
   if (t === "changement_poste") return "Avenant — Changement de poste"
