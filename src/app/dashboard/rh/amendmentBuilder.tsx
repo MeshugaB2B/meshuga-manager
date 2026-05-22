@@ -8,7 +8,7 @@
 //   - Si null/absent → fallback bloc "cachet · SAS AEGIA" classique
 //   → 100% rétro-compatible avec les appels existants
 
-import { esc, buildSharedHeader, buildSharedCss, wrapHtml } from "./contractBuilders"
+import { esc, buildSharedHeader, buildSharedCss, wrapHtml, getInitials, buildParaphFooter } from "./contractBuilders"
 import { renderEmployerSignatureBlock, renderEmployeeSignatureBlockEmpty } from "./employerSignature"
 import type { EmployerSignature } from "./employerSignature"
 
@@ -441,9 +441,16 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   // employerSig (optionnel) injecte la signature pré-enregistrée d'Edward
   var signatures = buildAvenantSignatures(contract, emp, amendment.signature_date, contract.fonction || "", employerSig || null)
   
+  // 🔥 Sprint C3 v2 : paraphes en bas à droite de chaque page imprimée.
+  // Côté employeur : remplies si employerSig actif. Côté salarié : remplies au moment
+  // de la signature électronique (le route /sign/[token]/submit fait un remplacement).
+  var employerInitials = (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : ""
+  // Zone salarié laissée vide ici (placeholder "paraphe") — le submit la remplira par les vraies initiales
+  var paraphFooter = buildParaphFooter(employerInitials, "")
+  
   return wrapHtml({
     titre: "Avenant " + amendmentNumStr + " Meshuga — " + (emp ? (emp.prenom + " " + emp.nom) : "—"),
     css: buildSharedCss(logoUri),
-    body: header + body + signatures
+    body: header + body + signatures + paraphFooter
   })
 }
