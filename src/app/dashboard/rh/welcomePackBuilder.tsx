@@ -729,15 +729,15 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // À l'écran : invisibles. En print : ancrés dans le coin bas-droite, répétés par Chrome sur chaque page.
     // Page signature : .final-page couvre via background blanc + z-index élevé.
     ".paraphes-fixed { display: none; }" +
-    "@media print { .paraphes-fixed { display: block; position: fixed; bottom: 8mm; right: 12mm; z-index: 1; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; } }" +
+    "@media print { .paraphes-fixed { display: block; position: fixed; bottom: 5mm; right: 10mm; z-index: 1; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; } }" +
     // Paraphes côte à côte, rapprochés, en coin bas-droite
     ".page-paraphes { display: flex; align-items: flex-end; gap: 6mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
     ".page-paraphes .paraphe-cell { text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
     ".page-paraphes .paraphe-label { font-family: 'Arial Narrow', sans-serif; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 1px; color: #191923; opacity: 0.55; margin-bottom: 2mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
     ".page-paraphes .paraphe-initials { font-family: 'Yellowtail', cursive; font-size: 24pt; color: #FF82D7; line-height: 1; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
     ".page-paraphes .paraphe-initials.pending { font-family: 'Arial Narrow', sans-serif; font-style: italic; font-size: 10pt; color: #BBBBBB; font-weight: 400; padding-bottom: 5mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }" +
-    // 🆕 Page finale (signatures) : couvre les paraphes-fixed via z-index élevé + background blanc
-    ".final-page { page: signature; page-break-before: always; break-before: page; width: 100%; position: relative; background: #FFFFFF; min-height: 100vh; z-index: 9999; }" +
+    // 🆕 Page finale (signatures) simplifiée : juste un page-break, pas de min-height ni z-index qui créaient une page vide parasite
+    ".final-page { page: signature; page-break-before: always; break-before: page; width: 100%; }" +
     // 🆕 Masquer la toolbar à l'impression
     "@media print { .toolbar { display: none !important; } body { margin: 0 !important; } }" +
     // Chapitre = un h2 Yellowtail + son contenu. break-before:page démarre chaque chapitre sur une nouvelle page.
