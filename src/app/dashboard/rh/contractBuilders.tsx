@@ -338,6 +338,21 @@ export function wrapHtml(opts) {
 }
 
 // ============================================================
+// 🆕 Compatibilité ascendante : buildParaphFooter (no-op)
+// ============================================================
+// Avant v12, certains composants (preview modals, routes /api/sign/*)
+// importaient et injectaient manuellement un footer de paraphes en
+// position:fixed bottom-right. Avec Paged.js (v12), les paraphes sont
+// ancrés nativement via la zone @bottom-right des règles @page, donc
+// ce helper est devenu inutile. On l'exporte comme no-op pour ne pas
+// casser les composants legacy qui l'importent encore.
+// TODO: supprimer cet export une fois tous les appelants migrés.
+// ============================================================
+export function buildParaphFooter() {
+  return ''
+}
+
+// ============================================================
 // Helper interne : résout les initiales du salarié selon l'état de signature
 // ============================================================
 // Lit c.salarie_signed_at (timestamptz ISO ou null). Si défini → initiales.
