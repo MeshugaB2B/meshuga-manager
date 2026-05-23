@@ -284,6 +284,7 @@ export function buildSharedHeader(opts) {
 // Bloc signatures partagé
 // 🆕 v12 : wrappé dans <div class="signature-page"> pour basculer
 // sur la règle @page signature (pas de paraphes bas-droite)
+// 🆕 v12.4 : ne ferme plus </body></html> — c'est wrapHtml qui le fait.
 // ============================================================
 export function buildSharedSignatures(c, emp, salarieRole) {
   var civilite = emp.civilite || "Madame"
@@ -315,39 +316,35 @@ export function buildSharedSignatures(c, emp, salarieRole) {
     + '</div></section>'
     + '</div>'   // ferme .signature-page
     + '</div>'   // ferme .page (ouvert dans buildSharedHeader)
-    + '</body></html>'
 }
 
 // ============================================================
 // Wrapper HTML complet
-// 🆕 v12.3 (23/05/2026) : injecte le polyfill Paged.js avec `defer`
-// (CRITIQUE : sans defer, Paged.js démarre avant le parsing complet
-// du body, prend une snapshot partielle du DOM et perd les signatures
-// + le runner element).
-// Le runner element est inséré JUSTE AVANT </body> via regex pour être
-// sûr d'être dans le DOM final (les builders ferment eux-mêmes </body></html>).
+// 🆕 v12.4 (23/05/2026) :
+//   - Paged.js avec `defer` (critique pour parser DOM complet)
+//   - Accepte signatures + paraphFooter (legacy amendmentBuilder)
+//     en plus du nouveau paraphRunner
+// Layout final du body :
+//   header → body → signatures (signature-page) → paraphRunner (en running)
 // ============================================================
 export function wrapHtml(opts) {
   var titre = opts.titre
   var css = opts.css
   var body = opts.body
-  var paraphRunner = opts.paraphRunner || ''
+  var signatures = opts.signatures || ''
+  // Legacy : amendmentBuilder passe encore "paraphFooter" qui est notre
+  // shim retournant un .paraphes-runner. On l'utilise comme runner.
+  var paraphRunner = opts.paraphRunner || opts.paraphFooter || ''
 
-  // Injecter le runner juste avant </body> existant
-  var bodyOut = body
-  if (paraphRunner) {
-    if (/<\/body>/i.test(body)) {
-      bodyOut = body.replace(/<\/body>/i, paraphRunner + '</body>')
-    } else {
-      bodyOut = body + paraphRunner
-    }
-  }
+  // Concaténer dans l'ordre : header+body → signatures → runner
+  var assembled = body + signatures + paraphRunner
 
   return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + esc(titre) + '</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">'
     + '<script src="https://unpkg.com/pagedjs/dist/paged.polyfill.js" defer></script>'
     + '<style>' + css + '</style></head><body>'
-    + bodyOut
+    + assembled
+    + '</body></html>'
 }
 
 // ============================================================
