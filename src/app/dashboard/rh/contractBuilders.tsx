@@ -320,21 +320,34 @@ export function buildSharedSignatures(c, emp, salarieRole) {
 
 // ============================================================
 // Wrapper HTML complet
-// 🆕 v12 : injecte le polyfill Paged.js + le runner des paraphes en
-// tête de <body> (position:running, donc retiré du flux et placé dans
-// la zone @bottom-right de chaque page par Paged.js)
+// 🆕 v12.3 (23/05/2026) : injecte le polyfill Paged.js avec `defer`
+// (CRITIQUE : sans defer, Paged.js démarre avant le parsing complet
+// du body, prend une snapshot partielle du DOM et perd les signatures
+// + le runner element).
+// Le runner element est inséré JUSTE AVANT </body> via regex pour être
+// sûr d'être dans le DOM final (les builders ferment eux-mêmes </body></html>).
 // ============================================================
 export function wrapHtml(opts) {
   var titre = opts.titre
   var css = opts.css
   var body = opts.body
   var paraphRunner = opts.paraphRunner || ''
+
+  // Injecter le runner juste avant </body> existant
+  var bodyOut = body
+  if (paraphRunner) {
+    if (/<\/body>/i.test(body)) {
+      bodyOut = body.replace(/<\/body>/i, paraphRunner + '</body>')
+    } else {
+      bodyOut = body + paraphRunner
+    }
+  }
+
   return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + esc(titre) + '</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">'
-    + '<script src="https://unpkg.com/pagedjs/dist/paged.polyfill.js"></script>'
+    + '<script src="https://unpkg.com/pagedjs/dist/paged.polyfill.js" defer></script>'
     + '<style>' + css + '</style></head><body>'
-    + paraphRunner
-    + body
+    + bodyOut
 }
 
 // ============================================================
