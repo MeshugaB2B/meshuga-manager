@@ -368,12 +368,15 @@ export function buildParaphFooter(employerInitials, employeeInitials) {
 // ============================================================
 // Helper interne : résout les initiales du salarié selon l'état de signature
 // ============================================================
-// Lit c.salarie_signed_at (timestamptz ISO ou null). Si défini → initiales.
-// Sinon → null (rendu "en attente" par buildParaphRunner).
-// Si Edward utilise un autre nom de champ, modifier ici uniquement.
+// Lit en priorité c.signature_signed_at (timestamp signature électronique
+// salarié dans hr_contracts ET hr_contract_amendments), avec fallback
+// sur c.signed_at (legacy contrat uploadé manuellement). Si null →
+// "en attente" rendu par buildParaphRunner.
+// ============================================================
 function resolveSalarieInitials(c, emp) {
   if (!c) return null
-  if (!c.salarie_signed_at) return null
+  var signed = c.signature_signed_at || c.signed_at || null
+  if (!signed) return null
   var full = (emp && (emp.prenom || '') ? emp.prenom + ' ' : '') + (emp && emp.nom ? emp.nom : '')
   return getInitials(full)
 }
