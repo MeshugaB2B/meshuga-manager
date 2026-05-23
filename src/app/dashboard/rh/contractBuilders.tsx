@@ -1,5 +1,5 @@
 // ============================================================
-// contractBuilders.tsx
+// contractBuilders.tsx — v12 (22/05/2026)
 // ============================================================
 // Builders HTML pour les 4 types de contrats Meshuga :
 //   - Extra (CDD d'usage)
@@ -7,27 +7,28 @@
 //   - CDI Caissier(ère) / Équipier(ère)
 //   - CDI Responsable / Manager (template Emy, statut agent de maîtrise/cadre)
 //
-// Chaque builder retourne un HTML complet (cover + parties + articles + signatures).
-// Le HTML inclut tout le CSS inline pour fonctionner dans une iframe ou être
-// imprimé directement sans dépendance externe (sauf la font Yellowtail via CDN).
+// 🆕 v12 — Paged.js polyfill + paraphes bas-droite :
+//   - Paged.js (CDN unpkg) repaginé côté client pour supporter le CSS Paged
+//     Media Level 3 dans Chrome (running elements, @page named, etc.)
+//   - Paraphes ancrés au bord physique bas-droite de chaque page via
+//     position: running(paraphes-runner) + @page { @bottom-right { ... } }
+//   - Page de signature exclue des paraphes via @page signature {...}
+//   - Page de couverture (welcomePack) exclue via @page cover {...}
+//   - Initiales conditionnelles : "E.T." (employeur) toujours,
+//     initiales salarié si c.salarie_signed_at est défini, sinon "en attente".
 //
 // Architecture :
-//   buildSharedCss()         - CSS commun à tous les contrats
-//   buildSharedHeader()      - bandeau + cover + parties (paramétré par titre)
-//   buildSharedSignatures()  - bloc signatures (paramétré par labels)
+//   buildSharedCss()         - CSS commun (Paged Media + UI)
+//   buildParaphRunner()      - HTML du runner element des paraphes      🆕
+//   getInitials()            - "Emy Dupont" → "E.D."                    🆕
+//   buildSharedHeader()      - bandeau + cover + parties
+//   buildSharedSignatures()  - bloc signatures (wrappé .signature-page)
+//   wrapHtml()               - doc complet, injecte Paged.js script
 //   build*Contract(c, emp)   - 4 builders spécialisés
 //   buildContract(c, emp)    - dispatcher selon c.type
-//
-// 🔥 Sprint Y1 — Signature électronique custom :
-//   Tous les builders acceptent un paramètre optionnel `employerSig` (EmployerSignature | null)
-//   - Si fourni → bloc signature Edward stylisé + cartouche audit
-//   - Si null/absent → fallback bloc "cachet · SAS AEGIA" classique
-//   → 100% rétro-compatible avec les appels existants
 // ============================================================
 
 import { MESHUGA_LEGAL, formatDateFr, formatEuros, numToFrenchWords } from "./rhConstants"
-import { renderEmployerSignatureBlock, renderEmployeeSignatureBlockEmpty } from "./employerSignature"
-import type { EmployerSignature } from "./employerSignature"
 
 // === Helper : safe() — protège contre null/undefined ===
 function safe(s) {
@@ -42,25 +43,17 @@ export function esc(s) {
 }
 
 // === Helper : genderize() — transforme les formules épicènes en forme genrée ===
-// Exemple : "Le/la Salarié(e) est engagé(e)" → "La Salariée est engagée" (féminin)
-//                                            → "Le Salarié est engagé" (masculin)
-// Patterns ordonnés du plus long au plus court pour éviter les collisions
-// (ex: "il/elle" est un sous-pattern de "Celui-ci/celle-ci")
 function genderize(html, isFemale) {
   if (!html) return ""
   var rules = [
-    // Articles + Salarié(e) — patterns longs en premier
     { from: /du\/de la Salarié\(e\)/g, to: isFemale ? "de la Salariée" : "du Salarié" },
     { from: /au\/à la Salarié\(e\)/g,  to: isFemale ? "à la Salariée"  : "au Salarié" },
     { from: /Le\/la Salarié\(e\)/g,    to: isFemale ? "La Salariée"    : "Le Salarié" },
     { from: /le\/la Salarié\(e\)/g,    to: isFemale ? "la Salariée"    : "le Salarié" },
-    // Pronoms composés (avant les pronoms simples, sinon collision)
     { from: /Celui-ci\/celle-ci/g,     to: isFemale ? "Celle-ci"  : "Celui-ci" },
     { from: /celui-ci\/celle-ci/g,     to: isFemale ? "celle-ci"  : "celui-ci" },
-    // Pronoms simples
     { from: /\bIl\/elle\b/g,           to: isFemale ? "Elle" : "Il" },
     { from: /\bil\/elle\b/g,           to: isFemale ? "elle" : "il" },
-    // Participes passés et adjectifs en (e) — l'ordre n'a pas d'importance ici
     { from: /engagé\(e\)/g,            to: isFemale ? "engagée"   : "engagé" },
     { from: /classé\(e\)/g,            to: isFemale ? "classée"   : "classé" },
     { from: /amené\(e\)/g,             to: isFemale ? "amenée"    : "amené" },
@@ -69,8 +62,7 @@ function genderize(html, isFemale) {
     { from: /affilié\(e\)/g,           to: isFemale ? "affiliée"  : "affilié" },
     { from: /dénommé\(e\)/g,           to: isFemale ? "dénommée"  : "dénommé" },
     { from: /habilité\(e\)/g,          to: isFemale ? "habilitée" : "habilité" },
-    { from: /libre\(e\)/g,             to: "libre" }, // épicène mais au cas où
-    // Pluriel (rare mais on couvre)
+    { from: /libre\(e\)/g,             to: "libre" },
     { from: /salarié\(e\)s/g,          to: isFemale ? "salariées" : "salariés" }
   ]
   var out = html
@@ -81,7 +73,29 @@ function genderize(html, isFemale) {
 }
 
 // ============================================================
+// 🆕 Helper : getInitials("Emy Touret") → "E.T."
+// ============================================================
+export function getInitials(fullName) {
+  if (!fullName) return ""
+  var parts = String(fullName).trim().split(/\s+/)
+  var out = ""
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i]
+    if (p && p.length > 0) {
+      out += p.charAt(0).toUpperCase() + "."
+    }
+  }
+  return out
+}
+
+// ============================================================
 // CSS partagé entre tous les contrats
+// ============================================================
+// 🆕 v12 : règles @page sorties du @media print (Paged.js ne descend pas
+// dans les media queries pour ses @page rules). Trois pages nommées :
+//   - default  → header haut + paraphes bas-droite
+//   - signature → header haut, PAS de paraphes (dernière page)
+//   - cover    → PAS de header, PAS de paraphes (welcomePack)
 // ============================================================
 export function buildSharedCss(logoDataUri) {
   return ''
@@ -105,7 +119,7 @@ export function buildSharedCss(logoDataUri) {
     + '.party-tag{display:block;text-align:right;font-style:italic;color:#666;font-size:11px;margin-top:2px}'
     + '.party-side{display:block;text-align:right;font-weight:900;font-size:11px;letter-spacing:1px;margin-top:2px;margin-bottom:14px}'
     + '.bold-center{text-align:center;font-weight:900;font-size:14px;letter-spacing:1px;margin:18px 0 24px}'
-    + '.art{margin:22px 0 10px;padding-bottom:5px;border-bottom:1.5px solid #FF82D7;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;page-break-after:avoid}'
+    + '.art{margin:22px 0 10px;padding-bottom:5px;border-bottom:1.5px solid #FF82D7;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;page-break-after:avoid;break-after:avoid}'
     + '.art-num{font-family:"Yellowtail",cursive;font-size:24px;color:#FF82D7;line-height:1}'
     + '.art-title{font-family:"Yellowtail",cursive;font-size:18px;color:#191923;line-height:1.1}'
     + '.body p{margin-bottom:9px;text-align:justify;font-size:12.5px;line-height:1.55}'
@@ -130,57 +144,97 @@ export function buildSharedCss(logoDataUri) {
     + '.sig-section .rule{height:2px;background:#FF82D7;margin:0 0 28px}'
     + '.fait-banner{background:#FFFFFF;border-top:2.5px solid #FF82D7;border-bottom:2.5px solid #FF82D7;padding:16px 18px;text-align:center;margin-bottom:24px;font-size:13.5px;color:#191923}'
     + '.fait-banner .small{display:block;font-size:11px;color:#666;font-style:italic;margin-top:6px}'
-    + '.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}'
-    + '.sig-block{display:flex;flex-direction:column;border:2px solid #FF82D7;background:#fff;break-inside:avoid;page-break-inside:avoid;min-height:480px}'
-    + '.sig-head{background:#FF82D7;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;text-transform:uppercase;letter-spacing:1.5px}'
-    + '.sig-id{background:#FFEB5A;padding:10px 16px;border-bottom:2px solid #FF82D7;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-height:72px}'
-    + '.sig-id .name{font-size:14px;font-weight:900;color:#191923;line-height:1.2;margin-bottom:3px}'
-    + '.sig-id .role{font-size:10px;color:#666;font-style:italic;line-height:1.3}'
-    + '.sig-space{flex:1;font-size:11px;color:#666;line-height:1.4}'
-    + '.sig-foot{background:#FAFAFA;border-top:1px solid #DDD;padding:6px 12px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#666;font-style:italic;min-height:30px}'
-    + '@media print{@page{size:A4;margin:2.2cm 1.4cm 1.4cm 1.4cm;@top-center{content:element(running-header)}}.toolbar{display:none !important}body{margin:0 !important}.page{padding:0;max-width:none}.art{break-inside:avoid;break-after:avoid}.sig-section{break-inside:avoid;page-break-inside:avoid}.sig-block{break-inside:avoid;page-break-inside:avoid}'
-    + '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.running-header,.sig-section h2,.parties h3,.art-title,.cover .rule,.sig-section .rule,.sig-block,.note,.page-paraphes,.page-paraphes *{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}}'
-    + '.running-header{position:running(running-header);display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #FF82D7;padding-bottom:6px;font-family:Arial Narrow,sans-serif;font-size:9px;color:#666}'
+    + '.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}'
+    + '.sig-block{display:grid;grid-template-rows:48px 96px minmax(160px,1fr) 40px;border:2px solid #FF82D7;background:#fff}'
+    + '.sig-head{background:#FF82D7;color:#fff;padding:0 16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;text-transform:uppercase;letter-spacing:1.5px}'
+    + '.sig-id{background:#FFEB5A;padding:10px 16px;border-bottom:2px solid #FF82D7;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}'
+    + '.sig-id .name{font-size:15px;font-weight:900;color:#191923;line-height:1.2;margin-bottom:4px}'
+    + '.sig-id .role{font-size:11px;color:#666;font-style:italic;line-height:1.3}'
+    + '.sig-space{padding:14px 16px;display:flex;flex-direction:column;font-size:11px;color:#666;font-style:italic;line-height:1.4}'
+    + '.sig-foot{background:#FAFAFA;border-top:1px solid #DDD;padding:0 16px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#666;font-style:italic}'
+
+    // ============================================================
+    // 🆕 PAGED MEDIA — règles @page lues par Paged.js (top-level, hors @media print)
+    // ============================================================
+    + '@page{size:A4;margin:2.2cm 1.4cm 2cm 1.4cm;'
+    +   '@top-center{content:element(running-header);vertical-align:bottom;padding-bottom:6px}'
+    +   '@bottom-right{content:element(paraphes-runner);vertical-align:top;padding-top:6px}'
+    + '}'
+    // Page nommée "signature" — dernière page, PAS de paraphes
+    + '@page signature{'
+    +   '@top-center{content:element(running-header);vertical-align:bottom;padding-bottom:6px}'
+    +   '@bottom-right{content:none}'
+    + '}'
+    // Page nommée "cover" — couverture welcomePack, PAS de header ni paraphes
+    + '@page cover{'
+    +   'margin:1.2cm 1.4cm 1.6cm 1.4cm;'
+    +   '@top-center{content:none}'
+    +   '@bottom-right{content:none}'
+    + '}'
+    // Le runner element retiré du flux normal et affecté à la zone @page
+    + '.running-header{position:running(running-header);display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #FF82D7;padding-bottom:6px;font-family:"Arial Narrow",sans-serif;font-size:9px;color:#666}'
     + '.running-header img{height:18px;width:auto}'
     + '.running-header .tag{font-style:italic;letter-spacing:1px;text-transform:uppercase}'
-    // 🔥 Sprint C3 v11 : position fixed, marge @page bottom courte (1.4cm) pour rapprocher du bord physique.
-    // Chrome répète position:fixed sur chaque page imprimée par rapport à la zone imprimable.
-    // bottom: 3mm = 3mm de la zone imprimable, soit ~17mm du bord physique (zone imprimable + 14mm marge).
-    + '@page signature{size:A4;margin:2.2cm 1.4cm 1.4cm 1.4cm;@top-center{content:element(running-header)}}'
-    + '.paraphes-runner{position:fixed;bottom:3mm;right:8mm;z-index:1000;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}'
-    + '.final-page{page:signature;page-break-before:always;break-before:page;width:100%}'
-    // Paraphes côte à côte, simplifiés
-    + '.page-paraphes{display:flex;align-items:flex-end;justify-content:flex-end;gap:5mm}'
-    + '.page-paraphes .paraphe-cell{text-align:center}'
-    + '.page-paraphes .paraphe-label{display:block;font-family:Arial,sans-serif;font-weight:700;font-size:7pt;text-transform:uppercase;letter-spacing:0.8px;color:#666666;margin-bottom:1mm;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}'
-    + '.page-paraphes .paraphe-initials{display:block;font-family:"Yellowtail",cursive;font-size:18pt;color:#FF82D7;line-height:1;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}'
-    + '.page-paraphes .paraphe-initials.pending{font-family:Arial,sans-serif;font-style:italic;font-size:9pt;color:#999999;font-weight:400;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}'
-    // 🔥 Sprint C3 v2 : cartouche audit enrichi
-    + '.audit-box{margin:18px 0 0 0;padding:14px 16px;background:#FAFAFA;border:1.5px solid #FF82D7;border-radius:6px;font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;line-height:1.5;color:#191923;break-inside:avoid;page-break-inside:avoid}'
-    + '.audit-box-title{font-family:"Yellowtail",cursive;font-size:18px;color:#FF82D7;margin-bottom:8px;line-height:1;display:flex;align-items:center;gap:8px}'
-    + '.audit-box-title::before{content:"✓";display:inline-block;background:#16A34A;color:#fff;width:18px;height:18px;border-radius:50%;font-size:11px;text-align:center;line-height:18px;font-family:Arial,sans-serif;font-weight:900}'
-    + '.audit-box h4{font-size:9px;font-weight:900;color:#FF82D7;text-transform:uppercase;letter-spacing:0.8px;margin:8px 0 4px 0;padding-bottom:2px;border-bottom:0.5px solid #FFEB5A}'
-    + '.audit-box .audit-row{display:grid;grid-template-columns:135px 1fr;gap:4px;margin-bottom:2px}'
-    + '.audit-box .audit-row .k{color:#555;font-weight:700}'
-    + '.audit-box .audit-row .v{color:#191923}'
-    + '.audit-box .audit-row .v.mono{font-family:"SF Mono",Consolas,monospace;font-size:8.5px;word-break:break-all;color:#555}'
-    + '.audit-box .audit-legal{margin-top:8px;padding-top:6px;border-top:1px dotted #DDD;font-size:8.5px;color:#666;font-style:italic;line-height:1.5}'
-    + '@media print{.audit-box,.audit-box-title{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+
+    // 🆕 PARAPHES RUNNER — ancré bas-droite de chaque page sauf signature/cover
+    + '.paraphes-runner{position:running(paraphes-runner);display:flex;justify-content:flex-end;align-items:center;gap:10px;font-family:"Arial Narrow",sans-serif;font-size:9px;color:#666;border-top:1px solid #EEE;padding-top:6px}'
+    + '.paraphes-runner .lbl{font-weight:700;color:#191923;font-style:normal;text-transform:uppercase;letter-spacing:.8px;margin-right:4px;font-size:8.5px}'
+    + '.paraphes-runner .ini{display:inline-block;min-width:34px;padding:2px 7px;border:1.5px solid #191923;border-radius:3px;background:#FFFFFF;text-align:center;font-weight:900;color:#191923;font-style:normal;font-size:10px;letter-spacing:.5px}'
+    + '.paraphes-runner .pending{display:inline-block;min-width:34px;padding:2px 7px;border:1.5px dashed #BBB;border-radius:3px;background:transparent;text-align:center;font-style:italic;color:#999;font-size:9px}'
+    + '.paraphes-runner .sep{color:#FF82D7;font-weight:900;font-style:normal}'
+    + '.paraphes-runner .grp{display:inline-flex;align-items:center;gap:5px}'
+
+    // 🆕 Classes qui basculent la page sur les règles @page nommées
+    + '.signature-page{page:signature;page-break-before:always;break-before:page}'
+    + '.cover-page{page:cover;page-break-after:always;break-after:page}'
+
+    // Fallback @media print (au cas où Paged.js échoue à charger)
+    + '@media print{'
+    +   '.toolbar{display:none}'
+    +   '.page{padding:0;max-width:none}'
+    +   '.art{break-inside:avoid;break-after:avoid}'
+    +   '.sig-section{break-inside:avoid;page-break-inside:avoid}'
+    +   '.sig-block{break-inside:avoid;page-break-inside:avoid}'
+    +   '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.running-header,.sig-section h2,.parties h3,.art-title,.cover .rule,.sig-section .rule,.sig-block,.note,.paraphes-runner .ini{-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    + '}'
+
+    // 🆕 Pendant que Paged.js travaille, on cache le toolbar (sera retiré après rendu)
+    + '.pagedjs_pages{margin:0 auto}'
+    + 'body.pagedjs_ready .toolbar{display:none}'
+}
+
+// ============================================================
+// 🆕 buildParaphRunner — HTML du runner element des paraphes
+// ============================================================
+// Affiche : "PARAPHES   Employeur [E.T.]  /  Salarié [E.D.]  ou  en attente"
+// Le runner est retiré du flux (position:running) et injecté par Paged.js
+// dans la zone @bottom-right de chaque page (sauf signature et cover).
+// ============================================================
+export function buildParaphRunner(opts) {
+  var emp = opts && opts.employeurInitials ? opts.employeurInitials : "E.T."
+  var sal = opts && opts.salarieInitials ? opts.salarieInitials : null
+
+  var salHtml = sal
+    ? '<span class="ini">' + esc(sal) + '</span>'
+    : '<span class="pending">en attente</span>'
+
+  return ''
+    + '<div class="paraphes-runner">'
+    +   '<span class="lbl">Paraphes</span>'
+    +   '<span class="grp"><span class="lbl" style="margin-right:2px">Employeur</span><span class="ini">' + esc(emp) + '</span></span>'
+    +   '<span class="sep">/</span>'
+    +   '<span class="grp"><span class="lbl" style="margin-right:2px">Salarié</span>' + salHtml + '</span>'
+    + '</div>'
 }
 
 // ============================================================
 // Header partagé (running-header + toolbar + cover + parties)
 // ============================================================
-// type: "extra" | "cdi"
-// titreCover: "CONTRAT DE TRAVAIL D'EXTRA" | "CONTRAT DE TRAVAIL À DURÉE INDÉTERMINÉE"
-// sousTitreCover: ligne discrète sous le titre
-// emp: l'employé(e) (objet hr_employees)
-// genre: "M" ou "F" pour adapter "né"/"née", "Madame"/"Monsieur"
 export function buildSharedHeader(opts) {
   var emp = opts.emp
   var titreCover = opts.titreCover
   var sousTitreCover = opts.sousTitreCover
-  var typeBandeau = opts.typeBandeau // texte du bandeau d'en-tête
+  var typeBandeau = opts.typeBandeau
   var logoUri = opts.logoUri
 
   var civilite = (emp.civilite || "Madame")
@@ -193,7 +247,6 @@ export function buildSharedHeader(opts) {
   var lieuNaiss = emp.lieu_naissance || "[lieu de naissance à compléter]"
   var nationalite = emp.nationalite || "[nationalité à compléter]"
 
-  // Construire l'adresse complète
   var adresseFull = [emp.adresse, emp.code_postal, emp.ville].filter(Boolean).join(" ")
   if (!adresseFull) adresseFull = "[adresse à compléter]"
 
@@ -229,11 +282,10 @@ export function buildSharedHeader(opts) {
 
 // ============================================================
 // Bloc signatures partagé
+// 🆕 v12 : wrappé dans <div class="signature-page"> pour basculer
+// sur la règle @page signature (pas de paraphes bas-droite)
 // ============================================================
-// 🔥 Sprint Y1 : 4ème paramètre `employerSig` optionnel pour injecter la
-// signature électronique pré-enregistrée d'Edward.
-// Si non fourni → bloc fallback "cachet · SAS AEGIA" (comportement historique).
-export function buildSharedSignatures(c, emp, salarieRole, employerSig?: EmployerSignature | null) {
+export function buildSharedSignatures(c, emp, salarieRole) {
   var civilite = emp.civilite || "Madame"
   var feminin = (civilite === "Madame" || civilite === "Mademoiselle")
   var dateSig = c.date_signature
@@ -241,14 +293,8 @@ export function buildSharedSignatures(c, emp, salarieRole, employerSig?: Employe
     : "[date à compléter]"
   var ville = c.ville_signature || "Paris"
 
-  // 🔥 Bloc signature Employeur : rendu via helper
-  // Contient .sig-id + .sig-space + .sig-foot (la .sig-head est rendue séparément ci-dessous)
-  var employerBlock = renderEmployerSignatureBlock(employerSig || null)
-
-  // Bloc signature Salarié : zone vide en attendant signature électronique
-  var employeeBlock = renderEmployeeSignatureBlockEmpty(emp.prenom || "", emp.nom || "", salarieRole, feminin)
-
   return ''
+    + '<div class="signature-page">'
     + '<section class="sig-section">'
     + '<h2 class="yt">Signatures</h2>'
     + '<div class="rule"></div>'
@@ -256,99 +302,52 @@ export function buildSharedSignatures(c, emp, salarieRole, employerSig?: Employe
     + '<div class="sig-grid">'
     + '<div class="sig-block">'
     + '<div class="sig-head">Pour l\'Employeur</div>'
-    + employerBlock
+    + '<div class="sig-id"><div class="name">AEGIA FOOD</div><div class="role">SAS AEGIA, Présidente<br>représentée par Edward TOURET, Président</div></div>'
+    + '<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé »</div>'
+    + '<div class="sig-foot" style="display:flex;align-items:center;justify-content:center;gap:8px"><span style="font-family:Yellowtail,cursive;font-size:14px;color:#FF82D7">cachet</span><span style="opacity:.5">·</span><span style="font-style:italic">SAS AEGIA</span></div>'
     + '</div>'
     + '<div class="sig-block">'
-    + employeeBlock
+    + '<div class="sig-head">' + (feminin ? "La Salariée" : "Le Salarié") + '</div>'
+    + '<div class="sig-id"><div class="name">' + esc(emp.prenom || "") + ' ' + esc((emp.nom || "").toUpperCase()) + '</div><div class="role">' + esc(salarieRole || "&nbsp;") + '</div></div>'
+    + '<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé »</div>'
+    + '<div class="sig-foot">Date : __ / __ / ____</div>'
     + '</div>'
     + '</div></section>'
+    + '</div>'   // ferme .signature-page
+    + '</div>'   // ferme .page (ouvert dans buildSharedHeader)
+    + '</body></html>'
 }
 
 // ============================================================
-// Wrapper HTML complet : <html><head>...</head><body>{header + corps + signatures}
+// Wrapper HTML complet
+// 🆕 v12 : injecte le polyfill Paged.js + le runner des paraphes en
+// tête de <body> (position:running, donc retiré du flux et placé dans
+// la zone @bottom-right de chaque page par Paged.js)
 // ============================================================
-// 🔥 Sprint C3 v6 : `signatures` et `paraphFooter` séparés du body.
-// - body : header + corps articles (sera wrappé dans <table class="flow-table"> avec tfoot répété)
-// - signatures : section signatures (sortie de la table, dans <div class="final-page"> → pas de paraphes)
-// - paraphFooter : HTML retourné par buildParaphFooter() → injecté dans <tfoot> du table
-//
-// Fallback : si signatures/paraphFooter non fournis, comportement legacy (body brut sans wrapping)
 export function wrapHtml(opts) {
   var titre = opts.titre
   var css = opts.css
   var body = opts.body
-  var signatures = opts.signatures || ''
-  var paraphFooter = opts.paraphFooter || ''
-
-  var openHtml = '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + esc(titre) + '</title>'
+  var paraphRunner = opts.paraphRunner || ''
+  return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + esc(titre) + '</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">'
+    + '<script src="https://unpkg.com/pagedjs/dist/paged.polyfill.js"></script>'
     + '<style>' + css + '</style></head><body>'
-
-  // Mode v6 : paraphes en position fixed (répétés sur chaque page imprimée) + final-page séparée
-  if (paraphFooter || signatures) {
-    return openHtml
-      + (paraphFooter ? '<div class="paraphes-runner">' + paraphFooter + '</div>' : '')
-      + body
-      + (signatures ? '<div class="final-page">' + signatures + '</div>' : '')
-      + '</body></html>'
-  }
-
-  // Mode legacy : body brut (compat avec appels existants qui ferment </body></html> dans body)
-  return openHtml + body
+    + paraphRunner
+    + body
 }
 
 // ============================================================
-// 🔥 Sprint C3 v2 : Paraphes (initiales en bas à droite de chaque page imprimée)
+// Helper interne : résout les initiales du salarié selon l'état de signature
 // ============================================================
-
-/**
- * Génère les initiales depuis un nom complet.
- * "Edward Touret" → "ET", "Emy SOULABAILLE" → "ES", "Jean-Marie de la Tour" → "JT"
- * Ignore les particules courantes (de, du, la, le, des).
- */
-export function getInitials(fullName: string): string {
-  if (!fullName) return ""
-  var particules = ["de", "du", "la", "le", "les", "des", "von", "van", "der"]
-  var parts = fullName.split(/[\s-]+/).filter(function (w) {
-    if (!w) return false
-    if (particules.indexOf(w.toLowerCase()) >= 0) return false
-    return true
-  })
-  // On prend la première lettre des 2 premiers mots significatifs
-  var initials = ""
-  for (var i = 0; i < parts.length && initials.length < 3; i++) {
-    var ch = parts[i].charAt(0)
-    if (ch) initials += ch.toUpperCase()
-  }
-  return initials
-}
-
-/**
- * Génère le contenu de la cellule <tfoot> pour les paraphes répétés sur chaque page imprimée.
- * À insérer dans : <table class="flow-table"><tfoot><tr><td>{buildParaphFooter()}</td></tr></tfoot>...
- *
- * @param employerInitials - ex "E.T." (ou "" si pas encore signé côté employeur)
- * @param employeeInitials - ex "E.S." (ou "" si pas encore signé côté salarié)
- */
-export function buildParaphFooter(employerInitials: string, employeeInitials: string): string {
-  var empCell = employerInitials
-    ? '<div class="paraphe-initials">' + esc(employerInitials) + '</div>'
-    : '<div class="paraphe-initials pending">en attente</div>'
-  var saCell = employeeInitials
-    ? '<div class="paraphe-initials">' + esc(employeeInitials) + '</div>'
-    : '<div class="paraphe-initials pending">en attente</div>'
-
-  return ''
-    + '<div class="page-paraphes">'
-    +   '<div class="paraphe-cell">'
-    +     '<div class="paraphe-label">Employeur</div>'
-    +     empCell
-    +   '</div>'
-    +   '<div class="paraphe-cell">'
-    +     '<div class="paraphe-label">Salarié</div>'
-    +     saCell
-    +   '</div>'
-    + '</div>'
+// Lit c.salarie_signed_at (timestamptz ISO ou null). Si défini → initiales.
+// Sinon → null (rendu "en attente" par buildParaphRunner).
+// Si Edward utilise un autre nom de champ, modifier ici uniquement.
+function resolveSalarieInitials(c, emp) {
+  if (!c) return null
+  if (!c.salarie_signed_at) return null
+  var full = (emp && (emp.prenom || '') ? emp.prenom + ' ' : '') + (emp && emp.nom ? emp.nom : '')
+  return getInitials(full)
 }
 
 // ============================================================
@@ -372,12 +371,11 @@ function renderMissionsBlocks(blocks) {
 // ============================================================
 // 1. BUILDER : Contrat d'EXTRA (CDD d'usage)
 // ============================================================
-export function buildExtraContract(c, emp, vacs, logoUri, employerSig?: EmployerSignature | null) {
+export function buildExtraContract(c, emp, vacs, logoUri) {
   var safeVacs = vacs || []
   var totalMin = 0
   safeVacs.forEach(function (v) { totalMin += (v.duree_minutes || 0) })
 
-  // Planning HTML
   var planningRows = safeVacs.map(function (v) {
     var dur = v.duree_minutes || 0
     var h = Math.floor(dur / 60), m = dur % 60
@@ -489,28 +487,24 @@ export function buildExtraContract(c, emp, vacs, logoUri, employerSig?: Employer
     + '<div class="body"><p>Pour l\'exécution des présentes, les Parties élisent domicile en leurs adresses respectives mentionnées en tête du contrat.</p>'
     + '<p>Tout litige relatif à l\'exécution du présent contrat relèvera de la compétence du Conseil de Prud\'hommes de Paris, sous réserve des règles d\'ordre public en matière de compétence territoriale.</p></div>'
 
-  var signatures = buildSharedSignatures(c, emp, c.fonction || "", employerSig || null)
-
-  // 🔥 Sprint C3 v6 : paraphes via tfoot répété — initiales auto-extraites depuis employerSig + emp
-  var paraphFooter = buildParaphFooter(
-    (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : "",
-    "" // côté salarié : "en attente" par défaut, remplacé au moment de la signature électronique
-  )
+  var signatures = buildSharedSignatures(c, emp, c.fonction || "")
+  var paraphRunner = buildParaphRunner({
+    employeurInitials: "E.T.",
+    salarieInitials: resolveSalarieInitials(c, emp)
+  })
 
   return wrapHtml({
     titre: "Contrat extra Meshuga — " + (emp.prenom || "") + " " + (emp.nom || ""),
     css: buildSharedCss(logoUri),
-    body: header + body,
-    signatures: signatures,
-    paraphFooter: paraphFooter
+    body: header + body + signatures,
+    paraphRunner: paraphRunner
   })
 }
 
 // ============================================================
-// 2. BUILDER : CDI Responsable / Manager (template Emy, postes à responsabilités)
+// 2. BUILDER : CDI Responsable / Manager
 // ============================================================
-export function buildCdiCadreContract(c, emp, logoUri, employerSig?: EmployerSignature | null) {
-  // Données dérivées
+export function buildCdiCadreContract(c, emp, logoUri) {
   var dateEmbauche = c.date_embauche
     ? new Date(c.date_embauche).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
     : "[date d'embauche à compléter]"
@@ -527,7 +521,6 @@ export function buildCdiCadreContract(c, emp, logoUri, employerSig?: EmployerSig
   var heuresMensuelles = c.heures_mensuelles ? parseFloat(c.heures_mensuelles) : (heuresHebdo * 52 / 12)
   var heuresSup = c.heures_sup_structurelles ? parseFloat(c.heures_sup_structurelles) : Math.max(0, heuresMensuelles - 151.67)
 
-  // Calcul du taux horaire de base si pas fourni
   var tauxBase = (salaire > 0 && heuresMensuelles > 0)
     ? Math.round((salaire / (Math.min(heuresMensuelles, 151.67) + heuresSup * 1.25)) * 100) / 100
     : 0
@@ -536,16 +529,13 @@ export function buildCdiCadreContract(c, emp, logoUri, employerSig?: EmployerSig
   var peRenouv = c.periode_essai_renouvelable !== false
   var peTotal = peRenouv ? pe * 2 : pe
 
-  // Mobilité
   var mobZone = c.clause_mobilite_zone || "région Île-de-France"
 
-  // Intéressement
   var intActive = !!c.interessement_active
   var intTaux = c.interessement_taux_pct ? parseFloat(c.interessement_taux_pct) : 10
   var intAssiette = c.interessement_assiette || "chiffre d'affaires HT B2B encaissé"
   var intPeriodicite = c.interessement_periodicite || "mensuelle ou trimestrielle, au choix de l'Employeur"
 
-  // Missions (jsonb structuré)
   var missionsHtml = renderMissionsBlocks(c.missions_blocks)
 
   var header = buildSharedHeader({
@@ -633,7 +623,6 @@ export function buildCdiCadreContract(c, emp, logoUri, employerSig?: EmployerSig
           + '</div>')
         : '')
 
-    // Articles suivants : si intéressement actif, on est à 9, sinon à 8
   var nextArt = intActive ? 9 : 8
 
   body += ''
@@ -745,41 +734,38 @@ export function buildCdiCadreContract(c, emp, logoUri, employerSig?: EmployerSig
     + '<p>Toute modification du présent contrat ne pourra résulter que d\'un avenant écrit signé des deux Parties.</p>'
     + '</div>'
 
-  var signatures = buildSharedSignatures(c, emp, fonction, employerSig || null)
-
-  // 🔥 Sprint C3 v6 : paraphes via tfoot répété
-  var paraphFooter = buildParaphFooter(
-    (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : "",
-    ""
-  )
+  var signatures = buildSharedSignatures(c, emp, fonction)
+  var paraphRunner = buildParaphRunner({
+    employeurInitials: "E.T.",
+    salarieInitials: resolveSalarieInitials(c, emp)
+  })
 
   return wrapHtml({
     titre: "Contrat CDI Meshuga — " + (emp.prenom || "") + " " + (emp.nom || ""),
     css: buildSharedCss(logoUri),
-    body: header + body,
-    signatures: signatures,
-    paraphFooter: paraphFooter
+    body: header + body + signatures,
+    paraphRunner: paraphRunner
   })
 }
 
 // ============================================================
-// 3. BUILDER : CDI Cuisinier(ère) — version simplifiée 18 articles
+// 3. BUILDER : CDI Cuisinier(ère)
 // ============================================================
-export function buildCdiCuisinierContract(c, emp, logoUri, employerSig?: EmployerSignature | null) {
-  return buildCdiSimpleContract(c, emp, logoUri, "cuisinier", employerSig || null)
+export function buildCdiCuisinierContract(c, emp, logoUri) {
+  return buildCdiSimpleContract(c, emp, logoUri, "cuisinier")
 }
 
 // ============================================================
-// 4. BUILDER : CDI Caissier(ère) — version simplifiée 18 articles
+// 4. BUILDER : CDI Caissier(ère)
 // ============================================================
-export function buildCdiCaissierContract(c, emp, logoUri, employerSig?: EmployerSignature | null) {
-  return buildCdiSimpleContract(c, emp, logoUri, "caissier", employerSig || null)
+export function buildCdiCaissierContract(c, emp, logoUri) {
+  return buildCdiSimpleContract(c, emp, logoUri, "caissier")
 }
 
 // ============================================================
-// Builder commun "CDI simple" (cuisinier, caissier) — sans intéressement, sans mobilité
+// Builder commun "CDI simple" (cuisinier, caissier)
 // ============================================================
-function buildCdiSimpleContract(c, emp, logoUri, profil, employerSig?: EmployerSignature | null) {
+function buildCdiSimpleContract(c, emp, logoUri, profil) {
   var dateEmbauche = c.date_embauche
     ? new Date(c.date_embauche).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
     : "[date d'embauche à compléter]"
@@ -933,39 +919,32 @@ function buildCdiSimpleContract(c, emp, logoUri, profil, employerSig?: EmployerS
     + '<p>Élection de domicile aux adresses respectives. Litige relevant du Conseil de Prud\'hommes de Paris.</p>'
     + '</div>'
 
-  var signatures = buildSharedSignatures(c, emp, fonction, employerSig || null)
-
-  // 🔥 Sprint C3 v6 : paraphes via tfoot répété
-  var paraphFooter = buildParaphFooter(
-    (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : "",
-    ""
-  )
+  var signatures = buildSharedSignatures(c, emp, fonction)
+  var paraphRunner = buildParaphRunner({
+    employeurInitials: "E.T.",
+    salarieInitials: resolveSalarieInitials(c, emp)
+  })
 
   return wrapHtml({
     titre: "Contrat CDI Meshuga — " + (emp.prenom || "") + " " + (emp.nom || ""),
     css: buildSharedCss(logoUri),
-    body: header + body,
-    signatures: signatures,
-    paraphFooter: paraphFooter
+    body: header + body + signatures,
+    paraphRunner: paraphRunner
   })
 }
 
 // ============================================================
 // DISPATCHER : retourne le bon builder selon c.type
 // ============================================================
-// 🔥 Sprint Y1 : 5ème paramètre `employerSig` optionnel propagé à tous les builders
-export function buildContract(c, emp, vacs, logoUri, employerSig?: EmployerSignature | null) {
+export function buildContract(c, emp, vacs, logoUri) {
   if (!c || !emp) return ''
   var t = c.type || "extra"
-  // Détection du genre : féminin si civilité Madame/Mademoiselle
   var civ = (emp.civilite || "Madame")
   var isFemale = (civ === "Madame" || civ === "Mademoiselle")
-  // Génération du HTML brut
   var html
-  if (t === "cdi_cadre") html = buildCdiCadreContract(c, emp, logoUri, employerSig || null)
-  else if (t === "cdi_cuisinier") html = buildCdiCuisinierContract(c, emp, logoUri, employerSig || null)
-  else if (t === "cdi_caissier") html = buildCdiCaissierContract(c, emp, logoUri, employerSig || null)
-  else html = buildExtraContract(c, emp, vacs, logoUri, employerSig || null)
-  // Application de la transformation genrée
+  if (t === "cdi_cadre") html = buildCdiCadreContract(c, emp, logoUri)
+  else if (t === "cdi_cuisinier") html = buildCdiCuisinierContract(c, emp, logoUri)
+  else if (t === "cdi_caissier") html = buildCdiCaissierContract(c, emp, logoUri)
+  else html = buildExtraContract(c, emp, vacs, logoUri)
   return genderize(html, isFemale)
 }
