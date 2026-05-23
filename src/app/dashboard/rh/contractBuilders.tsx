@@ -338,18 +338,31 @@ export function wrapHtml(opts) {
 }
 
 // ============================================================
-// 🆕 Compatibilité ascendante : buildParaphFooter (no-op)
+// 🆕 Compatibilité avec route.ts/submit (post-signature salarié)
 // ============================================================
-// Avant v12, certains composants (preview modals, routes /api/sign/*)
-// importaient et injectaient manuellement un footer de paraphes en
-// position:fixed bottom-right. Avec Paged.js (v12), les paraphes sont
-// ancrés nativement via la zone @bottom-right des règles @page, donc
-// ce helper est devenu inutile. On l'exporte comme no-op pour ne pas
-// casser les composants legacy qui l'importent encore.
-// TODO: supprimer cet export une fois tous les appelants migrés.
+// route.ts/submit appelle buildParaphFooter(empInitials, salInitials)
+// après signature du salarié pour injecter un footer mis à jour via
+// regex replace sur le HTML archivé. Avant v12 ce footer était en
+// position:fixed (ne marchait pas en Chrome print). En v12 (Paged.js),
+// on retourne un nouveau .paraphes-runner avec les initiales salarié.
+//
+// Mécanique : les 2 regex de route.ts (`paraph-footer`) ne matcheront
+// PLUS (on a changé la classe). Donc le fallback final s'applique :
+//   originalHtml.replace(/<\/body>/i, newFooter + "</body>")
+// → ça insère un 2e .paraphes-runner avant </body>.
+// → Paged.js voit deux running elements de même nom. Selon la spec
+//   CSS Paged Media, le DERNIER déclaré dans le DOM écrase le premier
+//   dans la zone @bottom-right. Les initiales salarié remplacent donc
+//   automatiquement le "en attente" sur toutes les pages.
+//
+// ⚠️  Pattern fragile. À refactor : modifier route.ts pour faire un
+//     replace ciblé sur class="paraphes-runner" plutôt qu'une insertion.
 // ============================================================
-export function buildParaphFooter() {
-  return ''
+export function buildParaphFooter(employerInitials, employeeInitials) {
+  return buildParaphRunner({
+    employeurInitials: employerInitials || "E.T.",
+    salarieInitials: employeeInitials || null
+  })
 }
 
 // ============================================================
