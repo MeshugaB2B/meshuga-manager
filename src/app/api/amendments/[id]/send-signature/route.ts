@@ -4,10 +4,13 @@
 // POST endpoint pour envoyer un avenant pour signature
 // électronique au salarié.
 //
-// Sprint Y1 — Phase C — Sprint C2A
+// v2 (24/05/2026) : envoi email + SMS en parallèle.
+//   - Email envoyé via Brevo si l'email destinataire est fourni
+//   - SMS envoyé via Twilio si le téléphone destinataire est fourni
+//   - Au moins un des deux doit être fourni
+//   - Téléphone sauvegardé sur le profil UNIQUEMENT si vide en DB
 //
-// Symétrique de /api/contracts/[id]/send-signature mais sur la
-// table hr_contract_amendments.
+// Sprint Y1 — Phase C — Sprint C2A
 // ============================================================
 
 import { NextResponse } from "next/server"
@@ -18,6 +21,7 @@ import {
   updateEmployeeContactInfo,
 } from "@/app/dashboard/rh/employeeWelcomePack"
 import { sendBrevoEmail, buildSignatureRequestEmail } from "@/lib/brevo"
+import { sendTwilioSms, normalizePhoneFR, buildSignatureSmsBody } from "@/lib/twilio"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -64,11 +68,35 @@ export async function POST(
   }
 
   var recipientEmail = (body && typeof body.recipientEmail === "string" ? body.recipientEmail : "").trim().toLowerCase()
+  var recipientPhone = (body && typeof body.recipientPhone === "string" ? body.recipientPhone : "").trim()
   var includeWelcomePack = body && body.includeWelcomePack === true
   var saveEmailToProfile = body && body.saveEmailToProfile === true
 
-  if (!recipientEmail || !recipientEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+  // === Validation : au moins email OU téléphone ===
+  var hasEmail = recipientEmail.length > 0
+  var hasPhone = recipientPhone.length > 0
+
+  if (!hasEmail && !hasPhone) {
+    return NextResponse.json(
+      { ok: false, error: "Email ou téléphone destinataire requis" },
+      { status: 400 }
+    )
+  }
+
+  if (hasEmail && !recipientEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
     return NextResponse.json({ ok: false, error: "Email destinataire invalide" }, { status: 400 })
+  }
+
+  // Normaliser le téléphone (E.164 +33...)
+  var normalizedPhone: string | null = null
+  if (hasPhone) {
+    normalizedPhone = normalizePhoneFR(recipientPhone)
+    if (!normalizedPhone) {
+      return NextResponse.json(
+        { ok: false, error: "Téléphone destinataire invalide (format français attendu)" },
+        { status: 400 }
+      )
+    }
   }
 
   // === 2. Init Supabase ===
@@ -124,7 +152,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Salarié introuvable" }, { status: 404 })
   }
 
-  // === 5. Statut welcome_pack ===
+  // === 5. Statut welcome_pack + infos contact actuelles ===
   var empStatus = await getEmployeeWelcomePackStatus(employeeId)
   if (!empStatus) {
     return NextResponse.json({ ok: false, error: "Statut salarié introuvable" }, { status: 404 })
@@ -136,16 +164,21 @@ export async function POST(
     finalIncludeWelcomePack = false
   }
 
-  // === 7. Token ===
+  // === 7. Token signature ===
   var token = randomUUID().replace(/-/g, "")
 
-  // === 8. UPDATE hr_contract_amendments ===
+  // === 8. Détermine le channel pour la DB ===
+  var signatureChannel = "email"
+  if (hasEmail && hasPhone) signatureChannel = "email+sms"
+  else if (hasPhone && !hasEmail) signatureChannel = "sms"
+
+  // === 9. UPDATE hr_contract_amendments ===
   var updatePayload: any = {
     signature_token: token,
     signature_status: "sent",
     signature_sent_at: new Date().toISOString(),
-    signature_channel: "email",
-    signature_recipient_email: recipientEmail,
+    signature_channel: signatureChannel,
+    signature_recipient_email: hasEmail ? recipientEmail : null,
     signature_includes_welcome_pack: finalIncludeWelcomePack,
     signature_viewed_at: null,
     signature_signed_at: null,
@@ -161,67 +194,115 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Erreur mise à jour avenant" }, { status: 500 })
   }
 
-  // === 9. Sauvegarder l'email ===
-  if (saveEmailToProfile && empStatus.email !== recipientEmail) {
+  // === 10. Sauvegarder email (case à cocher) et téléphone (auto si vide) sur le profil ===
+  var contactUpdate: any = {}
+  if (hasEmail && saveEmailToProfile && empStatus.email !== recipientEmail) {
+    contactUpdate.email = recipientEmail
+  }
+  // Téléphone : sauvegarder UNIQUEMENT si vide en DB (politique Edward)
+  if (hasPhone && normalizedPhone && (!empStatus.telephone || empStatus.telephone.trim() === "")) {
+    contactUpdate.telephone = normalizedPhone
+  }
+  if (contactUpdate.email || contactUpdate.telephone) {
     var ok = await updateEmployeeContactInfo({
       employeeId: employeeId,
-      email: recipientEmail,
+      email: contactUpdate.email,
+      telephone: contactUpdate.telephone,
     })
     if (!ok) {
-      console.warn("[send-signature/amendment] Échec sauvegarde email sur profil")
+      console.warn("[send-signature/amendment] Échec sauvegarde contact info sur profil")
     }
   }
 
-  // === 10. Email content ===
+  // === 11. Préparer URL signature ===
   var docLabel = getAmendmentTypeLabel(amendment.amendment_type || "")
   var siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://meshuga-manager.vercel.app"
   var signatureUrl = siteUrl.replace(/\/+$/, "") + "/sign/" + token
 
-  var emailContent = buildSignatureRequestEmail({
-    recipientFirstName: empStatus.prenom,
-    recipientLastName: empStatus.nom,
-    recipientCivilite: empStatus.civilite,
-    documentTypeLabel: docLabel,
-    signatureUrl: signatureUrl,
-    includeWelcomePack: finalIncludeWelcomePack,
-    senderName: "Edward Touret",
-    expiresInDays: 30,
-  })
+  // === 12. Envoi parallèle email + SMS ===
+  var emailPromise: Promise<any> = Promise.resolve(null)
+  var smsPromise: Promise<any> = Promise.resolve(null)
 
-  // === 11. Envoyer ===
-  var sendResult = await sendBrevoEmail({
-    to: [{ email: recipientEmail, name: empStatus.prenom + " " + empStatus.nom }],
-    bcc: [{ email: "edward@meshuga.fr", name: "Edward Touret" }],  // 🔥 Copie cachée pour vérification + archivage
-    subject: emailContent.subject,
-    htmlContent: emailContent.htmlContent,
-    textContent: emailContent.textContent,
-    replyTo: { email: "edward@meshuga.fr", name: "Edward Touret" },
-    tags: ["signature-request", "amendment"],
-  })
+  if (hasEmail) {
+    var emailContent = buildSignatureRequestEmail({
+      recipientFirstName: empStatus.prenom,
+      recipientLastName: empStatus.nom,
+      recipientCivilite: empStatus.civilite,
+      documentTypeLabel: docLabel,
+      signatureUrl: signatureUrl,
+      includeWelcomePack: finalIncludeWelcomePack,
+      senderName: "Edward Touret",
+      expiresInDays: 30,
+    })
+    emailPromise = sendBrevoEmail({
+      to: [{ email: recipientEmail, name: empStatus.prenom + " " + empStatus.nom }],
+      bcc: [{ email: "edward@meshuga.fr", name: "Edward Touret" }],
+      subject: emailContent.subject,
+      htmlContent: emailContent.htmlContent,
+      textContent: emailContent.textContent,
+      replyTo: { email: "edward@meshuga.fr", name: "Edward Touret" },
+      tags: ["signature-request", "amendment"],
+    })
+  }
 
-  if (!sendResult.ok) {
-    console.error("[send-signature/amendment] Brevo error:", sendResult.error)
+  if (hasPhone && normalizedPhone) {
+    var smsBody = buildSignatureSmsBody({
+      prenom: empStatus.prenom || "",
+      signatureUrl: signatureUrl,
+    })
+    smsPromise = sendTwilioSms({
+      to: normalizedPhone,
+      body: smsBody,
+    })
+  }
+
+  var results = await Promise.allSettled([emailPromise, smsPromise])
+  var emailResult: any = results[0].status === "fulfilled" ? results[0].value : { ok: false, error: "Exception" }
+  var smsResult: any = results[1].status === "fulfilled" ? results[1].value : { ok: false, error: "Exception" }
+
+  // === 13. Évaluation succès global ===
+  // On considère que c'est OK si au moins UN des deux canaux a réussi
+  // (ou si le canal demandé est null = pas demandé)
+  var emailOk = !hasEmail || (emailResult && emailResult.ok)
+  var smsOk = !hasPhone || (smsResult && smsResult.ok)
+  var anyChannelSucceeded = (hasEmail && emailResult && emailResult.ok) ||
+                            (hasPhone && smsResult && smsResult.ok)
+
+  if (!anyChannelSucceeded) {
+    var emailErr = emailResult ? emailResult.error : "non envoyé"
+    var smsErr = smsResult ? smsResult.error : "non envoyé"
+    console.error("[send-signature/amendment] Tous les canaux ont échoué:", emailErr, "|", smsErr)
     return NextResponse.json(
       {
         ok: false,
-        error: "Email non envoyé : " + sendResult.error,
+        error: "Aucun canal n'a abouti. Email: " + emailErr + " | SMS: " + smsErr,
         token: token,
         signatureUrl: signatureUrl,
-        partialSuccess: true,
+        channels: {
+          email: hasEmail ? { ok: false, error: emailErr } : null,
+          sms: hasPhone ? { ok: false, error: smsErr } : null,
+        },
       },
       { status: 500 }
     )
   }
 
-  // === 12. Succès ===
+  // === 14. Succès (au moins un canal a abouti) ===
   return NextResponse.json(
     {
       ok: true,
       token: token,
       signatureUrl: signatureUrl,
       includeWelcomePack: finalIncludeWelcomePack,
-      messageId: sendResult.messageId,
-      testMode: sendResult.testMode === true,
+      channels: {
+        email: hasEmail
+          ? { ok: !!emailResult.ok, messageId: emailResult.messageId, error: emailResult.ok ? null : emailResult.error }
+          : null,
+        sms: hasPhone
+          ? { ok: !!smsResult.ok, sid: smsResult.sid, error: smsResult.ok ? null : smsResult.error, testMode: smsResult.testMode }
+          : null,
+      },
+      partialSuccess: !(emailOk && smsOk),
     },
     { status: 200 }
   )
