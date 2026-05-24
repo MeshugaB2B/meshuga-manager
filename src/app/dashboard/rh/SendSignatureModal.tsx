@@ -23,6 +23,7 @@ interface Employee {
   prenom: string
   nom: string
   email?: string | null
+  telephone?: string | null
   civilite?: string | null
   welcome_pack_signed?: boolean
 }
@@ -40,6 +41,7 @@ export default function SendSignatureModal(props: Props) {
   var alreadySignedWp = props.employee.welcome_pack_signed === true
 
   var [email, setEmail] = useState(props.employee.email || "")
+  var [phone, setPhone] = useState(props.employee.telephone || "")
   var [saveEmail, setSaveEmail] = useState(true)
   // Inclure le dossier de bienvenue par défaut SAUF s'il a déjà été signé
   var [includeWelcomePack, setIncludeWelcomePack] = useState(!alreadySignedWp)
@@ -58,11 +60,34 @@ export default function SendSignatureModal(props: Props) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim())
   }
 
+  // === Validation téléphone FR (accepte tous formats courants) ===
+  var isValidPhoneFR = function (p) {
+    if (!p) return false
+    var cleaned = p.replace(/[\s\-\.\(\)]/g, "").trim()
+    if (!cleaned) return false
+    if (cleaned.match(/^\+33[1-9]\d{8}$/)) return true
+    if (cleaned.match(/^\+330[1-9]\d{8}$/)) return true
+    if (cleaned.match(/^0033[1-9]\d{8}$/)) return true
+    if (cleaned.match(/^0[1-9]\d{8}$/)) return true
+    if (cleaned.match(/^[1-9]\d{8}$/)) return true
+    return false
+  }
+
   // === Passage à l'écran de confirmation ===
   var goToConfirm = function () {
     setErrorMsg("")
-    if (!isValidEmail(email)) {
+    var hasEmail = email && email.trim().length > 0
+    var hasPhone = phone && phone.trim().length > 0
+    if (!hasEmail && !hasPhone) {
+      setErrorMsg("Email ou téléphone requis (au moins un des deux)")
+      return
+    }
+    if (hasEmail && !isValidEmail(email)) {
       setErrorMsg("Email invalide")
+      return
+    }
+    if (hasPhone && !isValidPhoneFR(phone)) {
+      setErrorMsg("Téléphone invalide (format français attendu, ex : 06 12 34 56 78 ou +33 6 12 34 56 78)")
       return
     }
     setPhase("confirming")
@@ -77,11 +102,15 @@ export default function SendSignatureModal(props: Props) {
         ? ("/api/contracts/" + props.documentId + "/send-signature")
         : ("/api/amendments/" + props.documentId + "/send-signature")
 
+      var hasEmail = email && email.trim().length > 0
+      var hasPhone = phone && phone.trim().length > 0
+
       var res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          recipientEmail: email.trim().toLowerCase(),
+          recipientEmail: hasEmail ? email.trim().toLowerCase() : "",
+          recipientPhone: hasPhone ? phone.trim() : "",
           includeWelcomePack: includeWelcomePack,
           saveEmailToProfile: saveEmail,
         }),
@@ -100,8 +129,18 @@ export default function SendSignatureModal(props: Props) {
 
   // === Fermeture finale ===
   var finishAndClose = function () {
+    var hasEmail = email && email.trim().length > 0
+    var hasPhone = phone && phone.trim().length > 0
+    var channelText = ""
+    if (hasEmail && hasPhone) channelText = " par email et SMS"
+    else if (hasPhone) channelText = " par SMS"
+    else channelText = " par email"
+    var dest = ""
+    if (hasEmail && hasPhone) dest = " à " + email + " et " + phone
+    else if (hasPhone) dest = " au " + phone
+    else dest = " à " + email
     props.onSent(
-      "📧 " + props.documentLabel + " envoyé à " + email +
+      "📧 " + props.documentLabel + " envoyé" + channelText + dest +
       (includeWelcomePack ? " (avec le Dossier de bienvenue)" : "")
     )
   }
@@ -158,10 +197,15 @@ export default function SendSignatureModal(props: Props) {
         {/* === ÉCRAN 1 : FORMULAIRE === */}
         {phase === "form" || phase === "error" ? (
           <div style={{ padding: 24 }}>
+            {/* Bandeau info canaux */}
+            <div style={{ padding: "10px 14px", background: "rgba(255,130,215,0.08)", borderLeft: "4px solid #FF82D7", borderRadius: 4, fontSize: 13, color: "#191923", marginBottom: 18, lineHeight: 1.5 }}>
+              Renseigne <strong>au moins un canal</strong> (email ou téléphone). Si les deux sont remplis, l&apos;envoi se fera <strong>en parallèle</strong> sur email + SMS.
+            </div>
+
             {/* Email */}
             <div style={{ marginBottom: 18 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "#191923", marginBottom: 6 }}>
-                Email du salarié *
+                Email du salarié
               </label>
               <input
                 type="email"
@@ -185,6 +229,37 @@ export default function SendSignatureModal(props: Props) {
               ) : (
                 <div style={{ fontSize: 11, color: "#C2185B", marginTop: 4 }}>
                   ⚠ Aucun email enregistré sur le profil — saisis-le.
+                </div>
+              )}
+            </div>
+
+            {/* Téléphone */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "#191923", marginBottom: 6 }}>
+                Téléphone du salarié (pour SMS)
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={function (e) { setPhone(e.target.value) }}
+                placeholder="06 12 34 56 78 ou +33 6 12 34 56 78"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: "1.5px solid #DDD",
+                  borderRadius: 6,
+                  fontSize: 15,
+                  background: "#FFFFFF",
+                  fontFamily: "inherit",
+                }}
+              />
+              {props.employee.telephone ? (
+                <div style={{ fontSize: 11, color: "#666", marginTop: 4, fontStyle: "italic" }}>
+                  ↳ Pré-rempli depuis le profil du salarié. Le SMS sera envoyé via Twilio (expéditeur : MESHUGA).
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: "#666", marginTop: 4, fontStyle: "italic" }}>
+                  Optionnel — si renseigné, un SMS sera envoyé en plus de l&apos;email. Sauvegarde auto sur le profil si vide.
                 </div>
               )}
             </div>
@@ -234,7 +309,7 @@ export default function SendSignatureModal(props: Props) {
 
             {/* Encart info */}
             <div style={{ padding: "12px 14px", background: "rgba(255,235,90,0.25)", borderLeft: "4px solid #FFEB5A", borderRadius: 4, fontSize: 13, color: "#191923", margin: "16px 0 4px 0", lineHeight: 1.5 }}>
-              <strong>📧 Email envoyé via Brevo</strong> depuis <strong>hello@meshuga.fr</strong>. Le salarié recevra un lien sécurisé pour signer en ligne en quelques clics depuis son téléphone ou ordinateur.
+              <strong>📧 Email via Brevo</strong> depuis <strong>hello@meshuga.fr</strong> · <strong>📱 SMS via Twilio</strong> avec expéditeur <strong>MESHUGA</strong>. Le salarié recevra un lien sécurisé pour signer en ligne.
             </div>
 
             {/* Erreur */}
@@ -286,7 +361,7 @@ export default function SendSignatureModal(props: Props) {
             </div>
 
             <p style={{ fontSize: 14, lineHeight: 1.6, color: "#191923", margin: "0 0 16px 0" }}>
-              Tu es sur le point d&apos;envoyer un <strong>email réel de demande de signature</strong>.
+              Tu es sur le point d&apos;envoyer une <strong>demande de signature réelle</strong>.
               Vérifie attentivement avant de confirmer.
             </p>
 
@@ -295,8 +370,19 @@ export default function SendSignatureModal(props: Props) {
                 <div style={{ fontWeight: 700, color: "#666" }}>Destinataire :</div>
                 <div><strong>{greetingName}</strong></div>
 
-                <div style={{ fontWeight: 700, color: "#666" }}>Email :</div>
-                <div><strong style={{ color: "#FF82D7" }}>{email}</strong></div>
+                {email && email.trim().length > 0 ? (
+                  <>
+                    <div style={{ fontWeight: 700, color: "#666" }}>📧 Email :</div>
+                    <div><strong style={{ color: "#FF82D7" }}>{email}</strong></div>
+                  </>
+                ) : null}
+
+                {phone && phone.trim().length > 0 ? (
+                  <>
+                    <div style={{ fontWeight: 700, color: "#666" }}>📱 SMS :</div>
+                    <div><strong style={{ color: "#FF82D7" }}>{phone}</strong> <span style={{ fontSize: 11, color: "#999" }}>(via MESHUGA)</span></div>
+                  </>
+                ) : null}
 
                 <div style={{ fontWeight: 700, color: "#666" }}>Document{includeWelcomePack ? "s" : ""} :</div>
                 <div>
@@ -309,12 +395,15 @@ export default function SendSignatureModal(props: Props) {
                 </div>
 
                 <div style={{ fontWeight: 700, color: "#666" }}>Expéditeur :</div>
-                <div>hello@meshuga.fr (Brevo)</div>
+                <div>
+                  {email && email.trim().length > 0 ? <div>hello@meshuga.fr (Brevo)</div> : null}
+                  {phone && phone.trim().length > 0 ? <div>MESHUGA (Twilio)</div> : null}
+                </div>
               </div>
             </div>
 
             <p style={{ fontSize: 13, lineHeight: 1.5, color: "#666", margin: "12px 0 0 0", fontStyle: "italic" }}>
-              {cherFr} {props.employee.prenom} recevra immédiatement le mail avec un lien sécurisé pour signer en ligne.
+              {cherFr} {props.employee.prenom} recevra le lien de signature dans les prochaines secondes.
             </p>
 
             {/* Footer */}
@@ -358,21 +447,55 @@ export default function SendSignatureModal(props: Props) {
         {/* === ÉCRAN 3 : SUCCÈS === */}
         {phase === "done" ? (
           <div style={{ padding: 24 }}>
-            <div style={{ textAlign: "center", fontSize: 56, lineHeight: 1, marginBottom: 16 }}>📧</div>
+            <div style={{ textAlign: "center", fontSize: 56, lineHeight: 1, marginBottom: 16 }}>✅</div>
             <div style={{ textAlign: "center", fontSize: 22, fontWeight: 700, color: "#16A34A", marginBottom: 8 }}>
-              Email envoyé avec succès
+              Envoyé avec succès
             </div>
             <p style={{ textAlign: "center", fontSize: 14, color: "#666", margin: "0 0 20px 0" }}>
               {props.employee.prenom} va recevoir le lien de signature dans les prochaines secondes.
             </p>
 
             <div style={{ background: "rgba(34,197,94,0.08)", borderLeft: "4px solid #16A34A", padding: "14px 18px", borderRadius: 6, margin: "16px 0", fontSize: 13, lineHeight: 1.6 }}>
-              <div><strong>Destinataire :</strong> {email}</div>
-              {resultData && resultData["messageId"] ? (
-                <div style={{ marginTop: 4, fontSize: 11, color: "#666", wordBreak: "break-all" }}>
-                  ID Brevo : {resultData["messageId"]}
+              {/* Statut email */}
+              {resultData && resultData["channels"] && resultData["channels"].email ? (
+                <div style={{ marginBottom: resultData["channels"].sms ? 10 : 0, paddingBottom: resultData["channels"].sms ? 10 : 0, borderBottom: resultData["channels"].sms ? "1px solid rgba(34,197,94,0.2)" : "none" }}>
+                  <div>
+                    <strong>{resultData["channels"].email.ok ? "✓ Email envoyé" : "✗ Email échoué"}</strong> à <strong>{email}</strong>
+                  </div>
+                  {resultData["channels"].email.messageId ? (
+                    <div style={{ marginTop: 2, fontSize: 11, color: "#666", wordBreak: "break-all" }}>
+                      ID Brevo : {resultData["channels"].email.messageId}
+                    </div>
+                  ) : null}
+                  {!resultData["channels"].email.ok && resultData["channels"].email.error ? (
+                    <div style={{ marginTop: 2, fontSize: 11, color: "#DC3545" }}>
+                      Erreur : {resultData["channels"].email.error}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
+
+              {/* Statut SMS */}
+              {resultData && resultData["channels"] && resultData["channels"].sms ? (
+                <div>
+                  <div>
+                    <strong>{resultData["channels"].sms.ok ? "✓ SMS envoyé" : "✗ SMS échoué"}</strong> au <strong>{phone}</strong>
+                    {resultData["channels"].sms.testMode ? <span style={{ fontSize: 11, color: "#F59E0B", marginLeft: 6 }}>(mode test)</span> : null}
+                  </div>
+                  {resultData["channels"].sms.sid ? (
+                    <div style={{ marginTop: 2, fontSize: 11, color: "#666", wordBreak: "break-all" }}>
+                      SID Twilio : {resultData["channels"].sms.sid}
+                    </div>
+                  ) : null}
+                  {!resultData["channels"].sms.ok && resultData["channels"].sms.error ? (
+                    <div style={{ marginTop: 2, fontSize: 11, color: "#DC3545" }}>
+                      Erreur : {resultData["channels"].sms.error}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {/* Lien signature (toujours affiché) */}
               {resultData && resultData["signatureUrl"] ? (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(34,197,94,0.2)" }}>
                   <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Lien de signature (à conserver pour relances) :</div>
@@ -382,6 +505,12 @@ export default function SendSignatureModal(props: Props) {
                 </div>
               ) : null}
             </div>
+
+            {resultData && resultData["partialSuccess"] ? (
+              <div style={{ padding: "10px 14px", background: "rgba(245,158,11,0.1)", borderLeft: "4px solid #F59E0B", borderRadius: 4, fontSize: 12, color: "#191923", marginBottom: 16, lineHeight: 1.5 }}>
+                ⚠ <strong>Envoi partiel</strong> — un des canaux a échoué mais l&apos;autre a abouti. Le salarié pourra accéder au lien malgré tout.
+              </div>
+            ) : null}
 
             <p style={{ fontSize: 13, color: "#666", margin: "16px 0 0 0", lineHeight: 1.5 }}>
               💡 Le statut <strong>« 📧 Envoyé »</strong> apparaîtra dans la liste des documents. Il passera à <strong>« 👁 Vu »</strong> dès que le salarié clique sur le lien, puis à <strong>« ✅ Signé »</strong> après signature.
