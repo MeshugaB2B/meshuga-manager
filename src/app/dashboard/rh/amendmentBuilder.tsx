@@ -473,16 +473,24 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   // employerSig (optionnel) injecte la signature pré-enregistrée d'Edward
   var signatures = buildAvenantSignatures(contract, emp, amendment.signature_date, contract.fonction || "", employerSig || null)
   
-  // 🔥 Sprint C3 v6 : paraphes via tfoot répété + signatures hors-table.
-  // - body : header + corps articles (sera wrappé dans <table class="flow-table"> avec tfoot répété par Chrome)
-  // - signatures : hors-table dans <div class="final-page"> → pas de paraphes sur la page signature
-  // - paraphFooter : initiales employeur auto-extraites, côté salarié "en attente" jusqu'à signature
-  var employerInitials = (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : ""
+  // 🆕 v17 : paraphes via CSS @page natif (plus de tfoot, plus de DOM .paraphes-runner).
+  // Le texte des paraphes est injecté dans le CSS @bottom-right via buildSharedCss(logoUri, paraphText, headerText).
+  // - paraphText : "E.T.   /   E.S."  (ou "en attente" si pas signé par le salarié)
+  // - headerText : "AVENANT  ·  EMY SOULABAILLE" (bandeau haut de chaque page)
+  var employerInitials = (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : "E.T."
+  var salarieInitials = "en attente"
+  if (contract && (contract.signature_signed_at || contract.signed_at)) {
+    var empFull = ((emp && emp.prenom) || '') + ' ' + ((emp && emp.nom) || '')
+    salarieInitials = getInitials(empFull) || "en attente"
+  }
+  var paraphText = employerInitials + "   /   " + salarieInitials
+  var empNameUpper = ((emp && emp.prenom) || '') + ' ' + (((emp && emp.nom) || '').toUpperCase())
+  var headerText = "AVENANT  ·  " + empNameUpper.trim()
   var paraphFooter = buildParaphFooter(employerInitials, "")
   
   return wrapHtml({
     titre: "Avenant Meshuga du " + esc(avenantDateShort) + " — " + (emp ? (emp.prenom + " " + emp.nom) : "—"),
-    css: buildSharedCss(logoUri),
+    css: buildSharedCss(logoUri, paraphText, headerText),
     body: header + body,
     signatures: signatures,
     paraphFooter: paraphFooter
