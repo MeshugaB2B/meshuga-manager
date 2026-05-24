@@ -72,10 +72,11 @@ export function getInitials(fullName) {
 }
 
 // Texte des paraphes pour le CSS content
+// 🆕 v16 : juste les initiales, plus le mot "Paraphes" (clarification via page signature)
 export function buildParaphText(employerInitials, salarieInitials) {
   var emp = employerInitials || "E.T."
   var sal = salarieInitials || "en attente"
-  return "Paraphes  " + emp + "  /  " + sal
+  return emp + "   /   " + sal
 }
 
 function resolveSalarieInitials(c, emp) {
@@ -174,10 +175,12 @@ export function buildSharedCss(logoUri, paraphText, headerText) {
     +     'font-family:"Yellowtail",cursive;'
     +     'font-size:14px;'
     +     'color:#FF82D7;'
-    +     'border:2px solid #FF82D7;'
-    +     'border-radius:999px;'
-    +     'padding:4px 14px;'
+    +     'border:1.5px solid #FF82D7;'
+    +     'border-radius:8px;'
+    +     'padding:3px 12px;'
     +     'background:#fff;'
+    +     'width:max-content;'
+    +     'margin-left:auto;'
     +   '}'
     + '}'
     // @page signature : header oui, paraphes NON
@@ -254,8 +257,9 @@ export function buildSharedHeader(opts) {
     + '<div class="toolbar"><h1>meshuga · ' + esc(titreCover.toLowerCase()) + '</h1>'
     + '<button class="btn primary" onclick="window.print()">Imprimer en PDF</button></div>'
 
-    // Page 1 : COVER (cover-page → @page cover : pas de header, pas de paraphes)
-    + '<div class="page cover-page">'
+    // 🆕 v16 : Page 1 : tout dans .page (PAS .cover-page) → paraphes apparaissent dès page 1.
+    // La cover-page est réservée à la couverture ROSE du welcomePack uniquement.
+    + '<div class="page">'
     + '<div class="cover">'
     + (logoUri ? '<img src="' + logoUri + '" alt="Meshuga">' : '<div style="font-family:Yellowtail,cursive;font-size:96px;color:#FF82D7;line-height:1">meshuga</div>')
     + '<div class="place">3 RUE VAVIN &nbsp;·&nbsp; PARIS 6<sup>e</sup></div>'
@@ -277,10 +281,7 @@ export function buildSharedHeader(opts) {
     + '<p style="text-align:center;font-style:italic;color:#666;font-size:11px;margin:14px 0 6px">Ensemble dénommées « les Parties ».</p>'
     + '<p class="bold-center">IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :</p>'
     + '</div>'
-    + '</div>' // ferme .page.cover-page
-
-    // Pages suivantes : page default (header + paraphes)
-    + '<div class="page">'
+    // 🆕 v16 : PAS de fermeture ici — on continue sur la même .page (pas de saut de page forcé)
 }
 
 // ============================================================
@@ -300,7 +301,7 @@ export function buildSharedSignatures(c, emp, salarieRole) {
     + '<section class="sig-section">'
     + '<h2 class="yt">Signatures</h2>'
     + '<div class="rule"></div>'
-    + '<div class="fait-banner">Fait à <strong>' + esc(ville) + '</strong>, en deux exemplaires originaux dont un remis à chacune des Parties, le <strong>' + esc(dateSig) + '</strong>.<span class="small">Chaque page doit être paraphée par les deux Parties.</span></div>'
+    + '<div class="fait-banner">Fait à <strong>' + esc(ville) + '</strong>, en deux exemplaires originaux dont un remis à chacune des Parties, le <strong>' + esc(dateSig) + '</strong>.<span class="small">Le paraphe figurant en bas à droite de chaque page (en lettres Yellowtail rose) constitue le paraphe ' + (feminin ? 'de la Salariée' : 'du Salarié') + ', à l\'identique de la signature électronique apposée ci-dessous. Le premier paraphe correspond à l\'Employeur (E.T. — Edward TOURET).</span></div>'
     + '<div class="sig-grid">'
     + '<div class="sig-block">'
     + '<div class="sig-head">Pour l\'Employeur</div>'
