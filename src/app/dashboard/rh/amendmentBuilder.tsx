@@ -40,10 +40,11 @@ function buildAvenantSignatures(contract: any, emp: any, signatureDate: string, 
   var employeeBlock = renderEmployeeSignatureBlockEmpty(emp.prenom || "", emp.nom || "", salarieRole, feminin)
 
   return ''
+    + '<div class="signature-page">'  // 🆕 v17.2 : déclenche @page signature → PAS de paraphe sur cette page
     + '<section class="sig-section">'
     + '<h2 class="yt">Signatures</h2>'
     + '<div class="rule"></div>'
-    + '<div class="fait-banner">Fait à <strong>' + esc(ville) + '</strong>, en deux exemplaires originaux dont un remis à chacune des Parties, le <strong>' + esc(dateSig) + '</strong>.<span class="small">Chaque page doit être paraphée par les deux Parties.</span></div>'
+    + '<div class="fait-banner">Fait à <strong>' + esc(ville) + '</strong>, en deux exemplaires originaux dont un remis à chacune des Parties, le <strong>' + esc(dateSig) + '</strong>.<span class="small">Le paraphe figurant en bas à droite de chaque page (en lettres Yellowtail rose) constitue le paraphe ' + (feminin ? 'de la Salariée' : 'du Salarié') + ', à l\'identique de la signature ci-dessous. Le premier paraphe (E.T.) correspond à l\'Employeur (Edward TOURET).</span></div>'
     + '<div class="sig-grid">'
     + '<div class="sig-block">'
     + '<div class="sig-head">Pour l\'Employeur</div>'
@@ -53,6 +54,7 @@ function buildAvenantSignatures(contract: any, emp: any, signatureDate: string, 
     + employeeBlock
     + '</div>'
     + '</div></section>'
+    + '</div>'  // ferme .signature-page
 }
 
 function fmtDateShortFR(d: any) {
