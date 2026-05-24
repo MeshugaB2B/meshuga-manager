@@ -1,48 +1,34 @@
 // ============================================================
-// contractBuilders.tsx — v12 (22/05/2026)
+// contractBuilders.tsx — v14 (23/05/2026)
 // ============================================================
-// Builders HTML pour les 4 types de contrats Meshuga :
-//   - Extra (CDD d'usage)
-//   - CDI Cuisinier(ère)
-//   - CDI Caissier(ère) / Équipier(ère)
-//   - CDI Responsable / Manager (template Emy, statut agent de maîtrise/cadre)
-//
-// 🆕 v12 — Paged.js polyfill + paraphes bas-droite :
-//   - Paged.js (CDN unpkg) repaginé côté client pour supporter le CSS Paged
-//     Media Level 3 dans Chrome (running elements, @page named, etc.)
-//   - Paraphes ancrés au bord physique bas-droite de chaque page via
-//     position: running(paraphes-runner) + @page { @bottom-right { ... } }
-//   - Page de signature exclue des paraphes via @page signature {...}
-//   - Page de couverture (welcomePack) exclue via @page cover {...}
-//   - Initiales conditionnelles : "E.T." (employeur) toujours,
-//     initiales salarié si c.salarie_signed_at est défini, sinon "en attente".
-//
-// Architecture :
-//   buildSharedCss()         - CSS commun (Paged Media + UI)
-//   buildParaphRunner()      - HTML du runner element des paraphes      🆕
-//   getInitials()            - "Emy Dupont" → "E.D."                    🆕
-//   buildSharedHeader()      - bandeau + cover + parties
-//   buildSharedSignatures()  - bloc signatures (wrappé .signature-page)
-//   wrapHtml()               - doc complet, injecte Paged.js script
-//   build*Contract(c, emp)   - 4 builders spécialisés
-//   buildContract(c, emp)    - dispatcher selon c.type
+// 🆕 v14 — Paraphes via CSS @page natif (Chrome print) :
+//   - Plus de Paged.js polyfill (Chrome NE supporte PAS position: running())
+//   - Chrome SUPPORTE @page { @bottom-right { content: "texte" } }
+//   - Texte des paraphes injecté directement dans le CSS
+//   - Encadré arrondi rose + font Yellowtail rose
+//   - @page signature → pas de paraphes (dernière page)
+//   - @page cover → pas de header ni paraphes (welcomePack)
+//   - VALIDÉ avec Chrome headless via puppeteer en local
 // ============================================================
 
 import { MESHUGA_LEGAL, formatDateFr, formatEuros, numToFrenchWords } from "./rhConstants"
 
-// === Helper : safe() — protège contre null/undefined ===
 function safe(s) {
   if (s === null || s === undefined || s === "") return "—"
   return String(s)
 }
 
-// === Helper : escape HTML pour éviter injection ===
 export function esc(s) {
   if (s === null || s === undefined) return ""
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 }
 
-// === Helper : genderize() — transforme les formules épicènes en forme genrée ===
+// Escape pour valeur CSS content "..."
+function escCss(s) {
+  if (s === null || s === undefined) return ""
+  return String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+}
+
 function genderize(html, isFemale) {
   if (!html) return ""
   var rules = [
@@ -72,9 +58,6 @@ function genderize(html, isFemale) {
   return out
 }
 
-// ============================================================
-// 🆕 Helper : getInitials("Emy Touret") → "E.T."
-// ============================================================
 export function getInitials(fullName) {
   if (!fullName) return ""
   var parts = String(fullName).trim().split(/\s+/)
@@ -88,21 +71,38 @@ export function getInitials(fullName) {
   return out
 }
 
+// Texte des paraphes pour le CSS content
+export function buildParaphText(employerInitials, salarieInitials) {
+  var emp = employerInitials || "E.T."
+  var sal = salarieInitials || "en attente"
+  return "Paraphes  " + emp + "  /  " + sal
+}
+
+function resolveSalarieInitials(c, emp) {
+  if (!c) return null
+  var signed = c.signature_signed_at || c.signed_at || null
+  if (!signed) return null
+  var full = (emp && (emp.prenom || '') ? emp.prenom + ' ' : '') + (emp && emp.nom ? emp.nom : '')
+  return getInitials(full)
+}
+
+function buildHeaderTagText(emp, type) {
+  var name = ((emp && emp.prenom) || "") + " " + (((emp && emp.nom) || "")).toUpperCase()
+  return type + "  ·  " + name.trim()
+}
+
 // ============================================================
-// CSS partagé entre tous les contrats
+// CSS partagé — v14 : @page natif avec texte statique
 // ============================================================
-// 🆕 v12 : règles @page sorties du @media print (Paged.js ne descend pas
-// dans les media queries pour ses @page rules). Trois pages nommées :
-//   - default  → header haut + paraphes bas-droite
-//   - signature → header haut, PAS de paraphes (dernière page)
-//   - cover    → PAS de header, PAS de paraphes (welcomePack)
-// ============================================================
-export function buildSharedCss(logoDataUri) {
+export function buildSharedCss(logoUri, paraphText, headerText) {
+  var ptxt = escCss(paraphText || "Paraphes  E.T.  /  en attente")
+  var htxt = escCss(headerText || "meshuga")
+
   return ''
     + '*{box-sizing:border-box;margin:0;padding:0}'
     + 'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:13px;line-height:1.55;background:#fff}'
     + '.yt{font-family:"Yellowtail",cursive;font-weight:400}'
-    + '.page{max-width:21cm;margin:0 auto;padding:1.5cm}'
+    + '.page{max-width:21cm;margin:0 auto;padding:0}'
     + '.toolbar{position:sticky;top:0;z-index:50;background:#FF82D7;color:#FFFFFF;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #FFEB5A}'
     + '.toolbar h1{font-family:"Yellowtail",cursive;font-size:28px;color:#FFFFFF}'
     + '.btn{font-family:"Arial Narrow",sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding:10px 16px;border:2px solid #191923;border-radius:4px;cursor:pointer;background:#fff;color:#191923}'
@@ -145,7 +145,7 @@ export function buildSharedCss(logoDataUri) {
     + '.fait-banner{background:#FFFFFF;border-top:2.5px solid #FF82D7;border-bottom:2.5px solid #FF82D7;padding:16px 18px;text-align:center;margin-bottom:24px;font-size:13.5px;color:#191923}'
     + '.fait-banner .small{display:block;font-size:11px;color:#666;font-style:italic;margin-top:6px}'
     + '.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}'
-    + '.sig-block{display:grid;grid-template-rows:48px 96px minmax(160px,1fr) 40px;border:2px solid #FF82D7;background:#fff}'
+    + '.sig-block{display:grid;grid-template-rows:48px 96px minmax(160px,1fr) 40px;border:2px solid #FF82D7;background:#fff;break-inside:avoid;page-break-inside:avoid}'
     + '.sig-head{background:#FF82D7;color:#fff;padding:0 16px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;text-transform:uppercase;letter-spacing:1.5px}'
     + '.sig-id{background:#FFEB5A;padding:10px 16px;border-bottom:2px solid #FF82D7;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}'
     + '.sig-id .name{font-size:15px;font-weight:900;color:#191923;line-height:1.2;margin-bottom:4px}'
@@ -153,88 +153,88 @@ export function buildSharedCss(logoDataUri) {
     + '.sig-space{padding:14px 16px;display:flex;flex-direction:column;font-size:11px;color:#666;font-style:italic;line-height:1.4}'
     + '.sig-foot{background:#FAFAFA;border-top:1px solid #DDD;padding:0 16px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#666;font-style:italic}'
 
-    // ============================================================
-    // 🆕 PAGED MEDIA — règles @page lues par Paged.js (top-level, hors @media print)
-    // ============================================================
-    + '@page{size:A4;margin:2.2cm 1.4cm 2cm 1.4cm;'
-    +   '@top-center{content:element(running-header);vertical-align:bottom;padding-bottom:6px}'
-    +   '@bottom-right{content:element(paraphes-runner);vertical-align:top;padding-top:6px}'
+    // === v14 PAGED MEDIA NATIF ===
+    // @page default : header haut + paraphes bas-droite (encadré arrondi rose, Yellowtail rose)
+    + '@page{'
+    +   'size:A4;'
+    +   'margin:2.2cm 1.4cm 2.5cm 1.4cm;'
+    +   '@top-center{'
+    +     'content:"' + htxt + '";'
+    +     'font-family:"Arial Narrow",sans-serif;'
+    +     'font-size:9px;'
+    +     'color:#666;'
+    +     'letter-spacing:1px;'
+    +     'text-transform:uppercase;'
+    +     'border-bottom:1.5px solid #FF82D7;'
+    +     'padding-bottom:6px;'
+    +     'width:100%;'
+    +   '}'
+    +   '@bottom-right{'
+    +     'content:"' + ptxt + '";'
+    +     'font-family:"Yellowtail",cursive;'
+    +     'font-size:14px;'
+    +     'color:#FF82D7;'
+    +     'border:2px solid #FF82D7;'
+    +     'border-radius:999px;'
+    +     'padding:4px 14px;'
+    +     'background:#fff;'
+    +   '}'
     + '}'
-    // Page nommée "signature" — dernière page, PAS de paraphes
+    // @page signature : header oui, paraphes NON
     + '@page signature{'
-    +   '@top-center{content:element(running-header);vertical-align:bottom;padding-bottom:6px}'
+    +   'size:A4;'
+    +   'margin:2.2cm 1.4cm 2cm 1.4cm;'
+    +   '@top-center{'
+    +     'content:"' + htxt + '";'
+    +     'font-family:"Arial Narrow",sans-serif;'
+    +     'font-size:9px;'
+    +     'color:#666;'
+    +     'letter-spacing:1px;'
+    +     'text-transform:uppercase;'
+    +     'border-bottom:1.5px solid #FF82D7;'
+    +     'padding-bottom:6px;'
+    +     'width:100%;'
+    +   '}'
     +   '@bottom-right{content:none}'
     + '}'
-    // Page nommée "cover" — couverture welcomePack, PAS de header ni paraphes
+    // @page cover : ni header ni paraphes
     + '@page cover{'
+    +   'size:A4;'
     +   'margin:1.2cm 1.4cm 1.6cm 1.4cm;'
     +   '@top-center{content:none}'
     +   '@bottom-right{content:none}'
     + '}'
-    // Le runner element retiré du flux normal et affecté à la zone @page
-    + '.running-header{position:running(running-header);display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #FF82D7;padding-bottom:6px;font-family:"Arial Narrow",sans-serif;font-size:9px;color:#666}'
-    + '.running-header img{height:18px;width:auto}'
-    + '.running-header .tag{font-style:italic;letter-spacing:1px;text-transform:uppercase}'
-
-    // 🆕 PARAPHES RUNNER — ancré bas-droite de chaque page sauf signature/cover
-    + '.paraphes-runner{position:running(paraphes-runner);display:flex;justify-content:flex-end;align-items:center;gap:10px;font-family:"Arial Narrow",sans-serif;font-size:9px;color:#666;border-top:1px solid #EEE;padding-top:6px}'
-    + '.paraphes-runner .lbl{font-weight:700;color:#191923;font-style:normal;text-transform:uppercase;letter-spacing:.8px;margin-right:4px;font-size:8.5px}'
-    + '.paraphes-runner .ini{display:inline-block;min-width:34px;padding:2px 7px;border:1.5px solid #191923;border-radius:3px;background:#FFFFFF;text-align:center;font-weight:900;color:#191923;font-style:normal;font-size:10px;letter-spacing:.5px}'
-    + '.paraphes-runner .pending{display:inline-block;min-width:34px;padding:2px 7px;border:1.5px dashed #BBB;border-radius:3px;background:transparent;text-align:center;font-style:italic;color:#999;font-size:9px}'
-    + '.paraphes-runner .sep{color:#FF82D7;font-weight:900;font-style:normal}'
-    + '.paraphes-runner .grp{display:inline-flex;align-items:center;gap:5px}'
-
-    // 🆕 Classes qui basculent la page sur les règles @page nommées
     + '.signature-page{page:signature;page-break-before:always;break-before:page}'
     + '.cover-page{page:cover;page-break-after:always;break-after:page}'
 
-    // Fallback @media print (au cas où Paged.js échoue à charger)
     + '@media print{'
     +   '.toolbar{display:none}'
     +   '.page{padding:0;max-width:none}'
     +   '.art{break-inside:avoid;break-after:avoid}'
     +   '.sig-section{break-inside:avoid;page-break-inside:avoid}'
     +   '.sig-block{break-inside:avoid;page-break-inside:avoid}'
-    +   '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.running-header,.sig-section h2,.parties h3,.art-title,.cover .rule,.sig-section .rule,.sig-block,.note,.paraphes-runner .ini{-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +   '.sig-head,.sig-id,.planning th,.planning tfoot td,.fait-banner,.art,.art-num,.sig-section h2,.parties h3,.art-title,.cover .rule,.sig-section .rule,.sig-block,.note{-webkit-print-color-adjust:exact;print-color-adjust:exact}'
     + '}'
-
-    // 🆕 Pendant que Paged.js travaille, on cache le toolbar (sera retiré après rendu)
-    + '.pagedjs_pages{margin:0 auto}'
-    + 'body.pagedjs_ready .toolbar{display:none}'
 }
 
-// ============================================================
-// 🆕 buildParaphRunner — HTML du runner element des paraphes
-// ============================================================
-// Affiche : "PARAPHES   Employeur [E.T.]  /  Salarié [E.D.]  ou  en attente"
-// Le runner est retiré du flux (position:running) et injecté par Paged.js
-// dans la zone @bottom-right de chaque page (sauf signature et cover).
-// ============================================================
-export function buildParaphRunner(opts) {
-  var emp = opts && opts.employeurInitials ? opts.employeurInitials : "E.T."
-  var sal = opts && opts.salarieInitials ? opts.salarieInitials : null
-
-  var salHtml = sal
-    ? '<span class="ini">' + esc(sal) + '</span>'
-    : '<span class="pending">en attente</span>'
-
+// === LEGACY SHIMS (compat amendmentBuilder + route.ts/submit) ===
+// v14 met les paraphes en CSS, plus dans le DOM. Ces fonctions retournent "".
+// TODO refactor : route.ts/submit doit régénérer le HTML complet via buildAvenant
+// au moment de la signature salarié, au lieu de patcher le HTML existant.
+export function buildParaphFooter(employerInitials, employeeInitials) {
   return ''
-    + '<div class="paraphes-runner">'
-    +   '<span class="lbl">Paraphes</span>'
-    +   '<span class="grp"><span class="lbl" style="margin-right:2px">Employeur</span><span class="ini">' + esc(emp) + '</span></span>'
-    +   '<span class="sep">/</span>'
-    +   '<span class="grp"><span class="lbl" style="margin-right:2px">Salarié</span>' + salHtml + '</span>'
-    + '</div>'
+}
+export function buildParaphRunner(opts) {
+  return ''
 }
 
 // ============================================================
-// Header partagé (running-header + toolbar + cover + parties)
+// Header partagé — cover + parties
 // ============================================================
 export function buildSharedHeader(opts) {
   var emp = opts.emp
   var titreCover = opts.titreCover
   var sousTitreCover = opts.sousTitreCover
-  var typeBandeau = opts.typeBandeau
   var logoUri = opts.logoUri
 
   var civilite = (emp.civilite || "Madame")
@@ -251,15 +251,14 @@ export function buildSharedHeader(opts) {
   if (!adresseFull) adresseFull = "[adresse à compléter]"
 
   return ''
-    + '<div class="running-header">'
-    + (logoUri ? '<img src="' + logoUri + '" alt="Meshuga">' : '<span style="font-family:Yellowtail,cursive;font-size:18px;color:#FF82D7">meshuga</span>')
-    + '<span class="tag">' + esc(typeBandeau) + ' · ' + esc((emp.prenom || "")) + ' ' + esc((emp.nom || "").toUpperCase()) + '</span></div>'
     + '<div class="toolbar"><h1>meshuga · ' + esc(titreCover.toLowerCase()) + '</h1>'
     + '<button class="btn primary" onclick="window.print()">Imprimer en PDF</button></div>'
-    + '<div class="page">'
+
+    // Page 1 : COVER (cover-page → @page cover : pas de header, pas de paraphes)
+    + '<div class="page cover-page">'
     + '<div class="cover">'
     + (logoUri ? '<img src="' + logoUri + '" alt="Meshuga">' : '<div style="font-family:Yellowtail,cursive;font-size:96px;color:#FF82D7;line-height:1">meshuga</div>')
-    + '<div class="place">CRAZY DELI &nbsp;·&nbsp; 3 RUE VAVIN &nbsp;·&nbsp; PARIS 6<sup>e</sup></div>'
+    + '<div class="place">3 RUE VAVIN &nbsp;·&nbsp; PARIS 6<sup>e</sup></div>'
     + '<h2>' + esc(titreCover) + '</h2>'
     + '<div class="subtitle">' + esc(sousTitreCover) + '</div>'
     + '<div class="rule"></div>'
@@ -278,13 +277,14 @@ export function buildSharedHeader(opts) {
     + '<p style="text-align:center;font-style:italic;color:#666;font-size:11px;margin:14px 0 6px">Ensemble dénommées « les Parties ».</p>'
     + '<p class="bold-center">IL A ÉTÉ CONVENU ET ARRÊTÉ CE QUI SUIT :</p>'
     + '</div>'
+    + '</div>' // ferme .page.cover-page
+
+    // Pages suivantes : page default (header + paraphes)
+    + '<div class="page">'
 }
 
 // ============================================================
-// Bloc signatures partagé
-// 🆕 v12 : wrappé dans <div class="signature-page"> pour basculer
-// sur la règle @page signature (pas de paraphes bas-droite)
-// 🆕 v12.4 : ne ferme plus </body></html> — c'est wrapHtml qui le fait.
+// Bloc signatures — wrappé dans .signature-page pour @page signature
 // ============================================================
 export function buildSharedSignatures(c, emp, salarieRole) {
   var civilite = emp.civilite || "Madame"
@@ -295,6 +295,7 @@ export function buildSharedSignatures(c, emp, salarieRole) {
   var ville = c.ville_signature || "Paris"
 
   return ''
+    + '</div>' // ferme .page ouverte par buildSharedHeader
     + '<div class="signature-page">'
     + '<section class="sig-section">'
     + '<h2 class="yt">Signatures</h2>'
@@ -315,85 +316,26 @@ export function buildSharedSignatures(c, emp, salarieRole) {
     + '</div>'
     + '</div></section>'
     + '</div>'   // ferme .signature-page
-    + '</div>'   // ferme .page (ouvert dans buildSharedHeader)
 }
 
 // ============================================================
-// Wrapper HTML complet
-// 🆕 v12.4 (23/05/2026) :
-//   - Paged.js avec `defer` (critique pour parser DOM complet)
-//   - Accepte signatures + paraphFooter (legacy amendmentBuilder)
-//     en plus du nouveau paraphRunner
-// Layout final du body :
-//   header → body → signatures (signature-page) → paraphRunner (en running)
+// Wrapper HTML complet — v14 sans Paged.js
 // ============================================================
 export function wrapHtml(opts) {
   var titre = opts.titre
   var css = opts.css
   var body = opts.body
   var signatures = opts.signatures || ''
-  // Legacy : amendmentBuilder passe encore "paraphFooter" qui est notre
-  // shim retournant un .paraphes-runner. On l'utilise comme runner.
-  var paraphRunner = opts.paraphRunner || opts.paraphFooter || ''
 
-  // Concaténer dans l'ordre : header+body → signatures → runner
-  var assembled = body + signatures + paraphRunner
+  var assembled = body + signatures
 
   return '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>' + esc(titre) + '</title>'
     + '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">'
-    + '<script src="https://unpkg.com/pagedjs/dist/paged.polyfill.js" defer></script>'
     + '<style>' + css + '</style></head><body>'
     + assembled
     + '</body></html>'
 }
 
-// ============================================================
-// 🆕 Compatibilité avec route.ts/submit (post-signature salarié)
-// ============================================================
-// route.ts/submit appelle buildParaphFooter(empInitials, salInitials)
-// après signature du salarié pour injecter un footer mis à jour via
-// regex replace sur le HTML archivé. Avant v12 ce footer était en
-// position:fixed (ne marchait pas en Chrome print). En v12 (Paged.js),
-// on retourne un nouveau .paraphes-runner avec les initiales salarié.
-//
-// Mécanique : les 2 regex de route.ts (`paraph-footer`) ne matcheront
-// PLUS (on a changé la classe). Donc le fallback final s'applique :
-//   originalHtml.replace(/<\/body>/i, newFooter + "</body>")
-// → ça insère un 2e .paraphes-runner avant </body>.
-// → Paged.js voit deux running elements de même nom. Selon la spec
-//   CSS Paged Media, le DERNIER déclaré dans le DOM écrase le premier
-//   dans la zone @bottom-right. Les initiales salarié remplacent donc
-//   automatiquement le "en attente" sur toutes les pages.
-//
-// ⚠️  Pattern fragile. À refactor : modifier route.ts pour faire un
-//     replace ciblé sur class="paraphes-runner" plutôt qu'une insertion.
-// ============================================================
-export function buildParaphFooter(employerInitials, employeeInitials) {
-  return buildParaphRunner({
-    employeurInitials: employerInitials || "E.T.",
-    salarieInitials: employeeInitials || null
-  })
-}
-
-// ============================================================
-// Helper interne : résout les initiales du salarié selon l'état de signature
-// ============================================================
-// Lit en priorité c.signature_signed_at (timestamp signature électronique
-// salarié dans hr_contracts ET hr_contract_amendments), avec fallback
-// sur c.signed_at (legacy contrat uploadé manuellement). Si null →
-// "en attente" rendu par buildParaphRunner.
-// ============================================================
-function resolveSalarieInitials(c, emp) {
-  if (!c) return null
-  var signed = c.signature_signed_at || c.signed_at || null
-  if (!signed) return null
-  var full = (emp && (emp.prenom || '') ? emp.prenom + ' ' : '') + (emp && emp.nom ? emp.nom : '')
-  return getInitials(full)
-}
-
-// ============================================================
-// Renderer pour les blocs missions (jsonb structuré)
-// ============================================================
 function renderMissionsBlocks(blocks) {
   if (!blocks || !blocks.length) return ''
   var html = ''
@@ -410,7 +352,7 @@ function renderMissionsBlocks(blocks) {
 }
 
 // ============================================================
-// 1. BUILDER : Contrat d'EXTRA (CDD d'usage)
+// 1. BUILDER : Contrat d'EXTRA
 // ============================================================
 export function buildExtraContract(c, emp, vacs, logoUri) {
   var safeVacs = vacs || []
@@ -433,14 +375,13 @@ export function buildExtraContract(c, emp, vacs, logoUri) {
     emp: emp,
     titreCover: "CONTRAT DE TRAVAIL D'EXTRA",
     sousTitreCover: "CDD d'usage · Article L.1242-2, 3° du Code du travail · CCN Restauration Rapide (IDCC 1501)",
-    typeBandeau: "CONTRAT D'EXTRA",
     logoUri: logoUri
   })
 
   var body = ''
     + '<div class="art"><span class="art-num">Article 1.</span><span class="art-title">Nature et motif du contrat</span></div>'
     + '<div class="body">'
-    + '<p>Le présent contrat est conclu en application des articles <strong>L.1242-2, 3°</strong> et <strong>D.1242-1</strong> du Code du travail, qui visent expressément le secteur de l\'hôtellerie-restauration parmi ceux dans lesquels il est d\'usage constant de ne pas recourir au contrat à durée indéterminée en raison de la nature de l\'activité exercée et du caractère par nature temporaire de ces emplois.</p>'
+    + '<p>Le présent contrat est conclu en application des articles <strong>L.1242-2, 3°</strong> et <strong>D.1242-1</strong> du Code du travail.</p>'
     + '<p>Il s\'agit d\'un <strong>contrat à durée déterminée d\'usage (CDD d\'usage)</strong>.</p>'
     + '</div>'
 
@@ -455,95 +396,88 @@ export function buildExtraContract(c, emp, vacs, logoUri) {
 
     + '<div class="art"><span class="art-num">Article 4.</span><span class="art-title">Fonctions et qualification</span></div>'
     + '<div class="body">'
-    + '<p>Le/la Salarié(e) est engagé(e) en qualité de <strong>' + safe(c.fonction) + '</strong>, classé(e) <strong>' + safe(c.classification) + '</strong> selon la grille de classification de la Convention Collective Nationale de la Restauration Rapide (IDCC 1501).</p>'
+    + '<p>Le/la Salarié(e) est engagé(e) en qualité de <strong>' + safe(c.fonction) + '</strong>, classé(e) <strong>' + safe(c.classification) + '</strong> selon la grille CCN Restauration Rapide (IDCC 1501).</p>'
     + '<p>À ce titre, il/elle assurera notamment :</p>'
     + '<ul><li>L\'accueil de la clientèle, la prise de commande et l\'encaissement le cas échéant ;</li>'
     + '<li>Le service en salle et/ou au comptoir ainsi que le débarrassage ;</li>'
     + '<li>La préparation, l\'assemblage et le service des produits proposés à la carte ;</li>'
     + '<li>La mise en place et la remise en état du poste de travail avant et après service ;</li>'
     + '<li>Toute tâche connexe relevant strictement de sa qualification, dans le respect des règles d\'hygiène (HACCP).</li></ul>'
-    + '<p>Le/la Salarié(e) s\'engage à exécuter ses fonctions avec loyauté, diligence et professionnalisme, dans le respect des consignes données par sa hiérarchie et des standards de qualité de l\'enseigne MESHUGA.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 5.</span><span class="art-title">Lieu de travail</span></div>'
-    + '<div class="body"><p>Le/la Salarié(e) exercera ses fonctions dans les locaux de l\'établissement MESHUGA Crazy Deli situé au <strong>3 rue Vavin, 75006 Paris</strong>.</p>'
-    + '<p>Cette mention ne constitue pas une clause de sédentarité. Le/la Salarié(e) pourra ponctuellement être amené(e) à se déplacer pour les besoins du service, dans la limite de la région Île-de-France et après son accord.</p></div>'
+    + '<div class="body"><p>Établissement MESHUGA, <strong>3 rue Vavin, 75006 Paris</strong>.</p></div>'
 
     + '<div class="art"><span class="art-num">Article 6.</span><span class="art-title">Rémunération et avantages</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">6.1 — Taux horaire forfaitaire.</span> Le/la Salarié(e) percevra une rémunération brute horaire forfaitaire de <strong>' + safe(c.taux_horaire_brut) + ' €</strong> (<strong>' + safe(c.taux_horaire_lettres) + '</strong> euros).</p>'
-    + '<p class="sub-clause"><span class="clause-label">6.2 — Travail du dimanche.</span> L\'établissement MESHUGA ouvre habituellement le dimanche. La CCN 1501 ne prévoit pas de majoration spécifique au titre du travail dominical.</p>'
-    + '<p class="sub-clause"><span class="clause-label">6.3 — Jours fériés.</span> Le travail effectué le 1<sup>er</sup> mai donnera lieu à une indemnité égale au montant du salaire (majoration de 100%).</p>'
-    + '<p class="sub-clause"><span class="clause-label">6.4 — Indemnité compensatrice de congés payés.</span> Le/la Salarié(e) percevra à l\'issue du contrat une indemnité égale à 10% de la rémunération totale brute.</p>'
-    + '<p class="sub-clause"><span class="clause-label">6.5 — Indemnité de fin de contrat.</span> L\'indemnité de précarité n\'est pas due (CDD d\'usage, article L.1243-10, 1° du Code du travail).</p>'
-    + '<p class="sub-clause"><span class="clause-label">6.6 — Avantage en nature « repas ».</span> Évalué et déclaré conformément à la valeur forfaitaire URSSAF (4,25 € en 2026).</p>'
+    + '<p class="sub-clause"><span class="clause-label">6.1 — Taux horaire.</span> <strong>' + safe(c.taux_horaire_brut) + ' €</strong> (<strong>' + safe(c.taux_horaire_lettres) + '</strong> euros).</p>'
+    + '<p class="sub-clause"><span class="clause-label">6.2 — Dimanche.</span> La CCN 1501 ne prévoit pas de majoration spécifique.</p>'
+    + '<p class="sub-clause"><span class="clause-label">6.3 — Jours fériés.</span> 1<sup>er</sup> mai majoré 100%.</p>'
+    + '<p class="sub-clause"><span class="clause-label">6.4 — ICCP.</span> 10% de la rémunération brute.</p>'
+    + '<p class="sub-clause"><span class="clause-label">6.5 — Précarité.</span> Non due (CDD d\'usage L.1243-10, 1°).</p>'
+    + '<p class="sub-clause"><span class="clause-label">6.6 — Repas.</span> URSSAF 4,25 € en 2026.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 7.</span><span class="art-title">Visite d\'information et de prévention</span></div>'
-    + '<div class="body"><p>Conformément à l\'article R.4624-10 du Code du travail, le/la Salarié(e) bénéficiera d\'une VIP réalisée par le service de prévention et de santé au travail (<strong>' + (c.service_sante_travail || MESHUGA_LEGAL.medecine_travail.nom) + '</strong>' + (c.service_sante_travail ? '' : ', ' + MESHUGA_LEGAL.medecine_travail.adresse) + ') dans un délai maximal de 3 mois.</p></div>'
+    + '<div class="body"><p>VIP réalisée par <strong>' + (c.service_sante_travail || MESHUGA_LEGAL.medecine_travail.nom) + '</strong>' + (c.service_sante_travail ? '' : ', ' + MESHUGA_LEGAL.medecine_travail.adresse) + ' dans un délai maximal de 3 mois.</p></div>'
 
     + '<div class="art"><span class="art-num">Article 8.</span><span class="art-title">Convention collective et protection sociale</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">8.1 — CCN.</span> Les conditions de travail sont régies par la CCN de la Restauration Rapide (IDCC 1501).</p>'
-    + '<p class="sub-clause"><span class="clause-label">8.2 — Caisse de retraite complémentaire.</span> L\'Employeur cotise auprès de <strong>' + MESHUGA_LEGAL.retraite.nom + '</strong>, ' + MESHUGA_LEGAL.retraite.adresse + '.</p>'
+    + '<p class="sub-clause"><span class="clause-label">8.1 — CCN.</span> Restauration Rapide IDCC 1501.</p>'
+    + '<p class="sub-clause"><span class="clause-label">8.2 — Retraite.</span> <strong>' + MESHUGA_LEGAL.retraite.nom + '</strong>, ' + MESHUGA_LEGAL.retraite.adresse + '.</p>'
     + '<p class="sub-clause"><span class="clause-label">8.3 — Prévoyance.</span> <strong>' + (c.prevoyance_organisme || MESHUGA_LEGAL.prevoyance.nom) + '</strong>' + (c.prevoyance_organisme ? (c.prevoyance_adresse ? ', ' + esc(c.prevoyance_adresse) : '') : ', ' + MESHUGA_LEGAL.prevoyance.adresse) + '.</p>'
-    + '<p class="sub-clause"><span class="clause-label">8.4 — Complémentaire santé.</span> <strong>' + MESHUGA_LEGAL.complementaire_sante.nom + '</strong>, ' + MESHUGA_LEGAL.complementaire_sante.adresse + '.</p>'
-    + '<p class="sub-clause"><span class="clause-label">8.5 — Déclarations sociales.</span> DPAE auprès de l\'URSSAF d\'Île-de-France.</p>'
+    + '<p class="sub-clause"><span class="clause-label">8.4 — Mutuelle.</span> <strong>' + MESHUGA_LEGAL.complementaire_sante.nom + '</strong>, ' + MESHUGA_LEGAL.complementaire_sante.adresse + '.</p>'
+    + '<p class="sub-clause"><span class="clause-label">8.5 — Déclarations.</span> DPAE auprès de l\'URSSAF d\'Île-de-France.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 9.</span><span class="art-title">Tenue de travail</span></div>'
-    + '<div class="body"><p>Le/la Salarié(e) s\'engage à respecter les standards d\'apparence et d\'hygiène applicables au sein de l\'établissement MESHUGA Crazy Deli, conformément à la réglementation en vigueur (arrêté du 21/12/2009 et HACCP).</p></div>'
+    + '<div class="body"><p>Conformément à la réglementation en vigueur (arrêté du 21/12/2009 et HACCP).</p></div>'
 
     + '<div class="art"><span class="art-num">Article 10.</span><span class="art-title">Confidentialité et loyauté</span></div>'
-    + '<div class="body"><p>Le/la Salarié(e) s\'engage à observer la discrétion la plus stricte sur toutes les informations dont il/elle aura connaissance à l\'occasion de ses fonctions, en particulier celles relatives aux recettes, fournisseurs, prix de revient, procédés, données clients et données financières de la Société.</p></div>'
+    + '<div class="body"><p>Stricte discrétion sur recettes, fournisseurs, prix de revient, données clients et financières.</p></div>'
 
     + '<div class="art"><span class="art-num">Article 11.</span><span class="art-title">Vidéosurveillance et données personnelles</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">11.1 — Information vidéosurveillance.</span> Le/la Salarié(e) est expressément informé(e) que l\'établissement est placé sous vidéosurveillance :</p>'
+    + '<p class="sub-clause"><span class="clause-label">11.1 — Vidéosurveillance.</span></p>'
     + '<ul class="cctv">'
-    + '<li><strong>Finalités :</strong> sécurité des biens et des personnes, prévention des vols ;</li>'
-    + '<li><strong>Base légale :</strong> intérêt légitime de l\'Employeur (art. 6.1.f RGPD) ;</li>'
-    + '<li><strong>Zones couvertes :</strong> salle / caisse / réserve, à l\'exclusion des locaux de pause et des sanitaires ;</li>'
-    + '<li><strong>Durée de conservation :</strong> 30 jours maximum ;</li>'
-    + '<li><strong>Droits :</strong> accès, rectification, effacement, opposition (à exercer auprès de la direction) ;</li>'
-    + '<li><strong>Réclamation :</strong> auprès de la CNIL — www.cnil.fr.</li>'
+    + '<li><strong>Finalités :</strong> sécurité des biens et personnes, prévention des vols ;</li>'
+    + '<li><strong>Base légale :</strong> intérêt légitime (art. 6.1.f RGPD) ;</li>'
+    + '<li><strong>Zones :</strong> salle / caisse / réserve, hors locaux de pause et sanitaires ;</li>'
+    + '<li><strong>Conservation :</strong> 30 jours maximum ;</li>'
+    + '<li><strong>Droits :</strong> accès, rectification, effacement, opposition ;</li>'
+    + '<li><strong>Réclamation :</strong> CNIL — www.cnil.fr.</li>'
     + '</ul>'
-    + '<p class="sub-clause"><span class="clause-label">11.2 — Données personnelles RH.</span> Conservées pendant la durée du contrat et 5 ans après sa cessation pour les besoins légaux et probatoires.</p>'
+    + '<p class="sub-clause"><span class="clause-label">11.2 — Données RH.</span> Conservées 5 ans après cessation.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 12.</span><span class="art-title">Cumul d\'emplois</span></div>'
-    + '<div class="body"><p>Le/la Salarié(e) déclare être libre de tout engagement vis-à-vis d\'un précédent employeur et n\'être soumis(e) à aucune clause de non-concurrence.</p>'
-    + '<p>Si le/la Salarié(e) cumule plusieurs emplois, il/elle s\'engage à respecter les durées maximales du travail et à informer l\'Employeur de tout autre engagement.</p></div>'
+    + '<div class="body"><p>Le/la Salarié(e) déclare être libre de tout engagement.</p></div>'
 
     + '<div class="art"><span class="art-num">Article 13.</span><span class="art-title">Rupture anticipée</span></div>'
-    + '<div class="body"><p>Conformément à l\'article L.1243-1 du Code du travail, le présent contrat ne pourra être rompu avant son terme qu\'en cas d\'accord entre les Parties, de faute grave, de force majeure, d\'inaptitude médicale, ou si le/la Salarié(e) justifie d\'une embauche en CDI.</p></div>'
+    + '<div class="body"><p>Conformément à l\'article L.1243-1 du Code du travail.</p></div>'
 
     + '<div class="art"><span class="art-num">Article 14.</span><span class="art-title">Dispositions diverses</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">14.1 — Règlement intérieur.</span> Le/la Salarié(e) déclare avoir pris connaissance du règlement intérieur de l\'établissement (le cas échéant) et s\'engage à en respecter les dispositions.</p>'
-    + '<p class="sub-clause"><span class="clause-label">14.2 — Changement de situation.</span> Le/la Salarié(e) s\'engage à informer la Société, dans les plus brefs délais, de tout changement affectant sa situation personnelle.</p>'
+    + '<p class="sub-clause"><span class="clause-label">14.1 — Règlement intérieur.</span> Pris connaissance.</p>'
+    + '<p class="sub-clause"><span class="clause-label">14.2 — Changement de situation.</span> À informer la Société.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 15.</span><span class="art-title">Domicile et juridiction compétente</span></div>'
-    + '<div class="body"><p>Pour l\'exécution des présentes, les Parties élisent domicile en leurs adresses respectives mentionnées en tête du contrat.</p>'
-    + '<p>Tout litige relatif à l\'exécution du présent contrat relèvera de la compétence du Conseil de Prud\'hommes de Paris, sous réserve des règles d\'ordre public en matière de compétence territoriale.</p></div>'
+    + '<div class="body"><p>Conseil de Prud\'hommes de Paris.</p></div>'
 
   var signatures = buildSharedSignatures(c, emp, c.fonction || "")
-  var paraphRunner = buildParaphRunner({
-    employeurInitials: "E.T.",
-    salarieInitials: resolveSalarieInitials(c, emp)
-  })
+  var paraphText = buildParaphText("E.T.", resolveSalarieInitials(c, emp))
+  var headerText = buildHeaderTagText(emp, "CONTRAT EXTRA")
 
   return wrapHtml({
     titre: "Contrat extra Meshuga — " + (emp.prenom || "") + " " + (emp.nom || ""),
-    css: buildSharedCss(logoUri),
-    body: header + body + signatures,
-    paraphRunner: paraphRunner
+    css: buildSharedCss(logoUri, paraphText, headerText),
+    body: header + body + signatures
   })
 }
 
 // ============================================================
-// 2. BUILDER : CDI Responsable / Manager
+// 2. BUILDER : CDI Cadre / Manager
 // ============================================================
 export function buildCdiCadreContract(c, emp, logoUri) {
   var dateEmbauche = c.date_embauche
@@ -575,7 +509,7 @@ export function buildCdiCadreContract(c, emp, logoUri) {
   var intActive = !!c.interessement_active
   var intTaux = c.interessement_taux_pct ? parseFloat(c.interessement_taux_pct) : 10
   var intAssiette = c.interessement_assiette || "chiffre d'affaires HT B2B encaissé"
-  var intPeriodicite = c.interessement_periodicite || "mensuelle ou trimestrielle, au choix de l'Employeur"
+  var intPeriodicite = c.interessement_periodicite || "mensuelle ou trimestrielle"
 
   var missionsHtml = renderMissionsBlocks(c.missions_blocks)
 
@@ -583,84 +517,72 @@ export function buildCdiCadreContract(c, emp, logoUri) {
     emp: emp,
     titreCover: "CONTRAT DE TRAVAIL À DURÉE INDÉTERMINÉE",
     sousTitreCover: "CDI · Articles L.1221-1 et suivants du Code du travail · CCN Restauration Rapide (IDCC 1501)",
-    typeBandeau: "CONTRAT CDI",
     logoUri: logoUri
   })
 
   var body = ''
     + '<div class="art"><span class="art-num">Article 1.</span><span class="art-title">Engagement et nature du contrat</span></div>'
     + '<div class="body">'
-    + '<p>Le/la Salarié(e) est engagé(e) par l\'Employeur dans le cadre d\'un <strong>contrat de travail à durée indéterminée (CDI)</strong> à temps plein, à compter du <strong>' + esc(dateEmbauche) + '</strong>, sous réserve des résultats de la visite d\'information et de prévention prévue à l\'article 12 du présent contrat.</p>'
-    + '<p>Le présent engagement est subordonné à la déclaration préalable à l\'embauche (DPAE) effectuée auprès de l\'URSSAF d\'Île-de-France conformément à l\'article L.1221-10 du Code du travail.</p>'
+    + '<p>Le/la Salarié(e) est engagé(e) en <strong>CDI à temps plein</strong>, à compter du <strong>' + esc(dateEmbauche) + '</strong>.</p>'
+    + '<p>Engagement subordonné à la DPAE auprès de l\'URSSAF d\'Île-de-France.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 2.</span><span class="art-title">Fonctions et qualification</span></div>'
     + '<div class="body">'
-    + '<p>Le/la Salarié(e) est engagé(e) en qualité de <strong>' + esc(fonction) + '</strong>.</p>'
-    + '<p>Il/elle est classé(e) selon la grille de classification de la Convention Collective Nationale de la Restauration Rapide (IDCC 1501) au <strong>' + esc(niveauLabel) + '</strong>, statut <strong>' + esc(statutLabel) + '</strong>.</p>'
-    + '<p>Ce poste est exercé sous l\'autorité directe du dirigeant de la Société, dans le respect des orientations stratégiques définies par l\'Employeur.</p>'
+    + '<p><strong>' + esc(fonction) + '</strong>, classé(e) au <strong>' + esc(niveauLabel) + '</strong>, statut <strong>' + esc(statutLabel) + '</strong>.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 3.</span><span class="art-title">Missions principales</span></div>'
     + '<div class="body">'
-    + '<p>Les missions ci-dessous sont essentielles, substantielles et non limitatives. Elles pourront évoluer selon les besoins de l\'entreprise, sans constituer une modification du présent contrat.</p>'
+    + '<p>Missions essentielles, substantielles et non limitatives.</p>'
     + (missionsHtml || '<p style="color:#999;font-style:italic">[Missions à compléter]</p>')
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 4.</span><span class="art-title">Période d\'essai</span></div>'
     + '<div class="body">'
-    + '<p>Le présent contrat est assorti d\'une <strong>période d\'essai de ' + pe + ' (' + esc(numToFrenchWords(pe)) + ') mois</strong>, conformément aux dispositions de l\'article L.1221-19 du Code du travail et de la Convention Collective Nationale de la Restauration Rapide.</p>'
+    + '<p><strong>' + pe + ' (' + esc(numToFrenchWords(pe)) + ') mois</strong>.</p>'
     + (peRenouv
-        ? '<p>Cette période d\'essai pourra être <strong>renouvelée une fois pour une durée de ' + pe + ' (' + esc(numToFrenchWords(pe)) + ') mois supplémentaires</strong>, soit une durée maximale totale de ' + peTotal + ' (' + esc(numToFrenchWords(peTotal)) + ') mois, sous réserve d\'un accord écrit du/de la Salarié(e) intervenant avant le terme de la période d\'essai initiale.</p>'
-        : '<p>Cette période d\'essai n\'est pas renouvelable.</p>')
-    + '<p>Pendant la période d\'essai, le contrat peut être rompu librement par chacune des Parties, sans indemnité, sous réserve du respect du délai de prévenance prévu aux articles L.1221-25 et L.1221-26 du Code du travail.</p>'
+        ? '<p>Renouvelable une fois pour ' + pe + ' mois (total max ' + peTotal + ' mois).</p>'
+        : '<p>Non renouvelable.</p>')
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 5.</span><span class="art-title">Lieu de travail' + (c.clause_mobilite ? ' et clause de mobilité' : '') + '</span></div>'
     + '<div class="body">'
-    + '<p>Le/la Salarié(e) exercera principalement ses fonctions au sein de l\'établissement <strong>MESHUGA Crazy Deli, 3 rue Vavin, 75006 Paris</strong>.</p>'
-    + (c.clause_mobilite
-        ? '<p>Compte tenu de la nature des fonctions exercées, le/la Salarié(e) pourra être amené(e) à exercer ses missions sur les lieux de prestations clients, chez des partenaires, sur des sites de production ponctuels ou sur tout autre lieu rendu nécessaire par l\'activité, dans la limite de la <strong>' + esc(mobZone) + '</strong>, sans que cela constitue une modification du présent contrat.</p><p>Tout déplacement professionnel hors de cette zone géographique fera l\'objet d\'un accord préalable entre les Parties.</p>'
-        : '<p>Cette mention ne constitue pas une clause de sédentarité. Le/la Salarié(e) pourra ponctuellement être amené(e) à se déplacer pour les besoins du service, après son accord.</p>')
+    + '<p><strong>MESHUGA, 3 rue Vavin, 75006 Paris</strong>.</p>'
+    + (c.clause_mobilite ? '<p>Mobilité dans la <strong>' + esc(mobZone) + '</strong>.</p>' : '')
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 6.</span><span class="art-title">Durée du travail et organisation</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">6.1 — Durée hebdomadaire.</span> Le/la Salarié(e) est soumis(e) à une durée du travail de <strong>' + heuresHebdo + ' heures hebdomadaires</strong>, correspondant à ' + heuresMensuelles.toFixed(2).replace(".",",") + ' heures mensuelles.</p>'
+    + '<p class="sub-clause"><span class="clause-label">6.1 — Durée hebdomadaire.</span> <strong>' + heuresHebdo + ' heures/semaine</strong> (' + heuresMensuelles.toFixed(2).replace(".",",") + ' h mensuelles).</p>'
     + (heuresSup > 0
-        ? '<p class="sub-clause"><span class="clause-label">6.2 — Heures supplémentaires structurelles.</span> Cette durée comprend la durée légale du travail (35 heures hebdomadaires, soit 151,67 heures mensuelles) et <strong>' + heuresSup.toFixed(2).replace(".",",") + ' heures supplémentaires structurelles mensuelles</strong>, majorées de 25 % conformément à l\'article L.3121-36 du Code du travail.</p>'
+        ? '<p class="sub-clause"><span class="clause-label">6.2 — Heures sup structurelles.</span> <strong>' + heuresSup.toFixed(2).replace(".",",") + ' h/mois</strong> majorées 25%.</p>'
         : '')
-    + '<p class="sub-clause"><span class="clause-label">6.' + (heuresSup > 0 ? '3' : '2') + ' — Variabilité des horaires.</span> Compte tenu de la nature des fonctions exercées, les horaires de travail peuvent varier selon les nécessités de l\'activité.</p>'
-    + '<p class="sub-clause"><span class="clause-label">6.' + (heuresSup > 0 ? '4' : '3') + ' — Heures supplémentaires complémentaires.</span> Toute heure de travail effectuée au-delà des ' + heuresHebdo + ' heures hebdomadaires devra faire l\'objet d\'une autorisation préalable et expresse de l\'Employeur. Ces heures donneront lieu à compensation ou rémunération conformément aux dispositions légales et conventionnelles applicables.</p>'
-    + '<p class="sub-clause"><span class="clause-label">6.' + (heuresSup > 0 ? '5' : '4') + ' — Repos.</span> Le/la Salarié(e) bénéficie d\'un repos quotidien minimum de 11 heures consécutives et d\'un repos hebdomadaire minimum de 35 heures consécutives, conformément aux articles L.3131-1 et L.3132-2 du Code du travail.</p>'
+    + '<p class="sub-clause"><span class="clause-label">6.' + (heuresSup > 0 ? '3' : '2') + ' — Repos.</span> 11h quotidien, 35h hebdomadaire.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 7.</span><span class="art-title">Rémunération fixe</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">7.1 — Salaire mensuel brut.</span> En contrepartie de l\'exécution de ses fonctions, le/la Salarié(e) percevra une rémunération brute mensuelle de <strong>' + formatEuros(salaire) + ' (' + esc(salaireLettres) + ' euros)</strong>, versée sur 12 mois, payable à terme échu au plus tard le 5 du mois suivant.'
-    + (heuresSup > 0
-        ? ' Cette rémunération se décompose en ' + (heuresMensuelles - heuresSup).toFixed(2).replace(".",",") + ' heures au taux horaire de base de ' + tauxBase.toFixed(2).replace(".",",") + ' € et ' + heuresSup.toFixed(2).replace(".",",") + ' heures supplémentaires structurelles majorées de 25 % conformément à l\'article L.3121-36 du Code du travail, l\'ensemble étant intégré au forfait mensuel ci-dessus.'
-        : '')
-    + '</p>'
-    + '<p class="sub-clause"><span class="clause-label">7.2 — Avantage en nature « repas ».</span> Lorsque le/la Salarié(e) prend un repas sur le lieu de travail à l\'occasion de ses fonctions, cet avantage est évalué et déclaré conformément à la valeur forfaitaire URSSAF en vigueur (4,25 € par repas en 2026), et apparaîtra sur le bulletin de paie.</p>'
-    + '<p class="sub-clause"><span class="clause-label">7.3 — Travail du dimanche et jours fériés.</span> L\'établissement MESHUGA ouvrant habituellement le dimanche, la Convention Collective Nationale de la Restauration Rapide (IDCC 1501) ne prévoit pas de majoration spécifique au titre du travail dominical pour les salariés de ces établissements. Conformément à l\'article L.3133-6 du Code du travail, le travail effectué le 1<sup>er</sup> mai donnera lieu, en plus du salaire correspondant, à une indemnité égale au montant du salaire (majoration de 100 %).</p>'
+    + '<p class="sub-clause"><span class="clause-label">7.1 — Salaire mensuel brut.</span> <strong>' + formatEuros(salaire) + ' (' + esc(salaireLettres) + ' euros)</strong>, sur 12 mois.</p>'
+    + '<p class="sub-clause"><span class="clause-label">7.2 — Repas.</span> URSSAF 4,25 €.</p>'
+    + '<p class="sub-clause"><span class="clause-label">7.3 — Dimanche et 1<sup>er</sup> mai.</span> Pas de majoration dominicale. 1<sup>er</sup> mai majoré 100%.</p>'
     + '</div>'
 
     + (intActive
         ? ('<div class="art"><span class="art-num">Article 8.</span><span class="art-title">Intéressement variable</span></div>'
           + '<div class="body">'
-          + '<p class="sub-clause"><span class="clause-label">8.1 — Principe.</span> En complément de la rémunération fixe prévue à l\'article 7, le/la Salarié(e) bénéficiera d\'un intéressement variable calculé sur ' + esc(intAssiette) + '.</p>'
-          + '<p class="sub-clause"><span class="clause-label">8.2 — Assiette de calcul.</span> L\'intéressement est égal à <strong>' + intTaux.toFixed(2).replace(".",",") + ' %</strong> de cette assiette, payable à la Société, répondant cumulativement aux conditions suivantes :</p>'
+          + '<p class="sub-clause"><span class="clause-label">8.1 — Principe.</span> Calculé sur ' + esc(intAssiette) + '.</p>'
+          + '<p class="sub-clause"><span class="clause-label">8.2 — Taux.</span> <strong>' + intTaux.toFixed(2).replace(".",",") + ' %</strong>, conditions cumulatives :</p>'
           + '<ul>'
-          + '<li>Le client, la prestation ou le partenariat a été directement ou indirectement développé par le/la Salarié(e) ;</li>'
-          + '<li>L\'opération a été préalablement validée par l\'Employeur ;</li>'
-          + '<li>La facture correspondante a été <strong>intégralement encaissée</strong> par la Société (les avoirs, annulations, remboursements et impayés sont exclus) ;</li>'
-          + '<li>La prestation a été réalisée conformément aux conditions convenues avec le client.</li>'
+          + '<li>Développement direct/indirect par le/la Salarié(e) ;</li>'
+          + '<li>Validation préalable de l\'Employeur ;</li>'
+          + '<li><strong>Facture intégralement encaissée</strong> ;</li>'
+          + '<li>Prestation réalisée conformément.</li>'
           + '</ul>'
-          + '<p class="sub-clause"><span class="clause-label">8.3 — Modalités de versement.</span> L\'intéressement est calculé mensuellement sur la base des encaissements du mois écoulé. Il est versé selon une périodicité ' + esc(intPeriodicite) + ', au plus tard avec la paie du mois suivant la période de référence.</p>'
-          + '<p class="sub-clause"><span class="clause-label">8.4 — Cessation du contrat.</span> En cas de cessation du contrat de travail pour quelque cause que ce soit, l\'intéressement reste dû au/à la Salarié(e) pour les seules opérations dont la facture aura été <strong>intégralement encaissée à la date effective de fin de contrat</strong>. Aucun intéressement n\'est dû sur les devis non signés, les factures émises mais non encaissées, ou les contrats en cours d\'exécution à la date de rupture.</p>'
-          + '<p class="sub-clause"><span class="clause-label">8.5 — Nature juridique.</span> Cet intéressement constitue un complément de salaire variable. Il ne constitue pas un élément fixe ni acquis de la rémunération et son versement reste subordonné à la réunion effective des conditions énoncées au présent article. Il est soumis aux cotisations sociales et à l\'impôt sur le revenu dans les conditions légales.</p>'
-          + '<p class="sub-clause"><span class="clause-label">8.6 — Régularisation et impayés.</span> En cas d\'impayé, d\'avoir, d\'annulation ou de remboursement intervenant après le versement de l\'intéressement correspondant, l\'Employeur pourra procéder à la régularisation par déduction sur les versements ultérieurs ou, à défaut, par récupération directe.</p>'
+          + '<p class="sub-clause"><span class="clause-label">8.3 — Versement.</span> Périodicité ' + esc(intPeriodicite) + '.</p>'
+          + '<p class="sub-clause"><span class="clause-label">8.4 — Cessation.</span> Dû uniquement sur factures encaissées à la date de rupture.</p>'
+          + '<p class="sub-clause"><span class="clause-label">8.5 — Nature.</span> Complément variable, soumis aux cotisations.</p>'
+          + '<p class="sub-clause"><span class="clause-label">8.6 — Régularisation.</span> Déduction sur versements ultérieurs si impayé.</p>'
           + '</div>')
         : '')
 
@@ -669,143 +591,109 @@ export function buildCdiCadreContract(c, emp, logoUri) {
   body += ''
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Congés payés</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">9.1 — Acquisition.</span> Conformément à l\'article L.3141-3 du Code du travail, le/la Salarié(e) acquiert un droit à congés payés de <strong>2,5 jours ouvrables par mois de travail effectif</strong>, dans la limite de <strong>30 jours ouvrables (5 semaines)</strong> par période de référence. La période de référence pour l\'acquisition s\'étend du <strong>1er juin de l\'année N-1 au 31 mai de l\'année N</strong>.</p>'
-    + '<p class="sub-clause"><span class="clause-label">9.2 — Période de prise.</span> Conformément aux articles L.3141-13 et suivants du Code du travail, la période principale de prise des congés payés s\'étend du <strong>1er mai au 31 octobre</strong> de chaque année. Le/la Salarié(e) doit formuler ses demandes de congés <strong>au moins 2 mois avant</strong> la date de départ souhaitée, par écrit (email accepté), afin de permettre à l\'Employeur d\'organiser la continuité du service.</p>'
-    + '<p class="sub-clause"><span class="clause-label">9.3 — Planification annuelle.</span> L\'Employeur s\'engage à informer le/la Salarié(e), au plus tard le <strong>1er mars</strong> de chaque année, des dates de fermeture éventuelles de l\'établissement et à valider ou proposer un calendrier de congés au plus tard le <strong>30 avril</strong>. À défaut de demande de la part du/de la Salarié(e), l\'Employeur pourra fixer unilatéralement les dates dans le cadre de son pouvoir de direction.</p>'
-    + '<p class="sub-clause"><span class="clause-label">9.4 — Report exceptionnel.</span> À titre exceptionnel et après accord écrit préalable de l\'Employeur, le report d\'une partie des congés non pris au 31 octobre vers la période suivante peut être autorisé, dans la limite maximale de <strong>10 jours ouvrables</strong> et <strong>jusqu\'au 31 mars de l\'année suivante</strong> au plus tard.</p>'
-    + '<p class="sub-clause"><span class="clause-label">9.5 — Congés non pris.</span> Conformément à la jurisprudence constante de la Cour de cassation et à la directive européenne 2003/88/CE, les congés payés non pris au terme de la période de prise et n\'ayant pas fait l\'objet d\'un report autorisé au titre du 9.4 ci-dessus sont perdus, dès lors que l\'Employeur a effectivement mis le/la Salarié(e) en mesure de les prendre. Cette disposition ne s\'applique pas aux congés acquis pendant les périodes de suspension du contrat de travail (maladie, accident du travail, maternité, paternité), qui bénéficient d\'un report légal de <strong>15 mois</strong> conformément à la loi n° 2024-364 du 22 avril 2024.</p>'
-    + '<p class="sub-clause"><span class="clause-label">9.6 — Indemnité compensatrice.</span> En cas de rupture du contrat de travail, les congés payés acquis et non pris donneront lieu au versement d\'une indemnité compensatrice de congés payés, conformément à l\'article L.3141-28 du Code du travail.</p>'
+    + '<p class="sub-clause"><span class="clause-label">9.1 — Acquisition.</span> 2,5 jours ouvrables/mois, max 30 jours (5 semaines) par période de référence (1er juin N-1 au 31 mai N).</p>'
+    + '<p class="sub-clause"><span class="clause-label">9.2 — Période de prise.</span> 1er mai au 31 octobre. Demandes 2 mois avant.</p>'
+    + '<p class="sub-clause"><span class="clause-label">9.3 — Planification.</span> Calendrier validé au 30 avril.</p>'
+    + '<p class="sub-clause"><span class="clause-label">9.4 — Report.</span> Max 10 jours, jusqu\'au 31 mars suivant.</p>'
+    + '<p class="sub-clause"><span class="clause-label">9.5 — Congés non pris.</span> Perdus si non pris (sauf suspension contrat : report 15 mois, loi 2024-364).</p>'
+    + '<p class="sub-clause"><span class="clause-label">9.6 — ICCP.</span> En cas de rupture, indemnité compensatrice (L.3141-28).</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Frais professionnels et déplacements</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">10.1 — Frais professionnels.</span> Les frais professionnels engagés par le/la Salarié(e) dans l\'intérêt exclusif de l\'entreprise (déplacements, repas d\'affaires, achats ponctuels validés…) seront pris en charge par l\'Employeur, sous réserve d\'un accord préalable et de la production des justificatifs originaux dans les 30 jours suivant la dépense.</p>'
-    + '<p class="sub-clause"><span class="clause-label">10.2 — Frais de transport domicile-travail.</span> Conformément à l\'article L.3261-2 du Code du travail, l\'Employeur prend en charge <strong>50 % du coût des abonnements aux transports publics</strong> souscrits par le/la Salarié(e) pour ses déplacements entre son domicile et son lieu de travail habituel, sur présentation des justificatifs.</p>'
+    + '<p class="sub-clause"><span class="clause-label">10.1 — Frais professionnels.</span> Sur justificatifs sous 30 jours.</p>'
+    + '<p class="sub-clause"><span class="clause-label">10.2 — Transport domicile-travail.</span> <strong>50%</strong> des abonnements transports publics.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Absences et maladie</span></div>'
     + '<div class="body">'
-    + '<p>Toute absence doit être signalée par tout moyen à l\'Employeur dans les meilleurs délais et au plus tard dans la matinée du premier jour d\'absence.</p>'
-    + '<p>En cas de maladie ou d\'accident, le/la Salarié(e) devra transmettre les <strong>justificatifs médicaux dans un délai de 48 heures</strong>, conformément à l\'article R.321-2 du Code de la sécurité sociale.</p>'
+    + '<p>Signalement au plus tard le matin du premier jour. Justificatifs médicaux sous 48h.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Visite d\'information et de prévention</span></div>'
     + '<div class="body">'
-    + '<p>Conformément à l\'article R.4624-10 du Code du travail, le/la Salarié(e) bénéficiera d\'une <strong>Visite d\'Information et de Prévention (VIP)</strong> réalisée par le service de prévention et de santé au travail dont relève l\'Employeur'
-    + ' (<strong>' + (c.service_sante_travail || MESHUGA_LEGAL.medecine_travail.nom) + '</strong>, ' + (c.service_sante_travail ? '' : MESHUGA_LEGAL.medecine_travail.adresse + ' — Tél. ' + MESHUGA_LEGAL.medecine_travail.telephone) + ')'
-    + ', dans un délai maximal de 3 mois à compter de la prise effective de poste.</p>'
+    + '<p>VIP par <strong>' + (c.service_sante_travail || MESHUGA_LEGAL.medecine_travail.nom) + '</strong>, ' + (c.service_sante_travail ? '' : MESHUGA_LEGAL.medecine_travail.adresse) + ' dans un délai max 3 mois.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Convention collective et protection sociale</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">13.1 — Convention collective applicable.</span> Les conditions de travail du/de la Salarié(e) sont régies par les dispositions de la <strong>Convention Collective Nationale de la Restauration Rapide (IDCC 1501)</strong>, ainsi que ses avenants, accords et annexes en vigueur. Un exemplaire de la convention est tenu à la disposition du/de la Salarié(e) auprès de la direction.</p>'
-    + '<p class="sub-clause"><span class="clause-label">13.2 — Caisse de retraite complémentaire.</span> L\'Employeur cotise auprès de <strong>' + MESHUGA_LEGAL.retraite.nom + '</strong>, ' + MESHUGA_LEGAL.retraite.adresse + ', au régime de retraite complémentaire des salariés ' + (statut === "cadre" ? "cadres" : "non-cadres") + '.</p>'
-    + '<p class="sub-clause"><span class="clause-label">13.3 — Prévoyance.</span> '
-    + 'L\'Employeur a souscrit auprès de <strong>' + (c.prevoyance_organisme || MESHUGA_LEGAL.prevoyance.nom) + '</strong>'
-    + (c.prevoyance_organisme ? (c.prevoyance_adresse ? ', ' + esc(c.prevoyance_adresse) : '') : ', ' + MESHUGA_LEGAL.prevoyance.adresse)
-    + ', un contrat collectif obligatoire de prévoyance conformément aux dispositions conventionnelles applicables. Le/la Salarié(e) est affilié(e) d\'office à ce régime à compter de sa prise de poste.</p>'
-    + '<p class="sub-clause"><span class="clause-label">13.4 — Complémentaire santé.</span> '
-    + 'L\'Employeur a également souscrit auprès de <strong>' + MESHUGA_LEGAL.complementaire_sante.nom + '</strong>, ' + MESHUGA_LEGAL.complementaire_sante.adresse + ', un contrat collectif obligatoire de complémentaire santé (« mutuelle ») conformément à l\'article L.911-7 du Code de la sécurité sociale. Le/la Salarié(e) est affilié(e) d\'office à ce régime à compter de sa prise de poste.</p>'
-    + '<p class="sub-clause"><span class="clause-label">13.5 — Déclarations sociales.</span> La Société établit la Déclaration Préalable à l\'Embauche (DPAE) auprès de l\'URSSAF d\'Île-de-France et transmet, via la Déclaration Sociale Nominative (DSN), l\'ensemble des informations sociales relatives au/à la Salarié(e). Celui-ci/celle-ci dispose, conformément au RGPD et à la loi « Informatique et libertés », d\'un droit d\'accès, de rectification, d\'effacement et de portabilité de ses données.</p>'
+    + '<p class="sub-clause"><span class="clause-label">13.1 — CCN.</span> Restauration Rapide IDCC 1501.</p>'
+    + '<p class="sub-clause"><span class="clause-label">13.2 — Retraite.</span> <strong>' + MESHUGA_LEGAL.retraite.nom + '</strong>, ' + MESHUGA_LEGAL.retraite.adresse + '.</p>'
+    + '<p class="sub-clause"><span class="clause-label">13.3 — Prévoyance.</span> <strong>' + (c.prevoyance_organisme || MESHUGA_LEGAL.prevoyance.nom) + '</strong>' + (c.prevoyance_organisme ? (c.prevoyance_adresse ? ', ' + esc(c.prevoyance_adresse) : '') : ', ' + MESHUGA_LEGAL.prevoyance.adresse) + '. Affiliation d\'office.</p>'
+    + '<p class="sub-clause"><span class="clause-label">13.4 — Mutuelle.</span> <strong>' + MESHUGA_LEGAL.complementaire_sante.nom + '</strong>, ' + MESHUGA_LEGAL.complementaire_sante.adresse + '. Affiliation d\'office.</p>'
+    + '<p class="sub-clause"><span class="clause-label">13.5 — Déclarations.</span> DPAE + DSN auprès de l\'URSSAF d\'Île-de-France.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Confidentialité</span></div>'
     + '<div class="body">'
-    + '<p>Le/la Salarié(e) s\'engage, tant pendant l\'exécution du présent contrat qu\'après sa cessation pour quelque cause que ce soit, à la <strong>plus stricte confidentialité</strong> concernant toute information dont il/elle aura connaissance dans le cadre ou à l\'occasion de ses fonctions, notamment :</p>'
-    + '<ul>'
-    + '<li>Les recettes, procédés de fabrication et savoir-faire de l\'enseigne MESHUGA ;</li>'
-    + '<li>Les conditions commerciales avec les fournisseurs et prestataires ;</li>'
-    + '<li>Les fichiers clients, prospects et leurs données ;</li>'
-    + '<li>Les données financières, comptables et fiscales de la Société ;</li>'
-    + '<li>La stratégie de développement, les projets en cours et études de marché ;</li>'
-    + '<li>Les informations relatives aux équipes (rémunérations, situations personnelles).</li>'
-    + '</ul>'
-    + '<p>Cette obligation survivra à la cessation du contrat pour une durée de <strong>cinq (5) ans</strong> à compter de cette cessation. Toute violation caractérisée pourra engager la responsabilité du/de la Salarié(e) et donner lieu à réparation du préjudice subi par la Société.</p>'
+    + '<p>Plus stricte confidentialité (5 ans après cessation) sur : recettes, fournisseurs, fichiers clients, données financières, stratégie, équipes.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Loyauté et exclusivité</span></div>'
     + '<div class="body">'
-    + '<p>Le/la Salarié(e) s\'engage à exercer ses fonctions avec <strong>loyauté, diligence et professionnalisme</strong>, et à ne pas porter atteinte aux intérêts de l\'entreprise.</p>'
-    + '<p>Il/elle déclare être libre de tout engagement vis-à-vis d\'un précédent employeur et n\'être soumis(e) à aucune clause de non-concurrence ou d\'exclusivité.</p>'
-    + '<p>Pendant l\'exécution du présent contrat, le/la Salarié(e) s\'engage à ne pas exercer d\'activité concurrente directe ou indirecte de celle de l\'Employeur, ni à participer, sous quelque forme que ce soit, à une entreprise ayant une activité similaire ou concurrente, sauf autorisation préalable et écrite de l\'Employeur. Cette obligation cesse à la rupture du contrat, conformément au choix exprès des Parties de ne pas convenir d\'une clause de non-concurrence post-contractuelle.</p>'
+    + '<p>Loyauté pendant l\'exécution. Pas de non-concurrence post-contractuelle.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Propriété intellectuelle</span></div>'
     + '<div class="body">'
-    + '<p>Toute création, méthode, document, contenu, outil, base de données, fichier client, support commercial ou tout autre élément élaboré par le/la Salarié(e) dans le cadre ou à l\'occasion de ses fonctions est la <strong>propriété exclusive de l\'Employeur</strong>, conformément aux articles L.111-1 et L.113-9 du Code de la propriété intellectuelle.</p>'
-    + '<p>Le/la Salarié(e) s\'engage à remettre à l\'Employeur, à première demande et au plus tard à la cessation du contrat, l\'intégralité des supports, fichiers et documents dont il/elle aurait la garde dans le cadre de ses fonctions.</p>'
+    + '<p>Toute création réalisée dans le cadre des fonctions est propriété exclusive de l\'Employeur (L.111-1 et L.113-9 CPI).</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Vidéosurveillance et données personnelles</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">17.1 — Vidéosurveillance.</span> Le/la Salarié(e) est expressément informé(e) que l\'établissement est placé sous vidéosurveillance, dont les caractéristiques sont les suivantes :</p>'
+    + '<p class="sub-clause"><span class="clause-label">17.1 — Vidéosurveillance.</span></p>'
     + '<ul class="cctv">'
-    + '<li><strong>Finalités :</strong> sécurité des biens et des personnes, prévention des vols ;</li>'
-    + '<li><strong>Base légale :</strong> intérêt légitime de l\'Employeur (art. 6.1.f RGPD) ;</li>'
-    + '<li><strong>Zones couvertes :</strong> salle / caisse / réserve, à l\'exclusion des locaux de pause et des sanitaires ;</li>'
-    + '<li><strong>Durée de conservation :</strong> 30 jours maximum ;</li>'
-    + '<li><strong>Droits :</strong> accès, rectification, effacement, opposition (à exercer auprès de la direction) ;</li>'
-    + '<li><strong>Réclamation :</strong> auprès de la CNIL — www.cnil.fr.</li>'
+    + '<li><strong>Finalités :</strong> sécurité, prévention vols ;</li>'
+    + '<li><strong>Base légale :</strong> intérêt légitime (art. 6.1.f RGPD) ;</li>'
+    + '<li><strong>Zones :</strong> salle / caisse / réserve ;</li>'
+    + '<li><strong>Conservation :</strong> 30 jours ;</li>'
+    + '<li><strong>Droits :</strong> accès, rectification, effacement, opposition ;</li>'
+    + '<li><strong>Réclamation :</strong> CNIL — www.cnil.fr.</li>'
     + '</ul>'
-    + '<p class="sub-clause"><span class="clause-label">17.2 — Données personnelles RH.</span> Les données personnelles du/de la Salarié(e) sont traitées par la Société en sa qualité de responsable de traitement, conformément au RGPD et à la loi n° 78-17 du 6 janvier 1978 modifiée. Elles sont conservées pendant la durée du contrat et 5 ans après sa cessation pour les besoins légaux et probatoires.</p>'
+    + '<p class="sub-clause"><span class="clause-label">17.2 — Données RH.</span> Conservées 5 ans après cessation.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Discipline et règlement intérieur</span></div>'
     + '<div class="body">'
-    + '<p>Le/la Salarié(e) s\'engage à respecter les règles applicables au sein de l\'entreprise, notamment celles relatives à l\'hygiène (HACCP, arrêté du 21/12/2009), à la sécurité, et à la tenue professionnelle.</p>'
-    + '<p>Tout manquement caractérisé pourra donner lieu à une sanction disciplinaire conforme aux dispositions des articles L.1331-1 et suivants du Code du travail et, le cas échéant, du règlement intérieur de l\'entreprise.</p>'
+    + '<p>Hygiène HACCP, sécurité, tenue professionnelle. Sanctions L.1331-1 et suivants.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Rupture du contrat</span></div>'
     + '<div class="body">'
-    + '<p>Le présent contrat pourra être rompu conformément aux dispositions légales et conventionnelles en vigueur (démission, licenciement, rupture conventionnelle, départ ou mise à la retraite).</p>'
-    + '<p>En cas de rupture, les Parties devront respecter les <strong>préavis prévus par la Convention Collective Nationale de la Restauration Rapide (IDCC 1501)</strong>, sauf dispense expresse et écrite de l\'autre Partie ou cas de faute grave ou lourde.</p>'
+    + '<p>Préavis selon CCN 1501.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Domicile et juridiction compétente</span></div>'
     + '<div class="body">'
-    + '<p>Pour l\'exécution des présentes, les Parties élisent domicile en leurs adresses respectives mentionnées en tête du contrat.</p>'
-    + '<p>Le présent contrat est soumis au droit français. Tout litige relatif à sa conclusion, son exécution ou sa rupture relèvera de la compétence exclusive du <strong>Conseil de Prud\'hommes de Paris</strong>, sous réserve des règles d\'ordre public en matière de compétence territoriale.</p>'
+    + '<p>Conseil de Prud\'hommes de Paris.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article ' + (nextArt++) + '.</span><span class="art-title">Dispositions finales</span></div>'
     + '<div class="body">'
-    + '<p>Le présent contrat annule et remplace tout accord antérieur, écrit ou verbal, ayant pu intervenir entre les Parties relativement à l\'objet des présentes.</p>'
-    + '<p>Si l\'une quelconque des stipulations venait à être déclarée nulle ou inapplicable, les autres stipulations conserveraient toute leur force et leur portée.</p>'
-    + '<p>Toute modification du présent contrat ne pourra résulter que d\'un avenant écrit signé des deux Parties.</p>'
+    + '<p>Le présent contrat annule et remplace tout accord antérieur. Toute modification fera l\'objet d\'un avenant écrit.</p>'
     + '</div>'
 
   var signatures = buildSharedSignatures(c, emp, fonction)
-  var paraphRunner = buildParaphRunner({
-    employeurInitials: "E.T.",
-    salarieInitials: resolveSalarieInitials(c, emp)
-  })
+  var paraphText = buildParaphText("E.T.", resolveSalarieInitials(c, emp))
+  var headerText = buildHeaderTagText(emp, "CONTRAT CDI")
 
   return wrapHtml({
     titre: "Contrat CDI Meshuga — " + (emp.prenom || "") + " " + (emp.nom || ""),
-    css: buildSharedCss(logoUri),
-    body: header + body + signatures,
-    paraphRunner: paraphRunner
+    css: buildSharedCss(logoUri, paraphText, headerText),
+    body: header + body + signatures
   })
 }
 
 // ============================================================
-// 3. BUILDER : CDI Cuisinier(ère)
+// 3 & 4. BUILDERS : CDI Cuisinier / Caissier (via simple)
 // ============================================================
 export function buildCdiCuisinierContract(c, emp, logoUri) {
   return buildCdiSimpleContract(c, emp, logoUri, "cuisinier")
 }
-
-// ============================================================
-// 4. BUILDER : CDI Caissier(ère)
-// ============================================================
 export function buildCdiCaissierContract(c, emp, logoUri) {
   return buildCdiSimpleContract(c, emp, logoUri, "caissier")
 }
 
-// ============================================================
-// Builder commun "CDI simple" (cuisinier, caissier)
-// ============================================================
 function buildCdiSimpleContract(c, emp, logoUri, profil) {
   var dateEmbauche = c.date_embauche
     ? new Date(c.date_embauche).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
@@ -836,146 +724,108 @@ function buildCdiSimpleContract(c, emp, logoUri, profil) {
     emp: emp,
     titreCover: "CONTRAT DE TRAVAIL À DURÉE INDÉTERMINÉE",
     sousTitreCover: "CDI · Articles L.1221-1 et suivants du Code du travail · CCN Restauration Rapide (IDCC 1501)",
-    typeBandeau: "CONTRAT CDI",
     logoUri: logoUri
   })
 
   var body = ''
     + '<div class="art"><span class="art-num">Article 1.</span><span class="art-title">Engagement et nature du contrat</span></div>'
     + '<div class="body">'
-    + '<p>Le/la Salarié(e) est engagé(e) par l\'Employeur dans le cadre d\'un <strong>contrat de travail à durée indéterminée (CDI)</strong> à temps plein, à compter du <strong>' + esc(dateEmbauche) + '</strong>, sous réserve des résultats de la visite d\'information et de prévention.</p>'
-    + '<p>Le présent engagement est subordonné à la déclaration préalable à l\'embauche (DPAE) effectuée auprès de l\'URSSAF d\'Île-de-France.</p>'
+    + '<p>Le/la Salarié(e) est engagé(e) en <strong>CDI à temps plein</strong>, à compter du <strong>' + esc(dateEmbauche) + '</strong>.</p>'
+    + '<p>Subordonné à la DPAE auprès de l\'URSSAF d\'Île-de-France.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 2.</span><span class="art-title">Fonctions et qualification</span></div>'
     + '<div class="body">'
-    + '<p>Le/la Salarié(e) est engagé(e) en qualité de <strong>' + esc(fonction) + '</strong>.</p>'
-    + '<p>Il/elle est classé(e) selon la grille de classification de la Convention Collective Nationale de la Restauration Rapide (IDCC 1501) au <strong>' + esc(niveauLabel) + '</strong>, statut <strong>non-cadre</strong>.</p>'
+    + '<p><strong>' + esc(fonction) + '</strong>, classé(e) au <strong>' + esc(niveauLabel) + '</strong>, statut <strong>non-cadre</strong>.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 3.</span><span class="art-title">Missions principales</span></div>'
     + '<div class="body">'
-    + '<p>Les missions ci-dessous sont essentielles, substantielles et non limitatives. Elles pourront évoluer selon les besoins de l\'entreprise, sans constituer une modification du présent contrat.</p>'
     + (missionsHtml || '<p style="color:#999;font-style:italic">[Missions à compléter]</p>')
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 4.</span><span class="art-title">Période d\'essai</span></div>'
     + '<div class="body">'
-    + '<p>Le présent contrat est assorti d\'une <strong>période d\'essai de ' + pe + ' (' + esc(numToFrenchWords(pe)) + ') mois</strong>, conformément aux dispositions de l\'article L.1221-19 du Code du travail et de la Convention Collective Nationale de la Restauration Rapide.</p>'
-    + (peRenouv
-        ? '<p>Cette période d\'essai pourra être <strong>renouvelée une fois pour une durée de ' + pe + ' mois supplémentaires</strong>, soit une durée maximale totale de ' + peTotal + ' mois, sous réserve d\'un accord écrit du/de la Salarié(e) intervenant avant le terme de la période d\'essai initiale.</p>'
-        : '<p>Cette période d\'essai n\'est pas renouvelable.</p>')
+    + '<p><strong>' + pe + ' (' + esc(numToFrenchWords(pe)) + ') mois</strong>.</p>'
+    + (peRenouv ? '<p>Renouvelable une fois.</p>' : '<p>Non renouvelable.</p>')
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 5.</span><span class="art-title">Lieu de travail</span></div>'
-    + '<div class="body">'
-    + '<p>Le/la Salarié(e) exercera ses fonctions au sein de l\'établissement <strong>MESHUGA Crazy Deli, 3 rue Vavin, 75006 Paris</strong>.</p>'
-    + '</div>'
+    + '<div class="body"><p><strong>MESHUGA, 3 rue Vavin, 75006 Paris</strong>.</p></div>'
 
     + '<div class="art"><span class="art-num">Article 6.</span><span class="art-title">Durée du travail</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">6.1 — Durée hebdomadaire.</span> Le/la Salarié(e) est soumis(e) à une durée du travail de <strong>' + heuresHebdo + ' heures hebdomadaires</strong>, correspondant à ' + heuresMensuelles.toFixed(2).replace(".",",") + ' heures mensuelles.</p>'
-    + (heuresSup > 0
-        ? '<p class="sub-clause"><span class="clause-label">6.2 — Heures supplémentaires structurelles.</span> Cette durée comprend la durée légale du travail (35 heures hebdomadaires) et <strong>' + heuresSup.toFixed(2).replace(".",",") + ' heures supplémentaires structurelles mensuelles</strong>, majorées de 25 % conformément à l\'article L.3121-36 du Code du travail.</p>'
-        : '')
-    + '<p class="sub-clause"><span class="clause-label">6.' + (heuresSup > 0 ? '3' : '2') + ' — Variabilité.</span> Les horaires de travail peuvent varier selon les nécessités de l\'activité, et incluent du travail en soirée et le week-end.</p>'
-    + '<p class="sub-clause"><span class="clause-label">6.' + (heuresSup > 0 ? '4' : '3') + ' — Repos.</span> Repos quotidien minimum 11h consécutives, repos hebdomadaire minimum 35h consécutives.</p>'
+    + '<p class="sub-clause"><span class="clause-label">6.1 — Durée hebdomadaire.</span> <strong>' + heuresHebdo + ' h/semaine</strong>.</p>'
+    + (heuresSup > 0 ? '<p class="sub-clause"><span class="clause-label">6.2 — Heures sup.</span> <strong>' + heuresSup.toFixed(2).replace(".",",") + ' h/mois</strong> majorées 25%.</p>' : '')
+    + '<p class="sub-clause"><span class="clause-label">6.' + (heuresSup > 0 ? '3' : '2') + ' — Repos.</span> 11h quotidien / 35h hebdo.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 7.</span><span class="art-title">Rémunération</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">7.1 — Salaire mensuel brut.</span> En contrepartie de l\'exécution de ses fonctions, le/la Salarié(e) percevra une rémunération brute mensuelle de <strong>' + formatEuros(salaire) + ' (' + esc(salaireLettres) + ' euros)</strong>, versée sur 12 mois, payable au plus tard le 5 du mois suivant.'
-    + (heuresSup > 0
-        ? ' Cette rémunération se décompose en ' + (heuresMensuelles - heuresSup).toFixed(2).replace(".",",") + ' heures au taux horaire de base de ' + tauxBase.toFixed(2).replace(".",",") + ' € et ' + heuresSup.toFixed(2).replace(".",",") + ' heures supplémentaires structurelles majorées de 25 %, l\'ensemble étant intégré au forfait mensuel ci-dessus.'
-        : '')
-    + '</p>'
-    + '<p class="sub-clause"><span class="clause-label">7.2 — Avantage en nature « repas ».</span> Évalué et déclaré conformément à la valeur forfaitaire URSSAF (4,25 € par repas en 2026).</p>'
-    + '<p class="sub-clause"><span class="clause-label">7.3 — Travail du dimanche et 1<sup>er</sup> mai.</span> L\'établissement ouvrant habituellement le dimanche, la CCN 1501 ne prévoit pas de majoration spécifique. Le 1<sup>er</sup> mai donne lieu à une indemnité égale au montant du salaire (majoration 100 %).</p>'
+    + '<p class="sub-clause"><span class="clause-label">7.1 — Salaire mensuel brut.</span> <strong>' + formatEuros(salaire) + ' (' + esc(salaireLettres) + ' euros)</strong>, sur 12 mois.</p>'
+    + '<p class="sub-clause"><span class="clause-label">7.2 — Repas.</span> URSSAF 4,25 €.</p>'
+    + '<p class="sub-clause"><span class="clause-label">7.3 — Dimanche et 1<sup>er</sup> mai.</span> Pas de majoration dominicale. 1<sup>er</sup> mai 100%.</p>'
     + '</div>'
 
     + '<div class="art"><span class="art-num">Article 8.</span><span class="art-title">Congés payés</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">8.1 — Acquisition.</span> Conformément à l\'article L.3141-3 du Code du travail, le/la Salarié(e) acquiert un droit à congés payés de <strong>2,5 jours ouvrables par mois de travail effectif</strong>, dans la limite de <strong>30 jours ouvrables (5 semaines)</strong> par période de référence. La période de référence pour l\'acquisition s\'étend du <strong>1er juin de l\'année N-1 au 31 mai de l\'année N</strong>.</p>'
-    + '<p class="sub-clause"><span class="clause-label">8.2 — Période de prise.</span> Conformément aux articles L.3141-13 et suivants du Code du travail, la période principale de prise des congés payés s\'étend du <strong>1er mai au 31 octobre</strong> de chaque année. Le/la Salarié(e) doit formuler ses demandes de congés <strong>au moins 2 mois avant</strong> la date de départ souhaitée, par écrit (email accepté), afin de permettre à l\'Employeur d\'organiser la continuité du service.</p>'
-    + '<p class="sub-clause"><span class="clause-label">8.3 — Planification annuelle.</span> L\'Employeur s\'engage à informer le/la Salarié(e), au plus tard le <strong>1er mars</strong> de chaque année, des dates de fermeture éventuelles de l\'établissement et à valider ou proposer un calendrier de congés au plus tard le <strong>30 avril</strong>. À défaut de demande de la part du/de la Salarié(e), l\'Employeur pourra fixer unilatéralement les dates dans le cadre de son pouvoir de direction.</p>'
-    + '<p class="sub-clause"><span class="clause-label">8.4 — Report exceptionnel.</span> À titre exceptionnel et après accord écrit préalable de l\'Employeur, le report d\'une partie des congés non pris au 31 octobre vers la période suivante peut être autorisé, dans la limite maximale de <strong>10 jours ouvrables</strong> et <strong>jusqu\'au 31 mars de l\'année suivante</strong> au plus tard.</p>'
-    + '<p class="sub-clause"><span class="clause-label">8.5 — Congés non pris.</span> Conformément à la jurisprudence constante de la Cour de cassation et à la directive européenne 2003/88/CE, les congés payés non pris au terme de la période de prise et n\'ayant pas fait l\'objet d\'un report autorisé au titre du 8.4 ci-dessus sont perdus, dès lors que l\'Employeur a effectivement mis le/la Salarié(e) en mesure de les prendre. Cette disposition ne s\'applique pas aux congés acquis pendant les périodes de suspension du contrat de travail (maladie, accident du travail, maternité, paternité), qui bénéficient d\'un report légal de <strong>15 mois</strong> conformément à la loi n° 2024-364 du 22 avril 2024.</p>'
-    + '<p class="sub-clause"><span class="clause-label">8.6 — Indemnité compensatrice.</span> En cas de rupture du contrat de travail, les congés payés acquis et non pris donneront lieu au versement d\'une indemnité compensatrice de congés payés, conformément à l\'article L.3141-28 du Code du travail.</p>'
+    + '<p class="sub-clause"><span class="clause-label">8.1 — Acquisition.</span> 2,5 jours/mois, max 30 jours.</p>'
+    + '<p class="sub-clause"><span class="clause-label">8.2 — Prise.</span> 1er mai au 31 octobre. Demandes 2 mois avant.</p>'
+    + '<p class="sub-clause"><span class="clause-label">8.3 — Planification.</span> Calendrier au 30 avril.</p>'
+    + '<p class="sub-clause"><span class="clause-label">8.4 — Report.</span> Max 10 jours, jusqu\'au 31 mars.</p>'
+    + '<p class="sub-clause"><span class="clause-label">8.5 — Non pris.</span> Perdus (sauf suspension contrat : 15 mois).</p>'
+    + '<p class="sub-clause"><span class="clause-label">8.6 — ICCP.</span> En cas de rupture.</p>'
     + '</div>'
 
-    + '<div class="art"><span class="art-num">Article 9.</span><span class="art-title">Frais de transport domicile-travail</span></div>'
-    + '<div class="body">'
-    + '<p>L\'Employeur prend en charge <strong>50 % du coût des abonnements aux transports publics</strong> souscrits par le/la Salarié(e), sur présentation des justificatifs (article L.3261-2 du Code du travail).</p>'
-    + '</div>'
+    + '<div class="art"><span class="art-num">Article 9.</span><span class="art-title">Frais de transport</span></div>'
+    + '<div class="body"><p><strong>50%</strong> des abonnements transports publics.</p></div>'
 
     + '<div class="art"><span class="art-num">Article 10.</span><span class="art-title">Absences et maladie</span></div>'
+    + '<div class="body"><p>Signalement le matin. Justificatifs sous 48h.</p></div>'
+
+    + '<div class="art"><span class="art-num">Article 11.</span><span class="art-title">VIP</span></div>'
+    + '<div class="body"><p><strong>' + (c.service_sante_travail || MESHUGA_LEGAL.medecine_travail.nom) + '</strong>' + (c.service_sante_travail ? '' : ', ' + MESHUGA_LEGAL.medecine_travail.adresse) + ' sous 3 mois.</p></div>'
+
+    + '<div class="art"><span class="art-num">Article 12.</span><span class="art-title">CCN et protection sociale</span></div>'
     + '<div class="body">'
-    + '<p>Toute absence doit être signalée le matin du premier jour. Les justificatifs médicaux doivent être transmis dans un délai de 48 heures.</p>'
+    + '<p class="sub-clause"><span class="clause-label">12.1 — CCN.</span> Restauration Rapide IDCC 1501.</p>'
+    + '<p class="sub-clause"><span class="clause-label">12.2 — Retraite.</span> ' + MESHUGA_LEGAL.retraite.nom + '.</p>'
+    + '<p class="sub-clause"><span class="clause-label">12.3 — Prévoyance.</span> <strong>' + (c.prevoyance_organisme || MESHUGA_LEGAL.prevoyance.nom) + '</strong>.</p>'
+    + '<p class="sub-clause"><span class="clause-label">12.4 — Mutuelle.</span> <strong>' + MESHUGA_LEGAL.complementaire_sante.nom + '</strong>.</p>'
+    + '<p class="sub-clause"><span class="clause-label">12.5 — DPAE/DSN.</span> URSSAF Île-de-France.</p>'
     + '</div>'
 
-    + '<div class="art"><span class="art-num">Article 11.</span><span class="art-title">Visite d\'information et de prévention</span></div>'
-    + '<div class="body">'
-    + '<p>Le/la Salarié(e) bénéficiera d\'une VIP réalisée par <strong>' + (c.service_sante_travail || MESHUGA_LEGAL.medecine_travail.nom) + '</strong>'
-    + (c.service_sante_travail ? '' : ', ' + MESHUGA_LEGAL.medecine_travail.adresse)
-    + ' dans un délai maximal de 3 mois (article R.4624-10 du Code du travail).</p>'
-    + '</div>'
-
-    + '<div class="art"><span class="art-num">Article 12.</span><span class="art-title">Convention collective et protection sociale</span></div>'
-    + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">12.1 — CCN.</span> Les conditions de travail sont régies par la CCN Restauration Rapide (IDCC 1501).</p>'
-    + '<p class="sub-clause"><span class="clause-label">12.2 — Retraite complémentaire.</span> ' + MESHUGA_LEGAL.retraite.nom + ', ' + MESHUGA_LEGAL.retraite.adresse + '.</p>'
-    + '<p class="sub-clause"><span class="clause-label">12.3 — Prévoyance.</span> <strong>' + (c.prevoyance_organisme || MESHUGA_LEGAL.prevoyance.nom) + '</strong>' + (c.prevoyance_organisme ? (c.prevoyance_adresse ? ', ' + esc(c.prevoyance_adresse) : '') : ', ' + MESHUGA_LEGAL.prevoyance.adresse) + '. Le/la Salarié(e) y est affilié(e) d\'office.</p>'
-    + '<p class="sub-clause"><span class="clause-label">12.4 — Complémentaire santé.</span> <strong>' + MESHUGA_LEGAL.complementaire_sante.nom + '</strong>, ' + MESHUGA_LEGAL.complementaire_sante.adresse + '. Le/la Salarié(e) y est affilié(e) d\'office.</p>'
-    + '<p class="sub-clause"><span class="clause-label">12.5 — Déclarations sociales.</span> DPAE et DSN auprès de l\'URSSAF d\'Île-de-France.</p>'
-    + '</div>'
-
-    + '<div class="art"><span class="art-num">Article 13.</span><span class="art-title">Tenue et hygiène (HACCP)</span></div>'
-    + '<div class="body">'
-    + '<p>Le/la Salarié(e) s\'engage à respecter les standards d\'hygiène et de présentation conformément à la réglementation en vigueur (arrêté du 21/12/2009 et HACCP). La tenue professionnelle est fournie par l\'Employeur.</p>'
-    + '</div>'
+    + '<div class="art"><span class="art-num">Article 13.</span><span class="art-title">Tenue et HACCP</span></div>'
+    + '<div class="body"><p>Arrêté du 21/12/2009 et HACCP. Tenue fournie par l\'Employeur.</p></div>'
 
     + '<div class="art"><span class="art-num">Article 14.</span><span class="art-title">Confidentialité et loyauté</span></div>'
-    + '<div class="body">'
-    + '<p>Le/la Salarié(e) s\'engage à la plus stricte confidentialité concernant les recettes, fournisseurs, prix de revient, données clients et financières de la Société, pendant l\'exécution du contrat et pour une durée de <strong>3 (trois) ans</strong> après sa cessation.</p>'
-    + '<p>Il/elle déclare n\'être soumis(e) à aucune clause de non-concurrence d\'un précédent employeur.</p>'
-    + '</div>'
+    + '<div class="body"><p>Confidentialité 3 ans après cessation. Pas de non-concurrence d\'un précédent employeur.</p></div>'
 
-    + '<div class="art"><span class="art-num">Article 15.</span><span class="art-title">Vidéosurveillance et données personnelles</span></div>'
-    + '<div class="body">'
-    + '<p>L\'établissement est placé sous vidéosurveillance pour la sécurité des biens et des personnes (intérêt légitime, art. 6.1.f RGPD). Conservation 30 jours maximum. Zones : salle / caisse / réserve, à l\'exclusion des locaux de pause et des sanitaires. Droits CNIL applicables.</p>'
-    + '</div>'
+    + '<div class="art"><span class="art-num">Article 15.</span><span class="art-title">Vidéosurveillance</span></div>'
+    + '<div class="body"><p>Intérêt légitime (art. 6.1.f RGPD). Conservation 30 jours. Zones salle/caisse/réserve.</p></div>'
 
-    + '<div class="art"><span class="art-num">Article 16.</span><span class="art-title">Discipline et règlement intérieur</span></div>'
-    + '<div class="body">'
-    + '<p>Le/la Salarié(e) s\'engage à respecter les règles applicables au sein de l\'entreprise (hygiène HACCP, sécurité, tenue). Tout manquement pourra donner lieu à une sanction disciplinaire conforme aux articles L.1331-1 et suivants du Code du travail.</p>'
-    + '</div>'
+    + '<div class="art"><span class="art-num">Article 16.</span><span class="art-title">Discipline</span></div>'
+    + '<div class="body"><p>Sanctions L.1331-1 et suivants.</p></div>'
 
     + '<div class="art"><span class="art-num">Article 17.</span><span class="art-title">Rupture du contrat</span></div>'
-    + '<div class="body">'
-    + '<p>Rupture conformément aux dispositions légales et conventionnelles. Préavis selon la CCN 1501, sauf dispense expresse, faute grave ou lourde.</p>'
-    + '</div>'
+    + '<div class="body"><p>Préavis selon CCN 1501.</p></div>'
 
-    + '<div class="art"><span class="art-num">Article 18.</span><span class="art-title">Domicile et juridiction compétente</span></div>'
-    + '<div class="body">'
-    + '<p>Élection de domicile aux adresses respectives. Litige relevant du Conseil de Prud\'hommes de Paris.</p>'
-    + '</div>'
+    + '<div class="art"><span class="art-num">Article 18.</span><span class="art-title">Domicile et juridiction</span></div>'
+    + '<div class="body"><p>Conseil de Prud\'hommes de Paris.</p></div>'
 
   var signatures = buildSharedSignatures(c, emp, fonction)
-  var paraphRunner = buildParaphRunner({
-    employeurInitials: "E.T.",
-    salarieInitials: resolveSalarieInitials(c, emp)
-  })
+  var paraphText = buildParaphText("E.T.", resolveSalarieInitials(c, emp))
+  var headerText = buildHeaderTagText(emp, "CONTRAT CDI")
 
   return wrapHtml({
     titre: "Contrat CDI Meshuga — " + (emp.prenom || "") + " " + (emp.nom || ""),
-    css: buildSharedCss(logoUri),
-    body: header + body + signatures,
-    paraphRunner: paraphRunner
+    css: buildSharedCss(logoUri, paraphText, headerText),
+    body: header + body + signatures
   })
 }
 
 // ============================================================
-// DISPATCHER : retourne le bon builder selon c.type
+// DISPATCHER
 // ============================================================
 export function buildContract(c, emp, vacs, logoUri) {
   if (!c || !emp) return ''
