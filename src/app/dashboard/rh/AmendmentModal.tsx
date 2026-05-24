@@ -319,11 +319,37 @@ export default function AmendmentModal(props: Props) {
     }
   }
   
-  // 🔥 Imprime via iframe (dialogue navigateur "Enregistrer en PDF")
+  // 🆕 v18 (24/05/2026) : Imprime en ouvrant le HTML dans une NOUVELLE FENÊTRE en racine
+  // (et plus via iframe.print() qui ne propage pas les @page margin boxes sur macOS).
+  // Cette méthode garantit que les paraphes, la pagination et le header @page apparaissent
+  // dans le PDF final.
   function doPrint() {
-    if (!iframeRef.current) return
-    iframeRef.current.contentWindow!.focus()
-    iframeRef.current.contentWindow!.print()
+    if (!previewHtml) return
+    // Ouvre une fenêtre vide (popup) puis injecte le HTML complet
+    var w = window.open('', '_blank', 'width=900,height=1100')
+    if (!w) {
+      alert('Impossible d\'ouvrir la fenêtre d\'impression. Vérifie que les popups ne sont pas bloqués pour ce site.')
+      return
+    }
+    w.document.open()
+    w.document.write(previewHtml)
+    w.document.close()
+    // Attend que la fenêtre charge ses styles et fontes (Yellowtail via Google Fonts)
+    // puis déclenche le print. setTimeout au cas où "load" est déjà passé.
+    var triggered = false
+    var doTrigger = function() {
+      if (triggered) return
+      triggered = true
+      try {
+        w.focus()
+        w.print()
+      } catch (e) {
+        // Ignore — la fenêtre peut être fermée par l'utilisateur
+      }
+    }
+    w.addEventListener('load', function() { setTimeout(doTrigger, 400) })
+    // Fallback : si load ne se déclenche pas (cache, etc.), trigger après 1.2s
+    setTimeout(doTrigger, 1200)
   }
   
   // 🔥 Télécharge le HTML avec nom propre
