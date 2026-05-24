@@ -1772,6 +1772,7 @@ export default function EmployeeDetail(props) {
             prenom: emp.prenom || "",
             nom: emp.nom || "",
             email: emp.email || null,
+            telephone: emp.telephone || null,
             civilite: emp.civilite || null,
             welcome_pack_signed: emp.welcome_pack_signed === true,
           }}
