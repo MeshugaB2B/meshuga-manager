@@ -677,6 +677,26 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     logoTag = '<div style="font-family: Yellowtail, cursive; font-size: 56px; color: #FF82D7;">Meshuga</div>'
   }
 
+  // ===== 🆕 v14 : Texte des paraphes (CSS @bottom-right) =====
+  // Format : "Paraphes  E.T.  /  E.M."  ou  "Paraphes  E.T.  /  en attente"
+  // Le texte est injecté tel quel dans le CSS content "..."
+  var empFullName = ((emp && emp.prenom) || '') + ' ' + ((emp && emp.nom) || '')
+  var employerInitialsWP = "E.T."
+  var employeeInitialsWP = ""
+  try {
+    if (typeof getInitials === "function") {
+      employeeInitialsWP = getInitials(empFullName)
+    }
+  } catch (e) { employeeInitialsWP = "" }
+  // Échapper pour valeur CSS content "..." : antislash et guillemets
+  function escForCssContent(s) {
+    if (s === null || s === undefined) return ""
+    return String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+  }
+  var salForParaph = employeeInitialsWP || "en attente"
+  // 🆕 v16 : juste les initiales, pas le mot "Paraphes" (mention dans page signature)
+  var paraphTextWelcome = escForCssContent(employerInitialsWP + "   /   " + salForParaph)
+
   // ===== STYLES =====
   var styles =
     ALL_MESHUGA_FONTFACES +
@@ -685,10 +705,14 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // Les @page margin boxes ne sont pas fiables dans toutes les versions Chrome — on opte pour
     // la technique HTML standard (table avec thead/tfoot) qui répète AUTOMATIQUEMENT le footer
     // sur chaque page imprimée. Compatible 100% des browsers depuis IE6.
-    "@page cover { size: A4; margin: 0; @bottom-center { content: ''; } }" +
-    "@page default { size: A4; margin: 18mm 14mm 14mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
-    // 🆕 Page signature dédiée : pas de marge bas surdimensionnée (pas de tfoot paraphes) + même footer central
-    "@page signature { size: A4; margin: 18mm 14mm 18mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } }" +
+    // 🆕 v14 (23/05/2026) : paraphes via @page @bottom-right en CSS natif Chrome.
+    // Plus de position:fixed (qui causait "paraphes en haut page suivante"),
+    // plus de DOM .paraphes-runner. Le texte des paraphes est injecté dans le content.
+    // Le texte est calculé en JS plus bas (paraphTextWelcome) et inséré dans la string CSS.
+    "@page cover { size: A4; margin: 0; @top-center { content: ''; } @bottom-center { content: ''; } @bottom-right { content: none; } }" +
+    "@page default { size: A4; margin: 18mm 14mm 22mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } @bottom-right { content: \"" + paraphTextWelcome + "\"; font-family: 'Yellowtail', cursive; font-size: 14px; color: #FF82D7; border: 1.5px solid #FF82D7; border-radius: 8px; padding: 3px 12px; background: #fff; width: max-content; margin-left: auto; } }" +
+    // 🆕 Page signature dédiée : header oui (footer central), paraphes NON
+    "@page signature { size: A4; margin: 18mm 14mm 18mm 14mm; @bottom-center { content: 'SAS AEGIA FOOD - Dossier de bienvenue Meshuga'; font-family: 'BILD Condensed', 'Arial Narrow', sans-serif; font-size: 8.5pt; color: #999999; letter-spacing: 1px; text-transform: uppercase; } @bottom-right { content: none; } }" +
     "html, body { background: #FFFFFF; }" +
     "body { font-family: 'Arial Narrow', Arial, sans-serif; color: #191923; font-size: 11pt; line-height: 1.55; }" +
     // 🔥 Sprint C3 v2 : encart paraphes (mêmes styles que contracts pour cohérence)
@@ -725,14 +749,7 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
     // `page: cover` assigne explicitement cette div à la @page cover définie plus haut.
     ".cover { page: cover; width: 210mm; height: 297mm; background: #FF82D7; padding: 22mm; position: relative; overflow: hidden; page-break-after: always; break-after: page; display: flex; flex-direction: column; justify-content: space-between; }" +
     ".cover .bg-circle { position: absolute; border-radius: 50%; pointer-events: none; }" +
-    // 🔥 Sprint C3 v11 : position fixed, marge @page bottom courte (1.4cm).
-    ".paraphes-runner { position: fixed; bottom: 3mm; right: 8mm; z-index: 1000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
-    // Paraphes côte à côte, rapprochés, en coin bas-droite
-    ".page-paraphes { display: flex; align-items: flex-end; justify-content: flex-end; gap: 5mm; }" +
-    ".page-paraphes .paraphe-cell { text-align: center; }" +
-    ".page-paraphes .paraphe-label { display: block; font-family: Arial, sans-serif; font-weight: 700; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.8px; color: #666666; margin-bottom: 1mm; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }" +
-    ".page-paraphes .paraphe-initials { display: block; font-family: 'Yellowtail', cursive; font-size: 18pt; color: #FF82D7; line-height: 1; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }" +
-    ".page-paraphes .paraphe-initials.pending { font-family: Arial, sans-serif; font-style: italic; font-size: 9pt; color: #999999; font-weight: 400; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }" +
+    // 🆕 v14 : .paraphes-runner et .page-paraphes SUPPRIMÉS (paraphes désormais dans @page @bottom-right).
     // 🆕 Page finale (signatures) simplifiée : juste un page-break, pas de min-height ni z-index qui créaient une page vide parasite
     ".final-page { page: signature; page-break-before: always; break-before: page; width: 100%; }" +
     // 🆕 Masquer la toolbar à l'impression
@@ -1556,21 +1573,8 @@ export function buildWelcomePack(emp, contract, logoUri, employerSig?: EmployerS
         '<button onclick="window.print()" style="font-family:\'Arial Narrow\',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;padding:10px 16px;border:2px solid #191923;border-radius:4px;cursor:pointer;background:#FFEB5A;color:#191923">Imprimer en PDF</button>' +
       '</div>' +
       page1 +
-      // 🔥 Sprint C3 v7 : paraphes via position:fixed (répétés sur chaque page imprimée par Chrome).
-      // Bien plus fiable que table tfoot — ancrés dans le coin bas-droite peu importe la longueur de page.
-      // Page signature : .final-page la couvre via background blanc + z-index élevé.
-      '<div class="paraphes-runner">' +
-        '<div class="page-paraphes">' +
-          '<div class="paraphe-cell">' +
-            '<div class="paraphe-label">Employeur</div>' +
-            '<div class="paraphe-initials">E.T.</div>' +
-          '</div>' +
-          '<div class="paraphe-cell">' +
-            '<div class="paraphe-label">' + g('Salarié', 'Salariée') + '</div>' +
-            '<div class="paraphe-initials pending">en attente</div>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
+      // 🆕 v14 : DOM .paraphes-runner SUPPRIMÉ — paraphes désormais dans @page @bottom-right (CSS natif Chrome).
+      // Plus de position:fixed (qui causait "paraphes en haut de page suivante" sur le welcomePack).
       pageSommaire +       // 🆕 Page 2 : Bienvenue + sommaire
       page2 +              // Page 3 : Fiche salarié
       pageDureeTravail +   // 🆕 Page 4 : Durée du travail & repos
