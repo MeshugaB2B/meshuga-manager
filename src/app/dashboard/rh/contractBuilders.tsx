@@ -182,10 +182,7 @@ export function buildSharedCss(logoUri, paraphText, headerText) {
     +     'content:"' + ptxt + '";'
     +     'font-family:"Yellowtail",cursive;'
     +     'font-size:13px;'
-    +     'color:#FF82D7 !important;'
-    +     '-webkit-print-color-adjust:exact !important;'
-    +     'print-color-adjust:exact !important;'
-    +     'color-adjust:exact !important;'
+    +     'color:#FF82D7;'  // 🆕 v18.1 : rose Meshuga (visible si l'utilisateur coche "Graphiques d'arrière-plan" à l'impression)
     +   '}'
     + '}'
     // @page signature : header oui, paraphes NON
