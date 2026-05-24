@@ -30,10 +30,12 @@ interface Props {
 }
 
 export default function SignaturePageClient(props: Props) {
-  // Pré-remplir le champ signature avec le nom complet du salarié pour gagner du temps
-  var defaultFullName = ((props.prenom || "") + " " + (props.nom || "")).trim()
+  // Le nom complet du salarié est utilisé comme PLACEHOLDER (filigrane gris clair)
+  // mais le champ démarre VIDE — le salarié doit taper son nom proactivement
+  // pour activer le bouton de signature (acte positif d'identification, juridiquement plus solide).
+  var placeholderFullName = ((props.prenom || "") + " " + (props.nom || "")).trim()
 
-  var [fullName, setFullName] = useState(defaultFullName)
+  var [fullName, setFullName] = useState("")
   var [consentDocument, setConsentDocument] = useState(false)
   var [consentWelcomePack, setConsentWelcomePack] = useState(false)
   var [submitting, setSubmitting] = useState(false)
@@ -183,7 +185,7 @@ export default function SignaturePageClient(props: Props) {
               type="text"
               value={fullName}
               onChange={function (e) { setFullName(e.target.value) }}
-              placeholder="Prénom NOM"
+              placeholder={placeholderFullName || "Prénom NOM"}
               autoComplete="name"
               style={{
                 width: "100%",
