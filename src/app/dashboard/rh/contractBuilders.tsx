@@ -96,7 +96,7 @@ function buildHeaderTagText(emp, type) {
 // CSS partagé — v14 : @page natif avec texte statique
 // ============================================================
 export function buildSharedCss(logoUri, paraphText, headerText) {
-  var ptxt = escCss(paraphText || "Paraphes  E.T.  /  en attente")
+  var ptxt = escCss(paraphText || "E.T.   /   en attente")
   var htxt = escCss(headerText || "meshuga")
 
   return ''
