@@ -175,8 +175,10 @@ export function buildSharedCss(logoUri, paraphText, headerText) {
     +     'font-family:"Yellowtail",cursive;'
     +     'font-size:13px;'
     +     'color:#FF82D7;'
-    +     '-webkit-print-color-adjust:exact;'
-    +     'print-color-adjust:exact;'
+    +     '-webkit-print-color-adjust:exact !important;'
+    +     'print-color-adjust:exact !important;'
+    +     'color-adjust:exact !important;'
+    +     'text-shadow:0 0 0 #FF82D7;'  // 🆕 v17.2 : hack Chrome force impression couleur
     +   '}'
     + '}'
     // @page signature : header oui, paraphes NON
