@@ -212,13 +212,27 @@ export function buildSignatureRequestEmail(
     '<meta name="viewport" content="width=device-width, initial-scale=1.0"/>' +
     '<meta name="x-apple-disable-message-reformatting"/>' +
     '<meta http-equiv="X-UA-Compatible" content="IE=edge"/>' +
+    // 🔒 Forcer light mode dans Apple Mail / Gmail / Outlook.com pour préserver les couleurs Meshuga
+    '<meta name="color-scheme" content="light only"/>' +
+    '<meta name="supported-color-schemes" content="light only"/>' +
     '<title>' + escHtml(subject) + '</title>' +
     // Reset email + media query mobile (Gmail mobile et Apple Mail supportent)
     '<style>' +
+    '  :root { color-scheme: light only; supported-color-schemes: light only }' +
     '  body, table, td, p, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100% }' +
     '  table { border-collapse:collapse !important }' +
     '  img { -ms-interpolation-mode:bicubic; border:0; outline:none; display:block }' +
     '  body { margin:0 !important; padding:0 !important; width:100% !important }' +
+    // 🔒 Force le bouton CTA rose Meshuga (Apple Mail dark mode tend à le transformer en violet/magenta)
+    '  .cta-btn { background-color:#FF82D7 !important; color:#FFFFFF !important }' +
+    '  .cta-btn-cell { background-color:#FF82D7 !important }' +
+    '  @media (prefers-color-scheme: dark) {' +
+    '    .cta-btn { background-color:#FF82D7 !important; color:#FFFFFF !important }' +
+    '    .cta-btn-cell { background-color:#FF82D7 !important }' +
+    '  }' +
+    // Outlook.com dark mode utilise l'attribut [data-ogsc] sur les éléments
+    '  [data-ogsc] .cta-btn { background-color:#FF82D7 !important; color:#FFFFFF !important }' +
+    '  [data-ogsc] .cta-btn-cell { background-color:#FF82D7 !important }' +
     '  @media screen and (max-width: 600px) {' +
     '    .container { width:100% !important; max-width:100% !important }' +
     '    .px-32 { padding-left:20px !important; padding-right:20px !important }' +
@@ -257,9 +271,11 @@ export function buildSignatureRequestEmail(
     'La signature se fait en quelques minutes depuis votre téléphone ou ordinateur. Aucune impression ni signature manuscrite n\'est nécessaire.' +
     '</p>' +
 
-    // CTA bouton (responsive)
+    // CTA bouton (responsive) — wrappé dans table+td bgcolor pour résister au dark mode
     '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0 24px 0"><tr><td align="center">' +
-    '<a href="' + escAttr(params.signatureUrl) + '" class="cta-btn" style="display:inline-block;background:#FF82D7;color:#FFFFFF;text-decoration:none;padding:16px 32px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.5px;font-family:Arial,Helvetica,sans-serif">Signer mes documents →</a>' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" bgcolor="#FF82D7" class="cta-btn-cell" style="background-color:#FF82D7;border-radius:8px"><tr><td bgcolor="#FF82D7" class="cta-btn-cell" align="center" style="background-color:#FF82D7;border-radius:8px;padding:0">' +
+    '<a href="' + escAttr(params.signatureUrl) + '" class="cta-btn" style="display:inline-block;background-color:#FF82D7;color:#FFFFFF;text-decoration:none;padding:16px 32px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.5px;font-family:Arial,Helvetica,sans-serif;mso-padding-alt:0"><span style="color:#FFFFFF;text-decoration:none">Signer mes documents &rarr;</span></a>' +
+    '</td></tr></table>' +
     '</td></tr></table>' +
 
     '<p style="margin:24px 0 8px 0;font-size:13px;line-height:1.5;color:#666">' +
