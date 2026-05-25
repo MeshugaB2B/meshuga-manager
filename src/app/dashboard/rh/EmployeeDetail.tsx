@@ -396,8 +396,31 @@ export default function EmployeeDetail(props) {
     }
   }
 
+  // === Construit l'URL du viewer inline pour un document signé ===
+  // Encode { k, i, d } en base64url. Cohérent avec /api/signatures/view/[token].
+  function buildSignedDocViewUrl(opts: any) {
+    var payload = { k: opts.entityKind, i: opts.entityId, d: opts.docKind }
+    var json = JSON.stringify(payload)
+    var b64 = ""
+    try {
+      // window.btoa: standard pour navigateur
+      b64 = window.btoa(unescape(encodeURIComponent(json)))
+    } catch (e) {
+      b64 = ""
+    }
+    var token = b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")
+    return "/api/signatures/view/" + token
+  }
+
   // 🔥 === Régénère le PDF d'un avenant de modification contractuelle (table hr_contract_amendments) ===
   async function regenerateAmendmentContractuelPdf(amendment: any) {
+    // Si l'avenant est signé, on ouvre le viewer inline (avec la signature visible)
+    // au lieu de regénérer un brouillon à blanc depuis le builder.
+    if (amendment.signed_at || amendment.status === "signed" || amendment.signature_status === "signed") {
+      var viewerUrl = buildSignedDocViewUrl({ entityKind: "amendment", entityId: amendment.id, docKind: "main" })
+      window.open(viewerUrl, "_blank")
+      return
+    }
     try {
       var res = await fetch("/api/hr/contracts/" + amendment.contract_id + "/amendment?amendment_id=" + amendment.id, {
         method: "GET"
@@ -1623,13 +1646,42 @@ export default function EmployeeDetail(props) {
                   Dossier signé téléversé le {fmtDate(welcomePackDocs[0].uploaded_at)}
                 </span>
               </div>
-              <div style={{ fontSize: 11, opacity: 0.7 }}>
+              <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 8 }}>
                 {welcomePackDocs.length} fichier{welcomePackDocs.length > 1 ? "s" : ""} archivé{welcomePackDocs.length > 1 ? "s" : ""} · catégorie « dossier_bienvenue_signe »
               </div>
+              {/* Bouton "Voir le signé" : ouvre le viewer inline avec toolbar PDF.
+                  Trouve le dernier avenant signé qui incluait le welcomepack. */}
+              {(function() {
+                var signedAmendments = contractAmendments.filter(function(a: any) {
+                  return a.signed_at && a.signature_includes_welcome_pack === true
+                })
+                if (signedAmendments.length === 0) return null
+                var lastSigned = signedAmendments[signedAmendments.length - 1]
+                var wpViewerUrl = buildSignedDocViewUrl({ entityKind: "amendment", entityId: lastSigned.id, docKind: "welcomepack" })
+                return (
+                  <a
+                    href={wpViewerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "inline-block",
+                      padding: "6px 12px",
+                      background: "#FFEB5A",
+                      border: "2px solid #191923",
+                      borderRadius: 4,
+                      fontSize: 11,
+                      fontWeight: 900,
+                      color: "#191923",
+                      textDecoration: "none",
+                      boxShadow: "1px 1px 0 #191923"
+                    }}
+                  >🖨️ Voir le dossier signé</a>
+                )
+              })()}
             </div>
           ) : (
             <div style={{ background: "#FAFAFA", border: "1px dashed #BBBBBB", borderRadius: 6, padding: 12, marginBottom: 10, fontSize: 11.5, color: "#666" }}>
-              ✗ Aucun dossier signé n'a encore été téléversé pour ce salarié.
+              ✗ Aucun dossier signé n&apos;a encore été téléversé pour ce salarié.
             </div>
           )}
 
