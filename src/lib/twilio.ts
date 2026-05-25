@@ -173,3 +173,43 @@ export function buildSignatureSmsBody(params: {
     "Lien : " + params.signatureUrl
   )
 }
+
+// ============================================================
+// buildRelanceSmsBody — SMS de relance quotidienne (J+N)
+// ============================================================
+// Envoye par le cron quotidien tant que le document n'est pas signe.
+// Ton plus pressant mais courtois.
+// ~145 caracteres avec URL = 1 segment GSM. Zero accent.
+//
+export function buildRelanceSmsBody(params: {
+  prenom: string
+  signatureUrl: string
+  daysSinceSent: number
+}): string {
+  var prenom = (params.prenom || "").trim()
+  var greeting = prenom ? ("Bonjour " + prenom + ", ") : "Bonjour, "
+  return (
+    greeting +
+    "rappel Meshuga : votre document n'est pas encore signe. " +
+    "Lien : " + params.signatureUrl
+  )
+}
+
+// ============================================================
+// buildEdwardSignatureNotifSms — Notification a Edward (signataire)
+// ============================================================
+// Envoye a Edward des qu'un salarie a signe. Inclut le lien vers
+// le PDF signe (URL signee Supabase valable plusieurs jours).
+//
+export function buildEdwardSignatureNotifSms(params: {
+  signerName: string
+  documentLabel: string
+  signedPdfUrl: string
+}): string {
+  var name = (params.signerName || "Un salarie").trim()
+  var label = (params.documentLabel || "document").trim()
+  return (
+    "Meshuga RH : " + name + " vient de signer " + label + ". " +
+    "Document signe : " + params.signedPdfUrl
+  )
+}
