@@ -329,11 +329,24 @@ export default function EmployeeDetail(props) {
       return
     }
     try {
+      // === Docs HTML signes electroniquement -> viewer (patche les paraphes "en attente") ===
+      // Pattern de file_path pour ces docs : "amendments/{uuid}/..." ou "contracts/{uuid}/..."
+      var mimeIsHtml = doc.mime_type && String(doc.mime_type).toLowerCase().indexOf("html") !== -1
+      var pathMatch = String(doc.file_path).match(/^(amendments|contracts)\/([0-9a-f-]+)\//)
+      if (mimeIsHtml && pathMatch) {
+        var entityKind = pathMatch[1] === "amendments" ? "amendment" : "contract"
+        var entityId = pathMatch[2]
+        var docKind = doc.doc_type === "dossier_bienvenue_signe" ? "welcomepack" : "main"
+        var viewerUrl = buildSignedDocViewUrl({ entityKind: entityKind, entityId: entityId, docKind: docKind })
+        window.open(viewerUrl, "_blank")
+        return
+      }
+      // === Fallback : PDFs uploades manuellement -> signed URL classique ===
       var res = await supabase.storage
         .from("hr-contract-docs")
         .createSignedUrl(doc.file_path, 3600)
       if (res.error || !res.data || !res.data.signedUrl) {
-        throw new Error((res.error && res.error.message) || "URL signée introuvable")
+        throw new Error((res.error && res.error.message) || "URL signee introuvable")
       }
       window.open(res.data.signedUrl, "_blank")
     } catch (err) {
@@ -398,6 +411,7 @@ export default function EmployeeDetail(props) {
 
   // === Construit l'URL du viewer inline pour un document signé ===
   // Encode { k, i, d } en base64url. Cohérent avec /api/signatures/view/[token].
+  // opts.mode : "preview" (toolbar) | "print" (auto-déclenche window.print())
   function buildSignedDocViewUrl(opts: any) {
     var payload = { k: opts.entityKind, i: opts.entityId, d: opts.docKind }
     var json = JSON.stringify(payload)
@@ -409,7 +423,11 @@ export default function EmployeeDetail(props) {
       b64 = ""
     }
     var token = b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")
-    return "/api/signatures/view/" + token
+    var url = "/api/signatures/view/" + token
+    if (opts.mode === "print") {
+      url += "?mode=print"
+    }
+    return url
   }
 
   // 🔥 === Régénère le PDF d'un avenant de modification contractuelle (table hr_contract_amendments) ===
@@ -1657,7 +1675,7 @@ export default function EmployeeDetail(props) {
                 })
                 if (signedAmendments.length === 0) return null
                 var lastSigned = signedAmendments[signedAmendments.length - 1]
-                var wpViewerUrl = buildSignedDocViewUrl({ entityKind: "amendment", entityId: lastSigned.id, docKind: "welcomepack" })
+                var wpViewerUrl = buildSignedDocViewUrl({ entityKind: "amendment", entityId: lastSigned.id, docKind: "welcomepack", mode: "print" })
                 return (
                   <a
                     href={wpViewerUrl}
@@ -1675,7 +1693,7 @@ export default function EmployeeDetail(props) {
                       textDecoration: "none",
                       boxShadow: "1px 1px 0 #191923"
                     }}
-                  >🖨️ Voir le dossier signé</a>
+                  >🖨️ Télécharger le dossier signé en PDF</a>
                 )
               })()}
             </div>
