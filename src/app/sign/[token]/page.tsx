@@ -37,6 +37,23 @@ function getAmendmentTypeLabel(amendmentType: string): string {
   return "Avenant au contrat de travail"
 }
 
+function getContractTypeLabel(type: string, statutCadre: string, isFemale: boolean): string {
+  var t = (type || "").toLowerCase()
+  if (t === "extra") return "Contrat de travail (CDD d'usage)"
+  if (t === "cdi_cadre") {
+    return statutCadre === "cadre"
+      ? "Contrat de travail CDI Cadre"
+      : "Contrat de travail CDI Agent de maîtrise"
+  }
+  if (t === "cdi_cuisinier") {
+    return isFemale ? "Contrat de travail CDI Cuisinière" : "Contrat de travail CDI Cuisinier"
+  }
+  if (t === "cdi_caissier") {
+    return isFemale ? "Contrat de travail CDI Caissière" : "Contrat de travail CDI Caissier"
+  }
+  return "Contrat de travail"
+}
+
 interface PageData {
   found: boolean
   errorState?: "invalid" | "signed" | "expired" | "server-error"
@@ -122,6 +139,68 @@ async function loadSignaturePageData(token: string): Promise<PageData> {
       documentTypeLabel: getAmendmentTypeLabel(a.amendment_type || ""),
       includeWelcomePack: a.signature_includes_welcome_pack === true,
       sentAt: a.signature_sent_at || null,
+    }
+  }
+
+  // === Fallback : pas trouvé dans avenants → chercher dans hr_contracts ===
+  var resContractDirect = await supabase
+    .from("hr_contracts")
+    .select(
+      "id, employee_id, cycle_id, type, statut_cadre, signature_status, " +
+      "signature_includes_welcome_pack, signature_sent_at, signature_viewed_at, signature_signed_at"
+    )
+    .eq("signature_token", token)
+    .maybeSingle()
+
+  if (resContractDirect.data) {
+    var c: any = resContractDirect.data
+    if (c.signature_signed_at || c.signature_status === "signed") {
+      return { found: false, errorState: "signed", errorMessage: "Ce document a déjà été signé" }
+    }
+    if (c.signature_status === "expired") {
+      return { found: false, errorState: "expired", errorMessage: "Ce lien a expiré" }
+    }
+
+    var empIdC: string | null = c.employee_id || null
+    if (!empIdC && c.cycle_id) {
+      var resCycC = await supabase
+        .from("hr_employment_cycles")
+        .select("employee_id")
+        .eq("id", c.cycle_id)
+        .maybeSingle()
+      empIdC = (resCycC.data && resCycC.data.employee_id) || null
+    }
+    if (!empIdC) {
+      return { found: false, errorState: "server-error", errorMessage: "Données incomplètes" }
+    }
+
+    var resEmpC = await supabase
+      .from("hr_employees")
+      .select("prenom, nom, civilite")
+      .eq("id", empIdC)
+      .maybeSingle()
+    if (!resEmpC.data) {
+      return { found: false, errorState: "server-error", errorMessage: "Salarié introuvable" }
+    }
+
+    var civC = (resEmpC.data.civilite || "").toLowerCase().trim()
+    var isFemaleC = civC === "mme" || civC === "madame"
+
+    if (!c.signature_viewed_at) {
+      await supabase
+        .from("hr_contracts")
+        .update({ signature_viewed_at: new Date().toISOString(), signature_status: "viewed" })
+        .eq("id", c.id)
+    }
+
+    return {
+      found: true,
+      prenom: resEmpC.data.prenom || "",
+      nom: resEmpC.data.nom || "",
+      civilite: resEmpC.data.civilite || null,
+      documentTypeLabel: getContractTypeLabel(c.type || "", c.statut_cadre || "", isFemaleC),
+      includeWelcomePack: c.signature_includes_welcome_pack === true,
+      sentAt: c.signature_sent_at || null,
     }
   }
 
