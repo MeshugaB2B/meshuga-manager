@@ -22,7 +22,8 @@ import { loadEmployerSignature } from "@/app/dashboard/rh/employerSignature"
 import { markEmployeeWelcomePackSigned } from "@/app/dashboard/rh/employeeWelcomePack"
 import { getInitials, buildParaphFooter } from "@/app/dashboard/rh/contractBuilders"
 import { LOGO_PINK } from "@/app/dashboard/logos"
-import { sendBrevoEmail } from "@/lib/brevo"
+import { sendBrevoEmail, buildEdwardSignatureNotifEmail } from "@/lib/brevo"
+import { sendTwilioSms, buildEdwardSignatureNotifSms, normalizePhoneFR } from "@/lib/twilio"
 import { createHash } from "crypto"
 
 export var runtime = "nodejs"
@@ -514,6 +515,98 @@ export async function POST(
   if (updateRes.error) {
     console.error("[sign/submit] DB update error:", updateRes.error.message)
     return NextResponse.json({ ok: false, error: "Erreur lors de l'enregistrement de la signature" }, { status: 500 })
+  }
+
+  // ============================================================
+  // 11bis. Notification Edward (email + SMS) avec liens PDF
+  // ============================================================
+  // Génère des URLs signées Supabase Storage valables 7 jours
+  // pour qu'Edward puisse vérifier le document signé directement.
+  // ============================================================
+  try {
+    var signedPdfUrl = ""
+    var signedWpUrl: string | null = null
+
+    var resSignedPdf = await sb.storage
+      .from("hr-signatures")
+      .createSignedUrl(avenantPath, 60 * 60 * 24 * 7) // 7 jours en secondes
+    if (resSignedPdf.data && resSignedPdf.data.signedUrl) {
+      signedPdfUrl = resSignedPdf.data.signedUrl
+    } else if (resSignedPdf.error) {
+      console.error("[sign/submit] Signed URL avenant error:", resSignedPdf.error.message)
+    }
+
+    if (includeWp && uploadedWpPath) {
+      var resSignedWp = await sb.storage
+        .from("hr-signatures")
+        .createSignedUrl(uploadedWpPath, 60 * 60 * 24 * 7)
+      if (resSignedWp.data && resSignedWp.data.signedUrl) {
+        signedWpUrl = resSignedWp.data.signedUrl
+      }
+    }
+
+    // Construit le libellé du document
+    var notifDocLabel = "Avenant au contrat de travail"
+    if (amendment.amendment_type === "regularisation_welcome_pack") notifDocLabel = "Avenant d'actualisation contractuelle"
+    else if (amendment.amendment_type === "prolongation_duree") notifDocLabel = "Avenant de prolongation"
+    else if (amendment.amendment_type === "augmentation_salaire") notifDocLabel = "Avenant de modification de rémunération"
+    else if (amendment.amendment_type === "modification_horaires") notifDocLabel = "Avenant de modification des horaires"
+    else if (amendment.amendment_type === "changement_poste") notifDocLabel = "Avenant de changement de poste"
+
+    var signerFullName = ((emp.prenom || "") + " " + (emp.nom || "")).trim() || signedFullName
+
+    // Notification email à Edward
+    var edwardEmail = process.env.EDWARD_NOTIFICATION_EMAIL || "edward@meshuga.fr"
+    if (signedPdfUrl) {
+      var notifContent = buildEdwardSignatureNotifEmail({
+        signerFirstName: emp.prenom || "",
+        signerLastName: emp.nom || "",
+        documentTypeLabel: notifDocLabel,
+        includeWelcomePack: includeWp,
+        signedAt: signedAt.toISOString(),
+        signedPdfUrl: signedPdfUrl,
+        signedWelcomePackUrl: signedWpUrl,
+        signatureId: signatureId,
+        pdfHash: hash,
+      })
+      // Ne pas await pour ne pas bloquer la réponse au salarié
+      sendBrevoEmail({
+        to: [{ email: edwardEmail, name: "Edward Touret" }],
+        subject: notifContent.subject,
+        htmlContent: notifContent.htmlContent,
+        textContent: notifContent.textContent,
+        replyTo: { email: edwardEmail, name: "Edward Touret" },
+        tags: ["signature-notif-edward"],
+      }).catch(function (e: any) {
+        console.error("[sign/submit] Notif Edward email error:", e.message || e)
+      })
+    }
+
+    // Notification SMS à Edward (si numéro configuré)
+    var edwardPhoneRaw = process.env.EDWARD_NOTIFICATION_PHONE || ""
+    var edwardPhone = edwardPhoneRaw ? normalizePhoneFR(edwardPhoneRaw) : null
+    if (edwardPhone && signedPdfUrl) {
+      var smsBody = buildEdwardSignatureNotifSms({
+        signerName: signerFullName,
+        documentLabel: notifDocLabel,
+        signedPdfUrl: signedPdfUrl,
+      })
+      // Ne pas await
+      sendTwilioSms({ to: edwardPhone, body: smsBody }).catch(function (e: any) {
+        console.error("[sign/submit] Notif Edward SMS error:", e.message || e)
+      })
+    }
+
+    // Marquer notifié (non bloquant)
+    sb.from("hr_contract_amendments")
+      .update({ edward_notified_at: new Date().toISOString() })
+      .eq("id", amendment.id)
+      .then(function () {})
+      .catch(function () {})
+
+  } catch (e: any) {
+    // Notif non bloquante : on log mais on ne fail pas la signature
+    console.error("[sign/submit] Notif Edward exception non bloquante:", e.message || e)
   }
 
   // === 12. Marquer le welcome pack signé sur le salarié (si inclus) ===
