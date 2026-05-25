@@ -1,29 +1,31 @@
+// ============================================================
 // src/app/api/signatures/view/[token]/route.ts
 // ============================================================
-// Sprint C3 v3 — Visualisation inline des documents signés
-// ============================================================
-// Sert un document signé (avenant, contrat ou welcomepack) en mode
-// inline pour qu'il s'affiche comme une vraie page web, avec une
-// toolbar Meshuga par-dessus pour permettre l'impression en PDF.
+// Endpoint de visualisation INLINE des documents signés.
 //
-// Pourquoi cette route ?
-// Les signed URLs Supabase Storage servent les .html avec
-//   Content-Disposition: attachment
-// → le navigateur les télécharge ou les affiche en raw text.
-// On remplace donc ces signed URLs (envoyées à Edward par email/SMS
-// après chaque signature) par un lien vers cette route, qui :
-//   - décode le token base64url { k, i, d }
-//   - récupère signed_pdf_path en DB
-//   - télécharge le HTML depuis le bucket hr-signatures
-//   - le réémet avec Content-Type: text/html + Content-Disposition: inline
-//   - injecte une toolbar rose Meshuga (Yellowtail + bouton "Télécharger en PDF")
+// Pourquoi cette route existe :
+//   1. Supabase Storage sert les fichiers HTML avec un mauvais
+//      Content-Type, ce qui fait que le navigateur les télécharge
+//      ou les affiche en texte brut (DOCTYPE visible).
+//   2. Le HTML stocké contient des paraphes "E.T. / en attente"
+//      au lieu de "E.T. / E.S." parce que injectEmployeeParaphes
+//      cherche un <div class="paraph-footer"> qui n'existe pas
+//      dans l'ancien builder (CSS Paged Media natif @bottom-right).
+//      Cette route fait le remplacement A LA VOLEE.
 //
-// Token base64url payload :
-//   { k: 'amendment' | 'contract', i: <entityId>, d: 'main' | 'welcomepack' }
+// Token base64url décodé en JSON :
+//   { k: "amendment" | "contract", i: <entityId>, d: "main" | "welcomepack" }
 //
-// Pour 'welcomepack', le path est dérivé de signed_pdf_path :
-//   amendments/<id>/<ts>_avenant.html       → ..._welcomepack.html
-//   contracts/<id>/<ts>_contrat.html        → ..._welcomepack.html
+// Query params :
+//   ?mode=print    -> pas de toolbar + autoprint au chargement
+//                     (idéal pour bouton "Voir le dossier signé" en PDF direct)
+//   ?mode=preview  -> (défaut) toolbar Meshuga + bouton "Télécharger en PDF"
+//
+// Logique de chemin :
+//   - d = "main"         -> utilise entity.signed_pdf_path
+//   - d = "welcomepack"  -> reconstruit depuis entity.signed_at + entity.id
+//                          (le builder submit.ts upload toujours au pattern
+//                          {folder}/{amendment.id}/{timestamp}_welcomepack.html)
 // ============================================================
 
 import { NextResponse } from "next/server"
@@ -36,8 +38,29 @@ export var dynamic = "force-dynamic"
 // === Helpers ================================================
 // ============================================================
 
-function escHtml(s: string): string {
-  return (s || "")
+interface ViewTokenPayload {
+  k: "amendment" | "contract"
+  i: string
+  d: "main" | "welcomepack"
+}
+
+function decodeToken(token: string): ViewTokenPayload | null {
+  try {
+    var json = Buffer.from(token, "base64url").toString("utf-8")
+    var parsed: any = JSON.parse(json)
+    if (!parsed || typeof parsed !== "object") return null
+    if (parsed.k !== "amendment" && parsed.k !== "contract") return null
+    if (!parsed.i || typeof parsed.i !== "string") return null
+    if (parsed.d !== "main" && parsed.d !== "welcomepack") return null
+    return { k: parsed.k, i: parsed.i, d: parsed.d }
+  } catch (e) {
+    return null
+  }
+}
+
+function escapeHtml(s: any): string {
+  if (s === null || s === undefined) return ""
+  return String(s)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -45,171 +68,337 @@ function escHtml(s: string): string {
     .replace(/'/g, "&#39;")
 }
 
-function decodeViewToken(token: string): { k: "amendment" | "contract"; i: string; d: "main" | "welcomepack" } | null {
-  if (!token || typeof token !== "string" || token.length < 4) return null
-  try {
-    // base64url → base64 standard
-    var b64 = token.replace(/-/g, "+").replace(/_/g, "/")
-    // Padding
-    while (b64.length % 4 !== 0) b64 += "="
-    var json = Buffer.from(b64, "base64").toString("utf-8")
-    var data: any = JSON.parse(json)
-    if (!data) return null
-    if (data.k !== "amendment" && data.k !== "contract") return null
-    if (typeof data.i !== "string" || data.i.length < 8) return null
-    if (data.d !== "main" && data.d !== "welcomepack") return null
-    return { k: data.k, i: data.i, d: data.d }
-  } catch (e) {
-    return null
+// Reproduit getInitials() du contractBuilders côté serveur (no import client)
+function getInitials(fullName: any): string {
+  if (!fullName) return ""
+  var parts = String(fullName).trim().split(/\s+/)
+  var out = ""
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i]
+    if (p && p.length > 0) {
+      out += p.charAt(0).toUpperCase() + "."
+    }
   }
+  return out
 }
 
-function deriveWelcomePackPath(mainPath: string): string | null {
-  if (!mainPath) return null
-  if (/_avenant\.html$/.test(mainPath)) return mainPath.replace(/_avenant\.html$/, "_welcomepack.html")
-  if (/_contrat\.html$/.test(mainPath)) return mainPath.replace(/_contrat\.html$/, "_welcomepack.html")
-  return null
-}
-
-// Page d'erreur stylée Meshuga (au lieu d'un texte brut moche)
-function errorPage(status: number, title: string, message: string): NextResponse {
-  var html = ''
+function buildErrorPage(title: string, message: string): string {
+  return ''
     + '<!DOCTYPE html><html lang="fr"><head>'
     + '<meta charset="utf-8"/>'
     + '<meta name="viewport" content="width=device-width, initial-scale=1.0"/>'
-    + '<title>' + escHtml(title) + ' — Meshuga</title>'
-    + '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet"/>'
+    + '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">'
+    + '<title>' + escapeHtml(title) + '</title>'
     + '<style>'
-    + '  html, body { margin:0; padding:0; height:100%; font-family:Helvetica,Arial,sans-serif; background:#FFEB5A; color:#191923 }'
-    + '  .wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px }'
-    + '  .card { background:#FFFFFF; border-radius:12px; padding:36px 40px; max-width:480px; width:100%; text-align:center; box-shadow:0 4px 20px rgba(0,0,0,0.08) }'
-    + '  .icon { font-size:48px; line-height:1; margin-bottom:8px }'
-    + '  .title { font-family:Yellowtail,cursive; font-size:38px; color:#FF82D7; line-height:1; margin:0 0 14px 0 }'
-    + '  .bar { width:60px; height:3px; background:#FFEB5A; margin:0 auto 18px auto }'
-    + '  .msg { font-size:15px; line-height:1.6; color:#444; margin:0 0 24px 0 }'
-    + '  .code { font-size:11px; color:#999; text-transform:uppercase; letter-spacing:1px }'
+    +   'body{font-family:Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#FFEB5A;color:#191923;padding:20px;box-sizing:border-box}'
+    +   '.box{background:#FFFFFF;padding:48px 40px;border-radius:14px;max-width:480px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.08)}'
+    +   'h1{font-family:"Yellowtail",cursive;color:#FF82D7;font-size:46px;margin:0 0 6px 0;line-height:1}'
+    +   '.sub{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:18px}'
+    +   'p{font-size:15px;line-height:1.55;color:#444;margin:0}'
     + '</style>'
-    + '</head><body>'
-    + '<div class="wrap"><div class="card">'
-    + '<div class="icon">⚠️</div>'
-    + '<h1 class="title">' + escHtml(title) + '</h1>'
-    + '<div class="bar"></div>'
-    + '<p class="msg">' + escHtml(message) + '</p>'
-    + '<div class="code">Erreur ' + status + '</div>'
-    + '</div></div>'
-    + '</body></html>'
-  return new NextResponse(html, {
+    + '</head><body><div class="box">'
+    + '<h1>' + escapeHtml(title) + '</h1>'
+    + '<div class="sub">Meshuga · Document signé</div>'
+    + '<p>' + escapeHtml(message) + '</p>'
+    + '</div></body></html>'
+}
+
+function errorResponse(status: number, title: string, message: string): Response {
+  return new Response(buildErrorPage(title, message), {
     status: status,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Content-Disposition": "inline",
-      "Cache-Control": "private, no-cache, no-store, max-age=0",
-      "X-Robots-Tag": "noindex, nofollow",
+      "Cache-Control": "no-store",
     },
   })
+}
+
+// ============================================================
+// === Patch des paraphes "en attente" dans le HTML stocké ====
+// ============================================================
+// Le HTML signé en prod contient encore "E.T.   /   en attente" car
+// l'ancien builder utilise @page @bottom-right { content: "..." }
+// et injectEmployeeParaphes() cherche un <div class="paraph-footer">
+// qui n'existe pas dans ce format. On corrige ici à la volée.
+//
+// Pattern matché (avec espaces variables) :
+//   content:"E.T.   /   en attente"
+//   content:"E.T. / en attente"
+//   content: "E.T.  /  en attente"
+// ============================================================
+function patchParaphes(html: string, employeeInitials: string): string {
+  if (!employeeInitials || employeeInitials.length === 0) return html
+  // Remplace toute occurrence de "/ en attente" (avec espaces variables) par "/ E.S."
+  // Le séparateur "/" est conservé.
+  var patched = html.replace(
+    /\/\s+en\s+attente/gi,
+    "/   " + employeeInitials
+  )
+  return patched
+}
+
+// ============================================================
+// === Toolbar Meshuga (mode preview) =========================
+// ============================================================
+function injectToolbar(html: string, docKind: "main" | "welcomepack"): string {
+  var label = docKind === "welcomepack" ? "Dossier de bienvenue signé" : "Document signé"
+
+  var styleInject = '<style>'
+    + '@import url("https://fonts.googleapis.com/css2?family=Yellowtail&display=swap");'
+    + '@media screen { body { margin-top: 56px !important; } }'
+    + '@media print { #__meshuga_viewer_toolbar { display: none !important; } body { margin-top: 0 !important; } }'
+    + '#__meshuga_viewer_toolbar { position: fixed; top: 0; left: 0; right: 0; height: 56px; background: #FF82D7; color: #FFFFFF; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; z-index: 999999; font-family: Arial, Helvetica, sans-serif; box-shadow: 0 2px 12px rgba(0,0,0,0.15); box-sizing: border-box; }'
+    + '#__meshuga_viewer_toolbar .meshuga-brand-wrap { display: flex; align-items: center; gap: 10px; min-width: 0; }'
+    + '#__meshuga_viewer_toolbar .meshuga-brand { font-family: "Yellowtail", cursive; font-size: 28px; line-height: 1; color: #FFFFFF; }'
+    + '#__meshuga_viewer_toolbar .meshuga-sub { opacity: 0.92; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }'
+    + '#__meshuga_viewer_toolbar button { background: #FFFFFF; color: #FF82D7; border: none; padding: 9px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; font-family: Arial, Helvetica, sans-serif; transition: background 0.15s, color 0.15s; white-space: nowrap; }'
+    + '#__meshuga_viewer_toolbar button:hover { background: #FFEB5A; color: #191923; }'
+    + '@media screen and (max-width: 600px) { #__meshuga_viewer_toolbar { padding: 0 14px; } #__meshuga_viewer_toolbar .meshuga-sub { display: none; } #__meshuga_viewer_toolbar button { padding: 8px 14px; font-size: 12px; } }'
+    + '</style>'
+
+  var toolbarHtml = '<div id="__meshuga_viewer_toolbar">'
+    + '<div class="meshuga-brand-wrap">'
+    +   '<span class="meshuga-brand">Meshuga</span>'
+    +   '<span class="meshuga-sub">— ' + escapeHtml(label) + '</span>'
+    + '</div>'
+    + '<button type="button" onclick="window.print()" aria-label="Telecharger en PDF">Telecharger en PDF</button>'
+    + '</div>'
+
+  var out = html
+
+  if (/<\/head>/i.test(out)) {
+    out = out.replace(/<\/head>/i, styleInject + '</head>')
+  } else {
+    out = styleInject + out
+  }
+
+  if (/<body[^>]*>/i.test(out)) {
+    out = out.replace(/<body([^>]*)>/i, '<body$1>' + toolbarHtml)
+  } else {
+    out = toolbarHtml + out
+  }
+
+  return out
+}
+
+// ============================================================
+// === Mode print : autoprint silencieux ======================
+// ============================================================
+// Injecte un script qui attend le chargement complet (fonts incluses)
+// puis déclenche window.print() automatiquement.
+// Pas de toolbar visible : le HTML s'affiche brièvement puis le
+// dialogue d'impression s'ouvre tout seul.
+//
+// Pourquoi le délai ? Les fonts Yellowtail viennent de Google Fonts
+// (async). Sans attendre, le print peut capturer le texte avant que
+// la font soit chargée -> rendu avec fallback Helvetica.
+// ============================================================
+function injectAutoprint(html: string): string {
+  var styleInject = '<style>'
+    + '@import url("https://fonts.googleapis.com/css2?family=Yellowtail&display=swap");'
+    + '/* Cacher la toolbar HTML interne du builder qui dit "Imprimer en PDF" */'
+    + '.toolbar { display: none !important; }'
+    + '/* Le HTML signé peut contenir sa propre toolbar de print; on la cache */'
+    + '@media print { .toolbar { display: none !important; } }'
+    + '</style>'
+
+  // Script autoprint :
+  // 1. Attend que document.fonts soit ready (Yellowtail chargee)
+  // 2. Attend 800ms supplementaires (rendering CSS Paged Media)
+  // 3. window.print()
+  // 4. Sur afterprint : tente window.close() (peut echouer si la fenetre
+  //    n'a pas ete ouverte par script -> pas grave)
+  var script = '<script>'
+    + '(function(){'
+    +   'function doPrint(){ try { window.print(); } catch(e) {} }'
+    +   'function go(){ setTimeout(doPrint, 800); }'
+    +   'if (document.fonts && document.fonts.ready && document.fonts.ready.then) {'
+    +     'document.fonts.ready.then(go).catch(go);'
+    +   '} else if (document.readyState === "complete") {'
+    +     'go();'
+    +   '} else {'
+    +     'window.addEventListener("load", go);'
+    +   '}'
+    +   'window.addEventListener("afterprint", function(){ try { window.close(); } catch(e) {} });'
+    + '})();'
+    + '</script>'
+
+  var out = html
+
+  if (/<\/head>/i.test(out)) {
+    out = out.replace(/<\/head>/i, styleInject + '</head>')
+  } else {
+    out = styleInject + out
+  }
+
+  if (/<\/body>/i.test(out)) {
+    out = out.replace(/<\/body>/i, script + '</body>')
+  } else {
+    out = out + script
+  }
+
+  return out
+}
+
+// ============================================================
+// === Resolution des initiales du salarie ====================
+// ============================================================
+// Cherche l'employee associe a l'entite (amendment ou contract)
+// en passant par hr_contracts puis hr_employment_cycles si besoin.
+// Retourne "" si introuvable (alors pas de patch des paraphes).
+// ============================================================
+async function resolveEmployeeInitials(sb: any, entity: any, entityKind: "amendment" | "contract"): Promise<string> {
+  try {
+    // Recupere le contract_id
+    var contractId: string | null = null
+    if (entityKind === "amendment") {
+      contractId = entity.contract_id || null
+    } else {
+      contractId = entity.id || null
+    }
+    if (!contractId) return ""
+
+    // Charge le contrat
+    var resC = await sb.from("hr_contracts").select("employee_id, cycle_id").eq("id", contractId).maybeSingle()
+    if (resC.error || !resC.data) return ""
+
+    var employeeId: string | null = resC.data.employee_id || null
+
+    // Fallback : via cycle (cas regularisation retroactive)
+    if (!employeeId && resC.data.cycle_id) {
+      var resCy = await sb.from("hr_employment_cycles").select("employee_id").eq("id", resC.data.cycle_id).maybeSingle()
+      if (!resCy.error && resCy.data) {
+        employeeId = resCy.data.employee_id || null
+      }
+    }
+    if (!employeeId) return ""
+
+    // Charge l'employee
+    var resE = await sb.from("hr_employees").select("prenom, nom").eq("id", employeeId).maybeSingle()
+    if (resE.error || !resE.data) return ""
+
+    var fullName = ((resE.data.prenom || "") + " " + (resE.data.nom || "")).trim()
+    return getInitials(fullName)
+  } catch (e) {
+    return ""
+  }
 }
 
 // ============================================================
 // === GET handler ============================================
 // ============================================================
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: { token: string } }
 ) {
-  var token = ctx.params.token || ""
-  var payload = decodeViewToken(token)
+  var token = ctx.params.token
+  if (!token || token.length < 4) {
+    return errorResponse(400, "Lien invalide", "Le lien semble incomplet ou corrompu.")
+  }
+
+  // === 0. Lire le query param mode ===
+  var mode = "preview"
+  try {
+    var url = new URL(req.url)
+    var qMode = url.searchParams.get("mode")
+    if (qMode === "print") mode = "print"
+  } catch (e) {
+    // ignore, on garde le defaut
+  }
+
+  // === 1. Decoder le token ===
+  var payload = decodeToken(token)
   if (!payload) {
-    return errorPage(400, "Lien invalide", "Ce lien n'est pas valide ou a été altéré. Demande un nouveau lien depuis le dashboard Meshuga.")
+    return errorResponse(400, "Lien invalide", "Le lien n'est pas reconnu. Il a peut-etre ete tronque dans un email ou un SMS.")
   }
 
+  // === 2. Charger l'entite depuis la DB ===
   var sb = createAdminClient()
+  var table = payload.k === "amendment" ? "hr_contract_amendments" : "hr_contracts"
 
-  // === 1. Récupérer signed_pdf_path depuis la bonne table ===
-  var targetTable = payload.k === "amendment" ? "hr_contract_amendments" : "hr_contracts"
-  var resEntity = await sb
-    .from(targetTable)
-    .select("signed_pdf_path, signature_includes_welcome_pack, signature_status")
-    .eq("id", payload.i)
-    .maybeSingle()
-
-  if (resEntity.error) {
-    console.error("[signatures/view] DB error:", resEntity.error.message)
-    return errorPage(500, "Erreur serveur", "Une erreur est survenue lors de la récupération du document.")
+  var res = await sb.from(table).select("*").eq("id", payload.i).maybeSingle()
+  if (res.error) {
+    console.error("[signatures/view] DB read error (" + table + "):", res.error.message)
+    return errorResponse(500, "Erreur serveur", "Impossible de charger le document. Veuillez reessayer dans quelques instants.")
   }
-  if (!resEntity.data) {
-    return errorPage(404, "Document introuvable", "Le document demandé n'existe pas ou a été supprimé.")
-  }
-  if (!resEntity.data.signed_pdf_path) {
-    return errorPage(404, "Document non signé", "Ce document n'a pas encore été signé. Le lien sera valide une fois la signature effectuée.")
+  if (!res.data) {
+    return errorResponse(404, "Introuvable", "Ce document n'existe pas ou a ete supprime.")
   }
 
-  // === 2. Calculer le path du fichier à servir ===
-  var mainPath: string = resEntity.data.signed_pdf_path
-  var filePath: string = mainPath
-  var docTitle = payload.k === "amendment" ? "Avenant signé" : "Contrat signé"
+  var entity: any = res.data
 
-  if (payload.d === "welcomepack") {
-    var derived = deriveWelcomePackPath(mainPath)
-    if (!derived) {
-      return errorPage(404, "Dossier de bienvenue introuvable", "Le format de stockage de ce document ne permet pas de retrouver le dossier de bienvenue.")
+  // === 3. Verifier que l'entite est signee ===
+  var isSigned = entity.signature_status === "signed"
+    || entity.signed_at
+    || entity.signature_signed_at
+  if (!isSigned) {
+    return errorResponse(403, "Pas encore signe", "Ce document n'a pas encore ete signe. Le lien ne sera actif qu'apres la signature du salarie.")
+  }
+
+  // === 4. Determiner le chemin du fichier dans le bucket ===
+  var filePath: string | null = null
+
+  if (payload.d === "main") {
+    filePath = entity.signed_pdf_path || null
+    if (!filePath) {
+      console.error("[signatures/view] signed_pdf_path manquant pour " + table + " id=" + payload.i)
+      return errorResponse(404, "Fichier introuvable", "Le document signe n'a pas pu etre localise. Contactez Edward.")
     }
-    filePath = derived
-    docTitle = "Dossier de bienvenue signé"
-  }
-
-  // === 3. Télécharger le HTML depuis le bucket hr-signatures ===
-  var resDownload = await sb.storage
-    .from("hr-signatures")
-    .download(filePath)
-
-  if (resDownload.error || !resDownload.data) {
-    var dlErrMsg = resDownload.error ? resDownload.error.message : "inconnue"
-    console.error("[signatures/view] Download error:", dlErrMsg, "path=", filePath)
-    return errorPage(404, "Fichier introuvable", "Le fichier signé est introuvable dans le coffre-fort. Contacte Edward si le problème persiste.")
-  }
-
-  var htmlBuffer = await resDownload.data.arrayBuffer()
-  var htmlText = new TextDecoder("utf-8").decode(htmlBuffer)
-
-  // === 4. Injecter la toolbar Meshuga au début du <body> ===
-  // La toolbar est en position:fixed avec une réserve d'espace (spacer)
-  // pour que le contenu original ne soit pas caché.
-  var toolbarHtml = ''
-    + '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet"/>'
-    + '<div id="meshuga-view-toolbar" style="position:fixed;top:0;left:0;right:0;height:56px;background:#FF82D7;color:#FFFFFF;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-family:Helvetica,Arial,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,0.18);z-index:99999;box-sizing:border-box">'
-    +   '<div style="display:flex;align-items:center;gap:12px;min-width:0">'
-    +     '<div style="font-family:Yellowtail,cursive;font-size:26px;line-height:1;white-space:nowrap">Meshuga</div>'
-    +     '<div style="width:1px;height:22px;background:rgba(255,255,255,0.4);flex-shrink:0"></div>'
-    +     '<div style="font-size:13px;font-weight:700;letter-spacing:0.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(docTitle) + '</div>'
-    +   '</div>'
-    +   '<button type="button" onclick="window.print()" style="background:#FFEB5A;color:#191923;border:none;padding:10px 16px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:Helvetica,Arial,sans-serif;letter-spacing:0.3px;white-space:nowrap;flex-shrink:0">↓ Télécharger en PDF</button>'
-    + '</div>'
-    + '<style>'
-    + '  @media print { #meshuga-view-toolbar, #meshuga-toolbar-spacer { display: none !important } }'
-    + '  @media (max-width: 480px) {'
-    + '    #meshuga-view-toolbar > div:first-child > div:nth-child(3) { display: none }'
-    + '    #meshuga-view-toolbar button { padding: 9px 12px; font-size: 12px }'
-    + '  }'
-    + '</style>'
-    + '<div id="meshuga-toolbar-spacer" style="height:56px"></div>'
-
-  var wrapped = htmlText
-  if (/<body[^>]*>/i.test(wrapped)) {
-    wrapped = wrapped.replace(/(<body[^>]*>)/i, "$1" + toolbarHtml)
   } else {
-    // Cas dégénéré : on préfixe quand même
-    wrapped = toolbarHtml + wrapped
+    var includesWp = entity.signature_includes_welcome_pack === true
+    if (!includesWp) {
+      return errorResponse(404, "Pas de dossier", "Aucun dossier de bienvenue n'est associe a ce document.")
+    }
+
+    var signedAtIso = entity.signed_at || entity.signature_signed_at || null
+    if (!signedAtIso) {
+      return errorResponse(404, "Fichier introuvable", "Le dossier de bienvenue n'a pas pu etre localise.")
+    }
+
+    var timestamp = new Date(signedAtIso).toISOString().replace(/[:.]/g, "-")
+    var folder = payload.k === "amendment" ? "amendments" : "contracts"
+    filePath = folder + "/" + payload.i + "/" + timestamp + "_welcomepack.html"
   }
 
-  // === 5. Réémettre en inline ===
-  return new NextResponse(wrapped, {
+  // === 5. Telecharger le HTML depuis le bucket hr-signatures ===
+  var dl = await sb.storage.from("hr-signatures").download(filePath)
+  if (dl.error || !dl.data) {
+    console.error("[signatures/view] Storage download error:", (dl.error && dl.error.message) || "no data", "path=" + filePath)
+    return errorResponse(404, "Fichier introuvable", "Le document signe est inaccessible. Il a peut-etre ete deplace ou supprime.")
+  }
+
+  var rawHtml = ""
+  try {
+    rawHtml = await dl.data.text()
+  } catch (e: any) {
+    console.error("[signatures/view] Blob.text() error:", e && e.message)
+    return errorResponse(500, "Erreur de lecture", "Le contenu du document est illisible.")
+  }
+
+  if (!rawHtml || rawHtml.length < 50) {
+    return errorResponse(500, "Document vide", "Le document signe est vide ou corrompu. Contactez Edward.")
+  }
+
+  // === 6. Patcher les paraphes "en attente" -> initiales du salarie ===
+  var employeeInitials = await resolveEmployeeInitials(sb, entity, payload.k)
+  var patchedHtml = patchParaphes(rawHtml, employeeInitials)
+
+  // === 7. Injecter selon le mode ===
+  var finalHtml: string
+  if (mode === "print") {
+    finalHtml = injectAutoprint(patchedHtml)
+  } else {
+    finalHtml = injectToolbar(patchedHtml, payload.d)
+  }
+
+  return new Response(finalHtml, {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Content-Disposition": "inline",
-      "Cache-Control": "private, no-cache, no-store, max-age=0",
-      "X-Robots-Tag": "noindex, nofollow",
-      // Permettre window.print() et les iframes Yellowtail
+      "Cache-Control": "private, no-store, max-age=0",
+      "X-Frame-Options": "SAMEORIGIN",
       "Referrer-Policy": "no-referrer",
     },
   })
