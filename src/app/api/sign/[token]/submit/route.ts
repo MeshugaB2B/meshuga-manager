@@ -20,7 +20,7 @@ import { buildAvenant } from "@/app/dashboard/rh/amendmentBuilder"
 import { buildWelcomePack } from "@/app/dashboard/rh/welcomePackBuilder"
 import { loadEmployerSignature } from "@/app/dashboard/rh/employerSignature"
 import { markEmployeeWelcomePackSigned } from "@/app/dashboard/rh/employeeWelcomePack"
-import { getInitials, buildParaphFooter } from "@/app/dashboard/rh/contractBuilders"
+import { getInitials, buildParaphFooter, buildContract } from "@/app/dashboard/rh/contractBuilders"
 import { LOGO_PINK } from "@/app/dashboard/logos"
 import { sendBrevoEmail, buildEdwardSignatureNotifEmail } from "@/lib/brevo"
 import { sendTwilioSms, buildEdwardSignatureNotifSms, normalizePhoneFR } from "@/lib/twilio"
@@ -323,20 +323,60 @@ export async function POST(
   var ua = parseUserAgent(userAgent)
   var signedAt = new Date()
 
-  // === 3. Charger l'avenant + contrat + salarié ===
+  // === 3. Charger l'avenant OU le contrat + salarié ===
+  // Le token peut référencer soit un avenant (table hr_contract_amendments)
+  // soit un contrat direct (table hr_contracts). On cherche dans l'ordre :
+  // d'abord avenants (cas le plus fréquent), puis contrats si pas trouvé.
   var sb = createAdminClient()
+
+  var entityKind: "amendment" | "contract" = "amendment"
+  var amendment: any = null
+  var contract: any = null
+
   var resAmendment = await sb
     .from("hr_contract_amendments")
     .select("*")
     .eq("signature_token", token)
     .maybeSingle()
 
-  if (!resAmendment.data) {
-    return NextResponse.json({ ok: false, error: "Token introuvable" }, { status: 404 })
-  }
-  var amendment: any = resAmendment.data
-  if (amendment.signed_at || amendment.signature_status === "signed") {
-    return NextResponse.json({ ok: false, error: "Ce document a déjà été signé" }, { status: 410 })
+  if (resAmendment.data) {
+    // === Cas 1 : c'est un avenant ===
+    entityKind = "amendment"
+    amendment = resAmendment.data
+    if (amendment.signed_at || amendment.signature_status === "signed") {
+      return NextResponse.json({ ok: false, error: "Ce document a déjà été signé" }, { status: 410 })
+    }
+  } else {
+    // === Cas 2 : pas trouvé en avenants → chercher dans contrats ===
+    var resContractDirect = await sb
+      .from("hr_contracts")
+      .select("*")
+      .eq("signature_token", token)
+      .maybeSingle()
+    if (!resContractDirect.data) {
+      return NextResponse.json({ ok: false, error: "Token introuvable" }, { status: 404 })
+    }
+    entityKind = "contract"
+    contract = resContractDirect.data
+    if (contract.signature_signed_at || contract.signature_status === "signed") {
+      return NextResponse.json({ ok: false, error: "Ce document a déjà été signé" }, { status: 410 })
+    }
+    // Pour le code commun, on crée un objet "amendment" virtuel (façade)
+    // qui expose les mêmes champs que le code attend, mappés depuis le contrat.
+    amendment = {
+      id: contract.id,
+      contract_id: contract.id,
+      amendment_number: contract.contract_number || 1,
+      amendment_type: "contract_initial", // marker spécial
+      signature_token: contract.signature_token,
+      signature_status: contract.signature_status,
+      signature_recipient_email: contract.signature_recipient_email,
+      signature_recipient_phone: contract.signature_recipient_phone,
+      signature_sent_at: contract.signature_sent_at,
+      signature_viewed_at: contract.signature_viewed_at,
+      signature_includes_welcome_pack: contract.signature_includes_welcome_pack,
+      changes: null, // pas de changes pour un contrat initial
+    }
   }
 
   // Welcome pack inclus → consentement obligatoire
@@ -345,12 +385,14 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Vous devez confirmer avoir lu et approuvé le Dossier de bienvenue" }, { status: 400 })
   }
 
-  // Contrat parent
-  var resContract = await sb.from("hr_contracts").select("*").eq("id", amendment.contract_id).maybeSingle()
-  if (!resContract.data) {
-    return NextResponse.json({ ok: false, error: "Contrat parent introuvable" }, { status: 404 })
+  // Contrat parent (déjà chargé si entityKind === "contract")
+  if (entityKind === "amendment") {
+    var resContract = await sb.from("hr_contracts").select("*").eq("id", amendment.contract_id).maybeSingle()
+    if (!resContract.data) {
+      return NextResponse.json({ ok: false, error: "Contrat parent introuvable" }, { status: 404 })
+    }
+    contract = resContract.data
   }
-  var contract: any = resContract.data
 
   // employee_id (cycle fallback)
   var empId = contract.employee_id
@@ -387,7 +429,15 @@ export async function POST(
     })
   }
 
-  var avenantHtml = buildAvenant(amendment, contract, emp, vacs, LOGO_PINK, previousValues, employerSig)
+  // Génération HTML du document brut selon le type d'entité
+  var avenantHtml = ""
+  if (entityKind === "amendment") {
+    avenantHtml = buildAvenant(amendment, contract, emp, vacs, LOGO_PINK, previousValues, employerSig)
+  } else {
+    // Contrat initial : buildContract ne prend pas employerSig en paramètre.
+    // Il est injecté plus tard via injectEmployeeSignature / Paraphes.
+    avenantHtml = buildContract(contract, emp, vacs, LOGO_PINK)
+  }
   var welcomePackHtml = ""
   if (includeWp) {
     welcomePackHtml = buildWelcomePack(emp, contract, LOGO_PINK, employerSig)
@@ -398,12 +448,19 @@ export async function POST(
   var hash = createHash("sha256").update(originalContent, "utf8").digest("hex")
 
   // === 7. Données pour le cartouche audit + signature ID ===
-  var signatureId = "MSH-" + signedAt.getFullYear() + "-" +
-    String(amendment.amendment_number || 1).padStart(4, "0") + "-" +
+  // Avenant : MSH-{year}-{amendment_number}-{initials}
+  // Contrat initial : MSH-CDI-{year}-{contract_number}-{initials}
+  var signaturePrefix = entityKind === "amendment" ? "MSH-" : "MSH-CDI-"
+  var signatureNumber = entityKind === "amendment"
+    ? (amendment.amendment_number || 1)
+    : (contract.contract_number || 1)
+  var signatureId = signaturePrefix + signedAt.getFullYear() + "-" +
+    String(signatureNumber).padStart(4, "0") + "-" +
     getInitials((emp.prenom || "") + " " + (emp.nom || ""))
 
+  var docNoun = entityKind === "amendment" ? "l'avenant" : "le contrat de travail"
   var consentText = includeWp
-    ? "Lu et approuvé l'intégralité de l'avenant et du Dossier de bienvenue Meshuga (13 pages)"
+    ? "Lu et approuvé l'intégralité de " + docNoun + " et du Dossier de bienvenue Meshuga (13 pages)"
     : "Lu et approuvé l'intégralité du document"
 
   var recipientEmail = amendment.signature_recipient_email || emp.email || ""
@@ -471,8 +528,10 @@ export async function POST(
 
   // === 10. Upload Storage hr-signatures/ ===
   var timestamp = signedAt.toISOString().replace(/[:.]/g, "-")
-  var avenantPath = "amendments/" + amendment.id + "/" + timestamp + "_avenant.html"
-  var wpPath = "amendments/" + amendment.id + "/" + timestamp + "_welcomepack.html"
+  var storageFolder = entityKind === "amendment" ? "amendments" : "contracts"
+  var docFileSuffix = entityKind === "amendment" ? "_avenant.html" : "_contrat.html"
+  var avenantPath = storageFolder + "/" + amendment.id + "/" + timestamp + docFileSuffix
+  var wpPath = storageFolder + "/" + amendment.id + "/" + timestamp + "_welcomepack.html"
 
   var uploadAv = await sb.storage.from("hr-signatures").upload(
     avenantPath,
@@ -498,22 +557,25 @@ export async function POST(
     }
   }
 
-  // === 11. UPDATE hr_contract_amendments ===
+  // === 11. UPDATE selon le type d'entité ===
+  var targetTable = entityKind === "amendment" ? "hr_contract_amendments" : "hr_contracts"
+  var updatePayload: any = {
+    signed_at: signedAt.toISOString(),
+    signature_signed_at: signedAt.toISOString(),
+    signature_status: "signed",
+    signature_audit_data: auditData,
+    signature_pdf_hash: hash,
+    signed_pdf_path: avenantPath,
+    signed_uploaded_at: signedAt.toISOString(),
+    status: "signed",
+  }
   var updateRes = await sb
-    .from("hr_contract_amendments")
-    .update({
-      signed_at: signedAt.toISOString(),
-      signature_signed_at: signedAt.toISOString(),
-      signature_status: "signed",
-      signature_audit_data: auditData,
-      signature_pdf_hash: hash,
-      signed_pdf_path: avenantPath,
-      status: "signed",
-    })
+    .from(targetTable)
+    .update(updatePayload)
     .eq("id", amendment.id)
 
   if (updateRes.error) {
-    console.error("[sign/submit] DB update error:", updateRes.error.message)
+    console.error("[sign/submit] DB update error (" + targetTable + "):", updateRes.error.message)
     return NextResponse.json({ ok: false, error: "Erreur lors de l'enregistrement de la signature" }, { status: 500 })
   }
 
@@ -546,12 +608,34 @@ export async function POST(
     }
 
     // Construit le libellé du document
-    var notifDocLabel = "Avenant au contrat de travail"
-    if (amendment.amendment_type === "regularisation_welcome_pack") notifDocLabel = "Avenant d'actualisation contractuelle"
-    else if (amendment.amendment_type === "prolongation_duree") notifDocLabel = "Avenant de prolongation"
-    else if (amendment.amendment_type === "augmentation_salaire") notifDocLabel = "Avenant de modification de rémunération"
-    else if (amendment.amendment_type === "modification_horaires") notifDocLabel = "Avenant de modification des horaires"
-    else if (amendment.amendment_type === "changement_poste") notifDocLabel = "Avenant de changement de poste"
+    // Construit le libellé du document selon le type d'entité
+    var notifDocLabel = "Document à signer"
+    if (entityKind === "amendment") {
+      notifDocLabel = "Avenant au contrat de travail"
+      if (amendment.amendment_type === "regularisation_welcome_pack") notifDocLabel = "Avenant d'actualisation contractuelle"
+      else if (amendment.amendment_type === "prolongation_duree") notifDocLabel = "Avenant de prolongation"
+      else if (amendment.amendment_type === "augmentation_salaire") notifDocLabel = "Avenant de modification de rémunération"
+      else if (amendment.amendment_type === "modification_horaires") notifDocLabel = "Avenant de modification des horaires"
+      else if (amendment.amendment_type === "changement_poste") notifDocLabel = "Avenant de changement de poste"
+    } else {
+      // Contrat initial : utiliser contract.type + statut_cadre + genre
+      var civNotif = (emp.civilite || "").toLowerCase().trim()
+      var isFemaleNotif = civNotif === "mme" || civNotif === "madame"
+      var ct = (contract.type || "").toLowerCase()
+      if (ct === "extra") notifDocLabel = "Contrat de travail (CDD d'usage)"
+      else if (ct === "cdi_cadre") {
+        notifDocLabel = contract.statut_cadre === "cadre"
+          ? "Contrat de travail CDI Cadre"
+          : "Contrat de travail CDI Agent de maîtrise"
+      }
+      else if (ct === "cdi_cuisinier") {
+        notifDocLabel = isFemaleNotif ? "Contrat de travail CDI Cuisinière" : "Contrat de travail CDI Cuisinier"
+      }
+      else if (ct === "cdi_caissier") {
+        notifDocLabel = isFemaleNotif ? "Contrat de travail CDI Caissière" : "Contrat de travail CDI Caissier"
+      }
+      else notifDocLabel = "Contrat de travail"
+    }
 
     var signerFullName = ((emp.prenom || "") + " " + (emp.nom || "")).trim() || signedFullName
 
@@ -598,7 +682,7 @@ export async function POST(
     }
 
     // Marquer notifié (non bloquant)
-    sb.from("hr_contract_amendments")
+    sb.from(targetTable)
       .update({ edward_notified_at: new Date().toISOString() })
       .eq("id", amendment.id)
       .then(function () {})
@@ -625,10 +709,31 @@ export async function POST(
 
   // === 13. Email de confirmation ===
   if (recipientEmail) {
-    var docLabel = "votre avenant au contrat de travail"
-    if (amendment.amendment_type === "regularisation_welcome_pack") docLabel = "votre avenant d'actualisation contractuelle"
-    else if (amendment.amendment_type === "prolongation_duree") docLabel = "votre avenant de prolongation"
-    else if (amendment.amendment_type === "augmentation_salaire") docLabel = "votre avenant de modification de rémunération"
+    var docLabel = "votre document"
+    if (entityKind === "amendment") {
+      docLabel = "votre avenant au contrat de travail"
+      if (amendment.amendment_type === "regularisation_welcome_pack") docLabel = "votre avenant d'actualisation contractuelle"
+      else if (amendment.amendment_type === "prolongation_duree") docLabel = "votre avenant de prolongation"
+      else if (amendment.amendment_type === "augmentation_salaire") docLabel = "votre avenant de modification de rémunération"
+    } else {
+      // Contrat initial
+      var civConfirm = (emp.civilite || "").toLowerCase().trim()
+      var isFemaleConfirm = civConfirm === "mme" || civConfirm === "madame"
+      var ctConfirm = (contract.type || "").toLowerCase()
+      if (ctConfirm === "extra") docLabel = "votre contrat de travail (CDD d'usage)"
+      else if (ctConfirm === "cdi_cadre") {
+        docLabel = contract.statut_cadre === "cadre"
+          ? "votre contrat de travail CDI Cadre"
+          : "votre contrat de travail CDI Agent de maîtrise"
+      }
+      else if (ctConfirm === "cdi_cuisinier") {
+        docLabel = isFemaleConfirm ? "votre contrat de travail CDI Cuisinière" : "votre contrat de travail CDI Cuisinier"
+      }
+      else if (ctConfirm === "cdi_caissier") {
+        docLabel = isFemaleConfirm ? "votre contrat de travail CDI Caissière" : "votre contrat de travail CDI Caissier"
+      }
+      else docLabel = "votre contrat de travail"
+    }
 
     var civ = (emp.civilite || "").toLowerCase().trim()
     var isFemale = civ === "mme" || civ === "madame"
