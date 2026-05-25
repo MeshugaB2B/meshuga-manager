@@ -12,13 +12,14 @@
 // envoie un mail de confirmation avec BCC Edward.
 //
 // Conforme : art. 1366-1367 Code civil + Règlement (UE) 910/2014 (eIDAS).
-//
-// Sprint C3 v3 — Section 11bis remaniée :
-// Les notifications Edward (email + SMS) pointent désormais vers
-// /api/signatures/view/[token] (qui sert les HTML en inline + toolbar PDF)
-// au lieu des signed URLs Supabase qui forçaient un .html en téléchargement.
-// L'email de confirmation salarié est wrappé proprement (DOCTYPE/head/body)
-// pour pouvoir charger Yellowtail depuis Google Fonts (Apple Mail compatible).
+// ============================================================
+// Mise à jour 25/05/2026 :
+//   - Section 11bis : les liens "Voir le document signé" envoyés à Edward
+//     (email + SMS) passent maintenant par /api/signatures/view/[token]
+//     au lieu de Supabase signed URLs (qui télécharge en HTML brut).
+//   - Section 13 : l'email de confirmation au salarié est wrappé dans un
+//     document HTML complet avec import Google Fonts Yellowtail (rendu
+//     correct dans Apple Mail).
 // ============================================================
 
 import { NextResponse } from "next/server"
@@ -90,32 +91,6 @@ function formatDuration(ms: number): string {
   if (hours > 0) return hours + "h " + mins + "min " + secs + "s"
   if (mins > 0) return mins + "min " + secs + "s"
   return secs + "s"
-}
-
-// ============================================================
-// makeViewToken — Encode { k, i, d } en base64url
-// ============================================================
-// Sert à construire les URLs /api/signatures/view/[token] envoyées
-// dans les notifications Edward (email + SMS).
-// k = "amendment" | "contract"
-// i = entityId (uuid)
-// d = "main" (avenant/contrat signé) | "welcomepack" (dossier de bienvenue)
-function makeViewToken(kind: string, entityId: string, doc: string): string {
-  var payload = JSON.stringify({ k: kind, i: entityId, d: doc })
-  var b64 = Buffer.from(payload, "utf-8").toString("base64")
-  // base64 standard → base64url (sans padding)
-  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
-}
-
-// Reconstruit l'origin de l'app (protocol + host) depuis les headers Vercel.
-// Fallback : variable d'env NEXT_PUBLIC_APP_URL, sinon prod.
-function getAppBaseUrl(req: Request): string {
-  var envUrl = process.env.NEXT_PUBLIC_APP_URL || ""
-  if (envUrl) return envUrl.replace(/\/+$/, "")
-  var host = req.headers.get("host") || ""
-  var proto = req.headers.get("x-forwarded-proto") || "https"
-  if (host) return proto + "://" + host
-  return "https://meshuga-manager.vercel.app"
 }
 
 // Parse User-Agent pour OS / Browser / Device
@@ -318,6 +293,23 @@ function injectEmployeeParaphes(originalHtml: string, employerInitials: string, 
   }
   // Fallback ultime : pas de bloc trouvé, on en ajoute un
   return originalHtml.replace(/<\/body>/i, newFooter + "</body>")
+}
+
+// ============================================================
+// === Construction des URLs de visualisation inline ===========
+// ============================================================
+// Encode { k, i, d } en base64url et préfixe avec l'URL de l'app
+// → /api/signatures/view/[token] sert le HTML signé inline avec une
+//   toolbar Meshuga (logo + bouton "Télécharger en PDF").
+function buildSignedDocViewUrl(opts: {
+  entityKind: "amendment" | "contract"
+  entityId: string
+  docKind: "main" | "welcomepack"
+}): string {
+  var appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://meshuga-manager.vercel.app"
+  var payload = { k: opts.entityKind, i: opts.entityId, d: opts.docKind }
+  var token = Buffer.from(JSON.stringify(payload), "utf-8").toString("base64url")
+  return appUrl + "/api/signatures/view/" + token
 }
 
 // ============================================================
@@ -612,7 +604,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Erreur lors de l'enregistrement de la signature" }, { status: 500 })
   }
 
-  // ============================================================
+// ============================================================
   // 11ter. Archivage dans hr_contract_documents pour fiche RH
   // ============================================================
   // Le HTML signe est deja dans hr-signatures (preuve juridique).
@@ -654,53 +646,65 @@ export async function POST(
     }
 
     if (includeWp && uploadedWpPath && signedWelcomePackHtml) {
-      var archiveWpPath = "welcomepack/" + empId + "/" + timestamp + "_dossier_bienvenue_signe.html"
+      // Convention identique a l'upload manuel via "Uploader le signe" dans EmployeeDetail.tsx
+      // -> bucket "hr-contract-docs" + table "hr_contract_documents" avec contract_id
+      // -> apparait dans la fiche RH du salarie (bloc Dossier de bienvenue)
+      var archiveWpPath = contract.id + "/dossier_bienvenue/" + timestamp + "_dossier_bienvenue_signe.html"
       var wpBlobSize = new Blob([signedWelcomePackHtml]).size
-      var copyWpRes = await sb.storage.from("hr-employee-docs").upload(
+      var copyWpRes = await sb.storage.from("hr-contract-docs").upload(
         archiveWpPath,
         new Blob([signedWelcomePackHtml], { type: "text/html; charset=utf-8" }),
         { contentType: "text/html; charset=utf-8", upsert: false }
       )
       if (copyWpRes.error) {
-        console.error("[sign/submit] Archive WP hr-employee-docs error:", copyWpRes.error.message)
+        console.error("[sign/submit] Archive WP hr-contract-docs error:", copyWpRes.error.message)
       } else {
-        var insWp = await sb.from("hr_employee_documents").insert({
-          employee_id: empId,
+        var insWp = await sb.from("hr_contract_documents").insert({
+          contract_id: contract.id,
           doc_type: "dossier_bienvenue_signe",
           label: "Dossier de bienvenue signe du " + signedAt.toLocaleDateString("fr-FR"),
           file_path: archiveWpPath,
           mime_type: "text/html; charset=utf-8",
           size_bytes: wpBlobSize,
+          document_date: signedAt.toISOString().substring(0, 10),
+          validated_by_user: true,
         })
         if (insWp.error) {
-          console.error("[sign/submit] Insert hr_employee_documents error:", insWp.error.message)
+          console.error("[sign/submit] Insert hr_contract_documents error:", insWp.error.message)
         }
       }
     }
   } catch (eArch: any) {
-    console.error("[sign/submit] Archivage RH non bloquant exception:", eArch.message || eArch)
+    console.error("[sign/submit] Archivage RH non bloquant exception:", (eArch && eArch.message) || eArch)
   }
 
   // ============================================================
-  // 11bis. Notification Edward (email + SMS)
+  // 11bis. Notification Edward (email + SMS) avec liens viewer
   // ============================================================
-  // ✨ Sprint C3 v3 : on n'envoie plus de signed URLs Supabase brutes
-  // (qui forçaient un download .html en raw text dans le navigateur).
-  // On construit à la place des liens vers /api/signatures/view/[token]
-  // qui sert le HTML inline + ajoute une toolbar rose Meshuga avec
-  // un bouton "Télécharger en PDF" (window.print).
+  // Construit des URLs vers /api/signatures/view/[token] qui sert le
+  // HTML signé inline avec une toolbar Meshuga (logo + "Télécharger en PDF").
+  // Le token base64url encode { k: entityKind, i: amendment.id, d: docKind }.
+  //
+  // Avantage vs les Supabase signed URLs précédentes :
+  //   - Le navigateur affiche le document au lieu de le télécharger en HTML brut
+  //   - Pas d'expiration de 7 jours côté Storage : le viewer reste accessible
+  //     tant que le fichier existe dans le bucket
+  //   - URLs courtes et stables (idéal pour SMS qui doit tenir en 1 segment)
   // ============================================================
   try {
-    var baseUrl = getAppBaseUrl(req)
-
-    // Tokens base64url pour la route view
-    var viewTokenMain = makeViewToken(entityKind, amendment.id, "main")
-    var signedPdfUrl = baseUrl + "/api/signatures/view/" + viewTokenMain
+    var signedPdfUrl = buildSignedDocViewUrl({
+      entityKind: entityKind,
+      entityId: amendment.id,
+      docKind: "main",
+    })
 
     var signedWpUrl: string | null = null
     if (includeWp && uploadedWpPath) {
-      var viewTokenWp = makeViewToken(entityKind, amendment.id, "welcomepack")
-      signedWpUrl = baseUrl + "/api/signatures/view/" + viewTokenWp
+      signedWpUrl = buildSignedDocViewUrl({
+        entityKind: entityKind,
+        entityId: amendment.id,
+        docKind: "welcomepack",
+      })
     }
 
     // Construit le libellé du document selon le type d'entité
@@ -800,9 +804,11 @@ export async function POST(
     }
   }
 
-  // === 13. Email de confirmation salarié ===
-  // ✨ Sprint C3 v3 : wrappé proprement DOCTYPE/head/body pour pouvoir
-  // charger Yellowtail depuis Google Fonts (Apple Mail compatible).
+  // === 13. Email de confirmation au salarié ====================
+  // Wrappé dans un doc HTML complet avec <head> + Google Fonts Yellowtail
+  // pour que Apple Mail rende correctement la signature manuscrite stylée
+  // en rose. Outlook ne supporte pas Google Fonts mais reçoit le fallback
+  // "cursive" via la system font.
   if (recipientEmail) {
     var docLabel = "votre document"
     if (entityKind === "amendment") {
@@ -846,35 +852,35 @@ export async function POST(
       +   '<meta name="x-apple-disable-message-reformatting"/>'
       +   '<meta name="color-scheme" content="light only"/>'
       +   '<meta name="supported-color-schemes" content="light only"/>'
+      +   '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">'
       +   '<title>' + escHtml(subject) + '</title>'
-      // 🎀 Yellowtail via Google Fonts — supporté par Apple Mail (pas Outlook desktop, mais le fallback cursive reste correct)
-      +   '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet"/>'
       +   '<style>'
       +     ':root { color-scheme: light only; supported-color-schemes: light only }'
-      +     'body { margin:0; padding:0 }'
+      +     'body, table, td, p, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100% }'
+      +     'img { -ms-interpolation-mode:bicubic; border:0; outline:none; display:block }'
+      +     'body { margin:0 !important; padding:0 !important; width:100% !important; background:#FFFFFF }'
       +   '</style>'
       + '</head>'
-      + '<body style="margin:0;padding:0;background:#FFFFFF;color:#191923">'
-      + '<div style="font-family: Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #191923;">'
-      +   '<div style="font-family: Yellowtail, cursive; color: #FF82D7; font-size: 32px; line-height: 1;">Signature confirmée ✓</div>'
-      +   '<div style="height: 3px; background: #FFEB5A; margin: 14px 0 22px 0;"></div>'
-      +   '<p style="line-height: 1.6; font-size: 15px;">' + cher + ' ' + escHtml(emp.prenom || "") + ',</p>'
-      +   '<p style="line-height: 1.6; font-size: 15px;">Nous accusons réception de votre signature électronique pour ' + docLabel + bundleText + '.</p>'
-      +   '<div style="background: #FAFAFA; border-left: 4px solid #FF82D7; padding: 14px 18px; border-radius: 4px; margin: 18px 0; font-size: 13px; line-height: 1.6;">'
-      +     '<div><strong>Identifiant signature :</strong> ' + escHtml(signatureId) + '</div>'
-      +     '<div><strong>Nom du signataire :</strong> ' + escHtml(signedFullName) + '</div>'
-      +     '<div><strong>Date et heure :</strong> ' + escHtml(formatDateTimeFr(signedAt)) + ' (heure de Paris)</div>'
-      +     '<div><strong>Adresse IP :</strong> ' + escHtml(ip) + (geo && geo.country ? ' — ' + escHtml(geo.country) : '') + '</div>'
-      +     '<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #EEE;"><strong>Empreinte SHA-256 :</strong></div>'
-      +     '<div style="font-family: monospace; font-size: 10px; word-break: break-all;">' + escHtml(hash) + '</div>'
+      + '<body style="margin:0;padding:0;background:#FFFFFF;font-family:Helvetica,Arial,sans-serif;color:#191923">'
+      +   '<div style="font-family: Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #191923;">'
+      +     '<div style="font-family: Yellowtail, cursive; color: #FF82D7; font-size: 32px; line-height: 1;">Signature confirmée ✓</div>'
+      +     '<div style="height: 3px; background: #FFEB5A; margin: 14px 0 22px 0;"></div>'
+      +     '<p style="line-height: 1.6; font-size: 15px;">' + cher + ' ' + escHtml(emp.prenom || "") + ',</p>'
+      +     '<p style="line-height: 1.6; font-size: 15px;">Nous accusons réception de votre signature électronique pour ' + docLabel + bundleText + '.</p>'
+      +     '<div style="background: #FAFAFA; border-left: 4px solid #FF82D7; padding: 14px 18px; border-radius: 4px; margin: 18px 0; font-size: 13px; line-height: 1.6;">'
+      +       '<div><strong>Identifiant signature :</strong> ' + escHtml(signatureId) + '</div>'
+      +       '<div><strong>Nom du signataire :</strong> ' + escHtml(signedFullName) + '</div>'
+      +       '<div><strong>Date et heure :</strong> ' + escHtml(formatDateTimeFr(signedAt)) + ' (heure de Paris)</div>'
+      +       '<div><strong>Adresse IP :</strong> ' + escHtml(ip) + (geo && geo.country ? ' — ' + escHtml(geo.country) : '') + '</div>'
+      +       '<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #EEE;"><strong>Empreinte SHA-256 :</strong></div>'
+      +       '<div style="font-family: monospace; font-size: 10px; word-break: break-all;">' + escHtml(hash) + '</div>'
+      +     '</div>'
+      +     '<p style="line-height: 1.6; font-size: 14px;">Conformément aux articles 1366 et 1367 du Code civil et au Règlement européen eIDAS n° 910/2014, votre signature électronique a la même force probante qu\'une signature manuscrite. Le document signé est archivé de manière sécurisée et peut être produit en cas de litige.</p>'
+      +     '<p style="line-height: 1.6; font-size: 14px;">Si vous souhaitez recevoir une copie du document signé, n\'hésitez pas à nous le demander en répondant à cet email.</p>'
+      +     '<p style="line-height: 1.6; font-size: 14px; margin-top: 30px;">Toute l\'équipe Meshuga te remercie pour ta confiance.</p>'
+      +     '<p style="line-height: 1.6; font-size: 14px;"><strong>Edward Touret</strong><br/>Président — SAS AEGIA, Présidente d\'AEGIA FOOD</p>'
       +   '</div>'
-      +   '<p style="line-height: 1.6; font-size: 14px;">Conformément aux articles 1366 et 1367 du Code civil et au Règlement européen eIDAS n° 910/2014, votre signature électronique a la même force probante qu\'une signature manuscrite. Le document signé est archivé de manière sécurisée et peut être produit en cas de litige.</p>'
-      +   '<p style="line-height: 1.6; font-size: 14px;">Si vous souhaitez recevoir une copie du document signé, n\'hésitez pas à nous le demander en répondant à cet email.</p>'
-      +   '<p style="line-height: 1.6; font-size: 14px; margin-top: 30px;">Toute l\'équipe Meshuga te remercie pour ta confiance.</p>'
-      +   '<p style="line-height: 1.6; font-size: 14px;"><strong>Edward Touret</strong><br/>Président — SAS AEGIA, Présidente d\'AEGIA FOOD</p>'
-      + '</div>'
-      + '</body>'
-      + '</html>'
+      + '</body></html>'
 
     var textContent = "Signature confirmée\n\n" + cher + " " + (emp.prenom || "") + ",\n\n" +
       "Nous accusons réception de votre signature électronique pour " + docLabel + bundleText + ".\n\n" +
