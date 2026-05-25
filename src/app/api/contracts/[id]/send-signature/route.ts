@@ -181,6 +181,7 @@ export async function POST(
     signature_sent_at: new Date().toISOString(),
     signature_channel: signatureChannel,
     signature_recipient_email: hasEmail ? recipientEmail : null,
+    signature_recipient_phone: normalizedPhone || null,
     signature_includes_welcome_pack: finalIncludeWelcomePack,
     signature_viewed_at: null,
     signature_signed_at: null,
