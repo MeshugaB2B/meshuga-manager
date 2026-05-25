@@ -12,6 +12,13 @@
 // envoie un mail de confirmation avec BCC Edward.
 //
 // Conforme : art. 1366-1367 Code civil + Règlement (UE) 910/2014 (eIDAS).
+//
+// Sprint C3 v3 — Section 11bis remaniée :
+// Les notifications Edward (email + SMS) pointent désormais vers
+// /api/signatures/view/[token] (qui sert les HTML en inline + toolbar PDF)
+// au lieu des signed URLs Supabase qui forçaient un .html en téléchargement.
+// L'email de confirmation salarié est wrappé proprement (DOCTYPE/head/body)
+// pour pouvoir charger Yellowtail depuis Google Fonts (Apple Mail compatible).
 // ============================================================
 
 import { NextResponse } from "next/server"
@@ -83,6 +90,32 @@ function formatDuration(ms: number): string {
   if (hours > 0) return hours + "h " + mins + "min " + secs + "s"
   if (mins > 0) return mins + "min " + secs + "s"
   return secs + "s"
+}
+
+// ============================================================
+// makeViewToken — Encode { k, i, d } en base64url
+// ============================================================
+// Sert à construire les URLs /api/signatures/view/[token] envoyées
+// dans les notifications Edward (email + SMS).
+// k = "amendment" | "contract"
+// i = entityId (uuid)
+// d = "main" (avenant/contrat signé) | "welcomepack" (dossier de bienvenue)
+function makeViewToken(kind: string, entityId: string, doc: string): string {
+  var payload = JSON.stringify({ k: kind, i: entityId, d: doc })
+  var b64 = Buffer.from(payload, "utf-8").toString("base64")
+  // base64 standard → base64url (sans padding)
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+}
+
+// Reconstruit l'origin de l'app (protocol + host) depuis les headers Vercel.
+// Fallback : variable d'env NEXT_PUBLIC_APP_URL, sinon prod.
+function getAppBaseUrl(req: Request): string {
+  var envUrl = process.env.NEXT_PUBLIC_APP_URL || ""
+  if (envUrl) return envUrl.replace(/\/+$/, "")
+  var host = req.headers.get("host") || ""
+  var proto = req.headers.get("x-forwarded-proto") || "https"
+  if (host) return proto + "://" + host
+  return "https://meshuga-manager.vercel.app"
 }
 
 // Parse User-Agent pour OS / Browser / Device
@@ -579,7 +612,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Erreur lors de l'enregistrement de la signature" }, { status: 500 })
   }
 
-// ============================================================
+  // ============================================================
   // 11ter. Archivage dans hr_contract_documents pour fiche RH
   // ============================================================
   // Le HTML signe est deja dans hr-signatures (preuve juridique).
@@ -644,37 +677,32 @@ export async function POST(
         }
       }
     }
-  } catch (eArch) {
+  } catch (eArch: any) {
     console.error("[sign/submit] Archivage RH non bloquant exception:", eArch.message || eArch)
-  }  // ============================================================
-  // 11bis. Notification Edward (email + SMS) avec liens PDF
+  }
+
   // ============================================================
-  // Génère des URLs signées Supabase Storage valables 7 jours
-  // pour qu'Edward puisse vérifier le document signé directement.
+  // 11bis. Notification Edward (email + SMS)
+  // ============================================================
+  // ✨ Sprint C3 v3 : on n'envoie plus de signed URLs Supabase brutes
+  // (qui forçaient un download .html en raw text dans le navigateur).
+  // On construit à la place des liens vers /api/signatures/view/[token]
+  // qui sert le HTML inline + ajoute une toolbar rose Meshuga avec
+  // un bouton "Télécharger en PDF" (window.print).
   // ============================================================
   try {
-    var signedPdfUrl = ""
+    var baseUrl = getAppBaseUrl(req)
+
+    // Tokens base64url pour la route view
+    var viewTokenMain = makeViewToken(entityKind, amendment.id, "main")
+    var signedPdfUrl = baseUrl + "/api/signatures/view/" + viewTokenMain
+
     var signedWpUrl: string | null = null
-
-    var resSignedPdf = await sb.storage
-      .from("hr-signatures")
-      .createSignedUrl(avenantPath, 60 * 60 * 24 * 7) // 7 jours en secondes
-    if (resSignedPdf.data && resSignedPdf.data.signedUrl) {
-      signedPdfUrl = resSignedPdf.data.signedUrl
-    } else if (resSignedPdf.error) {
-      console.error("[sign/submit] Signed URL avenant error:", resSignedPdf.error.message)
-    }
-
     if (includeWp && uploadedWpPath) {
-      var resSignedWp = await sb.storage
-        .from("hr-signatures")
-        .createSignedUrl(uploadedWpPath, 60 * 60 * 24 * 7)
-      if (resSignedWp.data && resSignedWp.data.signedUrl) {
-        signedWpUrl = resSignedWp.data.signedUrl
-      }
+      var viewTokenWp = makeViewToken(entityKind, amendment.id, "welcomepack")
+      signedWpUrl = baseUrl + "/api/signatures/view/" + viewTokenWp
     }
 
-    // Construit le libellé du document
     // Construit le libellé du document selon le type d'entité
     var notifDocLabel = "Document à signer"
     if (entityKind === "amendment") {
@@ -708,35 +736,33 @@ export async function POST(
 
     // Notification email à Edward
     var edwardEmail = process.env.EDWARD_NOTIFICATION_EMAIL || "edward@meshuga.fr"
-    if (signedPdfUrl) {
-      var notifContent = buildEdwardSignatureNotifEmail({
-        signerFirstName: emp.prenom || "",
-        signerLastName: emp.nom || "",
-        documentTypeLabel: notifDocLabel,
-        includeWelcomePack: includeWp,
-        signedAt: signedAt.toISOString(),
-        signedPdfUrl: signedPdfUrl,
-        signedWelcomePackUrl: signedWpUrl,
-        signatureId: signatureId,
-        pdfHash: hash,
-      })
-      // Ne pas await pour ne pas bloquer la réponse au salarié
-      sendBrevoEmail({
-        to: [{ email: edwardEmail, name: "Edward Touret" }],
-        subject: notifContent.subject,
-        htmlContent: notifContent.htmlContent,
-        textContent: notifContent.textContent,
-        replyTo: { email: edwardEmail, name: "Edward Touret" },
-        tags: ["signature-notif-edward"],
-      }).catch(function (e: any) {
-        console.error("[sign/submit] Notif Edward email error:", e.message || e)
-      })
-    }
+    var notifContent = buildEdwardSignatureNotifEmail({
+      signerFirstName: emp.prenom || "",
+      signerLastName: emp.nom || "",
+      documentTypeLabel: notifDocLabel,
+      includeWelcomePack: includeWp,
+      signedAt: signedAt.toISOString(),
+      signedPdfUrl: signedPdfUrl,
+      signedWelcomePackUrl: signedWpUrl,
+      signatureId: signatureId,
+      pdfHash: hash,
+    })
+    // Ne pas await pour ne pas bloquer la réponse au salarié
+    sendBrevoEmail({
+      to: [{ email: edwardEmail, name: "Edward Touret" }],
+      subject: notifContent.subject,
+      htmlContent: notifContent.htmlContent,
+      textContent: notifContent.textContent,
+      replyTo: { email: edwardEmail, name: "Edward Touret" },
+      tags: ["signature-notif-edward"],
+    }).catch(function (e: any) {
+      console.error("[sign/submit] Notif Edward email error:", e.message || e)
+    })
 
     // Notification SMS à Edward (si numéro configuré)
     var edwardPhoneRaw = process.env.EDWARD_NOTIFICATION_PHONE || ""
     var edwardPhone = edwardPhoneRaw ? normalizePhoneFR(edwardPhoneRaw) : null
-    if (edwardPhone && signedPdfUrl) {
+    if (edwardPhone) {
       var smsBody = buildEdwardSignatureNotifSms({
         signerName: signerFullName,
         documentLabel: notifDocLabel,
@@ -774,7 +800,9 @@ export async function POST(
     }
   }
 
-  // === 13. Email de confirmation ===
+  // === 13. Email de confirmation salarié ===
+  // ✨ Sprint C3 v3 : wrappé proprement DOCTYPE/head/body pour pouvoir
+  // charger Yellowtail depuis Google Fonts (Apple Mail compatible).
   if (recipientEmail) {
     var docLabel = "votre document"
     if (entityKind === "amendment") {
@@ -810,6 +838,23 @@ export async function POST(
     var bundleText = includeWp ? " ainsi que le Dossier de bienvenue Meshuga (13 pages)" : ""
 
     var htmlContent = ''
+      + '<!DOCTYPE html>'
+      + '<html lang="fr">'
+      + '<head>'
+      +   '<meta charset="utf-8"/>'
+      +   '<meta name="viewport" content="width=device-width, initial-scale=1.0"/>'
+      +   '<meta name="x-apple-disable-message-reformatting"/>'
+      +   '<meta name="color-scheme" content="light only"/>'
+      +   '<meta name="supported-color-schemes" content="light only"/>'
+      +   '<title>' + escHtml(subject) + '</title>'
+      // 🎀 Yellowtail via Google Fonts — supporté par Apple Mail (pas Outlook desktop, mais le fallback cursive reste correct)
+      +   '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet"/>'
+      +   '<style>'
+      +     ':root { color-scheme: light only; supported-color-schemes: light only }'
+      +     'body { margin:0; padding:0 }'
+      +   '</style>'
+      + '</head>'
+      + '<body style="margin:0;padding:0;background:#FFFFFF;color:#191923">'
       + '<div style="font-family: Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #191923;">'
       +   '<div style="font-family: Yellowtail, cursive; color: #FF82D7; font-size: 32px; line-height: 1;">Signature confirmée ✓</div>'
       +   '<div style="height: 3px; background: #FFEB5A; margin: 14px 0 22px 0;"></div>'
@@ -828,6 +873,8 @@ export async function POST(
       +   '<p style="line-height: 1.6; font-size: 14px; margin-top: 30px;">Toute l\'équipe Meshuga te remercie pour ta confiance.</p>'
       +   '<p style="line-height: 1.6; font-size: 14px;"><strong>Edward Touret</strong><br/>Président — SAS AEGIA, Présidente d\'AEGIA FOOD</p>'
       + '</div>'
+      + '</body>'
+      + '</html>'
 
     var textContent = "Signature confirmée\n\n" + cher + " " + (emp.prenom || "") + ",\n\n" +
       "Nous accusons réception de votre signature électronique pour " + docLabel + bundleText + ".\n\n" +
