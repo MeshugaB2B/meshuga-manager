@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js"
 import { LOGO_PINK } from "./logos"
 import RhWizard from "./rh/RhWizard"
 import EmployeeDetail from "./rh/EmployeeDetail"
+import SignaturesPendingWidget from "./rh/SignaturesPendingWidget"
 import RetroUploadWizard from "./rh/RetroUploadWizard"
 import OffboardingWizard from "./rh/OffboardingWizard"
 import { buildContract } from "./rh/contractBuilders"
@@ -182,6 +183,9 @@ export default function RhTab() {
         </div>
       </div>
       <div className="strip"></div>
+
+      {/* === 🔥 Widget signatures en attente (cron relances 24h) === */}
+      <SignaturesPendingWidget />
 
       {/* === ONGLETS ACTIFS / ANCIENS / TOUS === */}
       <div style={{ display: "flex", gap: 0, marginBottom: 0, borderBottom: "2.5px solid #191923", flexWrap: "wrap" }}>
