@@ -579,7 +579,74 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Erreur lors de l'enregistrement de la signature" }, { status: 500 })
   }
 
+// ============================================================
+  // 11ter. Archivage dans hr_contract_documents pour fiche RH
   // ============================================================
+  // Le HTML signe est deja dans hr-signatures (preuve juridique).
+  // On le copie aussi dans hr-contract-docs + on insere une row dans
+  // hr_contract_documents pour qu'il apparaisse sur la fiche du salarie
+  // (onglet Documents qui lit hr_contract_documents + bucket hr-contract-docs).
+  // Non bloquant : si l'archivage plante, la signature reste valide.
+  // ============================================================
+  try {
+    var docTypeForArchive = entityKind === "amendment" ? "avenant" : "contrat_signe"
+    var docLabelForArchive = entityKind === "amendment"
+      ? "Avenant signe du " + signedAt.toLocaleDateString("fr-FR")
+      : "Contrat signe du " + signedAt.toLocaleDateString("fr-FR")
+
+    var archivePath = (entityKind === "amendment" ? "amendments/" : "contracts/") +
+      contract.id + "/" + timestamp + (entityKind === "amendment" ? "_avenant_signe.html" : "_contrat_signe.html")
+    var blobSize = new Blob([signedAvenantHtml]).size
+    var copyRes = await sb.storage.from("hr-contract-docs").upload(
+      archivePath,
+      new Blob([signedAvenantHtml], { type: "text/html; charset=utf-8" }),
+      { contentType: "text/html; charset=utf-8", upsert: false }
+    )
+    if (copyRes.error) {
+      console.error("[sign/submit] Archive hr-contract-docs error:", copyRes.error.message)
+    } else {
+      var insArchive = await sb.from("hr_contract_documents").insert({
+        contract_id: contract.id,
+        doc_type: docTypeForArchive,
+        label: docLabelForArchive,
+        file_path: archivePath,
+        mime_type: "text/html; charset=utf-8",
+        size_bytes: blobSize,
+        document_date: signedAt.toISOString().substring(0, 10),
+        validated_by_user: true,
+      })
+      if (insArchive.error) {
+        console.error("[sign/submit] Insert hr_contract_documents error:", insArchive.error.message)
+      }
+    }
+
+    if (includeWp && uploadedWpPath && signedWelcomePackHtml) {
+      var archiveWpPath = "welcomepack/" + empId + "/" + timestamp + "_dossier_bienvenue_signe.html"
+      var wpBlobSize = new Blob([signedWelcomePackHtml]).size
+      var copyWpRes = await sb.storage.from("hr-employee-docs").upload(
+        archiveWpPath,
+        new Blob([signedWelcomePackHtml], { type: "text/html; charset=utf-8" }),
+        { contentType: "text/html; charset=utf-8", upsert: false }
+      )
+      if (copyWpRes.error) {
+        console.error("[sign/submit] Archive WP hr-employee-docs error:", copyWpRes.error.message)
+      } else {
+        var insWp = await sb.from("hr_employee_documents").insert({
+          employee_id: empId,
+          doc_type: "dossier_bienvenue_signe",
+          label: "Dossier de bienvenue signe du " + signedAt.toLocaleDateString("fr-FR"),
+          file_path: archiveWpPath,
+          mime_type: "text/html; charset=utf-8",
+          size_bytes: wpBlobSize,
+        })
+        if (insWp.error) {
+          console.error("[sign/submit] Insert hr_employee_documents error:", insWp.error.message)
+        }
+      }
+    }
+  } catch (eArch) {
+    console.error("[sign/submit] Archivage RH non bloquant exception:", eArch.message || eArch)
+  }  // ============================================================
   // 11bis. Notification Edward (email + SMS) avec liens PDF
   // ============================================================
   // Génère des URLs signées Supabase Storage valables 7 jours
