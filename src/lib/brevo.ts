@@ -326,7 +326,280 @@ export function buildSignatureRequestEmail(
   return { subject: subject, htmlContent: htmlContent, textContent: textContent }
 }
 
-// === Helpers HTML escape ===
+// ============================================================
+// buildRelanceEmail — Email de relance quotidienne (J+N)
+// ============================================================
+// Envoyé par le cron tant que le document n'est pas signé.
+// Plus court que l'email initial, ton de relance courtois.
+// ============================================================
+export interface RelanceEmailParams {
+  recipientFirstName: string
+  recipientLastName: string
+  recipientCivilite?: string | null
+  documentTypeLabel: string
+  signatureUrl: string
+  includeWelcomePack: boolean
+  daysSinceSent: number
+  senderName?: string
+}
+
+export function buildRelanceEmail(
+  params: RelanceEmailParams
+): { subject: string; htmlContent: string; textContent: string } {
+  var prenom = (params.recipientFirstName || "").trim()
+  var nom = (params.recipientLastName || "").trim().toUpperCase()
+  var civ = (params.recipientCivilite || "").trim()
+  var isFemale = civ.toLowerCase() === "mme" || civ.toLowerCase() === "madame"
+  var greeting = isFemale ? "Chère " : "Cher "
+  var greetingFull = greeting + prenom
+
+  var senderName = params.senderName || "Edward Touret"
+  var bundle = params.includeWelcomePack
+  var docLabel = params.documentTypeLabel
+  var days = params.daysSinceSent
+
+  var subject = "Rappel — Signature à effectuer : " + docLabel
+
+  var htmlContent =
+    '<!DOCTYPE html>' +
+    '<html lang="fr">' +
+    '<head>' +
+    '<meta charset="utf-8"/>' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0"/>' +
+    '<meta name="color-scheme" content="light only"/>' +
+    '<meta name="supported-color-schemes" content="light only"/>' +
+    '<title>' + escHtml(subject) + '</title>' +
+    '<style>' +
+    '  :root { color-scheme: light only; supported-color-schemes: light only }' +
+    '  body, table, td, p, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100% }' +
+    '  table { border-collapse:collapse !important }' +
+    '  img { -ms-interpolation-mode:bicubic; border:0; outline:none; display:block }' +
+    '  body { margin:0 !important; padding:0 !important; width:100% !important }' +
+    '  .cta-btn { background-color:#FF82D7 !important; color:#FFFFFF !important }' +
+    '  .cta-btn-cell { background-color:#FF82D7 !important }' +
+    '  @media (prefers-color-scheme: dark) {' +
+    '    .cta-btn { background-color:#FF82D7 !important; color:#FFFFFF !important }' +
+    '    .cta-btn-cell { background-color:#FF82D7 !important }' +
+    '  }' +
+    '  [data-ogsc] .cta-btn { background-color:#FF82D7 !important; color:#FFFFFF !important }' +
+    '  [data-ogsc] .cta-btn-cell { background-color:#FF82D7 !important }' +
+    '</style>' +
+    '</head>' +
+    '<body style="margin:0;padding:0;background:#FFEB5A;font-family:Arial,Helvetica,sans-serif;color:#191923">' +
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FFEB5A">' +
+    '<tr><td align="center" style="padding:24px 12px">' +
+    '<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:12px;overflow:hidden">' +
+
+    // Header
+    '<tr><td align="center" style="padding:32px 32px 20px 32px;background:#FFFFFF;border-bottom:1px solid #F5F5F5">' +
+    '<img src="' + MESHUGA_LOGO_PINK_DATA_URI + '" width="180" height="48" alt="Meshuga" style="display:block;width:180px;max-width:80%;height:auto;border:0;outline:none;margin:0 auto"/>' +
+    '</td></tr>' +
+
+    // Corps
+    '<tr><td style="padding:28px 32px 16px 32px">' +
+    '<div style="font-family: Yellowtail, cursive; color: #FF82D7; font-size: 28px; line-height: 1; margin-bottom: 14px;">Petit rappel...</div>' +
+    '<h1 style="margin:0 0 18px 0;font-size:17px;color:#191923;font-weight:400;line-height:1.5">' + escHtml(greetingFull) + ',</h1>' +
+    '<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#191923">' +
+    "Je n'ai pas encore reçu votre signature pour " +
+    (bundle ? '<strong>2 documents</strong> qui vous attendent' : 'votre <strong>' + escHtml(docLabel) + '</strong>') +
+    ' (envoyé il y a ' + (days <= 1 ? '1 jour' : (days + ' jours')) + ').' +
+    '</p>' +
+
+    (bundle
+      ? '<ul style="margin: 8px 0 16px 20px; padding: 0; color: #191923; font-size: 14px; line-height: 1.6;">' +
+        '<li><strong>' + escHtml(docLabel) + '</strong></li>' +
+        '<li><strong>Dossier de bienvenue Meshuga</strong></li>' +
+        '</ul>'
+      : ''
+    ) +
+
+    '<p style="margin:14px 0 20px 0;font-size:15px;line-height:1.6;color:#191923">' +
+    "La signature prend moins de 2 minutes depuis votre téléphone. " +
+    "Sans cette signature, votre dossier RH reste incomplet." +
+    '</p>' +
+
+    // CTA bouton (résistant dark mode)
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0 20px 0"><tr><td align="center">' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" bgcolor="#FF82D7" class="cta-btn-cell" style="background-color:#FF82D7;border-radius:8px"><tr><td bgcolor="#FF82D7" class="cta-btn-cell" align="center" style="background-color:#FF82D7;border-radius:8px;padding:0">' +
+    '<a href="' + escAttr(params.signatureUrl) + '" class="cta-btn" style="display:inline-block;background-color:#FF82D7;color:#FFFFFF;text-decoration:none;padding:16px 32px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.5px;font-family:Arial,Helvetica,sans-serif"><span style="color:#FFFFFF;text-decoration:none">Signer maintenant &rarr;</span></a>' +
+    '</td></tr></table>' +
+    '</td></tr></table>' +
+
+    '<p style="margin:20px 0 8px 0;font-size:12px;line-height:1.5;color:#666">' +
+    "Si le bouton ne fonctionne pas, copiez-collez ce lien :" +
+    '</p>' +
+    '<p style="margin:0 0 16px 0;font-size:11px;line-height:1.4;color:#666;word-break:break-all">' +
+    '<a href="' + escAttr(params.signatureUrl) + '" style="color:#FF82D7">' + escHtml(params.signatureUrl) + '</a>' +
+    '</p>' +
+
+    '<p style="margin:24px 0 0 0;font-size:14px;line-height:1.6;color:#191923">' +
+    "Pour toute question, vous pouvez me contacter directement." +
+    '</p>' +
+    '<p style="margin:14px 0 0 0;font-size:14px;line-height:1.6;color:#191923">' +
+    "Bien à vous,<br>" +
+    '<strong>' + escHtml(senderName) + '</strong>' +
+    '</p>' +
+    '</td></tr>' +
+
+    // Footer
+    '<tr><td style="padding:20px 32px;background:#FAFAFA;border-top:1px solid #EEEEEE;text-align:center">' +
+    '<p style="margin:0;font-size:11px;color:#999;line-height:1.5">' +
+    '<strong>Meshuga</strong> · 3 rue Vavin, 75006 Paris · SIREN 904 639 531<br>' +
+    'Signature électronique conforme art. 1367 C. civ. + eIDAS UE 910/2014.' +
+    '</p>' +
+    '</td></tr>' +
+    '</table>' +
+    '</td></tr></table>' +
+    '</body></html>'
+
+  var textContent =
+    greetingFull + ",\n\n" +
+    "Petit rappel : je n'ai pas encore reçu votre signature pour " +
+    (bundle ? "2 documents " : "votre document ") +
+    "(envoyé il y a " + days + " jour" + (days > 1 ? "s" : "") + ").\n\n" +
+    "Signez en ligne :\n" + params.signatureUrl + "\n\n" +
+    "Bien à vous,\n" + senderName
+
+  return { subject: subject, htmlContent: htmlContent, textContent: textContent }
+}
+
+// ============================================================
+// buildEdwardSignatureNotifEmail — Notification à Edward
+// ============================================================
+// Envoyé à Edward dès qu'un salarié a signé.
+// Contient le lien direct vers le PDF signé en DB pour vérification.
+// ============================================================
+export interface EdwardSignatureNotifParams {
+  signerFirstName: string
+  signerLastName: string
+  documentTypeLabel: string
+  includeWelcomePack: boolean
+  signedAt: string // ISO date
+  signedPdfUrl: string // URL signée Supabase Storage du PDF avenant
+  signedWelcomePackUrl?: string | null // URL signée du welcomepack si bundle
+  signatureId: string
+  pdfHash: string
+}
+
+export function buildEdwardSignatureNotifEmail(
+  params: EdwardSignatureNotifParams
+): { subject: string; htmlContent: string; textContent: string } {
+  var fullName = ((params.signerFirstName || "") + " " + (params.signerLastName || "")).trim()
+  var subject = "✓ " + fullName + " a signé — " + params.documentTypeLabel
+  var bundle = params.includeWelcomePack && params.signedWelcomePackUrl
+
+  // Format date FR
+  var d = new Date(params.signedAt)
+  var dateFr = d.toLocaleString("fr-FR", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+    hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris"
+  })
+
+  var htmlContent =
+    '<!DOCTYPE html>' +
+    '<html lang="fr">' +
+    '<head>' +
+    '<meta charset="utf-8"/>' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0"/>' +
+    '<meta name="color-scheme" content="light only"/>' +
+    '<meta name="supported-color-schemes" content="light only"/>' +
+    '<title>' + escHtml(subject) + '</title>' +
+    '<style>' +
+    '  :root { color-scheme: light only }' +
+    '  body, table, td, p, a { -webkit-text-size-adjust:100% }' +
+    '  table { border-collapse:collapse !important }' +
+    '  img { -ms-interpolation-mode:bicubic; border:0; outline:none; display:block }' +
+    '  .cta-btn { background-color:#FF82D7 !important; color:#FFFFFF !important }' +
+    '  .cta-btn-cell { background-color:#FF82D7 !important }' +
+    '  @media (prefers-color-scheme: dark) {' +
+    '    .cta-btn { background-color:#FF82D7 !important; color:#FFFFFF !important }' +
+    '    .cta-btn-cell { background-color:#FF82D7 !important }' +
+    '  }' +
+    '</style>' +
+    '</head>' +
+    '<body style="margin:0;padding:0;background:#FFEB5A;font-family:Arial,Helvetica,sans-serif;color:#191923">' +
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FFEB5A">' +
+    '<tr><td align="center" style="padding:24px 12px">' +
+    '<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:12px;overflow:hidden">' +
+
+    // Header avec coche verte
+    '<tr><td align="center" style="padding:32px 32px 20px 32px;background:#FFFFFF">' +
+    '<div style="font-size:48px;line-height:1;margin-bottom:8px">✓</div>' +
+    '<div style="font-family: Yellowtail, cursive; color: #FF82D7; font-size: 36px; line-height: 1;">Signature reçue</div>' +
+    '</td></tr>' +
+
+    // Corps
+    '<tr><td style="padding:8px 32px 16px 32px">' +
+    '<p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#191923">' +
+    'Edward, <strong>' + escHtml(fullName) + '</strong> vient de signer ' +
+    (bundle ? '<strong>2 documents</strong> :' : '<strong>' + escHtml(params.documentTypeLabel) + '</strong>.') +
+    '</p>' +
+
+    (bundle
+      ? '<ul style="margin: 8px 0 16px 20px; padding: 0; color: #191923; font-size: 14px; line-height: 1.6;">' +
+        '<li><strong>' + escHtml(params.documentTypeLabel) + '</strong></li>' +
+        '<li><strong>Dossier de bienvenue Meshuga</strong></li>' +
+        '</ul>'
+      : ''
+    ) +
+
+    // Encart audit
+    '<div style="background:#FAFAFA;border-left:4px solid #16A34A;padding:14px 18px;border-radius:4px;margin:18px 0;font-size:13px;line-height:1.6">' +
+    '<div><strong>Signataire :</strong> ' + escHtml(fullName) + '</div>' +
+    '<div><strong>Date :</strong> ' + escHtml(dateFr) + ' (heure de Paris)</div>' +
+    '<div><strong>ID signature :</strong> ' + escHtml(params.signatureId) + '</div>' +
+    '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #EEE"><strong>Empreinte SHA-256 :</strong></div>' +
+    '<div style="font-family:monospace;font-size:10px;word-break:break-all">' + escHtml(params.pdfHash) + '</div>' +
+    '</div>' +
+
+    // CTA voir le PDF signé
+    '<p style="margin:20px 0 12px 0;font-size:14px;color:#191923">Cliquez pour voir le document signé :</p>' +
+
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px 0"><tr><td align="center">' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" bgcolor="#FF82D7" class="cta-btn-cell" style="background-color:#FF82D7;border-radius:8px"><tr><td bgcolor="#FF82D7" class="cta-btn-cell" align="center" style="background-color:#FF82D7;border-radius:8px;padding:0">' +
+    '<a href="' + escAttr(params.signedPdfUrl) + '" class="cta-btn" style="display:inline-block;background-color:#FF82D7;color:#FFFFFF;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:15px;font-weight:700;font-family:Arial,Helvetica,sans-serif"><span style="color:#FFFFFF;text-decoration:none">Voir ' + escHtml(params.documentTypeLabel) + ' &rarr;</span></a>' +
+    '</td></tr></table>' +
+    '</td></tr></table>' +
+
+    (bundle && params.signedWelcomePackUrl
+      ? '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px 0"><tr><td align="center">' +
+        '<table role="presentation" cellspacing="0" cellpadding="0" border="0" bgcolor="#FF82D7" class="cta-btn-cell" style="background-color:#FF82D7;border-radius:8px"><tr><td bgcolor="#FF82D7" class="cta-btn-cell" align="center" style="background-color:#FF82D7;border-radius:8px;padding:0">' +
+        '<a href="' + escAttr(params.signedWelcomePackUrl) + '" class="cta-btn" style="display:inline-block;background-color:#FF82D7;color:#FFFFFF;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:15px;font-weight:700;font-family:Arial,Helvetica,sans-serif"><span style="color:#FFFFFF;text-decoration:none">Voir Dossier de bienvenue &rarr;</span></a>' +
+        '</td></tr></table>' +
+        '</td></tr></table>'
+      : ''
+    ) +
+
+    '<p style="margin:18px 0 8px 0;font-size:12px;color:#666;line-height:1.5">' +
+    'Liens valables 7 jours. Le document signé est aussi accessible en permanence depuis le dashboard Meshuga.' +
+    '</p>' +
+
+    '</td></tr>' +
+
+    // Footer
+    '<tr><td style="padding:20px 32px;background:#FAFAFA;border-top:1px solid #EEEEEE;text-align:center">' +
+    '<p style="margin:0;font-size:11px;color:#999;line-height:1.5">' +
+    '<strong>Meshuga RH</strong> · Notification automatique' +
+    '</p>' +
+    '</td></tr>' +
+    '</table>' +
+    '</td></tr></table>' +
+    '</body></html>'
+
+  var textContent =
+    "Edward,\n\n" +
+    fullName + " vient de signer " +
+    (bundle ? "2 documents :\n" : params.documentTypeLabel + ".\n") +
+    (bundle ? "- " + params.documentTypeLabel + "\n- Dossier de bienvenue Meshuga\n" : "") +
+    "\nDate : " + dateFr + " (heure de Paris)\n" +
+    "ID signature : " + params.signatureId + "\n\n" +
+    "Voir le document signé :\n" + params.signedPdfUrl + "\n" +
+    (bundle && params.signedWelcomePackUrl ? "Voir le dossier de bienvenue :\n" + params.signedWelcomePackUrl + "\n" : "") +
+    "\nLiens valables 7 jours.\n\n" +
+    "— Meshuga RH"
+
+  return { subject: subject, htmlContent: htmlContent, textContent: textContent }
+}
 function escHtml(s: any): string {
   if (s === null || s === undefined) return ""
   return String(s)
