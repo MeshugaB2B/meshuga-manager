@@ -2,16 +2,19 @@
 // ============================================================
 // Sprint C3 — Document à signer (publique, validée par token)
 // ============================================================
-// Renvoie le HTML de l'avenant (ou du contrat) associé au token de signature.
-// Validation : le token doit exister en base et l'avenant ne doit pas être signé.
+// Renvoie le HTML de l'avenant (ou du contrat initial) associé au
+// token de signature.
+// Validation : le token doit exister en base et le document ne doit
+// pas être signé.
 //
-// Sécurité : route publique côté Vercel (pas d'auth), mais validation token serveur
-// avant tout. Aucun donnée sensible n'est exposée sans token valide.
+// Sécurité : route publique côté Vercel (pas d'auth), mais validation
+// token serveur avant tout.
 // ============================================================
 
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/server"
 import { buildAvenant } from "@/app/dashboard/rh/amendmentBuilder"
+import { buildContract } from "@/app/dashboard/rh/contractBuilders"
 import { loadEmployerSignature } from "@/app/dashboard/rh/employerSignature"
 import { LOGO_PINK } from "@/app/dashboard/logos"
 
@@ -98,7 +101,58 @@ export async function GET(
     })
   }
 
-  // === 2) Pour l'instant : pas de support des contrats initiaux pour signature
-  // (les contrats initiaux passent par un autre workflow d'upload signé)
+  // === 2) Fallback : pas trouvé dans avenants → chercher dans hr_contracts ===
+  var resContractDirect = await sb
+    .from("hr_contracts")
+    .select("*")
+    .eq("signature_token", token)
+    .maybeSingle()
+
+  if (resContractDirect.data) {
+    var contractDirect: any = resContractDirect.data
+    if (contractDirect.signature_status === "signed" || contractDirect.signature_signed_at) {
+      return new NextResponse("Contrat déjà signé", { status: 410 })
+    }
+
+    // Résoudre employee_id (via cycle_id si manquant)
+    var empIdDirect = contractDirect.employee_id
+    if (!empIdDirect && contractDirect.cycle_id) {
+      var resCycDirect = await sb
+        .from("hr_employment_cycles")
+        .select("employee_id")
+        .eq("id", contractDirect.cycle_id)
+        .maybeSingle()
+      empIdDirect = (resCycDirect.data && resCycDirect.data.employee_id) || null
+    }
+    if (!empIdDirect) {
+      return new NextResponse("Salarié introuvable", { status: 404 })
+    }
+
+    var resEmpDirect = await sb.from("hr_employees").select("*").eq("id", empIdDirect).maybeSingle()
+    if (!resEmpDirect.data) {
+      return new NextResponse("Salarié introuvable", { status: 404 })
+    }
+    var empDirect: any = resEmpDirect.data
+
+    // Vacations pour les contrats extras
+    var resVacsDirect = await sb.from("hr_contract_vacations")
+      .select("*")
+      .eq("contract_id", contractDirect.id)
+      .order("ordre", { ascending: true })
+    var vacsDirect = resVacsDirect.data || []
+
+    // Signature employeur (mandat permanent) → utilisée par buildContract via injection ultérieure
+    // Note : buildContract n'accepte pas employerSig directement, on charge quand même
+    // pour cohérence avec le flow signed (submit_route.ts)
+    var _employerSigDirect = await loadEmployerSignature()
+    void _employerSigDirect
+
+    var htmlDirect = buildContract(contractDirect, empDirect, vacsDirect, LOGO_PINK)
+    return new NextResponse(htmlDirect, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    })
+  }
+
   return new NextResponse("Token introuvable", { status: 404 })
 }
