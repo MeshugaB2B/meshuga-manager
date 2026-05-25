@@ -369,6 +369,10 @@ export function buildRelanceEmail(
     '<meta name="color-scheme" content="light only"/>' +
     '<meta name="supported-color-schemes" content="light only"/>' +
     '<title>' + escHtml(subject) + '</title>' +
+    // 🎀 Yellowtail via Google Fonts (Apple Mail compatible).
+    // Sur les clients qui ne chargent pas les fonts externes (Outlook desktop, etc.),
+    // fallback cursive système — pas idéal mais inévitable côté Outlook.
+    '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet"/>' +
     '<style>' +
     '  :root { color-scheme: light only; supported-color-schemes: light only }' +
     '  body, table, td, p, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100% }' +
@@ -468,6 +472,12 @@ export function buildRelanceEmail(
 // ============================================================
 // Envoyé à Edward dès qu'un salarié a signé.
 // Contient le lien direct vers le PDF signé en DB pour vérification.
+//
+// ✨ Sprint C3 v3 :
+//   - signedPdfUrl / signedWelcomePackUrl pointent désormais vers
+//     /api/signatures/view/[token] (HTML inline + toolbar PDF) au lieu
+//     des signed URLs Supabase qui forçaient un download .html raw.
+//   - Le head charge Yellowtail via Google Fonts (Apple Mail compatible).
 // ============================================================
 export interface EdwardSignatureNotifParams {
   signerFirstName: string
@@ -475,8 +485,8 @@ export interface EdwardSignatureNotifParams {
   documentTypeLabel: string
   includeWelcomePack: boolean
   signedAt: string // ISO date
-  signedPdfUrl: string // URL signée Supabase Storage du PDF avenant
-  signedWelcomePackUrl?: string | null // URL signée du welcomepack si bundle
+  signedPdfUrl: string // URL /api/signatures/view/[token] vers le document principal
+  signedWelcomePackUrl?: string | null // URL /api/signatures/view/[token] vers le welcomepack
   signatureId: string
   pdfHash: string
 }
@@ -504,6 +514,10 @@ export function buildEdwardSignatureNotifEmail(
     '<meta name="color-scheme" content="light only"/>' +
     '<meta name="supported-color-schemes" content="light only"/>' +
     '<title>' + escHtml(subject) + '</title>' +
+    // 🎀 Yellowtail via Google Fonts (Apple Mail compatible).
+    // Sur les clients qui ne chargent pas les fonts externes (Outlook desktop, etc.),
+    // fallback cursive système.
+    '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet"/>' +
     '<style>' +
     '  :root { color-scheme: light only }' +
     '  body, table, td, p, a { -webkit-text-size-adjust:100% }' +
@@ -571,7 +585,7 @@ export function buildEdwardSignatureNotifEmail(
     ) +
 
     '<p style="margin:18px 0 8px 0;font-size:12px;color:#666;line-height:1.5">' +
-    'Liens valables 7 jours. Le document signé est aussi accessible en permanence depuis le dashboard Meshuga.' +
+    'Les liens ouvrent le document directement dans le navigateur. Tu peux le télécharger en PDF via le bouton "↓ Télécharger en PDF" en haut. Le document signé reste aussi accessible en permanence depuis le dashboard Meshuga.' +
     '</p>' +
 
     '</td></tr>' +
@@ -595,11 +609,11 @@ export function buildEdwardSignatureNotifEmail(
     "ID signature : " + params.signatureId + "\n\n" +
     "Voir le document signé :\n" + params.signedPdfUrl + "\n" +
     (bundle && params.signedWelcomePackUrl ? "Voir le dossier de bienvenue :\n" + params.signedWelcomePackUrl + "\n" : "") +
-    "\nLiens valables 7 jours.\n\n" +
-    "— Meshuga RH"
+    "\n— Meshuga RH"
 
   return { subject: subject, htmlContent: htmlContent, textContent: textContent }
 }
+
 function escHtml(s: any): string {
   if (s === null || s === undefined) return ""
   return String(s)
