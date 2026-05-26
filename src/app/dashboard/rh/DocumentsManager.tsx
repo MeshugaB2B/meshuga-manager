@@ -192,7 +192,16 @@ export default function DocumentsManager(props) {
   }
 
   // === Visualiser un doc ===
+  // Si le parent passe une prop onOpenDoc (callback), on lui delegue l'ouverture
+  // (ex : EmployeeDetail.tsx ouvre dans son modal PDF avec patch paraphes pour les HTML).
+  // Sinon, fallback historique : signed URL Supabase dans un nouvel onglet.
   async function viewDoc(doc) {
+    if (typeof props.onOpenDoc === "function") {
+      // Le parent gere l'ouverture. On enrichit doc avec _source pour qu'il sache le bucket.
+      var enriched = Object.assign({}, doc, { _source: doc._source || context })
+      props.onOpenDoc(enriched)
+      return
+    }
     var cat = doc._source || context
     var BUCKET = getBucketFor(cat)
     var res = await supabase.storage.from(BUCKET).createSignedUrl(doc.file_path, 3600)
