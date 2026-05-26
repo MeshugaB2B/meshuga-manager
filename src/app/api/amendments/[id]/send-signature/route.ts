@@ -10,22 +10,39 @@
 //   - Au moins un des deux doit être fourni
 //   - Téléphone sauvegardé sur le profil UNIQUEMENT si vide en DB
 //
-// Sprint Y1 — Phase C — Sprint C2A
+// v3 (26/05/2026) — Sprint C3 : workflow validation employer
+//   - Si l'utilisateur connecté n'est PAS edward@meshuga.fr (typiquement
+//     emy@meshuga.fr), l'envoi au salarié N'EST PAS déclenché.
+//   - À la place, on sauvegarde le payload en "pending" et on envoie
+//     un email à Edward avec un lien de validation. Une fois validé,
+//     l'envoi au salarié est déclenché par /api/amendments/[id]/employer-approve.
+//
+// Sprint Y1 — Phase C — Sprint C2A / C3
 // ============================================================
 
 import { NextResponse } from "next/server"
+import { cookies } from "next/headers"
 import { createClient } from "@supabase/supabase-js"
+import { createServerClient } from "@supabase/ssr"
 import { randomUUID } from "crypto"
 import {
   getEmployeeWelcomePackStatus,
   updateEmployeeContactInfo,
 } from "@/app/dashboard/rh/employeeWelcomePack"
-import { sendBrevoEmail, buildSignatureRequestEmail } from "@/lib/brevo"
+import {
+  sendBrevoEmail,
+  buildSignatureRequestEmail,
+  buildEmployerValidationEmail,
+} from "@/lib/brevo"
 import { sendTwilioSms, normalizePhoneFR, buildSignatureSmsBody } from "@/lib/twilio"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
+// === Compte employer signataire ===
+var EMPLOYER_EMAIL = "edward@meshuga.fr"
+
+// === Client Supabase service role (bypasse RLS pour writes) ===
 function getServerClient() {
   var url = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
   var key = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
@@ -33,6 +50,43 @@ function getServerClient() {
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
+}
+
+// === Lecture user connecté via cookies Supabase SSR ===
+async function getCurrentUserEmail(): Promise<string | null> {
+  try {
+    var url = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+    var anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+    if (!url || !anon) return null
+
+    var cookieStore = cookies()
+    var supa = createServerClient(url, anon, {
+      cookies: {
+        get: function (name: string) {
+          var c = cookieStore.get(name)
+          return c ? c.value : undefined
+        },
+        set: function () { /* no-op for API routes */ },
+        remove: function () { /* no-op */ },
+      },
+    })
+    var resUser = await supa.auth.getUser()
+    if (resUser.error) return null
+    var email = resUser.data && resUser.data.user ? resUser.data.user.email : null
+    return email ? email.toLowerCase() : null
+  } catch (e) {
+    return null
+  }
+}
+
+// === Display name à partir d'un email Meshuga ===
+function displayNameFromEmail(email: string): string {
+  var e = (email || "").toLowerCase().trim()
+  if (e === "edward@meshuga.fr") return "Edward Touret"
+  if (e === "emy@meshuga.fr") return "Emy Soulabaille"
+  // Fallback : prend la partie locale, capitalize
+  var local = e.split("@")[0] || e
+  return local.charAt(0).toUpperCase() + local.slice(1)
 }
 
 // === Helper : libellé du type d'avenant ===
@@ -164,7 +218,108 @@ export async function POST(
     finalIncludeWelcomePack = false
   }
 
-  // === 7. Token signature ===
+  // === 7. Détecter qui est en train d'envoyer ===
+  var currentUserEmail = await getCurrentUserEmail()
+  var isEmployerSigner = !currentUserEmail || currentUserEmail === EMPLOYER_EMAIL
+  // Si pas d'user authentifié (dev local, scripts), on fallback "comme si Edward"
+  // (backward compat). En prod le dashboard nécessite auth donc l'user sera là.
+
+  // ============================================================
+  // BRANCHE A : envoi préparé par un user AUTRE qu'Edward
+  // → on n'envoie PAS au salarié, on demande validation à Edward
+  // ============================================================
+  if (!isEmployerSigner) {
+    var validationToken = randomUUID().replace(/-/g, "")
+    var nowIso = new Date().toISOString()
+    var expiresIso = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString()
+
+    var pendingPayload: any = {
+      prepared_by_email: currentUserEmail,
+      prepared_at: nowIso,
+      employer_validation_token: validationToken,
+      employer_validation_token_expires_at: expiresIso,
+      employer_validated_at: null,
+      employer_validated_by_email: null,
+      employer_pending_recipient_email: hasEmail ? recipientEmail : null,
+      employer_pending_recipient_phone: normalizedPhone || null,
+      employer_pending_include_welcome_pack: finalIncludeWelcomePack,
+      employer_pending_save_email_to_profile: saveEmailToProfile === true,
+    }
+
+    var resPending = await supabase
+      .from("hr_contract_amendments")
+      .update(pendingPayload)
+      .eq("id", amendmentId)
+
+    if (resPending.error) {
+      console.error("[send-signature/amendment] Pending save error:", resPending.error.message)
+      return NextResponse.json({ ok: false, error: "Erreur sauvegarde validation" }, { status: 500 })
+    }
+
+    // Construit URL de validation pour Edward
+    var siteUrlA = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://meshuga-manager.vercel.app"
+    var validationUrl = siteUrlA.replace(/\/+$/, "") +
+      "/employer-validate?type=amendment&id=" + amendmentId + "&token=" + validationToken
+
+    // Envoie email à Edward
+    var docLabelA = getAmendmentTypeLabel(amendment.amendment_type || "")
+    var validationEmail = buildEmployerValidationEmail({
+      preparedByEmail: currentUserEmail || "?",
+      preparedByDisplayName: displayNameFromEmail(currentUserEmail || ""),
+      recipientFirstName: empStatus.prenom,
+      recipientLastName: empStatus.nom,
+      recipientCivilite: empStatus.civilite,
+      documentTypeLabel: docLabelA,
+      documentKind: "amendment",
+      includeWelcomePack: finalIncludeWelcomePack,
+      signatureRecipientEmail: hasEmail ? recipientEmail : null,
+      signatureRecipientPhone: normalizedPhone || null,
+      validationUrl: validationUrl,
+    })
+
+    var emailResultA = await sendBrevoEmail({
+      to: [{ email: EMPLOYER_EMAIL, name: "Edward Touret" }],
+      subject: validationEmail.subject,
+      htmlContent: validationEmail.htmlContent,
+      textContent: validationEmail.textContent,
+      replyTo: { email: currentUserEmail || EMPLOYER_EMAIL, name: displayNameFromEmail(currentUserEmail || "") },
+      tags: ["employer-validation", "amendment"],
+    })
+
+    if (!emailResultA.ok) {
+      console.error("[send-signature/amendment] Validation email failed:", emailResultA.error)
+      // On garde quand même la sauvegarde DB → Edward pourra valider via le dashboard
+      return NextResponse.json(
+        {
+          ok: true,
+          awaiting_employer_validation: true,
+          email_to_employer_sent: false,
+          email_error: emailResultA.error,
+          validation_token: validationToken,
+          message: "Préparation enregistrée. L'email à Edward n'a pas pu partir, mais il peut valider via le dashboard.",
+        },
+        { status: 200 }
+      )
+    }
+
+    return NextResponse.json(
+      {
+        ok: true,
+        awaiting_employer_validation: true,
+        email_to_employer_sent: true,
+        validation_token: validationToken,
+        message: "Avenant préparé. Edward a reçu un email pour valider et déclencher l'envoi au salarié.",
+      },
+      { status: 200 }
+    )
+  }
+
+  // ============================================================
+  // BRANCHE B : envoi direct (user = Edward ou pas d'auth)
+  // → comportement historique : on envoie au salarié immédiatement
+  // ============================================================
+
+  // === 7b. Token signature salarié ===
   var token = randomUUID().replace(/-/g, "")
 
   // === 8. Détermine le channel pour la DB ===
@@ -185,6 +340,9 @@ export async function POST(
     signature_signed_at: null,
     signature_audit_data: null,
     signature_pdf_hash: null,
+    // Si Edward valide directement, on marque aussi employer_validated_at
+    employer_validated_at: new Date().toISOString(),
+    employer_validated_by_email: EMPLOYER_EMAIL,
   }
   var resUpdate = await supabase
     .from("hr_contract_amendments")
@@ -200,7 +358,6 @@ export async function POST(
   if (hasEmail && saveEmailToProfile && empStatus.email !== recipientEmail) {
     contactUpdate.email = recipientEmail
   }
-  // Téléphone : sauvegarder UNIQUEMENT si vide en DB (politique Edward)
   if (hasPhone && normalizedPhone && (!empStatus.telephone || empStatus.telephone.trim() === "")) {
     contactUpdate.telephone = normalizedPhone
   }
@@ -261,9 +418,6 @@ export async function POST(
   var emailResult: any = results[0].status === "fulfilled" ? results[0].value : { ok: false, error: "Exception" }
   var smsResult: any = results[1].status === "fulfilled" ? results[1].value : { ok: false, error: "Exception" }
 
-  // === 13. Évaluation succès global ===
-  // On considère que c'est OK si au moins UN des deux canaux a réussi
-  // (ou si le canal demandé est null = pas demandé)
   var emailOk = !hasEmail || (emailResult && emailResult.ok)
   var smsOk = !hasPhone || (smsResult && smsResult.ok)
   var anyChannelSucceeded = (hasEmail && emailResult && emailResult.ok) ||
@@ -288,7 +442,6 @@ export async function POST(
     )
   }
 
-  // === 14. Succès (au moins un canal a abouti) ===
   return NextResponse.json(
     {
       ok: true,
