@@ -1,7 +1,8 @@
-// =====================================================================
-// FILE PATH: src/app/api/employer-validate/load/route.ts
-// SPRINT C3 — Vague 2 — Endpoint de lecture centralisé pour la page UI
-// =====================================================================
+// FILE PATH dans le repo (REMPLACE temporairement) :
+//   src/app/api/employer-validate/load/route.ts
+//
+// ⚠️ VERSION DEBUG TEMPORAIRE — révèle l'email vu et les cookies présents.
+// À remettre dans l'état "PATCH__1__" une fois le diagnostic terminé.
 
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
@@ -10,12 +11,29 @@ import { createClient } from "@supabase/supabase-js"
 
 export var dynamic = "force-dynamic"
 
-async function getCurrentUserEmail() {
+async function getAuthDiagnostic() {
+  var result: any = {
+    seen_email: null,
+    cookie_names: [] as string[],
+    cookies_count: 0,
+    auth_error: null,
+    env_url_set: false,
+    env_anon_set: false,
+  }
   try {
     var url = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
     var anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-    if (!url || !anon) return null
+    result.env_url_set = !!url
+    result.env_anon_set = !!anon
+    if (!url || !anon) {
+      result.auth_error = "missing_env_vars"
+      return result
+    }
     var cookieStore = cookies()
+    var allCookies = cookieStore.getAll()
+    result.cookies_count = allCookies.length
+    result.cookie_names = allCookies.map(function (c: any) { return c.name })
+
     var supa = createServerClient(url, anon, {
       cookies: {
         getAll: function () {
@@ -24,19 +42,16 @@ async function getCurrentUserEmail() {
         setAll: function () {},
       },
     })
-    var r = await supa.auth.getUser()
-    if (r.error) return null
-    var email = r.data && r.data.user ? r.data.user.email : null
-    return email ? email.toLowerCase() : null
-  } catch (e) {
-    return null
+    var r: any = await supa.auth.getUser()
+    if (r.error) {
+      result.auth_error = String(r.error.message || r.error)
+      return result
+    }
+    result.seen_email = r.data && r.data.user ? (r.data.user.email || null) : null
+  } catch (e: any) {
+    result.auth_error = "exception: " + String(e && e.message ? e.message : e)
   }
-}
-
-function adminClient() {
-  var url = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-  var key = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
-  return createClient(url, key)
+  return result
 }
 
 export async function GET(req: Request) {
@@ -53,15 +68,26 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: "invalid_type" }, { status: 400 })
     }
 
-    var email = await getCurrentUserEmail()
-    if (email !== "edward@meshuga.fr") {
+    var diag = await getAuthDiagnostic()
+    var seen = diag.seen_email ? String(diag.seen_email).toLowerCase() : null
+
+    if (seen !== "edward@meshuga.fr") {
       return NextResponse.json(
-        { ok: false, error: "forbidden", reason: "not_employer" },
+        {
+          ok: false,
+          error: "forbidden",
+          reason: "not_employer",
+          debug: diag,
+        },
         { status: 403 }
       )
     }
 
-    var admin = adminClient()
+    // Reste de la logique (load réelle) — identique à la version stable
+    var supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+    var serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+    var admin = createClient(supaUrl, serviceKey)
+
     var table = type === "contract" ? "hr_contracts" : "hr_contract_amendments"
     var selectCols = [
       "id",
@@ -109,7 +135,6 @@ export async function GET(req: Request) {
       })
     }
 
-    // Resolve employee (direct ou via cycle)
     var employeeId: string | null = r.employee_id
     if (!employeeId && r.cycle_id) {
       var cycleRow: any = await admin
@@ -130,7 +155,6 @@ export async function GET(req: Request) {
       if (e.data) emp = e.data
     }
 
-    // Find linked doc for preview
     var docTypes = type === "contract" ? ["contrat_genere"] : ["avenant"]
     var docCol = type === "contract" ? "contract_id" : "amendment_id"
     var docQ: any = await admin
