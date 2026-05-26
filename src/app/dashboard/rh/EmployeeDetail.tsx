@@ -473,83 +473,22 @@ export default function EmployeeDetail(props) {
     }
   }
 
-  // === Ouvre un document dans le modal PDF (HTML rendu correctement, PDF natif) ===
-  // - HTML : fetch + patch paraphes "en attente" -> initiales salarié, puis Blob URL
-  //          (sinon Supabase Storage le sert avec un Content-Disposition qui fait afficher
-  //           le code source au lieu du rendu)
-  // - PDF / image : signed URL Supabase directe (Chrome rend nativement dans l'iframe)
-  async function openContractDoc(doc) {
-    if (!doc || !doc.file_path) {
-      alert("Fichier introuvable")
+  // === Ouvre un document dans le modal PDF via la route API serveur ===
+  // La route /api/hr/document/{docId} utilise SUPABASE_SERVICE_ROLE_KEY pour
+  // bypass les RLS, trouve le fichier dans le bon bucket (hr-contract-docs,
+  // hr-signatures, ou hr-employee-docs), patche les paraphes pour les HTML
+  // signés et renvoie le contenu avec le bon Content-Type. C'est beaucoup
+  // plus simple et robuste que de tatonner côté client avec les buckets.
+  function openContractDoc(doc: any) {
+    if (!doc || !doc.id) {
+      alert("Document introuvable")
       return
     }
-    try {
-      var docLabel = doc.label || doc.doc_type || "Document"
-      var mimeIsHtml = doc.mime_type && String(doc.mime_type).toLowerCase().indexOf("html") !== -1
-
-      // === Resolution du bucket : on essaie plusieurs buckets dans l'ordre
-      //     car les file_path historiques sont incoherents :
-      //     - certains rows pointent dans hr-contract-docs (avenants archives UI)
-      //     - d'autres dans hr-signatures (preuve juridique du welcomepack)
-      //     - d'autres dans hr-employee-docs (docs perso)
-      // On itere et on prend le premier bucket ou le fichier existe vraiment. ===
-      var bucketsToTry = ["hr-contract-docs", "hr-signatures", "hr-employee-docs"]
-      if (doc._source === "employee") {
-        bucketsToTry = ["hr-employee-docs", "hr-contract-docs", "hr-signatures"]
-      }
-
-      var workingSignedUrl: string | null = null
-      var lastError: string = ""
-      for (var i = 0; i < bucketsToTry.length; i++) {
-        var b = bucketsToTry[i]
-        var r = await supabase.storage.from(b).createSignedUrl(doc.file_path, 3600)
-        if (r.error || !r.data || !r.data.signedUrl) {
-          lastError = (r.error && r.error.message) || "URL signee non generee"
-          continue
-        }
-        // Verifie que l'objet existe vraiment (HEAD request)
-        try {
-          var head = await fetch(r.data.signedUrl, { method: "HEAD" })
-          if (head.ok) {
-            workingSignedUrl = r.data.signedUrl
-            break
-          }
-          lastError = "HTTP " + head.status + " sur bucket " + b
-        } catch (e: any) {
-          lastError = (e && e.message) || "Erreur reseau"
-        }
-      }
-
-      if (!workingSignedUrl) {
-        throw new Error("Fichier introuvable dans aucun bucket. Dernier echec : " + lastError)
-      }
-
-      // res.data.signedUrl est utilise plus bas dans le code original, on aliase pour compatibilite
-      var res: any = { data: { signedUrl: workingSignedUrl }, error: null }
-
-      // === Cas HTML : fetch + patch paraphes + Blob URL ===
-      if (mimeIsHtml) {
-        var resp = await fetch(res.data.signedUrl)
-        if (!resp.ok) throw new Error("Telechargement HTML echoue (" + resp.status + ")")
-        var html = await resp.text()
-        // Patche les paraphes "en attente" si le salarie a deja signe
-        if (emp && emp.prenom && emp.nom) {
-          var initials = getInitialsFromName(emp.prenom, emp.nom)
-          html = html.replace(/\/\s+en\s+attente/gi, "/   " + initials)
-        }
-        var blob = new Blob([html], { type: "text/html;charset=utf-8" })
-        var blobUrl = URL.createObjectURL(blob)
-        setPdfModalTitle(docLabel)
-        setPdfModalUrl(blobUrl)
-        return
-      }
-
-      // === Cas PDF / image : signed URL directe dans l'iframe ===
-      setPdfModalTitle(docLabel)
-      setPdfModalUrl(res.data.signedUrl)
-    } catch (err) {
-      alert("Erreur ouverture : " + (err.message || err))
-    }
+    var docLabel = doc.label || doc.doc_type || "Document"
+    var source = doc._source === "employee" ? "employee" : "contract"
+    var url = "/api/hr/document/" + doc.id + "?source=" + source
+    setPdfModalTitle(docLabel)
+    setPdfModalUrl(url)
   }
 
   // === Génère un avenant pour un contrat (appelle l'API qui sauvegarde aussi en base) ===
@@ -648,7 +587,7 @@ export default function EmployeeDetail(props) {
         var docRow = (resDocs.data && resDocs.data[0]) || null
         if (docRow) {
           docRow._source = "contract"
-          await openContractDoc(docRow)
+          openContractDoc(docRow)
           return
         }
         // Fallback : viewer custom (peut afficher "Introuvable" si le HTML signé
