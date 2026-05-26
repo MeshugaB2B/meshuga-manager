@@ -38,8 +38,151 @@ var supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 )
 
+// === PdfPreviewModal : modal d'aperçu de document avec actions Fermer/Imprimer ===
+// Affiche un iframe sur l'URL passée (HTML signé via /api/signatures/view OU PDF
+// via signed URL Supabase). Le bouton "Imprimer" essaie d'abord d'utiliser
+// le mode=print du viewer custom (qui auto-print et ferme l'onglet), sinon
+// fallback sur iframe.contentWindow.print() (peut échouer cross-origin).
+function PdfPreviewModal(props: any) {
+  var iframeRef = useRef<HTMLIFrameElement>(null)
+
+  if (!props.url) return null
+
+  var handlePrint = function () {
+    var url = String(props.url || "")
+    if (url.indexOf("/api/signatures/view/") !== -1) {
+      var sep = url.indexOf("?") !== -1 ? "&" : "?"
+      window.open(url + sep + "mode=print", "_blank")
+      return
+    }
+    try {
+      var iframe = iframeRef.current
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.focus()
+        iframe.contentWindow.print()
+        return
+      }
+    } catch (e) {
+      // ignored, fallback below
+    }
+    window.open(url, "_blank")
+  }
+
+  return (
+    <div
+      onClick={props.onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(25,25,35,0.78)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={function (e) { e.stopPropagation() }}
+        style={{
+          background: "#FFFFFF",
+          borderRadius: 10,
+          width: "min(100%, 1100px)",
+          height: "min(100%, 92vh)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          boxShadow: "0 12px 60px rgba(0,0,0,0.4)",
+        }}
+      >
+        <div
+          style={{
+            background: "#FF82D7",
+            padding: "12px 20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "2px solid #191923",
+          }}
+        >
+          <div style={{ color: "#FFFFFF", fontWeight: 900, fontSize: 15, letterSpacing: ".3px" }}>
+            {props.title || "Document"}
+          </div>
+          <button
+            type="button"
+            onClick={props.onClose}
+            aria-label="Fermer"
+            style={{
+              background: "#FFFFFF",
+              color: "#191923",
+              border: "2px solid #191923",
+              borderRadius: 6,
+              width: 32,
+              height: 32,
+              fontWeight: 900,
+              fontSize: 16,
+              cursor: "pointer",
+              lineHeight: 1,
+            }}
+          >&times;</button>
+        </div>
+
+        <iframe
+          ref={iframeRef}
+          src={props.url}
+          title={props.title || "Document"}
+          style={{ flex: 1, width: "100%", border: 0, background: "#F5F5F5" }}
+        />
+
+        <div
+          style={{
+            background: "#FAFAFA",
+            padding: "12px 20px",
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 10,
+            borderTop: "1px solid #EDEDED",
+          }}
+        >
+          <button
+            type="button"
+            onClick={props.onClose}
+            style={{
+              background: "#FFFFFF",
+              color: "#191923",
+              border: "2px solid #191923",
+              borderRadius: 6,
+              padding: "8px 18px",
+              fontWeight: 700,
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >Fermer</button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            style={{
+              background: "#FFEB5A",
+              color: "#191923",
+              border: "2px solid #191923",
+              borderRadius: 6,
+              padding: "8px 18px",
+              fontWeight: 900,
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >🖨 Imprimer</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function EmployeeDetail(props) {
   var [emp, setEmp] = useState(null)
+  // === Modal PDF preview (ouvre les docs signés dans un overlay) ===
+  var [pdfModalUrl, setPdfModalUrl] = useState(null)
+  var [pdfModalTitle, setPdfModalTitle] = useState("Document")
   var [empOriginal, setEmpOriginal] = useState(null)
   var [contracts, setContracts] = useState([])
   var [contractDocs, setContractDocs] = useState({})
@@ -322,15 +465,15 @@ export default function EmployeeDetail(props) {
     }
   }
 
-  // === Ouvre un document de contrat dans un nouvel onglet via signed URL Supabase ===
+  // === Ouvre un document de contrat dans le modal PDF (au lieu d'un nouvel onglet) ===
   async function openContractDoc(doc) {
     if (!doc || !doc.file_path) {
       alert("Fichier introuvable")
       return
     }
     try {
-      // === Docs HTML signes electroniquement -> viewer (patche les paraphes "en attente") ===
-      // Pattern de file_path pour ces docs : "amendments/{uuid}/..." ou "contracts/{uuid}/..."
+      var docLabel = doc.label || doc.doc_type || "Document"
+      // === Docs HTML signes electroniquement -> viewer custom (patche les paraphes) ===
       var mimeIsHtml = doc.mime_type && String(doc.mime_type).toLowerCase().indexOf("html") !== -1
       var pathMatch = String(doc.file_path).match(/^(amendments|contracts)\/([0-9a-f-]+)\//)
       if (mimeIsHtml && pathMatch) {
@@ -338,17 +481,19 @@ export default function EmployeeDetail(props) {
         var entityId = pathMatch[2]
         var docKind = doc.doc_type === "dossier_bienvenue_signe" ? "welcomepack" : "main"
         var viewerUrl = buildSignedDocViewUrl({ entityKind: entityKind, entityId: entityId, docKind: docKind })
-        window.open(viewerUrl, "_blank")
+        setPdfModalTitle(docLabel)
+        setPdfModalUrl(viewerUrl)
         return
       }
-      // === Fallback : PDFs uploades manuellement -> signed URL classique ===
+      // === Fallback : PDFs uploades manuellement -> signed URL Supabase classique ===
       var res = await supabase.storage
         .from("hr-contract-docs")
         .createSignedUrl(doc.file_path, 3600)
       if (res.error || !res.data || !res.data.signedUrl) {
         throw new Error((res.error && res.error.message) || "URL signee introuvable")
       }
-      window.open(res.data.signedUrl, "_blank")
+      setPdfModalTitle(docLabel)
+      setPdfModalUrl(res.data.signedUrl)
     } catch (err) {
       alert("Erreur ouverture : " + (err.message || err))
     }
@@ -436,7 +581,8 @@ export default function EmployeeDetail(props) {
     // au lieu de regénérer un brouillon à blanc depuis le builder.
     if (amendment.signed_at || amendment.status === "signed" || amendment.signature_status === "signed") {
       var viewerUrl = buildSignedDocViewUrl({ entityKind: "amendment", entityId: amendment.id, docKind: "main" })
-      window.open(viewerUrl, "_blank")
+      setPdfModalTitle("Avenant signé")
+      setPdfModalUrl(viewerUrl)
       return
     }
     try {
@@ -882,31 +1028,11 @@ export default function EmployeeDetail(props) {
               onClick={function () { if (props.onNewContract) props.onNewContract(emp.id) }}
             >+ Nouveau contrat</button>
             <button
-              className="btn btn-y"
-              onClick={function () {
-                var target = contracts.filter(function (c) { return c.status !== "archived" })[0]
-                if (target) triggerSignedUpload(target)
-                else alert("Pas de contrat actif pour uploader le signé. Crée d'abord un contrat.")
-              }}
-            >📥 Uploader contrat signé</button>
-            <button
-              className="btn"
-              onClick={previewWelcomePack}
-              title="Générer / voir le dossier de bienvenue (4 pages)"
-            >📋 Dossier de bienvenue</button>
-            <button
               className="btn"
               onClick={requestLeave}
               disabled={!emp.email}
               title={emp.email ? "Envoyer la demande de planification des congés" : "Le salarié doit avoir une adresse email"}
             >📅 Demander les congés</button>
-            {!emp.date_sortie && !emp.needs_regularization ? (
-              <button
-                className="btn btn-p"
-                onClick={function () { setShowOriginalContract(true) }}
-                title="Uploader le contrat originel signé + générer automatiquement un avenant qui ajoute les clauses modernes"
-              >📄 Contrat originel + avenant</button>
-            ) : null}
             {!emp.date_sortie ? (
               <button
                 className="btn"
@@ -1650,10 +1776,6 @@ export default function EmployeeDetail(props) {
         {/* === BLOC DOSSIER DE BIENVENUE === */}
         <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
           <div className="ct">📋 Dossier de bienvenue</div>
-          <div style={{ background: "#FFF8E1", borderLeft: "3px solid #FF82D7", padding: "10px 14px", marginBottom: 12, fontSize: 11, lineHeight: 1.5 }}>
-            🥪 4 pages signables : couverture, fiche salarié pré-remplie, règles d'hygiène (L4122-1) et engagement de lecture (L1331-1) avec mention « Lu et approuvé ».
-          </div>
-
           {welcomePackDocs.length > 0 ? (
             <div style={{ background: "#FFFFFF", border: "2px solid #FF82D7", borderRadius: 6, padding: 12, marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -1730,19 +1852,16 @@ export default function EmployeeDetail(props) {
             mergeContractDocs={true}
           />
         </div>
-
-        {/* === ZONE DANGER === */}
-        <div className="mb" style={{ borderTop: "2px solid #EDEDED", paddingTop: 16, marginTop: 8 }}>
-          <button
-            className="btn btn-red"
-            onClick={deleteEmployee}
-            disabled={saving}
-            style={{ width: "100%" }}
-          >🗑 Supprimer définitivement ce salarié</button>
-        </div>
       </div>
 
-      {/* === MODAL OFFBOARDING === */}
+      {/* === MODAL PDF PREVIEW (ouvre les docs signés en overlay) === */}
+      <PdfPreviewModal
+        url={pdfModalUrl}
+        title={pdfModalTitle}
+        onClose={function () { setPdfModalUrl(null) }}
+      />
+
+            {/* === MODAL OFFBOARDING === */}
       {showOffboarding && emp ? (
         <OffboardingWizard
           employee={emp}
