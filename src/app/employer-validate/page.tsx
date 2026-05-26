@@ -1,11 +1,10 @@
-// =====================================================================
-// FILE PATH: src/app/employer-validate/page.tsx
-// SPRINT C3 — Vague 2 — Page UI de validation employeur (Edward seul)
-// =====================================================================
+// FILE PATH dans le repo :
+//   src/app/employer-validate/page.tsx
 
 "use client"
 
 import { useEffect, useState } from "react"
+import { createBrowserClient } from "@supabase/ssr"
 
 var PINK = "#FF82D7"
 var YELLOW = "#FFEB5A"
@@ -23,12 +22,27 @@ function YellowtailTitle(props: { text: string; size?: number; color?: string })
   return <img src={src} alt={props.text} style={{ height: size + "px", display: "block" }} />
 }
 
+async function getAccessToken(): Promise<string | null> {
+  try {
+    var url = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+    var anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+    if (!url || !anon) return null
+    var supabase = createBrowserClient(url, anon)
+    var r = await supabase.auth.getSession()
+    var session = r.data && r.data.session ? r.data.session : null
+    return session ? (session.access_token || null) : null
+  } catch (e) {
+    return null
+  }
+}
+
 export default function EmployerValidatePage() {
   var [status, setStatus] = useState("loading")
   var [data, setData] = useState<any>(null)
   var [errMsg, setErrMsg] = useState("")
   var [submitting, setSubmitting] = useState(false)
   var [successPayload, setSuccessPayload] = useState<any>(null)
+  var [accessToken, setAccessToken] = useState<string | null>(null)
 
   useEffect(function () {
     var params = new URLSearchParams(window.location.search)
@@ -42,38 +56,51 @@ export default function EmployerValidatePage() {
       return
     }
 
-    var qs =
-      "?type=" + encodeURIComponent(type) +
-      "&id=" + encodeURIComponent(id) +
-      "&token=" + encodeURIComponent(token)
+    getAccessToken().then(function (jwt) {
+      if (!jwt) {
+        var next = encodeURIComponent(window.location.pathname + window.location.search)
+        window.location.href = "/login?next=" + next
+        return
+      }
+      setAccessToken(jwt)
 
-    fetch("/api/employer-validate/load" + qs, { credentials: "include" })
-      .then(function (r) {
-        if (r.status === 403) {
-          var next = encodeURIComponent(window.location.pathname + window.location.search)
-          window.location.href = "/login?next=" + next
-          return null
-        }
-        return r.json()
+      var qs =
+        "?type=" + encodeURIComponent(type) +
+        "&id=" + encodeURIComponent(id) +
+        "&token=" + encodeURIComponent(token)
+
+      fetch("/api/employer-validate/load" + qs, {
+        headers: { Authorization: "Bearer " + jwt },
       })
-      .then(function (j) {
-        if (!j) return
-        if (!j.ok) {
-          setErrMsg(j.error || "Erreur inconnue")
+        .then(function (r) {
+          if (r.status === 403) {
+            return r.json().then(function (j) {
+              setErrMsg("Accès refusé : ce lien ne t&apos;est pas destiné. " + (j && j.debug && j.debug.seen_email ? "(Compte vu : " + j.debug.seen_email + ")" : ""))
+              setStatus("error")
+              return null
+            })
+          }
+          return r.json()
+        })
+        .then(function (j) {
+          if (!j) return
+          if (!j.ok) {
+            setErrMsg(j.error || "Erreur inconnue")
+            setStatus("error")
+            return
+          }
+          setData(j)
+          setStatus(j.status)
+        })
+        .catch(function (e) {
+          setErrMsg(String(e))
           setStatus("error")
-          return
-        }
-        setData(j)
-        setStatus(j.status)
-      })
-      .catch(function (e) {
-        setErrMsg(String(e))
-        setStatus("error")
-      })
+        })
+    })
   }, [])
 
   var handleApprove = function () {
-    if (submitting || !data) return
+    if (submitting || !data || !accessToken) return
     setSubmitting(true)
     var params = new URLSearchParams(window.location.search)
     var type = params.get("type") || ""
@@ -83,8 +110,10 @@ export default function EmployerValidatePage() {
       "/api/" + (type === "contract" ? "contracts" : "amendments") + "/" + id + "/employer-approve"
     fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + accessToken,
+      },
       body: JSON.stringify({ token: token }),
     })
       .then(function (r) { return r.json() })
@@ -107,7 +136,7 @@ export default function EmployerValidatePage() {
   }
 
   var handleReject = function () {
-    if (submitting || !data) return
+    if (submitting || !data || !accessToken) return
     var ok = window.confirm(
       "Annuler cet envoi ? Emy sera notifiée et devra re-préparer le document."
     )
@@ -121,8 +150,10 @@ export default function EmployerValidatePage() {
       "/api/" + (type === "contract" ? "contracts" : "amendments") + "/" + id + "/employer-reject"
     fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + accessToken,
+      },
       body: JSON.stringify({ token: token }),
     })
       .then(function (r) { return r.json() })
