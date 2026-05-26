@@ -687,6 +687,170 @@ export function buildEdwardSignatureNotifEmail(
   return { subject: subject, htmlContent: htmlContent, textContent: textContent }
 }
 
+// ============================================================
+// buildEmployerValidationEmail — Email à Edward pour valider un envoi
+// préparé par un autre utilisateur (typiquement Emy)
+// ============================================================
+// Quand Emy clique "Envoyer pour signature" sur un contrat ou avenant,
+// le système NE LE SEND PAS au salarié. À la place :
+//   1. Le payload d'envoi est sauvegardé en "pending"
+//   2. Cet email est envoyé à Edward avec un lien de validation
+//   3. Edward clique, voit le contrat, et confirme → seulement à ce
+//      moment l'envoi au salarié est déclenché avec la signature Edward
+//
+// Légalement, Edward signe TOUS les contrats (président SAS AEGIA FOOD).
+// Emy fait juste le travail préparatoire.
+// ============================================================
+export interface EmployerValidationEmailParams {
+  preparedByEmail: string         // ex: "emy@meshuga.fr"
+  preparedByDisplayName: string   // ex: "Emy Soulabaille"
+  recipientFirstName: string      // salarié destinataire final
+  recipientLastName: string
+  recipientCivilite?: string | null
+  documentTypeLabel: string       // ex: "Contrat de travail CDI Cuisinier"
+  documentKind: "contract" | "amendment"
+  includeWelcomePack: boolean
+  signatureRecipientEmail?: string | null  // email salarié final
+  signatureRecipientPhone?: string | null  // tél salarié final
+  validationUrl: string           // https://.../employer-validate?type=...&id=...&token=...
+}
+
+export function buildEmployerValidationEmail(
+  params: EmployerValidationEmailParams
+): { subject: string; htmlContent: string; textContent: string } {
+  var prenom = (params.recipientFirstName || "").trim()
+  var nom = (params.recipientLastName || "").trim().toUpperCase()
+  var fullSalarie = (prenom + " " + nom).trim()
+  var bundle = params.includeWelcomePack
+
+  var kindLabel = params.documentKind === "amendment" ? "avenant" : "contrat"
+  var subject = "⏳ À valider : " + params.documentTypeLabel + " de " + fullSalarie + " (préparé par " + params.preparedByDisplayName + ")"
+
+  // === Titre Yellowtail "À valider" ===
+  var titleYellowtail = yellowtailImg({
+    text: "À valider",
+    size: 42,
+    color: "FF82D7",
+    alt: "À valider",
+  })
+
+  // Récap canaux envoi prévus
+  var canauxList = ""
+  if (params.signatureRecipientEmail) {
+    canauxList += '<li>Email : <strong>' + escHtml(params.signatureRecipientEmail) + '</strong></li>'
+  }
+  if (params.signatureRecipientPhone) {
+    canauxList += '<li>SMS : <strong>' + escHtml(params.signatureRecipientPhone) + '</strong></li>'
+  }
+
+  var htmlContent =
+    '<!DOCTYPE html>' +
+    '<html lang="fr">' +
+    '<head>' +
+    '<meta charset="utf-8"/>' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0"/>' +
+    '<meta name="color-scheme" content="light only"/>' +
+    '<meta name="supported-color-schemes" content="light only"/>' +
+    '<title>' + escHtml(subject) + '</title>' +
+    '<style>' +
+    '  :root { color-scheme: light only }' +
+    '  body, table, td, p, a { -webkit-text-size-adjust:100% }' +
+    '  table { border-collapse:collapse !important }' +
+    '  img { -ms-interpolation-mode:bicubic; border:0; outline:none; display:block }' +
+    '  .cta-btn { background-color:#FF82D7 !important; color:#FFFFFF !important }' +
+    '  .cta-btn-cell { background-color:#FF82D7 !important }' +
+    '  @media (prefers-color-scheme: dark) {' +
+    '    .cta-btn { background-color:#FF82D7 !important; color:#FFFFFF !important }' +
+    '    .cta-btn-cell { background-color:#FF82D7 !important }' +
+    '  }' +
+    '</style>' +
+    '</head>' +
+    '<body style="margin:0;padding:0;background:#FFEB5A;font-family:Arial,Helvetica,sans-serif;color:#191923">' +
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FFEB5A">' +
+    '<tr><td align="center" style="padding:24px 12px">' +
+    '<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:12px;overflow:hidden">' +
+
+    // Header logo
+    '<tr><td align="center" style="padding:32px 32px 8px 32px;background:#FFFFFF">' +
+    '<img src="' + MESHUGA_LOGO_PINK_DATA_URI + '" width="180" height="48" alt="Meshuga" style="display:block;width:180px;max-width:80%;height:auto;border:0;outline:none;margin:0 auto"/>' +
+    '</td></tr>' +
+
+    // Titre Yellowtail "À valider"
+    '<tr><td align="center" style="padding:0 32px 24px 32px;background:#FFFFFF;border-bottom:1px solid #F5F5F5">' +
+    titleYellowtail +
+    '</td></tr>' +
+
+    // Corps
+    '<tr><td style="padding:24px 32px 16px 32px">' +
+    '<p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#191923">' +
+    'Edward, <strong>' + escHtml(params.preparedByDisplayName) + '</strong> vient de préparer ' +
+    (params.documentKind === "amendment" ? "un avenant" : "un contrat") +
+    ' à signer pour <strong>' + escHtml(fullSalarie) + '</strong>.' +
+    '</p>' +
+
+    // Encart récap
+    '<div style="background:#FFF8FB;border-left:4px solid #FF82D7;padding:14px 18px;border-radius:4px;margin:18px 0;font-size:14px;line-height:1.6;color:#191923">' +
+    '<div><strong>Document :</strong> ' + escHtml(params.documentTypeLabel) + '</div>' +
+    '<div><strong>Salarié :</strong> ' + escHtml(fullSalarie) + '</div>' +
+    (bundle ? '<div><strong>Dossier de bienvenue :</strong> inclus dans l&apos;envoi</div>' : '') +
+    (canauxList ? '<div style="margin-top:6px"><strong>Canaux d&apos;envoi prévus :</strong></div><ul style="margin:4px 0 0 20px;padding:0">' + canauxList + '</ul>' : '') +
+    '<div style="margin-top:8px"><strong>Préparé par :</strong> ' + escHtml(params.preparedByDisplayName) + ' &lt;' + escHtml(params.preparedByEmail) + '&gt;</div>' +
+    '</div>' +
+
+    '<p style="margin:18px 0 8px 0;font-size:15px;line-height:1.6;color:#191923">' +
+    "Rien n'a été envoyé au salarié pour le moment. " +
+    "Tu dois valider le contenu de " + (params.documentKind === "amendment" ? "l&apos;avenant" : "ce contrat") + " avant qu&apos;il soit envoyé." +
+    '</p>' +
+
+    '<p style="margin:8px 0 20px 0;font-size:14px;line-height:1.6;color:#666">' +
+    "C&apos;est <strong>toi</strong> qui signes le " + kindLabel + " côté employeur (président SAS AEGIA FOOD)." +
+    '</p>' +
+
+    // CTA "Valider et envoyer"
+    '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0 12px 0"><tr><td align="center">' +
+    '<table role="presentation" cellspacing="0" cellpadding="0" border="0" bgcolor="#FF82D7" class="cta-btn-cell" style="background-color:#FF82D7;border-radius:8px"><tr><td bgcolor="#FF82D7" class="cta-btn-cell" align="center" style="background-color:#FF82D7;border-radius:8px;padding:0">' +
+    '<a href="' + escAttr(params.validationUrl) + '" class="cta-btn" style="display:inline-block;background-color:#FF82D7;color:#FFFFFF;text-decoration:none;padding:16px 32px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.5px;font-family:Arial,Helvetica,sans-serif"><span style="color:#FFFFFF;text-decoration:none">Vérifier et envoyer &rarr;</span></a>' +
+    '</td></tr></table>' +
+    '</td></tr></table>' +
+
+    '<p style="margin:20px 0 8px 0;font-size:12px;line-height:1.5;color:#666">' +
+    "Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :" +
+    '</p>' +
+    '<p style="margin:0 0 16px 0;font-size:11px;line-height:1.4;color:#666;word-break:break-all">' +
+    '<a href="' + escAttr(params.validationUrl) + '" style="color:#FF82D7">' + escHtml(params.validationUrl) + '</a>' +
+    '</p>' +
+
+    '<p style="margin:16px 0 0 0;font-size:13px;color:#999;line-height:1.5">' +
+    "Lien valable 7 jours. Tant que tu n&apos;as pas validé, rien ne part au salarié." +
+    '</p>' +
+
+    '</td></tr>' +
+
+    // Footer
+    '<tr><td style="padding:20px 32px;background:#FAFAFA;border-top:1px solid #EEEEEE;text-align:center">' +
+    '<p style="margin:0;font-size:11px;color:#999;line-height:1.5">' +
+    '<strong>Meshuga RH</strong> · Workflow validation employer' +
+    '</p>' +
+    '</td></tr>' +
+    '</table>' +
+    '</td></tr></table>' +
+    '</body></html>'
+
+  var textContent =
+    "Edward,\n\n" +
+    params.preparedByDisplayName + " vient de préparer un " + kindLabel +
+    " à signer pour " + fullSalarie + ".\n\n" +
+    "Document : " + params.documentTypeLabel + "\n" +
+    (bundle ? "Dossier de bienvenue : inclus\n" : "") +
+    "Préparé par : " + params.preparedByDisplayName + " <" + params.preparedByEmail + ">\n\n" +
+    "Rien n'a été envoyé au salarié. Tu dois valider le contenu avant envoi.\n\n" +
+    "Vérifier et envoyer :\n" + params.validationUrl + "\n\n" +
+    "Lien valable 7 jours.\n\n" +
+    "— Meshuga RH"
+
+  return { subject: subject, htmlContent: htmlContent, textContent: textContent }
+}
+
 function escHtml(s: any): string {
   if (s === null || s === undefined) return ""
   return String(s)
