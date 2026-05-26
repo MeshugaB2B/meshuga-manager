@@ -38,6 +38,14 @@ var supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 )
 
+// === Helper : initiales "P.N." à partir de prénom + nom (pour patcher les paraphes) ===
+function getInitialsFromName(prenom: string, nom: string): string {
+  var p = (prenom || "").trim().charAt(0).toUpperCase()
+  var n = (nom || "").trim().charAt(0).toUpperCase()
+  if (!p && !n) return "?.?."
+  return (p || "?") + "." + (n || "?") + "."
+}
+
 // === PdfPreviewModal : modal d'aperçu de document avec actions Fermer/Imprimer ===
 // Affiche un iframe sur l'URL passée (HTML signé via /api/signatures/view OU PDF
 // via signed URL Supabase). Le bouton "Imprimer" essaie d'abord d'utiliser
@@ -465,7 +473,11 @@ export default function EmployeeDetail(props) {
     }
   }
 
-  // === Ouvre un document de contrat dans le modal PDF (au lieu d'un nouvel onglet) ===
+  // === Ouvre un document dans le modal PDF (HTML rendu correctement, PDF natif) ===
+  // - HTML : fetch + patch paraphes "en attente" -> initiales salarié, puis Blob URL
+  //          (sinon Supabase Storage le sert avec un Content-Disposition qui fait afficher
+  //           le code source au lieu du rendu)
+  // - PDF / image : signed URL Supabase directe (Chrome rend nativement dans l'iframe)
   async function openContractDoc(doc) {
     if (!doc || !doc.file_path) {
       alert("Fichier introuvable")
@@ -473,25 +485,39 @@ export default function EmployeeDetail(props) {
     }
     try {
       var docLabel = doc.label || doc.doc_type || "Document"
-      // === Docs HTML signes electroniquement -> viewer custom (patche les paraphes) ===
       var mimeIsHtml = doc.mime_type && String(doc.mime_type).toLowerCase().indexOf("html") !== -1
-      var pathMatch = String(doc.file_path).match(/^(amendments|contracts)\/([0-9a-f-]+)\//)
-      if (mimeIsHtml && pathMatch) {
-        var entityKind = pathMatch[1] === "amendments" ? "amendment" : "contract"
-        var entityId = pathMatch[2]
-        var docKind = doc.doc_type === "dossier_bienvenue_signe" ? "welcomepack" : "main"
-        var viewerUrl = buildSignedDocViewUrl({ entityKind: entityKind, entityId: entityId, docKind: docKind })
-        setPdfModalTitle(docLabel)
-        setPdfModalUrl(viewerUrl)
-        return
+
+      // Détermine le bucket Supabase selon le type de doc
+      // (les hr_employee_documents sont dans hr-employee-docs, les hr_contract_documents dans hr-contract-docs)
+      var bucket = "hr-contract-docs"
+      if (doc._source === "employee") {
+        bucket = "hr-employee-docs"
       }
-      // === Fallback : PDFs uploades manuellement -> signed URL Supabase classique ===
-      var res = await supabase.storage
-        .from("hr-contract-docs")
-        .createSignedUrl(doc.file_path, 3600)
+
+      // Signed URL Supabase (valable 1h)
+      var res = await supabase.storage.from(bucket).createSignedUrl(doc.file_path, 3600)
       if (res.error || !res.data || !res.data.signedUrl) {
         throw new Error((res.error && res.error.message) || "URL signee introuvable")
       }
+
+      // === Cas HTML : fetch + patch paraphes + Blob URL ===
+      if (mimeIsHtml) {
+        var resp = await fetch(res.data.signedUrl)
+        if (!resp.ok) throw new Error("Telechargement HTML echoue (" + resp.status + ")")
+        var html = await resp.text()
+        // Patche les paraphes "en attente" si le salarie a deja signe
+        if (emp && emp.prenom && emp.nom) {
+          var initials = getInitialsFromName(emp.prenom, emp.nom)
+          html = html.replace(/\/\s+en\s+attente/gi, "/   " + initials)
+        }
+        var blob = new Blob([html], { type: "text/html;charset=utf-8" })
+        var blobUrl = URL.createObjectURL(blob)
+        setPdfModalTitle(docLabel)
+        setPdfModalUrl(blobUrl)
+        return
+      }
+
+      // === Cas PDF / image : signed URL directe dans l'iframe ===
       setPdfModalTitle(docLabel)
       setPdfModalUrl(res.data.signedUrl)
     } catch (err) {
@@ -580,9 +606,32 @@ export default function EmployeeDetail(props) {
     // Si l'avenant est signé, on ouvre le viewer inline (avec la signature visible)
     // au lieu de regénérer un brouillon à blanc depuis le builder.
     if (amendment.signed_at || amendment.status === "signed" || amendment.signature_status === "signed") {
-      var viewerUrl = buildSignedDocViewUrl({ entityKind: "amendment", entityId: amendment.id, docKind: "main" })
-      setPdfModalTitle("Avenant signé")
-      setPdfModalUrl(viewerUrl)
+      // L'avenant est signé : on cherche le HTML archivé dans hr_contract_documents
+      // (doc_type = "avenant") lié à ce contract_id, puis on l'ouvre via openContractDoc
+      // (qui patche les paraphes + utilise un Blob URL).
+      try {
+        var resDocs = await supabase
+          .from("hr_contract_documents")
+          .select("id, doc_type, label, mime_type, file_path, uploaded_at")
+          .eq("contract_id", amendment.contract_id)
+          .eq("doc_type", "avenant")
+          .order("uploaded_at", { ascending: false })
+          .limit(1)
+        if (resDocs.error) throw resDocs.error
+        var docRow = (resDocs.data && resDocs.data[0]) || null
+        if (docRow) {
+          docRow._source = "contract"
+          await openContractDoc(docRow)
+          return
+        }
+        // Fallback : viewer custom (peut afficher "Introuvable" si le HTML signé
+        // n'est pas dans hr-signatures, mais on a tenté hr_contract_documents avant)
+        var viewerUrl = buildSignedDocViewUrl({ entityKind: "amendment", entityId: amendment.id, docKind: "main" })
+        setPdfModalTitle("Avenant signé")
+        setPdfModalUrl(viewerUrl)
+      } catch (e) {
+        alert("Erreur ouverture avenant signé : " + ((e && e.message) || e))
+      }
       return
     }
     try {
@@ -1850,6 +1899,7 @@ export default function EmployeeDetail(props) {
             parentId={emp.id}
             contractIds={contracts.map(function (c) { return c.id })}
             mergeContractDocs={true}
+            onOpenDoc={openContractDoc}
           />
         </div>
       </div>
@@ -1858,7 +1908,13 @@ export default function EmployeeDetail(props) {
       <PdfPreviewModal
         url={pdfModalUrl}
         title={pdfModalTitle}
-        onClose={function () { setPdfModalUrl(null) }}
+        onClose={function () {
+          // Si c'est un Blob URL (HTML patche), on le revoque pour libere la memoire
+          if (pdfModalUrl && String(pdfModalUrl).indexOf("blob:") === 0) {
+            try { URL.revokeObjectURL(pdfModalUrl) } catch (e) { /* ignore */ }
+          }
+          setPdfModalUrl(null)
+        }}
       />
 
             {/* === MODAL OFFBOARDING === */}
