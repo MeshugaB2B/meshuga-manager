@@ -2,40 +2,19 @@
 //   src/app/api/amendments/[id]/employer-approve/route.ts
 
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import { createServerClient } from "@supabase/ssr"
 import { executeEmployerApprove } from "@/lib/employer-validation"
+import { getUserEmailFromBearer } from "@/lib/server-auth"
 
 export var dynamic = "force-dynamic"
 
-async function getCurrentUserEmail() {
-  try {
-    var url = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-    var anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-    if (!url || !anon) return null
-    var cookieStore = cookies()
-    var supa = createServerClient(url, anon, {
-      cookies: {
-        getAll: function () {
-          return cookieStore.getAll()
-        },
-        setAll: function () {},
-      },
-    })
-    var r = await supa.auth.getUser()
-    if (r.error) return null
-    var email = r.data && r.data.user ? r.data.user.email : null
-    return email ? email.toLowerCase() : null
-  } catch (e) {
-    return null
-  }
-}
-
 export async function POST(req: Request, ctx: { params: { id: string } }) {
   try {
-    var email = await getCurrentUserEmail()
+    var email = await getUserEmailFromBearer(req)
     if (email !== "edward@meshuga.fr") {
-      return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 })
+      return NextResponse.json(
+        { ok: false, error: "forbidden", debug: { seen_email: email } },
+        { status: 403 }
+      )
     }
 
     var id = ctx && ctx.params ? ctx.params.id : ""
