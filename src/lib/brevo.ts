@@ -26,6 +26,12 @@
 //   envoyé mais juste loggé. Utile pour le dev local.
 //
 // ⚠️ NE PAS importer côté client (BREVO_API_KEY doit rester serveur).
+//
+// === YELLOWTAIL DANS LES EMAILS ===
+// Apple Mail / Gmail / Outlook bloquent Google Fonts. Pour afficher
+// du Yellowtail réel dans les emails, on génère un PNG côté serveur
+// via /api/og/yellowtail et on l'embarque comme <img>. Helper :
+// yellowtailImg({ text, size, color }) retourne le HTML <img>.
 // ============================================================
 
 import { MESHUGA_LOGO_PINK_DATA_URI } from "./meshugaLogo"
@@ -55,6 +61,52 @@ export interface BrevoSendResult {
 var DEFAULT_SENDER = {
   email: "hello@meshuga.fr",
   name: "Meshuga RH",
+}
+
+// === URL de base de l'app (pour les <img> Yellowtail) ===
+// On lit NEXT_PUBLIC_APP_URL si défini, sinon fallback prod.
+function getAppBaseUrl(): string {
+  var u = process.env.NEXT_PUBLIC_APP_URL || ""
+  if (u) return u.replace(/\/+$/, "")
+  return "https://meshuga-manager.vercel.app"
+}
+
+// === Helper Yellowtail : retourne un <img> qui rend du texte en
+//     Yellowtail réel via la route Edge /api/og/yellowtail. ===
+function yellowtailImg(opts: {
+  text: string
+  size?: number
+  color?: string
+  alt?: string
+  marginTop?: number
+  marginBottom?: number
+}): string {
+  var text = opts.text
+  var size = opts.size || 36
+  var colorRaw = (opts.color || "FF82D7").replace(/^#/, "")
+  var alt = opts.alt || text
+  var mt = typeof opts.marginTop === "number" ? opts.marginTop : 0
+  var mb = typeof opts.marginBottom === "number" ? opts.marginBottom : 0
+
+  var base = getAppBaseUrl()
+  var qs =
+    "text=" + encodeURIComponent(text) +
+    "&size=" + size +
+    "&color=" + colorRaw
+  var src = base + "/api/og/yellowtail?" + qs
+
+  // height ≈ size * 1.5 → cohérent avec la route OG
+  var heightPx = Math.ceil(size * 1.5)
+
+  return (
+    '<img src="' + src + '"' +
+    ' alt="' + escAttr(alt) + '"' +
+    ' height="' + heightPx + '"' +
+    ' style="display:block;border:0;outline:none;max-width:100%;' +
+    'height:' + heightPx + 'px;line-height:1;' +
+    'margin:' + mt + 'px auto ' + mb + 'px auto"' +
+    '/>'
+  )
 }
 
 // ============================================================
@@ -165,7 +217,8 @@ export async function sendBrevoEmail(
 // /api/amendments/[id]/send-signature.
 //
 // Le rendu est volontairement simple et inline (compatible Gmail,
-// Outlook, etc.). Charte Meshuga : Yellowtail header, BILD body.
+// Outlook, etc.). Charte Meshuga : Yellowtail header (img PNG),
+// Arial body.
 // ============================================================
 export interface SignatureRequestEmailParams {
   recipientFirstName: string
@@ -182,7 +235,6 @@ export function buildSignatureRequestEmail(
   params: SignatureRequestEmailParams
 ): { subject: string; htmlContent: string; textContent: string } {
   var prenom = (params.recipientFirstName || "").trim()
-  var nom = (params.recipientLastName || "").trim().toUpperCase()
   var civ = (params.recipientCivilite || "").trim()
   var isFemale = civ.toLowerCase() === "mme" || civ.toLowerCase() === "madame"
   var greeting = isFemale ? "Chère " : "Cher "
@@ -200,9 +252,17 @@ export function buildSignatureRequestEmail(
   var docsList = bundle
     ? '<ul style="margin: 8px 0 16px 20px; padding: 0; color: #191923; font-size: 15px; line-height: 1.6;">' +
       '<li>Votre <strong>' + escHtml(docLabel) + '</strong></li>' +
-      '<li>Le <strong>Dossier de bienvenue Meshuga</strong> (règles d\'hygiène, sécurité, RGPD, vidéosurveillance)</li>' +
+      '<li>Le <strong>Dossier de bienvenue Meshuga</strong> (règles d&apos;hygiène, sécurité, RGPD, vidéosurveillance)</li>' +
       '</ul>'
     : '<p style="margin: 8px 0 16px 0; color: #191923; font-size: 15px;">Votre <strong>' + escHtml(docLabel) + '</strong></p>'
+
+  // === Titre Yellowtail principal (PNG via /api/og/yellowtail) ===
+  var titleYellowtail = yellowtailImg({
+    text: "À signer",
+    size: 42,
+    color: "FF82D7",
+    alt: "À signer",
+  })
 
   var htmlContent =
     '<!DOCTYPE html>' +
@@ -253,9 +313,14 @@ export function buildSignatureRequestEmail(
     // Card centrale : max-width 600px, width 100% pour le responsive
     '<table role="presentation" class="container" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:12px;overflow:hidden">' +
 
-    // Header BLANC avec logotype rose centré (pas de "Crazy Deli")
-    '<tr><td align="center" class="py-32" style="padding:36px 32px 28px 32px;background:#FFFFFF;border-bottom:1px solid #F5F5F5">' +
+    // Header BLANC avec logotype rose centré
+    '<tr><td align="center" class="py-32" style="padding:36px 32px 16px 32px;background:#FFFFFF">' +
     '<img src="' + MESHUGA_LOGO_PINK_DATA_URI + '" width="200" height="54" alt="Meshuga" class="logo-img" style="display:block;width:200px;max-width:80%;height:auto;border:0;outline:none;margin:0 auto"/>' +
+    '</td></tr>' +
+
+    // Titre Yellowtail "À signer"
+    '<tr><td align="center" style="padding:0 32px 24px 32px;background:#FFFFFF;border-bottom:1px solid #F5F5F5">' +
+    titleYellowtail +
     '</td></tr>' +
 
     // Corps
@@ -268,7 +333,7 @@ export function buildSignatureRequestEmail(
     docsList +
 
     '<p class="body-text" style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#191923">' +
-    'La signature se fait en quelques minutes depuis votre téléphone ou ordinateur. Aucune impression ni signature manuscrite n\'est nécessaire.' +
+    'La signature se fait en quelques minutes depuis votre téléphone ou ordinateur. Aucune impression ni signature manuscrite n&apos;est nécessaire.' +
     '</p>' +
 
     // CTA bouton (responsive) — wrappé dans table+td bgcolor pour résister au dark mode
@@ -295,7 +360,7 @@ export function buildSignatureRequestEmail(
     '</p>' +
     '</td></tr>' +
 
-    // Footer (sans "Crazy Deli")
+    // Footer
     '<tr><td class="px-32" style="padding:20px 32px;background:#FAFAFA;border-top:1px solid #EEEEEE;text-align:center">' +
     '<p style="margin:0;font-size:11px;line-height:1.5;color:#999">' +
     '<strong>Meshuga</strong> · 3 rue Vavin, 75006 Paris · SIREN 904 639 531<br>' +
@@ -347,7 +412,6 @@ export function buildRelanceEmail(
   params: RelanceEmailParams
 ): { subject: string; htmlContent: string; textContent: string } {
   var prenom = (params.recipientFirstName || "").trim()
-  var nom = (params.recipientLastName || "").trim().toUpperCase()
   var civ = (params.recipientCivilite || "").trim()
   var isFemale = civ.toLowerCase() === "mme" || civ.toLowerCase() === "madame"
   var greeting = isFemale ? "Chère " : "Cher "
@@ -360,6 +424,14 @@ export function buildRelanceEmail(
 
   var subject = "Rappel — Signature à effectuer : " + docLabel
 
+  // === Titre Yellowtail "Petit rappel..." ===
+  var titleYellowtail = yellowtailImg({
+    text: "Petit rappel...",
+    size: 32,
+    color: "FF82D7",
+    alt: "Petit rappel",
+  })
+
   var htmlContent =
     '<!DOCTYPE html>' +
     '<html lang="fr">' +
@@ -369,10 +441,6 @@ export function buildRelanceEmail(
     '<meta name="color-scheme" content="light only"/>' +
     '<meta name="supported-color-schemes" content="light only"/>' +
     '<title>' + escHtml(subject) + '</title>' +
-    // 🎀 Yellowtail via Google Fonts (Apple Mail compatible).
-    // Sur les clients qui ne chargent pas les fonts externes (Outlook desktop, etc.),
-    // fallback cursive système — pas idéal mais inévitable côté Outlook.
-    '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet"/>' +
     '<style>' +
     '  :root { color-scheme: light only; supported-color-schemes: light only }' +
     '  body, table, td, p, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100% }' +
@@ -395,16 +463,20 @@ export function buildRelanceEmail(
     '<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:12px;overflow:hidden">' +
 
     // Header
-    '<tr><td align="center" style="padding:32px 32px 20px 32px;background:#FFFFFF;border-bottom:1px solid #F5F5F5">' +
+    '<tr><td align="center" style="padding:32px 32px 14px 32px;background:#FFFFFF">' +
     '<img src="' + MESHUGA_LOGO_PINK_DATA_URI + '" width="180" height="48" alt="Meshuga" style="display:block;width:180px;max-width:80%;height:auto;border:0;outline:none;margin:0 auto"/>' +
+    '</td></tr>' +
+
+    // Titre Yellowtail "Petit rappel..."
+    '<tr><td align="center" style="padding:0 32px 18px 32px;background:#FFFFFF;border-bottom:1px solid #F5F5F5">' +
+    titleYellowtail +
     '</td></tr>' +
 
     // Corps
     '<tr><td style="padding:28px 32px 16px 32px">' +
-    '<div style="font-family: Yellowtail, cursive; color: #FF82D7; font-size: 28px; line-height: 1; margin-bottom: 14px;">Petit rappel...</div>' +
     '<h1 style="margin:0 0 18px 0;font-size:17px;color:#191923;font-weight:400;line-height:1.5">' + escHtml(greetingFull) + ',</h1>' +
     '<p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#191923">' +
-    "Je n'ai pas encore reçu votre signature pour " +
+    "Je n&apos;ai pas encore reçu votre signature pour " +
     (bundle ? '<strong>2 documents</strong> qui vous attendent' : 'votre <strong>' + escHtml(docLabel) + '</strong>') +
     ' (envoyé il y a ' + (days <= 1 ? '1 jour' : (days + ' jours')) + ').' +
     '</p>' +
@@ -472,12 +544,6 @@ export function buildRelanceEmail(
 // ============================================================
 // Envoyé à Edward dès qu'un salarié a signé.
 // Contient le lien direct vers le PDF signé en DB pour vérification.
-//
-// ✨ Sprint C3 v3 :
-//   - signedPdfUrl / signedWelcomePackUrl pointent désormais vers
-//     /api/signatures/view/[token] (HTML inline + toolbar PDF) au lieu
-//     des signed URLs Supabase qui forçaient un download .html raw.
-//   - Le head charge Yellowtail via Google Fonts (Apple Mail compatible).
 // ============================================================
 export interface EdwardSignatureNotifParams {
   signerFirstName: string
@@ -485,8 +551,8 @@ export interface EdwardSignatureNotifParams {
   documentTypeLabel: string
   includeWelcomePack: boolean
   signedAt: string // ISO date
-  signedPdfUrl: string // URL /api/signatures/view/[token] vers le document principal
-  signedWelcomePackUrl?: string | null // URL /api/signatures/view/[token] vers le welcomepack
+  signedPdfUrl: string // URL signée Supabase Storage du PDF avenant
+  signedWelcomePackUrl?: string | null // URL signée du welcomepack si bundle
   signatureId: string
   pdfHash: string
 }
@@ -505,6 +571,14 @@ export function buildEdwardSignatureNotifEmail(
     hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris"
   })
 
+  // === Titre Yellowtail "Signature reçue" ===
+  var titleYellowtail = yellowtailImg({
+    text: "Signature reçue",
+    size: 40,
+    color: "FF82D7",
+    alt: "Signature reçue",
+  })
+
   var htmlContent =
     '<!DOCTYPE html>' +
     '<html lang="fr">' +
@@ -514,10 +588,6 @@ export function buildEdwardSignatureNotifEmail(
     '<meta name="color-scheme" content="light only"/>' +
     '<meta name="supported-color-schemes" content="light only"/>' +
     '<title>' + escHtml(subject) + '</title>' +
-    // 🎀 Yellowtail via Google Fonts (Apple Mail compatible).
-    // Sur les clients qui ne chargent pas les fonts externes (Outlook desktop, etc.),
-    // fallback cursive système.
-    '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet"/>' +
     '<style>' +
     '  :root { color-scheme: light only }' +
     '  body, table, td, p, a { -webkit-text-size-adjust:100% }' +
@@ -536,10 +606,12 @@ export function buildEdwardSignatureNotifEmail(
     '<tr><td align="center" style="padding:24px 12px">' +
     '<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#FFFFFF;border-radius:12px;overflow:hidden">' +
 
-    // Header avec coche verte
-    '<tr><td align="center" style="padding:32px 32px 20px 32px;background:#FFFFFF">' +
+    // Header avec coche verte + titre Yellowtail "Signature reçue"
+    '<tr><td align="center" style="padding:32px 32px 8px 32px;background:#FFFFFF">' +
     '<div style="font-size:48px;line-height:1;margin-bottom:8px">✓</div>' +
-    '<div style="font-family: Yellowtail, cursive; color: #FF82D7; font-size: 36px; line-height: 1;">Signature reçue</div>' +
+    '</td></tr>' +
+    '<tr><td align="center" style="padding:0 32px 24px 32px;background:#FFFFFF">' +
+    titleYellowtail +
     '</td></tr>' +
 
     // Corps
@@ -585,7 +657,7 @@ export function buildEdwardSignatureNotifEmail(
     ) +
 
     '<p style="margin:18px 0 8px 0;font-size:12px;color:#666;line-height:1.5">' +
-    'Les liens ouvrent le document directement dans le navigateur. Tu peux le télécharger en PDF via le bouton "↓ Télécharger en PDF" en haut. Le document signé reste aussi accessible en permanence depuis le dashboard Meshuga.' +
+    'Liens valables 7 jours. Le document signé est aussi accessible en permanence depuis le dashboard Meshuga.' +
     '</p>' +
 
     '</td></tr>' +
@@ -609,7 +681,8 @@ export function buildEdwardSignatureNotifEmail(
     "ID signature : " + params.signatureId + "\n\n" +
     "Voir le document signé :\n" + params.signedPdfUrl + "\n" +
     (bundle && params.signedWelcomePackUrl ? "Voir le dossier de bienvenue :\n" + params.signedWelcomePackUrl + "\n" : "") +
-    "\n— Meshuga RH"
+    "\nLiens valables 7 jours.\n\n" +
+    "— Meshuga RH"
 
   return { subject: subject, htmlContent: htmlContent, textContent: textContent }
 }
