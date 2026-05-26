@@ -487,18 +487,45 @@ export default function EmployeeDetail(props) {
       var docLabel = doc.label || doc.doc_type || "Document"
       var mimeIsHtml = doc.mime_type && String(doc.mime_type).toLowerCase().indexOf("html") !== -1
 
-      // Détermine le bucket Supabase selon le type de doc
-      // (les hr_employee_documents sont dans hr-employee-docs, les hr_contract_documents dans hr-contract-docs)
-      var bucket = "hr-contract-docs"
+      // === Resolution du bucket : on essaie plusieurs buckets dans l'ordre
+      //     car les file_path historiques sont incoherents :
+      //     - certains rows pointent dans hr-contract-docs (avenants archives UI)
+      //     - d'autres dans hr-signatures (preuve juridique du welcomepack)
+      //     - d'autres dans hr-employee-docs (docs perso)
+      // On itere et on prend le premier bucket ou le fichier existe vraiment. ===
+      var bucketsToTry = ["hr-contract-docs", "hr-signatures", "hr-employee-docs"]
       if (doc._source === "employee") {
-        bucket = "hr-employee-docs"
+        bucketsToTry = ["hr-employee-docs", "hr-contract-docs", "hr-signatures"]
       }
 
-      // Signed URL Supabase (valable 1h)
-      var res = await supabase.storage.from(bucket).createSignedUrl(doc.file_path, 3600)
-      if (res.error || !res.data || !res.data.signedUrl) {
-        throw new Error((res.error && res.error.message) || "URL signee introuvable")
+      var workingSignedUrl: string | null = null
+      var lastError: string = ""
+      for (var i = 0; i < bucketsToTry.length; i++) {
+        var b = bucketsToTry[i]
+        var r = await supabase.storage.from(b).createSignedUrl(doc.file_path, 3600)
+        if (r.error || !r.data || !r.data.signedUrl) {
+          lastError = (r.error && r.error.message) || "URL signee non generee"
+          continue
+        }
+        // Verifie que l'objet existe vraiment (HEAD request)
+        try {
+          var head = await fetch(r.data.signedUrl, { method: "HEAD" })
+          if (head.ok) {
+            workingSignedUrl = r.data.signedUrl
+            break
+          }
+          lastError = "HTTP " + head.status + " sur bucket " + b
+        } catch (e: any) {
+          lastError = (e && e.message) || "Erreur reseau"
+        }
       }
+
+      if (!workingSignedUrl) {
+        throw new Error("Fichier introuvable dans aucun bucket. Dernier echec : " + lastError)
+      }
+
+      // res.data.signedUrl est utilise plus bas dans le code original, on aliase pour compatibilite
+      var res: any = { data: { signedUrl: workingSignedUrl }, error: null }
 
       // === Cas HTML : fetch + patch paraphes + Blob URL ===
       if (mimeIsHtml) {
