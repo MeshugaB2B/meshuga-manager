@@ -18,12 +18,10 @@ async function getCurrentUserEmail() {
     var cookieStore = cookies()
     var supa = createServerClient(url, anon, {
       cookies: {
-        get: function (name: string) {
-          var c = cookieStore.get(name)
-          return c ? c.value : undefined
+        getAll: function () {
+          return cookieStore.getAll()
         },
-        set: function () {},
-        remove: function () {},
+        setAll: function () {},
       },
     })
     var r = await supa.auth.getUser()
