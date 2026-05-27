@@ -60,7 +60,7 @@ export default function KpiHistoryModal(props) {
 
   useEffect(function() {
     sb().from('daily_z_reports')
-      .select('z_date, ca_ttc, ca_ht, nb_tickets, nb_couverts, ticket_moyen')
+      .select('z_date, ca_ttc, ca_ht, nb_tickets, nb_couverts, nb_articles, ticket_moyen')
       .order('z_date', { ascending: false })
       .limit(30)
       .then(function(res) {
@@ -101,6 +101,7 @@ export default function KpiHistoryModal(props) {
   else if (kpi === 'nb_tickets') graphTitle = 'Évolution du nombre de tickets'
   else if (kpi === 'ticket_moyen') graphTitle = 'Évolution du panier moyen'
   else if (kpi === 'nb_couverts') graphTitle = 'Évolution du nombre de couverts'
+  else if (kpi === 'nb_articles') graphTitle = 'Évolution des articles vendus'
 
   return (
     <div className="overlay" onClick={onClose}>
