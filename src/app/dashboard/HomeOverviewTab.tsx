@@ -80,7 +80,7 @@ export default function HomeOverviewTab(props) {
     var c = sb()
 
     c.from('daily_z_reports')
-      .select('z_date, ca_ttc, ca_ht, nb_tickets, nb_couverts, ticket_moyen, canaux, canaux_nb_tickets')
+      .select('z_date, ca_ttc, ca_ht, nb_tickets, nb_couverts, nb_articles, ticket_moyen, canaux, canaux_nb_tickets')
       .order('z_date', { ascending: false })
       .limit(15)
       .then(function(res) {
@@ -205,7 +205,13 @@ export default function HomeOverviewTab(props) {
   var caEvol = (zToday && zPrev && Number(zPrev.ca_ttc) > 0) ? ((Number(zToday.ca_ttc) - Number(zPrev.ca_ttc)) / Number(zPrev.ca_ttc)) * 100 : null
   var ticketsEvol = (zToday && zPrev && Number(zPrev.nb_tickets) > 0) ? ((Number(zToday.nb_tickets) - Number(zPrev.nb_tickets)) / Number(zPrev.nb_tickets)) * 100 : null
   var panierEvol = (zToday && zPrev && Number(zPrev.ticket_moyen) > 0) ? ((Number(zToday.ticket_moyen) - Number(zPrev.ticket_moyen)) / Number(zPrev.ticket_moyen)) * 100 : null
-  var couvertsEvol = (zToday && zPrev && Number(zPrev.nb_couverts) > 0) ? ((Number(zToday.nb_couverts) - Number(zPrev.nb_couverts)) / Number(zPrev.nb_couverts)) * 100 : null
+  var articlesEvol = (zToday && zPrev && Number(zPrev.nb_articles) > 0) ? ((Number(zToday.nb_articles) - Number(zPrev.nb_articles)) / Number(zPrev.nb_articles)) * 100 : null
+
+  // Ratio articles/ticket (indicateur de cross-sell)
+  var articlesParTicket = null
+  if (zToday && Number(zToday.nb_tickets) > 0 && Number(zToday.nb_articles) > 0) {
+    articlesParTicket = Number(zToday.nb_articles) / Number(zToday.nb_tickets)
+  }
 
   // Tâches actives
   var tasksActives = (tasks || []).filter(function(t) { return t.status === 'in_progress' || t.status === 'todo' })
@@ -333,12 +339,13 @@ export default function HomeOverviewTab(props) {
                 label="CA TTC" value={FMT_EUR(zToday.ca_ttc)} evol={caEvol}
                 icon="💰" onClick={function(){ openKpi('ca_ttc', 'CA TTC', 'eur', '#FF82D7') }}
               />
-              {/* Couverts : JAUNE + texte NOIR */}
+              {/* Articles vendus : JAUNE + texte NOIR (avec ratio art/tk en sous-info) */}
               <KpiCard
                 bg="#FFEB5A" textColor="#191923" labelColor="#191923" labelOpacity={0.85}
                 accentBar="#191923"
-                label="Couverts" value={Number(zToday.nb_couverts) > 0 ? FMT_INT(zToday.nb_couverts) : '—'} evol={couvertsEvol}
-                icon="🍽️" onClick={function(){ openKpi('nb_couverts', 'Couverts', 'int', '#FFEB5A') }}
+                label="Articles vendus" value={Number(zToday.nb_articles) > 0 ? FMT_INT(zToday.nb_articles) : '—'} evol={articlesEvol}
+                subInfo={articlesParTicket !== null ? articlesParTicket.toFixed(2) + ' art/ticket' : null}
+                icon="🥪" onClick={function(){ openKpi('nb_articles', 'Articles vendus', 'int', '#FFEB5A') }}
               />
               {/* Tickets : BLANC + accent rose */}
               <KpiCard
@@ -514,6 +521,7 @@ function KpiCard(props) {
   var labelOpacity = props.labelOpacity !== undefined ? props.labelOpacity : 1
   var accentBar = props.accentBar || '#FF82D7'
   var icon = props.icon || ''
+  var subInfo = props.subInfo || null
 
   var evolStr = '—'
   var evolBg = 'transparent'
@@ -531,12 +539,14 @@ function KpiCard(props) {
     <div onClick={props.onClick} style={{background:bg,color:textColor,borderRadius:7,border:'2px solid #191923',padding:'14px 12px 12px 16px',position:'relative',boxShadow:'3px 3px 0 #191923',cursor:'pointer',transition:'transform .1s',overflow:'hidden'}}
       onMouseEnter={function(e){ e.currentTarget.style.transform='translate(-2px,-2px)'; e.currentTarget.style.boxShadow='5px 5px 0 #191923' }}
       onMouseLeave={function(e){ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='3px 3px 0 #191923' }}>
-      {/* Accent bar gauche */}
       <span style={{position:'absolute',left:0,top:0,bottom:0,width:5,background:accentBar}} />
       <span style={{position:'absolute',right:10,top:8,fontSize:22,opacity:0.18}}>{icon}</span>
       <div style={{fontFamily:"'Yellowtail',cursive",fontSize:14,lineHeight:1,color:labelColor,opacity:labelOpacity}}>{label}</div>
       <div style={{fontWeight:900,fontSize:26,marginTop:6,lineHeight:1,letterSpacing:-0.5}}>{value}</div>
-      <div style={{marginTop:8,display:'inline-block',background:evolBg,color:evolColor,padding:'2px 8px',borderRadius:11,fontSize:10,fontWeight:900,border:'1.5px solid '+evolBorder}}>{evolStr} vs J-7</div>
+      <div style={{marginTop:8,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+        <span style={{display:'inline-block',background:evolBg,color:evolColor,padding:'2px 8px',borderRadius:11,fontSize:10,fontWeight:900,border:'1.5px solid '+evolBorder}}>{evolStr} vs J-7</span>
+        {subInfo && <span style={{fontSize:10,fontWeight:900,opacity:0.65,whiteSpace:'nowrap'}}>· {subInfo}</span>}
+      </div>
     </div>
   )
 }
