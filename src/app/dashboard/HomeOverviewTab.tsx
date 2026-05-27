@@ -536,12 +536,14 @@ function KpiCard(props) {
   }
 
   return (
-    <div onClick={props.onClick} style={{background:bg,color:textColor,borderRadius:7,border:'2px solid #191923',padding:'14px 12px 12px 16px',position:'relative',boxShadow:'3px 3px 0 #191923',cursor:'pointer',transition:'transform .1s',overflow:'hidden'}}
+    <div onClick={props.onClick} style={{background:bg,color:textColor,borderRadius:7,border:'2px solid #191923',padding:'14px 14px 12px 16px',position:'relative',boxShadow:'3px 3px 0 #191923',cursor:'pointer',transition:'transform .1s',overflow:'hidden'}}
       onMouseEnter={function(e){ e.currentTarget.style.transform='translate(-2px,-2px)'; e.currentTarget.style.boxShadow='5px 5px 0 #191923' }}
       onMouseLeave={function(e){ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='3px 3px 0 #191923' }}>
       <span style={{position:'absolute',left:0,top:0,bottom:0,width:5,background:accentBar}} />
-      <span style={{position:'absolute',right:10,top:8,fontSize:22,opacity:0.18}}>{icon}</span>
-      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:14,lineHeight:1,color:labelColor,opacity:labelOpacity}}>{label}</div>
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        {icon && <span style={{fontSize:16,lineHeight:1}}>{icon}</span>}
+        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:14,lineHeight:1,color:labelColor,opacity:labelOpacity}}>{label}</div>
+      </div>
       <div style={{fontWeight:900,fontSize:26,marginTop:6,lineHeight:1,letterSpacing:-0.5}}>{value}</div>
       <div style={{marginTop:8,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
         <span style={{display:'inline-block',background:evolBg,color:evolColor,padding:'2px 8px',borderRadius:11,fontSize:10,fontWeight:900,border:'1.5px solid '+evolBorder}}>{evolStr} vs J-7</span>
