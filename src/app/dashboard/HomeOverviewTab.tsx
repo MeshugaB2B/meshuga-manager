@@ -12,16 +12,11 @@ import KpiHistoryModal from './KpiHistoryModal'
 //
 // Cliquabilité totale :
 //   - Chaque KPI ouvre KpiHistoryModal (graph 30 jours)
-//   - Chaque ligne hausse de prix ouvre ArticleDetailModal (3 onglets)
+//   - Chaque ligne hausse de prix ouvre ArticleDetailModal (composant existant
+//     du dashboard, qui utilise ArticleDetailView : graph recharts multi-fourn.,
+//     tiles min/max/moy/dernier, recettes liées)
 //   - Chaque ligne food cost en dérive ouvre la page recettes
 //   - Chaque chip alerte ouvre la modale ou page concernée
-//
-// Branchements live :
-//   - daily_z_reports                  : chiffres veille + J-7
-//   - v_price_variations_clean         : hausses prix (anti-anomalies)
-//   - v_recipe_real_food_cost          : recettes en dérive
-//   - hr_contracts + hr_contract_amendments : signatures pending
-//   - devis                            : devis B2B actifs
 // =============================================================================
 
 function sb() {
@@ -469,15 +464,12 @@ export default function HomeOverviewTab(props) {
       </div>
 
       {/* ====== MODALES ====== */}
-      {openArticle && (
-        <ArticleDetailModal
-          productId={openArticle.productId}
-          productName={openArticle.productName}
-          supplierName={openArticle.supplierName}
-          initialTab={openArticle.initialTab}
-          onClose={function(){ setOpenArticle(null) }}
-        />
-      )}
+      <ArticleDetailModal
+        isOpen={openArticle !== null}
+        productId={openArticle ? openArticle.productId : undefined}
+        productName={openArticle ? openArticle.productName : undefined}
+        onClose={function(){ setOpenArticle(null) }}
+      />
       {openKpiModal && (
         <KpiHistoryModal
           kpi={openKpiModal.kpi}
