@@ -1,4 +1,14 @@
 "use client"
+// ============================================================
+// FILE PATH dans le repo :
+//   src/app/dashboard/RhTab.tsx
+// ============================================================
+// v2 (27/05/2026) — Refonte UX SignaturesPendingWidget :
+//   AJOUT : listener sur l'event "meshuga:open-employee" pour permettre au
+//   widget compact de demander l'ouverture d'une fiche salarié sans prop drilling.
+//   Tout le reste du fichier est identique à la version actuelle en prod.
+// ============================================================
+
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@supabase/supabase-js"
 import { LOGO_PINK } from "./logos"
@@ -110,6 +120,21 @@ export default function RhTab() {
 
   useEffect(function () { loadAll() }, [])
 
+  // ============================================================
+  // 🔥 v2 (27/05/2026) — Listener pour le SignaturesPendingWidget
+  // Quand l'utilisateur clique sur une carte dans le widget compact,
+  // le widget dispatch un CustomEvent "meshuga:open-employee" avec
+  // l'employeeId dans le detail. On l'écoute ici pour ouvrir la fiche.
+  // ============================================================
+  useEffect(function () {
+    var handler = function (ev) {
+      var empId = ev && ev.detail && ev.detail.employeeId
+      if (empId) setViewingEmployeeId(empId)
+    }
+    window.addEventListener("meshuga:open-employee", handler)
+    return function () { window.removeEventListener("meshuga:open-employee", handler) }
+  }, [])
+
   // Détermine le contrat principal d'un employé (CDI le plus récent, sinon dernier extra)
   // Utilise _employee_id pour gérer aussi les contrats rattachés via cycle_id
   function getMainContract(empId) {
@@ -184,7 +209,7 @@ export default function RhTab() {
       </div>
       <div className="strip"></div>
 
-      {/* === 🔥 Widget signatures en attente (cron relances 24h) === */}
+      {/* === Widget signatures en attente (compact, replié par défaut) === */}
       <SignaturesPendingWidget />
 
       {/* === ONGLETS ACTIFS / ANCIENS / TOUS === */}
