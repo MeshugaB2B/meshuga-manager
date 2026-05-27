@@ -1,22 +1,22 @@
+// ============================================================
 // FILE PATH dans le repo :
 //   src/app/api/contracts/[id]/employer-approve/route.ts
+// ============================================================
+// v2 (26/05/2026) — Sprint C3 fix auth :
+//   Auth = token URL uniquement (vérifié par executeEmployerApprove).
+//   Plus de getUserEmailFromBearer. approverEmail hardcodé à edward@meshuga.fr
+//   (le token unique garantit que seul Edward, qui a reçu le lien, peut approuver).
+// ============================================================
 
 import { NextResponse } from "next/server"
 import { executeEmployerApprove } from "@/lib/employer-validation"
-import { getUserEmailFromBearer } from "@/lib/server-auth"
 
 export var dynamic = "force-dynamic"
 
+var EMPLOYER_EMAIL = "edward@meshuga.fr"
+
 export async function POST(req: Request, ctx: { params: { id: string } }) {
   try {
-    var email = await getUserEmailFromBearer(req)
-    if (email !== "edward@meshuga.fr") {
-      return NextResponse.json(
-        { ok: false, error: "forbidden", debug: { seen_email: email } },
-        { status: 403 }
-      )
-    }
-
     var id = ctx && ctx.params ? ctx.params.id : ""
     if (!id) {
       return NextResponse.json({ ok: false, error: "missing_id" }, { status: 400 })
@@ -32,7 +32,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       kind: "contract",
       id: id,
       token: token,
-      approverEmail: email,
+      approverEmail: EMPLOYER_EMAIL,
     })
 
     if (!result.ok) {
