@@ -1,9 +1,14 @@
+// ============================================================
 // FILE PATH dans le repo :
 //   src/app/api/employer-validate/load/route.ts
+// ============================================================
+// v2 (26/05/2026) — Sprint C3 fix auth :
+//   Auth = token URL uniquement. Plus de getUserEmailFromBearer.
+//   Le token est cryptographiquement sûr et expire après 7 jours.
+// ============================================================
 
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { getUserEmailFromBearer } from "@/lib/server-auth"
 
 export var dynamic = "force-dynamic"
 
@@ -25,14 +30,6 @@ export async function GET(req: Request) {
     }
     if (type !== "contract" && type !== "amendment") {
       return NextResponse.json({ ok: false, error: "invalid_type" }, { status: 400 })
-    }
-
-    var email = await getUserEmailFromBearer(req)
-    if (email !== "edward@meshuga.fr") {
-      return NextResponse.json(
-        { ok: false, error: "forbidden", reason: "not_employer", debug: { seen_email: email } },
-        { status: 403 }
-      )
     }
 
     var admin = adminClient()
@@ -58,6 +55,11 @@ export async function GET(req: Request) {
     }
     var r = row.data
 
+    // === Vérification token AVANT toute autre logique ===
+    if (!r.employer_validation_token || r.employer_validation_token !== token) {
+      return NextResponse.json({ ok: false, error: "invalid_token" }, { status: 401 })
+    }
+
     if (r.employer_validated_at) {
       return NextResponse.json({
         ok: true,
@@ -65,10 +67,6 @@ export async function GET(req: Request) {
         validated_at: r.employer_validated_at,
         validated_by: r.employer_validated_by_email,
       })
-    }
-
-    if (!r.employer_validation_token || r.employer_validation_token !== token) {
-      return NextResponse.json({ ok: false, error: "invalid_token" }, { status: 401 })
     }
 
     var now = new Date()
