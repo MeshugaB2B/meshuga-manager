@@ -2,9 +2,12 @@
 // FILE PATH dans le repo :
 //   src/app/employer-validate/page.tsx
 // ============================================================
-// v2 (26/05/2026) — Sprint C3 fix auth :
-//   Auth = token URL uniquement. Plus de Bearer, plus de redirect /login.
-//   Cohérent avec une app 100% localStorage (pas de cookies SSR).
+// v3 (27/05/2026) — Sprint C3 fix branding :
+//   Le wordmark "Meshuga" du bandeau utilise désormais le logotype
+//   image officiel (public/MESHUGA_Logotypepink.jpg).
+//   Yellowtail reste utilisé UNIQUEMENT pour les titres décoratifs
+//   ("Oups", "À valider", "Envoyé !", etc.).
+//   Auth = token URL uniquement (inchangé depuis v2).
 // ============================================================
 
 "use client"
@@ -16,6 +19,24 @@ var YELLOW = "#FFEB5A"
 var BLACK = "#191923"
 var FONT_BODY = "'Arial Narrow', Arial, sans-serif"
 
+// === Logotype Meshuga officiel (image servie depuis /public) ===
+function MeshugaLogotype(props: { height?: number }) {
+  var h = props.height || 36
+  return (
+    <img
+      src="/MESHUGA_Logotypepink.jpg"
+      alt="Meshuga"
+      style={{
+        height: h + "px",
+        display: "block",
+        // Le JPG a un fond blanc qu'on neutralise visuellement sur fond rose
+        mixBlendMode: "multiply",
+      }}
+    />
+  )
+}
+
+// === Titre décoratif Yellowtail (pour "Oups", "À valider", etc.) ===
 function YellowtailTitle(props: { text: string; size?: number; color?: string }) {
   var size = props.size || 48
   var color = props.color || BLACK
@@ -161,7 +182,7 @@ export default function EmployerValidatePage() {
             gap: 8,
           }}
         >
-          <YellowtailTitle text="Meshuga" size={36} color="#FFFFFF" />
+          <MeshugaLogotype height={36} />
           <span
             style={{
               color: "#FFFFFF",
