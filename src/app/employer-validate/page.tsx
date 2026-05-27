@@ -2,11 +2,11 @@
 // FILE PATH dans le repo :
 //   src/app/employer-validate/page.tsx
 // ============================================================
-// v3 (27/05/2026) — Sprint C3 fix branding :
-//   Le wordmark "Meshuga" du bandeau utilise désormais le logotype
-//   image officiel (public/MESHUGA_Logotypepink.jpg).
+// v4 (27/05/2026) — Sprint C3 fix branding contraste :
+//   Bandeau rose → wordmark Meshuga BLANC (/MESHUGA_Logotype_white.png).
+//   Plus de mix-blend-mode bidouillé.
 //   Yellowtail reste utilisé UNIQUEMENT pour les titres décoratifs
-//   ("Oups", "À valider", "Envoyé !", etc.).
+//   ("Oups", "À valider", "Envoyé !", "Lien expiré", "Déjà validé", "Annulé").
 //   Auth = token URL uniquement (inchangé depuis v2).
 // ============================================================
 
@@ -19,19 +19,19 @@ var YELLOW = "#FFEB5A"
 var BLACK = "#191923"
 var FONT_BODY = "'Arial Narrow', Arial, sans-serif"
 
-// === Logotype Meshuga officiel (image servie depuis /public) ===
-function MeshugaLogotype(props: { height?: number }) {
+// === Logotype Meshuga officiel ===
+// Règle non-négo : sur fond blanc → version rose ; sur fond rose → version blanche.
+function MeshugaLogotype(props: { height?: number; variant?: "pink" | "white" }) {
   var h = props.height || 36
+  var variant = props.variant === "white" ? "white" : "pink"
+  var src = variant === "white"
+    ? "/MESHUGA_Logotype_white.png"
+    : "/MESHUGA_Logotypepink.jpg"
   return (
     <img
-      src="/MESHUGA_Logotypepink.jpg"
+      src={src}
       alt="Meshuga"
-      style={{
-        height: h + "px",
-        display: "block",
-        // Le JPG a un fond blanc qu'on neutralise visuellement sur fond rose
-        mixBlendMode: "multiply",
-      }}
+      style={{ height: h + "px", display: "block" }}
     />
   )
 }
@@ -182,7 +182,8 @@ export default function EmployerValidatePage() {
             gap: 8,
           }}
         >
-          <MeshugaLogotype height={36} />
+          {/* Fond rose → logotype BLANC */}
+          <MeshugaLogotype height={36} variant="white" />
           <span
             style={{
               color: "#FFFFFF",
