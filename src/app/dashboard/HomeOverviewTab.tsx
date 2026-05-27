@@ -1,22 +1,22 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import { LineChart, Line, ResponsiveContainer, ReferenceLine, YAxis } from 'recharts'
 import ArticleDetailModal from './ArticleDetailModal'
 import KpiHistoryModal from './KpiHistoryModal'
 
 // =============================================================================
-// HomeOverviewTab v2 — Homepage Edward (et Emy)
+// HomeOverviewTab v3 — Homepage Edward (et Emy)
 //
-// Design : Meshuga néo-brutalist (rose/jaune/noir, borders 2-3px, box-shadows
-// décalées, Yellowtail pour titres décoratifs, Arial Narrow 900 pour valeurs).
-//
-// Cliquabilité totale :
-//   - Chaque KPI ouvre KpiHistoryModal (graph 30 jours)
-//   - Chaque ligne hausse de prix ouvre ArticleDetailModal (composant existant
-//     du dashboard, qui utilise ArticleDetailView : graph recharts multi-fourn.,
-//     tiles min/max/moy/dernier, recettes liées)
-//   - Chaque ligne food cost en dérive ouvre la page recettes
-//   - Chaque chip alerte ouvre la modale ou page concernée
+// Refonte design v3 :
+//   - Palette KPI revue : zéro fond noir, fond rose minimisé (CA uniquement)
+//     avec texte BLANC dessus, autres KPI en blanc / jaune avec accents
+//   - Titre du bloc Z : "CA" (au lieu de "Chiffres de la veille")
+//   - Couverts cliquables même si data = 0 (Edward verra le pb data source)
+//   - Hausses de prix : sparkline recharts + moyenne ligne pointillée
+//     DANS chaque carte (avant même de cliquer)
+//   - 3 boutons par carte ouvrent l'ArticleDetailModal existant
+//   - KpiHistoryModal = recharts BarChart avec axes propres et ReferenceLine
 // =============================================================================
 
 function sb() {
@@ -59,10 +59,10 @@ export default function HomeOverviewTab(props) {
   var toast = props.toast || function(){}
   var openModal = props.openModal || function(){}
 
-  // Data
   var [zToday, setZToday] = useState(null)
   var [zPrev, setZPrev] = useState(null)
   var [priceVariations, setPriceVariations] = useState([])
+  var [productHistories, setProductHistories] = useState({})   // {product_id: [{date, price}, ...]}
   var [recipeAlerts, setRecipeAlerts] = useState([])
   var [recipeStats, setRecipeStats] = useState({critique:0, alerte:0, surveillance:0})
   var [signaturesPending, setSignaturesPending] = useState([])
@@ -70,9 +70,8 @@ export default function HomeOverviewTab(props) {
   var [carouselIdx, setCarouselIdx] = useState(0)
   var [loading, setLoading] = useState(true)
 
-  // Modal state
-  var [openArticle, setOpenArticle] = useState(null)        // {productId, productName, supplierName, initialTab}
-  var [openKpiModal, setOpenKpiModal] = useState(null)      // {kpi, label, unit, accent}
+  var [openArticle, setOpenArticle] = useState(null)
+  var [openKpiModal, setOpenKpiModal] = useState(null)
 
   useEffect(function() { loadAll() }, [])
 
@@ -114,7 +113,26 @@ export default function HomeOverviewTab(props) {
           if (days !== null && days > 45) return false
           return true
         })
-        setPriceVariations(filtered.slice(0, 10))
+        filtered = filtered.slice(0, 10)
+        setPriceVariations(filtered)
+
+        // Fetch en batch des historiques de prix pour les produits visibles (sparkline)
+        if (filtered.length > 0) {
+          var ids = filtered.map(function(v) { return v.product_id })
+          c.from('product_prices')
+            .select('product_id, invoice_date, master_unit_price')
+            .in('product_id', ids)
+            .order('invoice_date', { ascending: true })
+            .then(function(res2) {
+              var byPid = {}
+              ;(res2.data || []).forEach(function(p) {
+                var pid = p.product_id
+                if (!byPid[pid]) byPid[pid] = []
+                byPid[pid].push({date: p.invoice_date, price: Number(p.master_unit_price)})
+              })
+              setProductHistories(byPid)
+            })
+        }
       })
 
     c.from('v_recipe_real_food_cost')
@@ -199,14 +217,13 @@ export default function HomeOverviewTab(props) {
   })
 
   // Food cost niveau
-  var fcLevel = 'green'
   var fcEmoji = '✅'
   var fcLabel = 'Food cost sous contrôle'
   var fcBg = '#E6F7E9'
   var fcAccent = '#009D3A'
-  if (recipeStats.critique > 0) { fcLevel = 'red'; fcEmoji = '🔥'; fcLabel = 'Food cost critique'; fcBg = '#FFE6E6'; fcAccent = '#CC0066' }
-  else if (recipeStats.alerte > 0) { fcLevel = 'orange'; fcEmoji = '⚠️'; fcLabel = 'Food cost en alerte'; fcBg = '#FFF4D6'; fcAccent = '#B8920A' }
-  else if (recipeStats.surveillance > 2) { fcLevel = 'orange'; fcEmoji = '⚠️'; fcLabel = 'Recettes à surveiller'; fcBg = '#FFF4D6'; fcAccent = '#B8920A' }
+  if (recipeStats.critique > 0) { fcEmoji = '🔥'; fcLabel = 'Food cost critique'; fcBg = '#FFE6E6'; fcAccent = '#CC0066' }
+  else if (recipeStats.alerte > 0) { fcEmoji = '⚠️'; fcLabel = 'Food cost en alerte'; fcBg = '#FFF4D6'; fcAccent = '#B8920A' }
+  else if (recipeStats.surveillance > 2) { fcEmoji = '⚠️'; fcLabel = 'Recettes à surveiller'; fcBg = '#FFF4D6'; fcAccent = '#B8920A' }
   var fcCount = recipeStats.critique + recipeStats.alerte + recipeStats.surveillance
 
   // Chips alertes
@@ -229,7 +246,7 @@ export default function HomeOverviewTab(props) {
   var canalColor = function(k) {
     if (k === 'sur_place') return '#FF82D7'
     if (k === 'emporter') return '#FFEB5A'
-    if (k === 'livraison') return '#191923'
+    if (k === 'livraison') return '#005FFF'
     return '#888'
   }
   var canalLabel = function(k) {
@@ -245,18 +262,16 @@ export default function HomeOverviewTab(props) {
   function openKpi(kpi, label, unit, accent) {
     setOpenKpiModal({kpi: kpi, label: label, unit: unit, accent: accent})
   }
-  function openArt(variation, initialTab) {
+  function openArt(variation) {
     setOpenArticle({
       productId: variation.product_id,
-      productName: variation.product_name,
-      supplierName: variation.supplier_name,
-      initialTab: initialTab
+      productName: variation.product_name
     })
   }
 
   return (
     <div>
-      {/* ====== 1. EN-TÊTE ====== */}
+      {/* ====== EN-TÊTE ====== */}
       <div className="ph">
         <div>
           <div style={{fontFamily:"'Yellowtail',cursive",fontSize:42,lineHeight:1,color:'#FF82D7'}}>{isEmy ? 'Bonjour Emy' : 'Bonjour Edward'}</div>
@@ -265,13 +280,13 @@ export default function HomeOverviewTab(props) {
         {isEmy && <button className="btn btn-p btn-sm" onClick={function(){ openModal('cr', {}) }}>+ Nouveau CR</button>}
       </div>
 
-      {/* ====== 2. BANDEAU ALERTES ====== */}
+      {/* ====== BANDEAU ALERTES ====== */}
       {chips.length > 0 && (
         <div className="card" style={{borderColor:'#FF82D7',borderWidth:3}}>
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
             <span style={{fontSize:18}}>🔔</span>
             <span style={{fontWeight:900,fontSize:13,textTransform:'uppercase',letterSpacing:0.5}}>Ce qui demande ton attention</span>
-            <span style={{marginLeft:'auto',background:'#191923',color:'#FFEB5A',padding:'3px 9px',borderRadius:12,fontWeight:900,fontSize:11}}>{chips.length}</span>
+            <span style={{marginLeft:'auto',background:'#FF82D7',color:'#FFFFFF',padding:'3px 9px',borderRadius:12,fontWeight:900,fontSize:11,border:'1.5px solid #191923'}}>{chips.length}</span>
           </div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
             {chips.map(function(ch) {
@@ -284,7 +299,7 @@ export default function HomeOverviewTab(props) {
                   onMouseLeave={function(e){ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='2px 2px 0 #191923' }}>
                   <span style={{fontSize:14}}>{ch.icon}</span>
                   <span>{ch.label}</span>
-                  <span style={{opacity:0.6,fontSize:14}}>→</span>
+                  <span style={{opacity:0.7,fontSize:14}}>→</span>
                 </div>
               )
             })}
@@ -292,11 +307,11 @@ export default function HomeOverviewTab(props) {
         </div>
       )}
 
-      {/* ====== 3. CHIFFRES DE LA VEILLE ====== */}
+      {/* ====== CA (ex Chiffres de la veille) ====== */}
       <div className="card">
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>
           <div>
-            <div style={{fontFamily:"'Yellowtail',cursive",fontSize:24,color:'#FF82D7',lineHeight:1}}>Chiffres de la veille</div>
+            <div style={{fontFamily:"'Yellowtail',cursive",fontSize:30,color:'#FF82D7',lineHeight:1}}>CA</div>
             <div style={{fontSize:11,opacity:0.55,marginTop:3,textTransform:'capitalize',fontWeight:700}}>{zDateLabel}</div>
           </div>
           <div style={{fontSize:10,opacity:0.5,fontWeight:900,textTransform:'uppercase',letterSpacing:0.5}}>↓ Clique sur un chiffre pour l&apos;historique</div>
@@ -311,29 +326,33 @@ export default function HomeOverviewTab(props) {
         {zToday && (
           <div>
             <div className="g4">
+              {/* CA TTC : ROSE + texte BLANC */}
               <KpiCard
-                bg="#FF82D7" textColor="#191923"
+                bg="#FF82D7" textColor="#FFFFFF" labelColor="#FFFFFF" labelOpacity={1}
+                accentBar="#FFFFFF"
                 label="CA TTC" value={FMT_EUR(zToday.ca_ttc)} evol={caEvol}
-                icon="💰"
-                onClick={function(){ openKpi('ca_ttc', 'CA TTC', 'eur', '#FF82D7') }}
+                icon="💰" onClick={function(){ openKpi('ca_ttc', 'CA TTC', 'eur', '#FF82D7') }}
               />
+              {/* Couverts : JAUNE + texte NOIR */}
               <KpiCard
-                bg="#FFEB5A" textColor="#191923"
+                bg="#FFEB5A" textColor="#191923" labelColor="#191923" labelOpacity={0.85}
+                accentBar="#191923"
                 label="Couverts" value={Number(zToday.nb_couverts) > 0 ? FMT_INT(zToday.nb_couverts) : '—'} evol={couvertsEvol}
-                icon="🍽️"
-                onClick={function(){ openKpi('nb_couverts', 'Couverts', 'int', '#FFEB5A') }}
+                icon="🍽️" onClick={function(){ openKpi('nb_couverts', 'Couverts', 'int', '#FFEB5A') }}
               />
+              {/* Tickets : BLANC + accent rose */}
               <KpiCard
-                bg="#FFFFFF" textColor="#191923"
+                bg="#FFFFFF" textColor="#191923" labelColor="#FF82D7" labelOpacity={1}
+                accentBar="#FF82D7"
                 label="Tickets" value={FMT_INT(zToday.nb_tickets)} evol={ticketsEvol}
-                icon="🎫"
-                onClick={function(){ openKpi('nb_tickets', 'Tickets', 'int', '#005FFF') }}
+                icon="🎫" onClick={function(){ openKpi('nb_tickets', 'Tickets', 'int', '#FF82D7') }}
               />
+              {/* Panier moyen : BLANC + accent jaune épais */}
               <KpiCard
-                bg="#191923" textColor="#FFEB5A"
+                bg="#FFFFFF" textColor="#191923" labelColor="#B8920A" labelOpacity={1}
+                accentBar="#FFEB5A"
                 label="Panier moyen" value={FMT_EUR_DEC(zToday.ticket_moyen)} evol={panierEvol}
-                icon="🛒"
-                onClick={function(){ openKpi('ticket_moyen', 'Panier moyen', 'eur', '#FFEB5A') }}
+                icon="🛒" onClick={function(){ openKpi('ticket_moyen', 'Panier moyen', 'eur', '#B8920A') }}
               />
             </div>
             <CanauxBar canaux={zToday.canaux || {}} canalColor={canalColor} canalLabel={canalLabel} />
@@ -341,7 +360,7 @@ export default function HomeOverviewTab(props) {
         )}
       </div>
 
-      {/* ====== 4. BANDEAU FOOD COST DÉTAILLÉ ====== */}
+      {/* ====== BANDEAU FOOD COST ====== */}
       <div style={{background:fcBg,border:'3px solid '+fcAccent,borderRadius:8,marginBottom:12,boxShadow:'4px 4px 0 #191923',overflow:'hidden'}}>
         <div onClick={function(){ nav('recipes') }} style={{padding:'14px 18px',cursor:'pointer',display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
           <span style={{fontSize:36,lineHeight:1}}>{fcEmoji}</span>
@@ -355,7 +374,7 @@ export default function HomeOverviewTab(props) {
             <div style={{textAlign:'right',display:'flex',gap:6,alignItems:'center'}}>
               {recipeStats.critique > 0 && <Pill bg="#CC0066" color="#FFF">{recipeStats.critique} 🔥</Pill>}
               {recipeStats.alerte > 0 && <Pill bg="#B8920A" color="#FFF">{recipeStats.alerte} ⚠️</Pill>}
-              {recipeStats.surveillance > 0 && <Pill bg="#191923" color="#FFEB5A">{recipeStats.surveillance} 👁</Pill>}
+              {recipeStats.surveillance > 0 && <Pill bg="#FFFFFF" color="#191923">{recipeStats.surveillance} 👁</Pill>}
             </div>
           )}
         </div>
@@ -386,13 +405,13 @@ export default function HomeOverviewTab(props) {
         )}
       </div>
 
-      {/* ====== 5. CARROUSEL HAUSSES DE PRIX ====== */}
+      {/* ====== CARROUSEL HAUSSES DE PRIX (avec mini-graphs intégrés) ====== */}
       {priceVariations.length > 0 && (
         <div className="card">
           <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
             <div>
               <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#FF82D7',lineHeight:1}}>Hausses de prix détectées</div>
-              <div style={{fontSize:11,opacity:0.55,marginTop:3,fontWeight:700}}>{priceVariations.length} variation{priceVariations.length > 1 ? 's' : ''} récentes</div>
+              <div style={{fontSize:11,opacity:0.55,marginTop:3,fontWeight:700}}>{priceVariations.length} variation{priceVariations.length > 1 ? 's' : ''} récentes · ligne pointillée = prix moyen historique</div>
             </div>
             {carouselTotal > 1 && (
               <div style={{display:'flex',gap:6,alignItems:'center'}}>
@@ -404,7 +423,7 @@ export default function HomeOverviewTab(props) {
           </div>
           <div className="g2" style={{marginBottom:0}}>
             {visibleVariations.map(function(v) {
-              return <PriceVariationCard key={v.product_id + '_' + v.invoice_date} variation={v} onOpen={openArt} />
+              return <PriceVariationCard key={v.product_id + '_' + v.invoice_date} variation={v} history={productHistories[v.product_id] || []} onOpen={openArt} />
             })}
           </div>
           {carouselTotal > 1 && (
@@ -419,9 +438,8 @@ export default function HomeOverviewTab(props) {
         </div>
       )}
 
-      {/* ====== 6. GRID TÂCHES + DEVIS ====== */}
+      {/* ====== GRID TÂCHES + DEVIS ====== */}
       <div className="g2">
-        {/* Tâches */}
         <div className="card">
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10,flexWrap:'wrap',gap:6}}>
             <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#FF82D7',lineHeight:1}}>Tâches en cours</div>
@@ -443,7 +461,6 @@ export default function HomeOverviewTab(props) {
           )}
         </div>
 
-        {/* Devis B2B */}
         <div className="card">
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10,flexWrap:'wrap',gap:6}}>
             <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#FF82D7',lineHeight:1}}>Devis B2B en attente</div>
@@ -493,25 +510,33 @@ function KpiCard(props) {
   var evol = props.evol
   var bg = props.bg || '#FFFFFF'
   var textColor = props.textColor || '#191923'
+  var labelColor = props.labelColor || '#FF82D7'
+  var labelOpacity = props.labelOpacity !== undefined ? props.labelOpacity : 1
+  var accentBar = props.accentBar || '#FF82D7'
   var icon = props.icon || ''
+
   var evolStr = '—'
-  var evolColor = '#888'
   var evolBg = 'transparent'
+  var evolColor = '#888'
+  var evolBorder = '#888'
   if (evol !== null && evol !== undefined && !isNaN(Number(evol))) {
     var n = Number(evol)
     evolStr = (n >= 0 ? '+' : '') + n.toFixed(1) + ' %'
-    if (n > 0) { evolColor = '#FFFFFF'; evolBg = '#009D3A' }
-    else if (n < 0) { evolColor = '#FFFFFF'; evolBg = '#CC0066' }
-    else { evolColor = '#191923'; evolBg = '#EBEBEB' }
+    if (n > 0) { evolBg = '#009D3A'; evolColor = '#FFFFFF'; evolBorder = '#191923' }
+    else if (n < 0) { evolBg = '#CC0066'; evolColor = '#FFFFFF'; evolBorder = '#191923' }
+    else { evolBg = '#EBEBEB'; evolColor = '#191923'; evolBorder = '#191923' }
   }
+
   return (
-    <div onClick={props.onClick} style={{background:bg,color:textColor,borderRadius:7,border:'2px solid #191923',padding:'14px 12px 12px',position:'relative',boxShadow:'3px 3px 0 #191923',cursor:'pointer',transition:'transform .1s'}}
+    <div onClick={props.onClick} style={{background:bg,color:textColor,borderRadius:7,border:'2px solid #191923',padding:'14px 12px 12px 16px',position:'relative',boxShadow:'3px 3px 0 #191923',cursor:'pointer',transition:'transform .1s',overflow:'hidden'}}
       onMouseEnter={function(e){ e.currentTarget.style.transform='translate(-2px,-2px)'; e.currentTarget.style.boxShadow='5px 5px 0 #191923' }}
       onMouseLeave={function(e){ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='3px 3px 0 #191923' }}>
+      {/* Accent bar gauche */}
+      <span style={{position:'absolute',left:0,top:0,bottom:0,width:5,background:accentBar}} />
       <span style={{position:'absolute',right:10,top:8,fontSize:22,opacity:0.18}}>{icon}</span>
-      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:14,lineHeight:1,opacity:textColor==='#FFEB5A'?0.85:0.7}}>{label}</div>
+      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:14,lineHeight:1,color:labelColor,opacity:labelOpacity}}>{label}</div>
       <div style={{fontWeight:900,fontSize:26,marginTop:6,lineHeight:1,letterSpacing:-0.5}}>{value}</div>
-      <div style={{marginTop:8,display:'inline-block',background:evolBg,color:evolColor,padding:'2px 8px',borderRadius:11,fontSize:10,fontWeight:900,border:'1.5px solid #191923'}}>{evolStr} vs J-7</div>
+      <div style={{marginTop:8,display:'inline-block',background:evolBg,color:evolColor,padding:'2px 8px',borderRadius:11,fontSize:10,fontWeight:900,border:'1.5px solid '+evolBorder}}>{evolStr} vs J-7</div>
     </div>
   )
 }
@@ -537,7 +562,7 @@ function CanauxBar(props) {
           var pct = total > 0 ? (v / total) * 100 : 0
           if (pct === 0) return null
           var col = canalColor(k)
-          var textC = k === 'livraison' ? '#FFEB5A' : '#191923'
+          var textC = k === 'livraison' ? '#FFFFFF' : '#191923'
           return (
             <div key={k} style={{width:pct+'%',background:col,display:'flex',alignItems:'center',justifyContent:'center'}}>
               {pct >= 8 && <span style={{fontSize:10,fontWeight:900,color:textC,whiteSpace:'nowrap'}}>{pct.toFixed(0)}%</span>}
@@ -570,10 +595,23 @@ function Pill(props) {
 
 function PriceVariationCard(props) {
   var v = props.variation
+  var history = props.history || []
   var onOpen = props.onOpen
   var pct = Number(v.variation_pct)
   var pctColor = pct >= 10 ? '#CC0066' : (pct >= 5 ? '#B8920A' : '#191923')
   var pctBg = pct >= 10 ? '#FFE6E6' : (pct >= 5 ? '#FFF4D6' : '#FAFAFA')
+
+  // Computer la moyenne historique
+  var avg = null
+  if (history.length > 0) {
+    var sum = 0; var n = 0
+    history.forEach(function(h) { if (h.price > 0) { sum += h.price; n++ } })
+    if (n > 0) avg = sum / n
+  }
+
+  // Data pour la sparkline
+  var sparkData = history.map(function(h) { return {date: h.date, price: h.price} })
+
   return (
     <div style={{background:'#FFFFFF',border:'2px solid #191923',borderRadius:7,padding:'12px 14px',boxShadow:'3px 3px 0 #191923',display:'flex',flexDirection:'column',gap:10}}>
       <div>
@@ -583,16 +621,33 @@ function PriceVariationCard(props) {
         </div>
         <div style={{fontSize:10,opacity:0.55,marginTop:2,fontWeight:700}}>📦 {v.supplier_name || '—'}</div>
       </div>
+
+      {/* Mini-graph sparkline + moyenne */}
+      {sparkData.length >= 2 && (
+        <div style={{background:'#FAFAFA',border:'1.5px solid #191923',borderRadius:5,padding:'6px 8px 2px',position:'relative'}}>
+          <div style={{position:'absolute',top:4,left:8,fontSize:8,fontWeight:900,textTransform:'uppercase',letterSpacing:0.3,opacity:0.5}}>Historique ({sparkData.length} pts)</div>
+          <div style={{width:'100%',height:60,marginTop:8}}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={sparkData} margin={{top: 2, right: 2, left: 2, bottom: 2}}>
+                <YAxis hide domain={['dataMin', 'dataMax']} />
+                {avg !== null && <ReferenceLine y={avg} stroke="#005FFF" strokeWidth={1.5} strokeDasharray="3 2" />}
+                <Line type="monotone" dataKey="price" stroke="#191923" strokeWidth={2} dot={false} activeDot={{r: 3, fill: '#FF82D7', stroke: '#191923'}} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          {avg !== null && (
+            <div style={{position:'absolute',top:4,right:8,fontSize:8,fontWeight:900,color:'#005FFF',textTransform:'uppercase',letterSpacing:0.3}}>━━ Moy. {Number(avg).toFixed(2)} €</div>
+          )}
+        </div>
+      )}
+
       <div style={{display:'flex',alignItems:'baseline',gap:8,padding:'6px 10px',background:'#FFEB5A',border:'2px solid #191923',borderRadius:5}}>
         <span style={{fontSize:10,opacity:0.5,textDecoration:'line-through'}}>{Number(v.previous_price).toFixed(2)} €</span>
         <span style={{fontSize:12,opacity:0.4}}>→</span>
         <span style={{fontSize:15,fontWeight:900,letterSpacing:-0.3}}>{Number(v.current_price).toFixed(2)} €</span>
       </div>
-      <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-        <button className="btn btn-sm" onClick={function(){ onOpen(v, 'graph') }} style={{flex:1,minWidth:80,justifyContent:'center'}}>📊 Graph</button>
-        <button className="btn btn-sm" onClick={function(){ onOpen(v, 'factures') }} style={{flex:1,minWidth:80,justifyContent:'center'}}>📄 Factures</button>
-        <button className="btn btn-sm" onClick={function(){ onOpen(v, 'historique') }} style={{flex:1,minWidth:80,justifyContent:'center'}}>🕓 Historique</button>
-      </div>
+
+      <button className="btn btn-sm btn-p" onClick={function(){ onOpen(v) }} style={{justifyContent:'center'}}>📊 Voir l&apos;article complet →</button>
     </div>
   )
 }
@@ -601,7 +656,6 @@ function TaskRow(props) {
   var t = props.task
   var openModal = props.openModal
   var prioColor = t.priority === 'high' ? '#CC0066' : (t.priority === 'medium' ? '#B8920A' : '#888')
-  var prioBg = t.priority === 'high' ? '#FFE6E6' : (t.priority === 'medium' ? '#FFF4D6' : '#FAFAFA')
   var dl = t.deadline ? new Date(t.deadline) : null
   var days = dl ? Math.floor((dl.getTime() - new Date().getTime()) / (1000*60*60*24)) : null
   var dlLabel = '—'
@@ -626,7 +680,7 @@ function TaskRow(props) {
           <span style={{opacity:0.5,textTransform:'capitalize'}}>{t.assignee || '—'}</span>
         </div>
       </div>
-      <span style={{fontSize:9,padding:'3px 8px',background:t.status==='in_progress'?'#FF82D7':'#FFFFFF',color:'#191923',border:'1.5px solid #191923',borderRadius:11,fontWeight:900,textTransform:'uppercase',letterSpacing:0.5,whiteSpace:'nowrap'}}>
+      <span style={{fontSize:9,padding:'3px 8px',background:t.status==='in_progress'?'#FF82D7':'#FFFFFF',color:t.status==='in_progress'?'#FFFFFF':'#191923',border:'1.5px solid #191923',borderRadius:11,fontWeight:900,textTransform:'uppercase',letterSpacing:0.5,whiteSpace:'nowrap'}}>
         {t.status === 'in_progress' ? 'En cours' : 'À faire'}
       </span>
     </div>
