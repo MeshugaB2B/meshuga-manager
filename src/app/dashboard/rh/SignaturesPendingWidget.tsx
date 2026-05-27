@@ -1,17 +1,15 @@
 "use client"
 // ============================================================
-// SignaturesPendingWidget.tsx
+// FILE PATH dans le repo :
+//   src/app/dashboard/rh/SignaturesPendingWidget.tsx
 // ============================================================
-// Widget dashboard RH : liste live des signatures en attente.
-//
-// Affiche :
-//   - Tous les avenants/contrats avec status sent OU viewed (non signés)
-//   - Nom du salarié, type de document, canal d'envoi
-//   - Temps écoulé depuis l'envoi (X jours, Y heures)
-//   - Statut : 📧 envoyé / 👁 vu / 🔁 relancé N fois
-//   - Bouton "Renvoyer le lien" pour relancer manuellement
-//
-// Polling toutes les 60s pour refresh.
+// v2 (27/05/2026) — Refonte UX :
+//   - Replié par défaut : juste une bande compacte avec compteur
+//   - Clic sur la bande → déplie/replie la liste
+//   - Clic sur une carte salarié → ouvre sa fiche (via window.dispatchEvent)
+//   - Refresh auto 60s + bouton ↻ conservés
+//   - Statuts VU/Envoyé/Relance conservés
+//   - Empty state caché par défaut (replié), pas de "Tout est signé !" qui occupe l'écran
 // ============================================================
 
 import { useEffect, useState } from "react"
@@ -22,6 +20,7 @@ interface PendingItem {
   documentLabel: string
   prenom: string
   nom: string
+  employeeId: string | null
   sentAt: string
   viewedAt: string | null
   channel: string
@@ -34,14 +33,20 @@ interface PendingItem {
 }
 
 interface Props {
-  refreshIntervalMs?: number // default 60000 (60s)
+  refreshIntervalMs?: number
+  defaultExpanded?: boolean
 }
+
+// Couleurs Meshuga
+var PINK = "#FF82D7"
+var YELLOW = "#FFEB5A"
+var BLACK = "#191923"
 
 export default function SignaturesPendingWidget(props: Props) {
   var [items, setItems] = useState([] as PendingItem[])
   var [loading, setLoading] = useState(true)
   var [errorMsg, setErrorMsg] = useState("")
-  var [lastRefresh, setLastRefresh] = useState(new Date().toISOString())
+  var [expanded, setExpanded] = useState(props.defaultExpanded === true)
 
   var refreshInterval = props.refreshIntervalMs || 60000
 
@@ -54,7 +59,6 @@ export default function SignaturesPendingWidget(props: Props) {
       }
       setItems(data.items || [])
       setErrorMsg("")
-      setLastRefresh(new Date().toISOString())
     } catch (e: any) {
       setErrorMsg(e.message || String(e))
     } finally {
@@ -79,139 +83,245 @@ export default function SignaturesPendingWidget(props: Props) {
     return "il y a " + Math.floor(diffDays) + " jours"
   }
 
+  // Stats pour la bande compacte
+  var nbTotal = items.length
+  var nbVu = items.filter(function (it) { return !!it.viewedAt }).length
+  var nbRelances = items.filter(function (it) { return it.relanceCount > 0 }).length
+  var nbRetards = items.filter(function (it) { return it.daysSinceSent >= 2 }).length // >= 48h
+
+  // Ouvre la fiche salarié dans RhTab via custom event
+  // RhTab écoute "meshuga:open-employee" et appelle setViewingEmployeeId(empId)
+  var openEmployee = function (empId: string | null) {
+    if (!empId) return
+    try {
+      window.dispatchEvent(new CustomEvent("meshuga:open-employee", { detail: { employeeId: empId } }))
+    } catch (e) { /* noop */ }
+  }
+
   var getStatusBadge = function (item: PendingItem) {
     if (item.viewedAt) {
       return (
-        <span style={{ background: "rgba(255,235,90,0.4)", color: "#7A6500", padding: "3px 10px", borderRadius: 4, fontSize: 11, fontWeight: 700, letterSpacing: 0.3 }}>
+        <span style={{ background: "rgba(255,235,90,0.4)", color: "#7A6500", padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: 0.3, whiteSpace: "nowrap" }}>
           👁 VU · {formatTimeAgo(item.viewedAt)}
         </span>
       )
     }
     return (
-      <span style={{ background: "rgba(255,130,215,0.15)", color: "#C2185B", padding: "3px 10px", borderRadius: 4, fontSize: 11, fontWeight: 700, letterSpacing: 0.3 }}>
+      <span style={{ background: "rgba(255,130,215,0.15)", color: "#C2185B", padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: 0.3, whiteSpace: "nowrap" }}>
         📧 ENVOYÉ
       </span>
     )
   }
 
   var getChannelLabel = function (channel: string): string {
-    if (channel === "email+sms") return "📧 Email + 📱 SMS"
-    if (channel === "email") return "📧 Email"
-    if (channel === "sms") return "📱 SMS"
+    if (channel === "email+sms") return "📧 + 📱"
+    if (channel === "email") return "📧"
+    if (channel === "sms") return "📱"
     return channel
   }
 
-  return (
-    <div style={{ background: "#FFFFFF", borderRadius: 12, padding: 20, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", margin: "16px 0" }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <div>
-          <div style={{ fontFamily: "Yellowtail, cursive", color: "#FF82D7", fontSize: 28, lineHeight: 1 }}>
-            Signatures en attente
-          </div>
-          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
-            {items.length} document{items.length > 1 ? "s" : ""} en attente · refresh auto toutes les 60s
-          </div>
-        </div>
+  // ============================================================
+  // CAS 1 : rien en attente — on n'affiche RIEN du tout (pas même un encart vide)
+  // ============================================================
+  if (!loading && nbTotal === 0 && !errorMsg) {
+    return null
+  }
+
+  // ============================================================
+  // CAS 2 : erreur silencieuse en mode replié (n'occupe pas l'écran)
+  // ============================================================
+  if (!loading && nbTotal === 0 && errorMsg) {
+    return (
+      <div style={{
+        margin: "12px 0",
+        padding: "8px 14px",
+        background: "rgba(220,53,69,0.06)",
+        borderLeft: "3px solid #DC3545",
+        borderRadius: 4,
+        fontSize: 12,
+        color: "#666",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+      }}>
+        <span>⚠ Signatures : {errorMsg}</span>
         <button
           onClick={loadData}
           style={{
-            padding: "6px 14px", background: "#FFEB5A", color: "#191923", border: "none",
-            borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer",
-            fontFamily: "inherit", letterSpacing: 0.3,
+            padding: "3px 10px", background: "transparent", color: "#DC3545", border: "1px solid #DC3545",
+            borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
           }}
-        >
-          ↻ Rafraîchir
-        </button>
+        >↻</button>
       </div>
+    )
+  }
 
-      {/* Erreur */}
-      {errorMsg ? (
-        <div style={{ padding: "10px 14px", background: "rgba(220,53,69,0.08)", borderLeft: "4px solid #DC3545", borderRadius: 4, fontSize: 13, color: "#191923", marginBottom: 12 }}>
-          ⚠ {errorMsg}
+  // ============================================================
+  // CAS 3 : il y a des signatures en attente — bande compacte
+  // ============================================================
+
+  // Construit le résumé textuel en haut de la bande
+  var summaryParts: string[] = []
+  summaryParts.push(nbTotal + " en attente")
+  if (nbVu > 0) summaryParts.push(nbVu + " vu" + (nbVu > 1 ? "s" : ""))
+  if (nbRetards > 0) summaryParts.push("⏰ " + nbRetards + " > 48h")
+  if (nbRelances > 0) summaryParts.push("🔁 " + nbRelances + " relancé" + (nbRelances > 1 ? "s" : ""))
+
+  // Couleur d'accent : rouge-rose si retards, rose normal sinon
+  var hasUrgent = nbRetards > 0
+  var accentColor = hasUrgent ? "#DC3545" : PINK
+
+  return (
+    <div style={{ margin: "12px 0" }}>
+      {/* ===== BANDE COMPACTE (toujours visible) ===== */}
+      <button
+        onClick={function () { setExpanded(!expanded) }}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: "10px 14px",
+          background: "#FFFFFF",
+          border: "1.5px solid " + (hasUrgent ? "#DC3545" : "#EEE"),
+          borderLeft: "4px solid " + accentColor,
+          borderRadius: 8,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          textAlign: "left",
+          transition: "background 0.15s",
+        }}
+        onMouseEnter={function (ev: any) { ev.currentTarget.style.background = "#FAFAFA" }}
+        onMouseLeave={function (ev: any) { ev.currentTarget.style.background = "#FFFFFF" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 20, lineHeight: 1 }}>📨</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: BLACK, lineHeight: 1.2 }}>
+              Signatures en attente
+            </div>
+            <div style={{ fontSize: 11, color: "#666", marginTop: 2, lineHeight: 1.3 }}>
+              {summaryParts.join(" · ")}
+            </div>
+          </div>
         </div>
-      ) : null}
-
-      {/* Loading */}
-      {loading && items.length === 0 ? (
-        <div style={{ padding: "20px 0", textAlign: "center", color: "#999", fontSize: 13, fontStyle: "italic" }}>
-          Chargement...
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <span
+            onClick={function (ev: any) { ev.stopPropagation(); loadData() }}
+            title="Rafraîchir"
+            style={{
+              padding: "4px 8px",
+              background: YELLOW,
+              color: BLACK,
+              borderRadius: 4,
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: "pointer",
+              letterSpacing: 0.3,
+              display: "inline-block",
+            }}
+          >↻</span>
+          <span style={{ fontSize: 12, color: "#999", transition: "transform 0.2s", display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>
+            ▼
+          </span>
         </div>
-      ) : null}
+      </button>
 
-      {/* Empty state */}
-      {!loading && items.length === 0 && !errorMsg ? (
-        <div style={{ padding: "30px 20px", textAlign: "center", background: "rgba(34,197,94,0.06)", borderRadius: 8 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
-          <div style={{ fontSize: 14, color: "#16A34A", fontWeight: 700 }}>Tout est signé !</div>
-          <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>Aucun document en attente de signature.</div>
-        </div>
-      ) : null}
-
-      {/* Liste */}
-      {items.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {items.map(function (item) {
-            var fullName = (item.prenom + " " + item.nom).trim() || "Salarié inconnu"
-            return (
-              <div key={item.id} style={{ padding: "12px 14px", border: "1px solid #EEE", borderRadius: 8, background: "#FAFAFA" }}>
-                {/* Ligne 1 : Nom + statut */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: "#191923" }}>
-                    {fullName}
-                  </div>
-                  {getStatusBadge(item)}
-                </div>
-
-                {/* Ligne 2 : type document */}
-                <div style={{ fontSize: 13, color: "#444", marginBottom: 6 }}>
-                  {item.documentLabel}
-                </div>
-
-                {/* Ligne 3 : meta */}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px", fontSize: 11, color: "#666", marginBottom: 8 }}>
-                  <span>Envoyé {formatTimeAgo(item.sentAt)}</span>
-                  <span>·</span>
-                  <span>{getChannelLabel(item.channel)}</span>
-                  {item.relanceCount > 0 ? (
-                    <>
-                      <span>·</span>
-                      <span style={{ color: "#F59E0B", fontWeight: 700 }}>
-                        🔁 {item.relanceCount} relance{item.relanceCount > 1 ? "s" : ""}
+      {/* ===== LISTE DÉPLIÉE ===== */}
+      {expanded ? (
+        <div style={{
+          marginTop: 8,
+          padding: 12,
+          background: "#FAFAFA",
+          border: "1px solid #EEE",
+          borderRadius: 8,
+        }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {items.map(function (item) {
+              var fullName = (item.prenom + " " + item.nom).trim() || "Salarié inconnu"
+              var canOpenEmployee = !!item.employeeId
+              return (
+                <div
+                  key={item.id}
+                  onClick={function () { openEmployee(item.employeeId) }}
+                  style={{
+                    padding: "10px 12px",
+                    border: "1px solid #EEE",
+                    borderRadius: 6,
+                    background: "#FFFFFF",
+                    cursor: canOpenEmployee ? "pointer" : "default",
+                    transition: "background 0.15s, border-color 0.15s",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    flexWrap: "wrap",
+                  }}
+                  onMouseEnter={function (ev: any) {
+                    if (!canOpenEmployee) return
+                    ev.currentTarget.style.background = "#FFF8FC"
+                    ev.currentTarget.style.borderColor = PINK
+                  }}
+                  onMouseLeave={function (ev: any) {
+                    ev.currentTarget.style.background = "#FFFFFF"
+                    ev.currentTarget.style.borderColor = "#EEE"
+                  }}
+                  title={canOpenEmployee ? "Cliquer pour ouvrir la fiche salarié" : ""}
+                >
+                  {/* Bloc gauche : nom + doc + meta */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: BLACK }}>
+                        {fullName}
                       </span>
-                    </>
-                  ) : null}
-                </div>
-
-                {/* Ligne 4 : email/tel et bouton lien */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                  <div style={{ fontSize: 11, color: "#888", fontFamily: "monospace" }}>
-                    {item.email ? <div>{item.email}</div> : null}
-                    {item.phone ? <div>{item.phone}</div> : null}
+                      {getStatusBadge(item)}
+                      {item.relanceCount > 0 ? (
+                        <span style={{ background: "rgba(245,158,11,0.15)", color: "#B45309", padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700, letterSpacing: 0.3, whiteSpace: "nowrap" }}>
+                          🔁 {item.relanceCount}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#666", lineHeight: 1.4 }}>
+                      <span>{item.documentLabel}</span>
+                      <span style={{ color: "#CCC", margin: "0 6px" }}>·</span>
+                      <span>envoyé {formatTimeAgo(item.sentAt)}</span>
+                      <span style={{ color: "#CCC", margin: "0 6px" }}>·</span>
+                      <span>{getChannelLabel(item.channel)}</span>
+                    </div>
                   </div>
+
+                  {/* Bloc droite : bouton lien (action secondaire) */}
                   <a
                     href={"/sign/" + item.signatureToken}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={function (ev: any) { ev.stopPropagation() }}
                     style={{
-                      fontSize: 11, color: "#FF82D7", textDecoration: "none",
-                      padding: "5px 10px", border: "1px solid #FF82D7", borderRadius: 4,
-                      fontWeight: 700, letterSpacing: 0.2,
+                      fontSize: 11,
+                      color: PINK,
+                      textDecoration: "none",
+                      padding: "4px 10px",
+                      border: "1px solid " + PINK,
+                      borderRadius: 4,
+                      fontWeight: 700,
+                      letterSpacing: 0.2,
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
                     }}
                   >
                     Voir le lien ↗
                   </a>
                 </div>
-              </div>
-            )
-          })}
-        </div>
-      ) : null}
+              )
+            })}
+          </div>
 
-      {/* Footer info */}
-      {items.length > 0 ? (
-        <div style={{ marginTop: 14, padding: "10px 12px", background: "rgba(255,235,90,0.18)", borderRadius: 6, fontSize: 11, color: "#666", lineHeight: 1.5 }}>
-          💡 Une relance email + SMS est envoyée automatiquement chaque jour à 11h (heure de Paris) tant que le document n'est pas signé.
+          {/* Footer info compact */}
+          <div style={{ marginTop: 10, fontSize: 10, color: "#999", textAlign: "center", lineHeight: 1.5 }}>
+            💡 Relance auto chaque jour à 11h · clic sur une ligne = fiche salarié
+          </div>
         </div>
       ) : null}
     </div>
