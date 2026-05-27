@@ -1,22 +1,18 @@
 "use client"
 // ============================================================
-// SendSignatureModal.tsx
+// FILE PATH dans le repo :
+//   src/app/dashboard/rh/SendSignatureModal.tsx
 // ============================================================
-// Modal d'envoi d'un contrat ou avenant pour signature électronique.
-//
-// Sprint Y1 — Phase C — Sprint C2B
-//
-// Workflow :
-//   1. Écran formulaire : email du salarié (pré-rempli) + case Welcome Pack
-//      + case "Sauvegarder l'email sur le profil"
-//   2. Écran confirmation : "Vous allez envoyer X à Y@Z.com — Confirmer ?"
-//   3. Écran succès : "Envoyé ✓" avec lien copiable + bouton fermer
-//
-// Charte Meshuga : Yellowtail titre + Arial body, rose/jaune/noir
-// Pas de fond foncé, signature électronique conforme eIDAS.
+// v2 (26/05/2026) — Sprint C3 fix auth :
+//   Au moment de l'envoi, on lit l'email du user logué via Supabase JS
+//   (localStorage) et on le passe dans body.preparedByEmail.
+//   L'API back-end utilise ce champ pour décider entre branche A
+//   (preparedByEmail = Emy → envoyer validation à Edward)
+//   et branche B (preparedByEmail = Edward → envoyer directement au salarié).
 // ============================================================
 
 import { useState } from "react"
+import { createBrowserClient } from "@supabase/ssr"
 
 interface Employee {
   id: string
@@ -31,10 +27,27 @@ interface Employee {
 interface Props {
   documentType: "contract" | "amendment"
   documentId: string
-  documentLabel: string  // ex: "Avenant Mise en conformité"
+  documentLabel: string
   employee: Employee
   onClose: () => void
   onSent: (message: string) => void
+}
+
+// === Helper : récupère l'email du user logué via Supabase JS (localStorage) ===
+async function getCurrentUserEmail(): Promise<string> {
+  try {
+    var url = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+    var anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
+    if (!url || !anon) return ""
+    var supabase = createBrowserClient(url, anon)
+    var r = await supabase.auth.getSession()
+    var session = r.data && r.data.session ? r.data.session : null
+    if (!session || !session.user) return ""
+    var em = session.user.email || ""
+    return em.toLowerCase()
+  } catch (e) {
+    return ""
+  }
 }
 
 export default function SendSignatureModal(props: Props) {
@@ -43,9 +56,8 @@ export default function SendSignatureModal(props: Props) {
   var [email, setEmail] = useState(props.employee.email || "")
   var [phone, setPhone] = useState(props.employee.telephone || "")
   var [saveEmail, setSaveEmail] = useState(true)
-  // Inclure le dossier de bienvenue par défaut SAUF s'il a déjà été signé
   var [includeWelcomePack, setIncludeWelcomePack] = useState(!alreadySignedWp)
-  var [phase, setPhase] = useState("form")  // form | confirming | sending | done | error
+  var [phase, setPhase] = useState("form")
   var [errorMsg, setErrorMsg] = useState("")
   var [resultData, setResultData] = useState(null)
 
@@ -54,13 +66,11 @@ export default function SendSignatureModal(props: Props) {
   var isFemale = civ === "mme" || civ === "madame" || civ === "mlle" || civ === "mademoiselle"
   var cherFr = isFemale ? "Chère" : "Cher"
 
-  // === Validation email basique ===
   var isValidEmail = function (e) {
     if (!e) return false
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim())
   }
 
-  // === Validation téléphone FR (accepte tous formats courants) ===
   var isValidPhoneFR = function (p) {
     if (!p) return false
     var cleaned = p.replace(/[\s\-\.\(\)]/g, "").trim()
@@ -73,7 +83,6 @@ export default function SendSignatureModal(props: Props) {
     return false
   }
 
-  // === Passage à l'écran de confirmation ===
   var goToConfirm = function () {
     setErrorMsg("")
     var hasEmail = email && email.trim().length > 0
@@ -93,7 +102,6 @@ export default function SendSignatureModal(props: Props) {
     setPhase("confirming")
   }
 
-  // === Envoi effectif ===
   var doSend = async function () {
     setPhase("sending")
     setErrorMsg("")
@@ -105,6 +113,9 @@ export default function SendSignatureModal(props: Props) {
       var hasEmail = email && email.trim().length > 0
       var hasPhone = phone && phone.trim().length > 0
 
+      // Récupérer l'email du user logué (Supabase localStorage)
+      var currentUserEmail = await getCurrentUserEmail()
+
       var res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -113,6 +124,7 @@ export default function SendSignatureModal(props: Props) {
           recipientPhone: hasPhone ? phone.trim() : "",
           includeWelcomePack: includeWelcomePack,
           saveEmailToProfile: saveEmail,
+          preparedByEmail: currentUserEmail,
         }),
       })
       var data = await res.json()
@@ -127,8 +139,21 @@ export default function SendSignatureModal(props: Props) {
     }
   }
 
-  // === Fermeture finale ===
   var finishAndClose = function () {
+    // Cas A : Emy a préparé, validation Edward attendue
+    if (resultData && resultData["awaiting_employer_validation"]) {
+      var msgA = "📨 Document préparé. Edward a reçu "
+      var emA = resultData["email_to_employer_sent"]
+      var smA = resultData["sms_to_employer_sent"]
+      if (emA && smA) msgA += "un email et un SMS"
+      else if (emA) msgA += "un email"
+      else if (smA) msgA += "un SMS"
+      else msgA += "rien (échec) — il peut valider via le dashboard"
+      msgA += " pour valider l'envoi au salarié."
+      props.onSent(msgA)
+      return
+    }
+    // Cas B : envoi direct au salarié
     var hasEmail = email && email.trim().length > 0
     var hasPhone = phone && phone.trim().length > 0
     var channelText = ""
@@ -145,8 +170,8 @@ export default function SendSignatureModal(props: Props) {
     )
   }
 
-  // === UI ===
   var disabled = phase === "sending"
+  var awaitingValidation = resultData && resultData["awaiting_employer_validation"]
 
   return (
     <div
@@ -197,7 +222,6 @@ export default function SendSignatureModal(props: Props) {
         {/* === ÉCRAN 1 : FORMULAIRE === */}
         {phase === "form" || phase === "error" ? (
           <div style={{ padding: 24 }}>
-            {/* Bandeau info canaux */}
             <div style={{ padding: "10px 14px", background: "rgba(255,130,215,0.08)", borderLeft: "4px solid #FF82D7", borderRadius: 4, fontSize: 13, color: "#191923", marginBottom: 18, lineHeight: 1.5 }}>
               Renseigne <strong>au moins un canal</strong> (email ou téléphone). Si les deux sont remplis, l&apos;envoi se fera <strong>en parallèle</strong> sur email + SMS.
             </div>
@@ -264,7 +288,6 @@ export default function SendSignatureModal(props: Props) {
               )}
             </div>
 
-            {/* Sauvegarder email sur profil */}
             <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0", cursor: "pointer", fontSize: 14, color: "#191923" }}>
               <input
                 type="checkbox"
@@ -283,7 +306,6 @@ export default function SendSignatureModal(props: Props) {
 
             <div style={{ height: 1, background: "#EEEEEE", margin: "12px 0" }} />
 
-            {/* Inclure dossier de bienvenue */}
             <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0", cursor: alreadySignedWp ? "default" : "pointer", fontSize: 14, color: "#191923", opacity: alreadySignedWp ? 0.6 : 1 }}>
               <input
                 type="checkbox"
@@ -307,19 +329,16 @@ export default function SendSignatureModal(props: Props) {
               </span>
             </label>
 
-            {/* Encart info */}
             <div style={{ padding: "12px 14px", background: "rgba(255,235,90,0.25)", borderLeft: "4px solid #FFEB5A", borderRadius: 4, fontSize: 13, color: "#191923", margin: "16px 0 4px 0", lineHeight: 1.5 }}>
               <strong>📧 Email via Brevo</strong> depuis <strong>hello@meshuga.fr</strong> · <strong>📱 SMS via Twilio</strong> avec expéditeur <strong>MESHUGA</strong>. Le salarié recevra un lien sécurisé pour signer en ligne.
             </div>
 
-            {/* Erreur */}
             {errorMsg ? (
               <div style={{ padding: "12px 14px", background: "rgba(220,53,69,0.1)", borderLeft: "4px solid #DC3545", borderRadius: 4, fontSize: 13, color: "#191923", margin: "12px 0 0 0" }}>
                 ⚠ {errorMsg}
               </div>
             ) : null}
 
-            {/* Footer */}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 18, marginTop: 18, borderTop: "1px solid #EEEEEE" }}>
               <button
                 onClick={props.onClose}
@@ -403,10 +422,9 @@ export default function SendSignatureModal(props: Props) {
             </div>
 
             <p style={{ fontSize: 13, lineHeight: 1.5, color: "#666", margin: "12px 0 0 0", fontStyle: "italic" }}>
-              {cherFr} {props.employee.prenom} recevra le lien de signature dans les prochaines secondes.
+              {cherFr} {props.employee.prenom} recevra le lien de signature dans les prochaines secondes <em>après validation Edward si tu es Emy</em>.
             </p>
 
-            {/* Footer */}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 18, marginTop: 18, borderTop: "1px solid #EEEEEE" }}>
               <button
                 onClick={function () { setPhase("form") }}
@@ -447,64 +465,89 @@ export default function SendSignatureModal(props: Props) {
         {/* === ÉCRAN 3 : SUCCÈS === */}
         {phase === "done" ? (
           <div style={{ padding: 24 }}>
-            <div style={{ textAlign: "center", fontSize: 56, lineHeight: 1, marginBottom: 16 }}>✅</div>
-            <div style={{ textAlign: "center", fontSize: 22, fontWeight: 700, color: "#16A34A", marginBottom: 8 }}>
-              Envoyé avec succès
+            <div style={{ textAlign: "center", fontSize: 56, lineHeight: 1, marginBottom: 16 }}>
+              {awaitingValidation ? "📨" : "✅"}
+            </div>
+            <div style={{ textAlign: "center", fontSize: 22, fontWeight: 700, color: awaitingValidation ? "#FF82D7" : "#16A34A", marginBottom: 8 }}>
+              {awaitingValidation ? "En attente validation Edward" : "Envoyé avec succès"}
             </div>
             <p style={{ textAlign: "center", fontSize: 14, color: "#666", margin: "0 0 20px 0" }}>
-              {props.employee.prenom} va recevoir le lien de signature dans les prochaines secondes.
+              {awaitingValidation
+                ? "Edward a reçu une demande de validation. Une fois qu'il aura cliqué sur Approuver, le lien de signature partira automatiquement vers " + props.employee.prenom + "."
+                : (props.employee.prenom + " va recevoir le lien de signature dans les prochaines secondes.")
+              }
             </p>
 
-            <div style={{ background: "rgba(34,197,94,0.08)", borderLeft: "4px solid #16A34A", padding: "14px 18px", borderRadius: 6, margin: "16px 0", fontSize: 13, lineHeight: 1.6 }}>
-              {/* Statut email */}
-              {resultData && resultData["channels"] && resultData["channels"].email ? (
-                <div style={{ marginBottom: resultData["channels"].sms ? 10 : 0, paddingBottom: resultData["channels"].sms ? 10 : 0, borderBottom: resultData["channels"].sms ? "1px solid rgba(34,197,94,0.2)" : "none" }}>
-                  <div>
-                    <strong>{resultData["channels"].email.ok ? "✓ Email envoyé" : "✗ Email échoué"}</strong> à <strong>{email}</strong>
-                  </div>
-                  {resultData["channels"].email.messageId ? (
-                    <div style={{ marginTop: 2, fontSize: 11, color: "#666", wordBreak: "break-all" }}>
-                      ID Brevo : {resultData["channels"].email.messageId}
-                    </div>
-                  ) : null}
-                  {!resultData["channels"].email.ok && resultData["channels"].email.error ? (
-                    <div style={{ marginTop: 2, fontSize: 11, color: "#DC3545" }}>
-                      Erreur : {resultData["channels"].email.error}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {/* Statut SMS */}
-              {resultData && resultData["channels"] && resultData["channels"].sms ? (
+            {/* CAS A : validation en attente (preview Edward) */}
+            {awaitingValidation ? (
+              <div style={{ background: "rgba(255,130,215,0.08)", borderLeft: "4px solid #FF82D7", padding: "14px 18px", borderRadius: 6, margin: "16px 0", fontSize: 13, lineHeight: 1.6 }}>
                 <div>
-                  <div>
-                    <strong>{resultData["channels"].sms.ok ? "✓ SMS envoyé" : "✗ SMS échoué"}</strong> au <strong>{phone}</strong>
-                    {resultData["channels"].sms.testMode ? <span style={{ fontSize: 11, color: "#F59E0B", marginLeft: 6 }}>(mode test)</span> : null}
-                  </div>
-                  {resultData["channels"].sms.sid ? (
-                    <div style={{ marginTop: 2, fontSize: 11, color: "#666", wordBreak: "break-all" }}>
-                      SID Twilio : {resultData["channels"].sms.sid}
-                    </div>
-                  ) : null}
-                  {!resultData["channels"].sms.ok && resultData["channels"].sms.error ? (
-                    <div style={{ marginTop: 2, fontSize: 11, color: "#DC3545" }}>
-                      Erreur : {resultData["channels"].sms.error}
-                    </div>
-                  ) : null}
+                  <strong>{resultData["email_to_employer_sent"] ? "✓" : "✗"} Email à Edward</strong>
                 </div>
-              ) : null}
+                <div>
+                  <strong>{resultData["sms_to_employer_sent"] ? "✓" : "✗"} SMS à Edward</strong>
+                </div>
+                {resultData["validation_url"] ? (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,130,215,0.2)" }}>
+                    <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Lien validation Edward (debug) :</div>
+                    <div style={{ fontSize: 11, color: "#FF82D7", wordBreak: "break-all", fontFamily: "monospace" }}>
+                      {resultData["validation_url"]}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
-              {/* Lien signature (toujours affiché) */}
-              {resultData && resultData["signatureUrl"] ? (
-                <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(34,197,94,0.2)" }}>
-                  <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Lien de signature (à conserver pour relances) :</div>
-                  <div style={{ fontSize: 11, color: "#FF82D7", wordBreak: "break-all", fontFamily: "monospace" }}>
-                    {resultData["signatureUrl"]}
+            {/* CAS B : envoi direct au salarié */}
+            {!awaitingValidation ? (
+              <div style={{ background: "rgba(34,197,94,0.08)", borderLeft: "4px solid #16A34A", padding: "14px 18px", borderRadius: 6, margin: "16px 0", fontSize: 13, lineHeight: 1.6 }}>
+                {resultData && resultData["channels"] && resultData["channels"].email ? (
+                  <div style={{ marginBottom: resultData["channels"].sms ? 10 : 0, paddingBottom: resultData["channels"].sms ? 10 : 0, borderBottom: resultData["channels"].sms ? "1px solid rgba(34,197,94,0.2)" : "none" }}>
+                    <div>
+                      <strong>{resultData["channels"].email.ok ? "✓ Email envoyé" : "✗ Email échoué"}</strong> à <strong>{email}</strong>
+                    </div>
+                    {resultData["channels"].email.messageId ? (
+                      <div style={{ marginTop: 2, fontSize: 11, color: "#666", wordBreak: "break-all" }}>
+                        ID Brevo : {resultData["channels"].email.messageId}
+                      </div>
+                    ) : null}
+                    {!resultData["channels"].email.ok && resultData["channels"].email.error ? (
+                      <div style={{ marginTop: 2, fontSize: 11, color: "#DC3545" }}>
+                        Erreur : {resultData["channels"].email.error}
+                      </div>
+                    ) : null}
                   </div>
-                </div>
-              ) : null}
-            </div>
+                ) : null}
+
+                {resultData && resultData["channels"] && resultData["channels"].sms ? (
+                  <div>
+                    <div>
+                      <strong>{resultData["channels"].sms.ok ? "✓ SMS envoyé" : "✗ SMS échoué"}</strong> au <strong>{phone}</strong>
+                      {resultData["channels"].sms.testMode ? <span style={{ fontSize: 11, color: "#F59E0B", marginLeft: 6 }}>(mode test)</span> : null}
+                    </div>
+                    {resultData["channels"].sms.sid ? (
+                      <div style={{ marginTop: 2, fontSize: 11, color: "#666", wordBreak: "break-all" }}>
+                        SID Twilio : {resultData["channels"].sms.sid}
+                      </div>
+                    ) : null}
+                    {!resultData["channels"].sms.ok && resultData["channels"].sms.error ? (
+                      <div style={{ marginTop: 2, fontSize: 11, color: "#DC3545" }}>
+                        Erreur : {resultData["channels"].sms.error}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {resultData && resultData["signatureUrl"] ? (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(34,197,94,0.2)" }}>
+                    <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Lien de signature (à conserver pour relances) :</div>
+                    <div style={{ fontSize: 11, color: "#FF82D7", wordBreak: "break-all", fontFamily: "monospace" }}>
+                      {resultData["signatureUrl"]}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             {resultData && resultData["partialSuccess"] ? (
               <div style={{ padding: "10px 14px", background: "rgba(245,158,11,0.1)", borderLeft: "4px solid #F59E0B", borderRadius: 4, fontSize: 12, color: "#191923", marginBottom: 16, lineHeight: 1.5 }}>
@@ -512,9 +555,11 @@ export default function SendSignatureModal(props: Props) {
               </div>
             ) : null}
 
-            <p style={{ fontSize: 13, color: "#666", margin: "16px 0 0 0", lineHeight: 1.5 }}>
-              💡 Le statut <strong>« 📧 Envoyé »</strong> apparaîtra dans la liste des documents. Il passera à <strong>« 👁 Vu »</strong> dès que le salarié clique sur le lien, puis à <strong>« ✅ Signé »</strong> après signature.
-            </p>
+            {!awaitingValidation ? (
+              <p style={{ fontSize: 13, color: "#666", margin: "16px 0 0 0", lineHeight: 1.5 }}>
+                💡 Le statut <strong>« 📧 Envoyé »</strong> apparaîtra dans la liste des documents. Il passera à <strong>« 👁 Vu »</strong> dès que le salarié clique sur le lien, puis à <strong>« ✅ Signé »</strong> après signature.
+              </p>
+            ) : null}
 
             <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 18, marginTop: 18, borderTop: "1px solid #EEEEEE" }}>
               <button
