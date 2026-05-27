@@ -1,29 +1,16 @@
 // ============================================================
-// /api/amendments/[id]/send-signature/route.ts
+// FILE PATH dans le repo :
+//   src/app/api/amendments/[id]/send-signature/route.ts
 // ============================================================
-// POST endpoint pour envoyer un avenant pour signature
-// électronique au salarié.
-//
-// v2 (24/05/2026) : envoi email + SMS en parallèle.
-//   - Email envoyé via Brevo si l'email destinataire est fourni
-//   - SMS envoyé via Twilio si le téléphone destinataire est fourni
-//   - Au moins un des deux doit être fourni
-//   - Téléphone sauvegardé sur le profil UNIQUEMENT si vide en DB
-//
-// v3 (26/05/2026) — Sprint C3 : workflow validation employer
-//   - Si l'utilisateur connecté n'est PAS edward@meshuga.fr (typiquement
-//     emy@meshuga.fr), l'envoi au salarié N'EST PAS déclenché.
-//   - À la place, on sauvegarde le payload en "pending" et on envoie
-//     un email à Edward avec un lien de validation. Une fois validé,
-//     l'envoi au salarié est déclenché par /api/amendments/[id]/employer-approve.
-//
-// Sprint Y1 — Phase C — Sprint C2A / C3
+// v4 (26/05/2026) — Sprint C3 fix auth :
+//   Plus de getCurrentUserEmail (cookies SSR cassé car app localStorage).
+//   À la place : le frontend envoie preparedByEmail dans le body.
+//   Branche A (Emy prépare) : envoie à Edward email + SMS (EDWARD_NOTIFICATION_PHONE).
+//   Branche B (Edward envoie directement) : envoie au salarié immédiatement.
 // ============================================================
 
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import { createClient } from "@supabase/supabase-js"
-import { createServerClient } from "@supabase/ssr"
 import { randomUUID } from "crypto"
 import {
   getEmployeeWelcomePackStatus,
@@ -41,6 +28,7 @@ export const runtime = "nodejs"
 
 // === Compte employer signataire ===
 var EMPLOYER_EMAIL = "edward@meshuga.fr"
+var EMPLOYER_PHONE_FALLBACK = "+33658585801"
 
 // === Client Supabase service role (bypasse RLS pour writes) ===
 function getServerClient() {
@@ -52,39 +40,11 @@ function getServerClient() {
   })
 }
 
-// === Lecture user connecté via cookies Supabase SSR ===
-async function getCurrentUserEmail(): Promise<string | null> {
-  try {
-    var url = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-    var anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-    if (!url || !anon) return null
-
-    var cookieStore = cookies()
-    var supa = createServerClient(url, anon, {
-      cookies: {
-        get: function (name: string) {
-          var c = cookieStore.get(name)
-          return c ? c.value : undefined
-        },
-        set: function () { /* no-op for API routes */ },
-        remove: function () { /* no-op */ },
-      },
-    })
-    var resUser = await supa.auth.getUser()
-    if (resUser.error) return null
-    var email = resUser.data && resUser.data.user ? resUser.data.user.email : null
-    return email ? email.toLowerCase() : null
-  } catch (e) {
-    return null
-  }
-}
-
 // === Display name à partir d'un email Meshuga ===
 function displayNameFromEmail(email: string): string {
   var e = (email || "").toLowerCase().trim()
   if (e === "edward@meshuga.fr") return "Edward Touret"
   if (e === "emy@meshuga.fr") return "Emy Soulabaille"
-  // Fallback : prend la partie locale, capitalize
   var local = e.split("@")[0] || e
   return local.charAt(0).toUpperCase() + local.slice(1)
 }
@@ -99,6 +59,13 @@ function getAmendmentTypeLabel(amendmentType: string): string {
   if (t === "prolongation_duree") return "Avenant — Prolongation de la durée"
   if (t === "autre") return "Avenant au contrat de travail"
   return "Avenant au contrat de travail"
+}
+
+// === Helper : SMS body pour Edward (validation employer) ===
+function buildEmployerValidationSmsBody(prepBy: string, empName: string, docLabel: string, validationUrl: string): string {
+  var who = displayNameFromEmail(prepBy)
+  var docShort = docLabel.length > 30 ? docLabel.substring(0, 27) + "..." : docLabel
+  return "Meshuga: " + who + " a prepare " + docShort + " pour " + empName + ". Valide ici: " + validationUrl
 }
 
 // ============================================================
@@ -125,6 +92,7 @@ export async function POST(
   var recipientPhone = (body && typeof body.recipientPhone === "string" ? body.recipientPhone : "").trim()
   var includeWelcomePack = body && body.includeWelcomePack === true
   var saveEmailToProfile = body && body.saveEmailToProfile === true
+  var preparedByEmail = (body && typeof body.preparedByEmail === "string" ? body.preparedByEmail : "").trim().toLowerCase()
 
   // === Validation : au moins email OU téléphone ===
   var hasEmail = recipientEmail.length > 0
@@ -218,15 +186,12 @@ export async function POST(
     finalIncludeWelcomePack = false
   }
 
-  // === 7. Détecter qui est en train d'envoyer ===
-  var currentUserEmail = await getCurrentUserEmail()
-  var isEmployerSigner = !currentUserEmail || currentUserEmail === EMPLOYER_EMAIL
-  // Si pas d'user authentifié (dev local, scripts), on fallback "comme si Edward"
-  // (backward compat). En prod le dashboard nécessite auth donc l'user sera là.
+  // === 7. Détecter qui est en train d'envoyer (via param body, plus de cookies SSR) ===
+  var isEmployerSigner = !preparedByEmail || preparedByEmail === EMPLOYER_EMAIL
 
   // ============================================================
   // BRANCHE A : envoi préparé par un user AUTRE qu'Edward
-  // → on n'envoie PAS au salarié, on demande validation à Edward
+  // → on n'envoie PAS au salarié, on demande validation à Edward (email + SMS)
   // ============================================================
   if (!isEmployerSigner) {
     var validationToken = randomUUID().replace(/-/g, "")
@@ -234,7 +199,7 @@ export async function POST(
     var expiresIso = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString()
 
     var pendingPayload: any = {
-      prepared_by_email: currentUserEmail,
+      prepared_by_email: preparedByEmail,
       prepared_at: nowIso,
       employer_validation_token: validationToken,
       employer_validation_token_expires_at: expiresIso,
@@ -261,11 +226,14 @@ export async function POST(
     var validationUrl = siteUrlA.replace(/\/+$/, "") +
       "/employer-validate?type=amendment&id=" + amendmentId + "&token=" + validationToken
 
-    // Envoie email à Edward
+    // Préparation contenus
     var docLabelA = getAmendmentTypeLabel(amendment.amendment_type || "")
+    var empFullName = (empStatus.prenom || "") + " " + (empStatus.nom || "")
+
+    // Email à Edward
     var validationEmail = buildEmployerValidationEmail({
-      preparedByEmail: currentUserEmail || "?",
-      preparedByDisplayName: displayNameFromEmail(currentUserEmail || ""),
+      preparedByEmail: preparedByEmail,
+      preparedByDisplayName: displayNameFromEmail(preparedByEmail),
       recipientFirstName: empStatus.prenom,
       recipientLastName: empStatus.nom,
       recipientCivilite: empStatus.civilite,
@@ -277,26 +245,52 @@ export async function POST(
       validationUrl: validationUrl,
     })
 
-    var emailResultA = await sendBrevoEmail({
+    var emailToEdwardPromise = sendBrevoEmail({
       to: [{ email: EMPLOYER_EMAIL, name: "Edward Touret" }],
       subject: validationEmail.subject,
       htmlContent: validationEmail.htmlContent,
       textContent: validationEmail.textContent,
-      replyTo: { email: currentUserEmail || EMPLOYER_EMAIL, name: displayNameFromEmail(currentUserEmail || "") },
+      replyTo: { email: preparedByEmail, name: displayNameFromEmail(preparedByEmail) },
       tags: ["employer-validation", "amendment"],
     })
 
-    if (!emailResultA.ok) {
-      console.error("[send-signature/amendment] Validation email failed:", emailResultA.error)
-      // On garde quand même la sauvegarde DB → Edward pourra valider via le dashboard
+    // SMS à Edward (en parallèle)
+    var edwardPhone = process.env.EDWARD_NOTIFICATION_PHONE || EMPLOYER_PHONE_FALLBACK
+    var smsToEdwardBody = buildEmployerValidationSmsBody(
+      preparedByEmail,
+      empFullName.trim(),
+      docLabelA,
+      validationUrl
+    )
+    var smsToEdwardPromise = sendTwilioSms({
+      to: edwardPhone,
+      body: smsToEdwardBody,
+    })
+
+    var resultsToEdward = await Promise.allSettled([emailToEdwardPromise, smsToEdwardPromise])
+    var emailToEdwardResult: any = resultsToEdward[0].status === "fulfilled" ? resultsToEdward[0].value : { ok: false, error: "Exception" }
+    var smsToEdwardResult: any = resultsToEdward[1].status === "fulfilled" ? resultsToEdward[1].value : { ok: false, error: "Exception" }
+
+    var emailOk = emailToEdwardResult && emailToEdwardResult.ok
+    var smsOk = smsToEdwardResult && smsToEdwardResult.ok
+
+    if (!emailOk && !smsOk) {
+      console.error("[send-signature/amendment] Tous les canaux validation Edward échoués:",
+        emailToEdwardResult ? emailToEdwardResult.error : "?",
+        "|",
+        smsToEdwardResult ? smsToEdwardResult.error : "?"
+      )
       return NextResponse.json(
         {
           ok: true,
           awaiting_employer_validation: true,
           email_to_employer_sent: false,
-          email_error: emailResultA.error,
+          sms_to_employer_sent: false,
+          email_error: emailToEdwardResult ? emailToEdwardResult.error : null,
+          sms_error: smsToEdwardResult ? smsToEdwardResult.error : null,
           validation_token: validationToken,
-          message: "Préparation enregistrée. L'email à Edward n'a pas pu partir, mais il peut valider via le dashboard.",
+          validation_url: validationUrl,
+          message: "Préparation enregistrée. Email + SMS à Edward ont échoué, mais il peut valider via le dashboard ou le lien direct.",
         },
         { status: 200 }
       )
@@ -306,16 +300,18 @@ export async function POST(
       {
         ok: true,
         awaiting_employer_validation: true,
-        email_to_employer_sent: true,
+        email_to_employer_sent: !!emailOk,
+        sms_to_employer_sent: !!smsOk,
         validation_token: validationToken,
-        message: "Avenant préparé. Edward a reçu un email pour valider et déclencher l'envoi au salarié.",
+        validation_url: validationUrl,
+        message: "Avenant préparé. Edward a reçu " + (emailOk && smsOk ? "un email et un SMS" : emailOk ? "un email" : "un SMS") + " pour valider et déclencher l'envoi au salarié.",
       },
       { status: 200 }
     )
   }
 
   // ============================================================
-  // BRANCHE B : envoi direct (user = Edward ou pas d'auth)
+  // BRANCHE B : envoi direct (preparedByEmail = Edward ou vide)
   // → comportement historique : on envoie au salarié immédiatement
   // ============================================================
 
@@ -340,7 +336,6 @@ export async function POST(
     signature_signed_at: null,
     signature_audit_data: null,
     signature_pdf_hash: null,
-    // Si Edward valide directement, on marque aussi employer_validated_at
     employer_validated_at: new Date().toISOString(),
     employer_validated_by_email: EMPLOYER_EMAIL,
   }
@@ -377,7 +372,7 @@ export async function POST(
   var siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://meshuga-manager.vercel.app"
   var signatureUrl = siteUrl.replace(/\/+$/, "") + "/sign/" + token
 
-  // === 12. Envoi parallèle email + SMS ===
+  // === 12. Envoi parallèle email + SMS au salarié ===
   var emailPromise: Promise<any> = Promise.resolve(null)
   var smsPromise: Promise<any> = Promise.resolve(null)
 
@@ -418,15 +413,15 @@ export async function POST(
   var emailResult: any = results[0].status === "fulfilled" ? results[0].value : { ok: false, error: "Exception" }
   var smsResult: any = results[1].status === "fulfilled" ? results[1].value : { ok: false, error: "Exception" }
 
-  var emailOk = !hasEmail || (emailResult && emailResult.ok)
-  var smsOk = !hasPhone || (smsResult && smsResult.ok)
+  var emailOkB = !hasEmail || (emailResult && emailResult.ok)
+  var smsOkB = !hasPhone || (smsResult && smsResult.ok)
   var anyChannelSucceeded = (hasEmail && emailResult && emailResult.ok) ||
                             (hasPhone && smsResult && smsResult.ok)
 
   if (!anyChannelSucceeded) {
     var emailErr = emailResult ? emailResult.error : "non envoyé"
     var smsErr = smsResult ? smsResult.error : "non envoyé"
-    console.error("[send-signature/amendment] Tous les canaux ont échoué:", emailErr, "|", smsErr)
+    console.error("[send-signature/amendment] Tous les canaux salarié ont échoué:", emailErr, "|", smsErr)
     return NextResponse.json(
       {
         ok: false,
@@ -456,7 +451,7 @@ export async function POST(
           ? { ok: !!smsResult.ok, sid: smsResult.sid, error: smsResult.ok ? null : smsResult.error, testMode: smsResult.testMode }
           : null,
       },
-      partialSuccess: !(emailOk && smsOk),
+      partialSuccess: !(emailOkB && smsOkB),
     },
     { status: 200 }
   )
