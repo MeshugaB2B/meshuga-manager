@@ -231,8 +231,8 @@ export default function FloatingChat(props) {
               <div style={{display:'flex', flexDirection:'column', alignItems: isMe ? 'flex-end' : 'flex-start'}}>
                 <div style={{
                   maxWidth:'82%',
-                  background: isMe ? '#191923' : '#FF82D7',
-                  color: isMe ? '#FFEB5A' : '#FFFFFF',
+                  background: isMe ? '#FFEB5A' : '#FF82D7',
+                  color: isMe ? '#191923' : '#FFFFFF',
                   border:'2px solid #191923',
                   borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
                   padding:'8px 12px',
