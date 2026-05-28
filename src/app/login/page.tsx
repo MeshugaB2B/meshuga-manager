@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
+import { LOGO_PINK } from '../dashboard/logos'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -46,17 +47,20 @@ export default function LoginPage() {
 
   return (
     <div style={{ minHeight:'100vh', background:'#FFEB5A', display:'flex', alignItems:'center', justifyContent:'center', padding:24, fontFamily:"'Arial Narrow', Arial, sans-serif" }}>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet" />
       <div style={{ width:'100%', maxWidth:400 }}>
 
         <div style={{ textAlign:'center', marginBottom:40 }}>
-          <img src="/apple-touch-icon.png" alt="Meshuga" width={120} height={120}
-            style={{ borderRadius:'50%', margin:'0 auto 16px', display:'block', border:'3px solid #191923', boxShadow:'5px 5px 0px #191923' }} />
-          <h1 style={{ fontFamily:"'Arial Narrow', Arial", fontWeight:900, fontSize:48, color:'#191923', letterSpacing:2, textTransform:'uppercase', lineHeight:1, margin:0 }}>meshuga</h1>
-          <p style={{ fontSize:18, color:'#191923', opacity:0.6, marginTop:4 }}>B2B Manager</p>
+          <img src="/stamp-pink.png" alt="Meshuga" width={130} height={130}
+            style={{ margin:'0 auto 14px', display:'block', objectFit:'contain' }} />
+          <img src={LOGO_PINK} alt="meshuga" style={{ display:'block', width:230, maxWidth:'80%', margin:'0 auto' }} />
+          <p style={{ fontFamily:"'Yellowtail', sans-serif", fontSize:24, color:'#FF82D7', marginTop:2, lineHeight:1 }}>B2B Manager</p>
         </div>
 
         <div style={{ background:'#FFFFFF', borderRadius:8, padding:28, border:'3px solid #191923', boxShadow:'6px 6px 0px #191923' }}>
-          <div style={{ fontFamily:"'Yellowtail', cursive", fontSize:22, marginBottom:20, color:'#191923' }}>
+          <div style={{ fontFamily:"'Yellowtail', sans-serif", fontSize:30, marginBottom:20, color:'#FF82D7', lineHeight:1 }}>
             {mode === 'login' ? 'Connexion 👋' : 'Mot de passe oublié'}
           </div>
 
