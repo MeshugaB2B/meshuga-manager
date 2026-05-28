@@ -56,6 +56,7 @@ export default function FoodCostTab(props) {
   var [fcInvoiceModal, setFcInvoiceModal] = useState(false)
 
   var [drinkEdit, setDrinkEdit] = useState(null)
+  var [alertsModalOpen, setAlertsModalOpen] = useState(false)
 
   // ============= LOAD DATA =============
   function loadData() {
@@ -653,12 +654,15 @@ export default function FoodCostTab(props) {
                   </div>
                   <div style={{fontSize:30,fontWeight:900,color:kpis.avg>fcSeuil?'var(--p)':'#009D3A',lineHeight:1.1,marginTop:4}}>{kpis.avg.toFixed(1)}<span style={{fontSize:16}}>%</span></div>
                 </div>
-                <div style={{background:'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                <div onClick={function(){if(kpis.alerts.length>0)setAlertsModalOpen(true)}} style={{background:'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',cursor:kpis.alerts.length>0?'pointer':'default',transition:'transform .12s'}} onMouseEnter={function(e){if(kpis.alerts.length>0){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='4px 4px 0 #191923'}}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}}>
                   <div style={{display:'flex',alignItems:'center',gap:6}}>
                     <span style={{width:9,height:9,borderRadius:'50%',background:kpis.alerts.length>0?'var(--p)':'#009D3A',flexShrink:0}}></span>
                     <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>À surveiller</div>
                   </div>
-                  <div style={{fontSize:30,fontWeight:900,color:kpis.alerts.length>0?'var(--p)':'#009D3A',lineHeight:1.1,marginTop:4}}>{kpis.alerts.length}</div>
+                  <div style={{display:'flex',alignItems:'baseline',gap:6}}>
+                    <div style={{fontSize:30,fontWeight:900,color:kpis.alerts.length>0?'var(--p)':'#009D3A',lineHeight:1.1,marginTop:4}}>{kpis.alerts.length}</div>
+                    {kpis.alerts.length>0 && <span style={{fontSize:10,color:'var(--p)',fontWeight:900}}>voir →</span>}
+                  </div>
                   <div style={{fontSize:9,opacity:.55,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',fontWeight:700}}>{kpis.alerts.length>0?kpis.alerts.slice(0,2).map(function(v){return v.name}).join(' · '):'Tout est OK ✅'}</div>
                 </div>
                 {kpis.best && (
@@ -1227,6 +1231,59 @@ export default function FoodCostTab(props) {
       )}
 
       {ingPopup && <IngredientPopup ing={ingPopup} onClose={function(){setIngPopup(null)}} />}
+
+      {/* ========== MODAL RECETTES À SURVEILLER ========== */}
+      {alertsModalOpen && (function(){
+        var sorted = kpis.alerts.slice().sort(function(a,b){ return b.food_cost_pct - a.food_cost_pct })
+        return (
+          <div style={{position:'fixed',inset:0,background:'rgba(25,25,35,.6)',zIndex:400,display:'flex',alignItems:'center',justifyContent:'center',padding:14}} onClick={function(){setAlertsModalOpen(false)}}>
+            <div style={{background:'#FFFFFF',borderRadius:16,padding:18,width:'100%',maxWidth:520,maxHeight:'85vh',overflowY:'auto',border:'2px solid #191923',boxShadow:'4px 4px 0 #191923'}} onClick={function(e){e.stopPropagation()}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,gap:8}}>
+                <div>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:28,color:'var(--p)',lineHeight:1}}>À surveiller</div>
+                  <div style={{fontSize:10,opacity:.55,fontWeight:700,marginTop:2}}>{sorted.length} recette{sorted.length>1?'s':''} au-dessus de {fcSeuil}% de food cost</div>
+                </div>
+                <button onClick={function(){setAlertsModalOpen(false)}} style={{width:34,height:34,borderRadius:'50%',border:'2px solid #191923',background:'#FFFFFF',cursor:'pointer',fontSize:16,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:0,flexShrink:0}}>✕</button>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {sorted.map(function(item){
+                  var parentSlug = null
+                  var variantKey = item.variant_key || 'standard'
+                  // Retrouver le parent
+                  for (var gi=0; gi<groupedList.length; gi++) {
+                    var keys = Object.keys(groupedList[gi].variants)
+                    for (var ki=0; ki<keys.length; ki++) {
+                      if (groupedList[gi].variants[keys[ki]].id === item.id) {
+                        parentSlug = groupedList[gi].parent_slug
+                        variantKey = keys[ki]
+                        break
+                      }
+                    }
+                    if (parentSlug) break
+                  }
+                  return (
+                    <div key={item.id} onClick={function(){
+                      if (parentSlug) { setFcSelectedParent(parentSlug); setFcSelectedVariant(variantKey) }
+                      setAlertsModalOpen(false)
+                    }} style={{background:'#FFFFFF',border:'2px solid #191923',borderRadius:12,padding:'10px 14px',cursor:'pointer',boxShadow:'2px 2px 0 #191923',display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,transition:'transform .12s'}} onMouseEnter={function(e){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='2px 2px 0 #191923'}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:14,fontWeight:900,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item.name}</div>
+                        <div style={{fontSize:10,opacity:.55,fontWeight:700,marginTop:2,textTransform:'capitalize'}}>{item.categorie.replace('_',' ')} · Marge {fmt(item.marge_ht)}€</div>
+                      </div>
+                      <div style={{textAlign:'right',flexShrink:0}}>
+                        <div style={{fontSize:20,fontWeight:900,color:'var(--p)',lineHeight:1}}>{item.food_cost_pct}<span style={{fontSize:12}}>%</span></div>
+                        <div style={{fontSize:9,fontWeight:700,color:'var(--p)',marginTop:2}}>FC</div>
+                      </div>
+                      <div style={{fontSize:14,opacity:.55,fontWeight:900,flexShrink:0}}>›</div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div style={{fontSize:10,opacity:.5,fontWeight:700,marginTop:14,textAlign:'center'}}>Clique sur une recette pour ouvrir sa fiche</div>
+            </div>
+          </div>
+        )
+      })()}
 
     </div>
   )
