@@ -709,7 +709,7 @@ export default function FoodCostTab(props) {
         )
       })()}
 
-      {/* ========== DETAIL RECETTE ========== */}
+      {/* ========== DETAIL RECETTE V2 (Sprint 2) ========== */}
       {fcView === 'recettes' && selectedParent && (function(){
         var parent = selectedParent
         var v = pickVariant(parent, fcSelectedVariant)
@@ -721,44 +721,67 @@ export default function FoodCostTab(props) {
         var variantsList = Object.values(parent.variants)
         var coeffActuel = v.food_cost_ht > 0 ? Math.round(v.prix_vente_ht / v.food_cost_ht * 100) / 100 : 0
 
+        // Couleur food cost
+        var fcMainColor = v.food_cost_pct > fcSeuil ? '#CC0066' : (v.food_cost_pct > fcSeuil - 5 ? '#FFA500' : '#009D3A')
+        function catEmoji(cat){
+          var m = {classique:'🥪', mini:'🥖', salade:'🥗', accompagnement:'🍟', boisson:'🥤', dessert:'🍪', merchandising:'🛍️', sous_recette:'⚙️', sauce:'🥫'}
+          return m[cat] || '🍴'
+        }
+
+        // Calcul des coûts par ingrédient (pour les barres de poids)
+        var ingsWithCost = v.ingredients.map(function(ing){
+          var cost = Number(ing.prix_achat || 0) * Number(ing.qte || 0)
+          return Object.assign({}, ing, {_cost: cost})
+        })
+        ingsWithCost.sort(function(a,b){ return b._cost - a._cost })
+        var maxIngCost = ingsWithCost.length > 0 ? Math.max.apply(null, ingsWithCost.map(function(x){return x._cost})) : 1
+        if (maxIngCost === 0) maxIngCost = 1
+
         return (
           <div>
-            <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
-              <button className="btn btn-sm" onClick={function(){setFcSelectedParent(null);setAddIngOpen(false);setEditingIngId(null);setEditingPrixTTC(null);setEditingMeta(null);setCreatingProduct(false);setNewProductDraft(null)}}>← Retour</button>
-              <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#191923',flex:1,display:'flex',alignItems:'center',gap:8}}>
-                {parent.name}
-                {isPrep && <span style={{fontFamily:'Arial Narrow, Arial, sans-serif',fontSize:10,background:'#F3EBFA',color:'#A06CD5',padding:'3px 8px',borderRadius:4,fontWeight:900,textTransform:'uppercase'}}>🧪 Préparation maison</span>}
+            {/* ============= HEADER FICHE ============= */}
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,flexWrap:'wrap'}}>
+              <button onClick={function(){setFcSelectedParent(null);setAddIngOpen(false);setEditingIngId(null);setEditingPrixTTC(null);setEditingMeta(null);setCreatingProduct(false);setNewProductDraft(null)}} style={{width:36,height:36,borderRadius:'50%',border:'2px solid #191923',background:'#FFFFFF',cursor:'pointer',fontSize:16,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,padding:0}} title="Retour">←</button>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontFamily:"'Yellowtail',cursive",fontSize:32,color:'var(--p)',lineHeight:1}}>{parent.name}</div>
+                <div style={{fontSize:10,fontWeight:700,opacity:.55,textTransform:'capitalize',marginTop:2}}>
+                  {catEmoji(v.categorie)} {v.categorie.replace('_',' ')}
+                  {isPrep && <span style={{marginLeft:6,background:'#F3EBFA',color:'#A06CD5',padding:'2px 8px',borderRadius:6,fontWeight:900,fontSize:9,textTransform:'uppercase'}}>Sous-recette</span>}
+                </div>
               </div>
-              <button className="btn btn-sm" style={{background:'#FFEB5A',fontWeight:900}} onClick={function(){startEditMeta(v, parent)}}>✏️ Modifier</button>
-              <button className="btn btn-sm" style={{background:'#FFE5E5',color:'#CC0066',fontWeight:900}} onClick={function(){deleteRecipeParent(parent.parent_slug, parent.name)}}>🗑️ Supprimer</button>
+              <div style={{display:'flex',gap:6}}>
+                <button onClick={function(){startEditMeta(v, parent)}} title="Modifier" style={{width:36,height:36,borderRadius:'50%',border:'2px solid #191923',background:'var(--y)',cursor:'pointer',fontSize:14,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>✏️</button>
+                <button onClick={function(){deleteRecipeParent(parent.parent_slug, parent.name)}} title="Supprimer" style={{width:36,height:36,borderRadius:'50%',border:'2px solid #CC0066',background:'#FFE5E5',color:'#CC0066',cursor:'pointer',fontSize:14,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>🗑️</button>
+              </div>
             </div>
 
+            {/* Edit meta */}
             {editingMeta && editingMeta.recipe_id === v.id && (
-              <div style={{background:'#F8F9FF',borderRadius:12,padding:16,marginBottom:12,border:'2px solid #005FFF'}}>
-                <div style={{fontWeight:900,fontSize:13,textTransform:'uppercase',marginBottom:10,color:'#005FFF'}}>✏️ Modifier la recette</div>
+              <div style={{background:'#FFFFFF',borderRadius:14,padding:16,marginBottom:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'var(--p)',marginBottom:10,lineHeight:1}}>Modifier la fiche</div>
                 <div style={{marginBottom:10}}>
-                  <div style={{fontSize:10,opacity:.5,marginBottom:3}}>Nom</div>
+                  <div style={{fontSize:10,opacity:.55,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Nom</div>
                   <input className="inp" value={editingMeta.name} onChange={function(e){setEditingMeta(function(p){return Object.assign({},p,{name:e.target.value})})}} />
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
                   <div>
-                    <div style={{fontSize:10,opacity:.5,marginBottom:3}}>Catégorie</div>
+                    <div style={{fontSize:10,opacity:.55,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Catégorie</div>
                     <select className="inp" value={editingMeta.categorie} onChange={function(e){setEditingMeta(function(p){return Object.assign({},p,{categorie:e.target.value})})}}>
                       <option value="classique">🥪 Sandwich</option>
                       <option value="salade">🥗 Salade</option>
                       <option value="accompagnement">🍟 Accomp.</option>
                       <option value="boisson">🥤 Boisson</option>
-                      <option value="mini">🥨 Mini</option>
-                      <option value="sous_recette">🧪 Sous-recette maison</option>
-                      <option value="sauce">🧪 Sauce maison</option>
+                      <option value="mini">🥖 Mini</option>
+                      <option value="sous_recette">⚙️ Sous-recette</option>
+                      <option value="sauce">🥫 Sauce</option>
                     </select>
                   </div>
                   <div>
-                    <div style={{fontSize:10,opacity:.5,marginBottom:3}}>TVA (%)</div>
+                    <div style={{fontSize:10,opacity:.55,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>TVA (%)</div>
                     <select className="inp" value={editingMeta.tva} onChange={function(e){setEditingMeta(function(p){return Object.assign({},p,{tva:parseFloat(e.target.value)})})}}>
-                      <option value="5.5">5,5% (restauration à emporter)</option>
-                      <option value="10">10% (restauration sur place)</option>
-                      <option value="20">20% (alcool, boissons)</option>
+                      <option value="5.5">5,5% (à emporter)</option>
+                      <option value="10">10% (sur place)</option>
+                      <option value="20">20% (alcool)</option>
                     </select>
                   </div>
                 </div>
@@ -769,290 +792,240 @@ export default function FoodCostTab(props) {
               </div>
             )}
 
+            {/* ============= TABS STD/MINI ============= */}
             {variantsList.length > 1 && (
-              <div style={{display:'flex',gap:0,marginBottom:16,background:'#F5F5F5',borderRadius:10,padding:4}}>
+              <div style={{display:'flex',gap:6,marginBottom:16}}>
                 {variantsList.map(function(vv){
                   var active = vv.variant_key === fcSelectedVariant
                   return (
-                    <button key={vv.variant_key} onClick={function(){setFcSelectedVariant(vv.variant_key);setEditingIngId(null);setAddIngOpen(false);setEditingPrixTTC(null);setCreatingProduct(false);setNewProductDraft(null)}} style={{flex:1,padding:'10px 14px',background:active?'#FF82D7':'transparent',color:active?'#fff':'#555',border:'none',borderRadius:8,fontWeight:900,fontSize:13,cursor:'pointer'}}>
-                      {vv.variant_label} · {fmt(vv.prix_vente_ttc)}€
+                    <button key={vv.variant_key} onClick={function(){setFcSelectedVariant(vv.variant_key);setEditingIngId(null);setAddIngOpen(false);setEditingPrixTTC(null);setCreatingProduct(false);setNewProductDraft(null)}} style={{flex:1,padding:'10px 14px',background:active?'#191923':'#FFFFFF',color:active?'var(--y)':'#191923',border:'2px solid #191923',borderRadius:20,fontWeight:900,fontSize:13,cursor:'pointer',display:'flex',justifyContent:'center',alignItems:'center',gap:6}}>
+                      {vv.variant_label} · <span style={{fontSize:14}}>{fmt(vv.prix_vente_ttc)}€</span>
                     </button>
                   )
                 })}
               </div>
             )}
 
-            {!isPrep && (
-              <div style={{background:'#FF82D7',borderRadius:12,padding:16,marginBottom:12,border:'2px solid #fff'}}>
-                <div style={{fontFamily:"'Yellowtail',cursive",fontSize:18,color:'#191923',marginBottom:8}}>💡 Prix conseillé</div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                  <div style={{background:'#FFEB5A',borderRadius:8,padding:'10px 12px'}}>
-                    <div style={{fontSize:10,color:'#191923',fontWeight:900,textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>x4 — minimum</div>
-                    <div style={{fontSize:22,fontWeight:900,color:'#191923'}}>{fmt(conseilX4TTC)}€ TTC</div>
-                  </div>
-                  <div style={{background:'#fff',borderRadius:8,padding:'10px 12px'}}>
-                    <div style={{fontSize:10,color:'#CC0066',fontWeight:900,textTransform:'uppercase',letterSpacing:.5,marginBottom:4}}>x5 — confortable</div>
-                    <div style={{fontSize:22,fontWeight:900,color:'#CC0066'}}>{fmt(conseilX5TTC)}€ TTC</div>
-                  </div>
+            {/* ============= 4 TUILES KPI FICHE ============= */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:18}}>
+              {!isPrep && (
+                <div style={{background:'#FFFFFF',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                  <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Prix de vente TTC</div>
+                  {editingPrixTTC === null && (
+                    <div onClick={function(){setEditingPrixTTC(v.prix_vente_ttc)}} style={{cursor:'pointer',marginTop:4}}>
+                      <div style={{fontSize:26,fontWeight:900,lineHeight:1}}>{fmt(v.prix_vente_ttc)}<span style={{fontSize:14}}>€</span></div>
+                      <div style={{fontSize:9,opacity:.5,marginTop:3,fontWeight:700}}>HT {fmt(v.prix_vente_ht)}€ · ✏️ clic pour modifier</div>
+                    </div>
+                  )}
+                  {editingPrixTTC !== null && (
+                    <div style={{display:'flex',gap:4,alignItems:'center',marginTop:5,flexWrap:'wrap'}}>
+                      <input type="number" step="0.1" value={editingPrixTTC} onChange={function(e){setEditingPrixTTC(parseFloat(e.target.value)||0)}} style={{width:74,padding:'4px 6px',fontSize:16,fontWeight:900,border:'2px solid #005FFF',borderRadius:6}} autoFocus />
+                      <button className="btn btn-sm btn-y" style={{fontSize:10,padding:'4px 6px',fontWeight:900}} onClick={function(){saveRecipePriceTTC(v.id, editingPrixTTC)}}>✓</button>
+                      <button className="btn btn-sm" style={{fontSize:10,padding:'4px 6px'}} onClick={function(){setEditingPrixTTC(null)}}>✕</button>
+                    </div>
+                  )}
                 </div>
-                <div style={{fontSize:11,color:'#191923',opacity:.6,marginTop:8}}>Food cost actuel : {fmt(v.food_cost_ht)}€ · TVA {(tvaRatio*100).toFixed(1)}%</div>
+              )}
+              <div style={{background:'#FFFFFF',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Coût matières (HT)</div>
+                <div style={{fontSize:26,fontWeight:900,color:'#191923',lineHeight:1,marginTop:4}}>{isPrep ? fmtPrep(v.food_cost_ht) : fmt(v.food_cost_ht)}<span style={{fontSize:14}}>€</span></div>
+                <div style={{fontSize:9,opacity:.55,marginTop:3,fontWeight:700}}>{v.ingredients.length} ingrédient{v.ingredients.length > 1 ? 's' : ''}</div>
               </div>
-            )}
+              {!isPrep && (
+                <div style={{background:fcMainColor === '#009D3A' ? '#E8F8EE' : (fcMainColor === '#FFA500' ? '#FFF5E5' : '#FFE5E5'),borderRadius:14,padding:'12px 14px',border:'2px solid '+fcMainColor,boxShadow:'3px 3px 0 '+fcMainColor}}>
+                  <div style={{fontSize:9,fontWeight:900,opacity:.7,textTransform:'uppercase',letterSpacing:.5,color:fcMainColor}}>Food cost</div>
+                  <div style={{fontSize:26,fontWeight:900,color:fcMainColor,lineHeight:1,marginTop:4}}>{v.food_cost_pct}<span style={{fontSize:14}}>%</span></div>
+                  <div style={{fontSize:9,opacity:.7,marginTop:3,fontWeight:700,color:fcMainColor}}>Coeff actuel : ×{coeffActuel}</div>
+                </div>
+              )}
+              {!isPrep && (
+                <div style={{background:'var(--y)',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                  <div style={{fontSize:9,fontWeight:900,opacity:.7,textTransform:'uppercase',letterSpacing:.5}}>Marge HT</div>
+                  <div style={{fontSize:26,fontWeight:900,color:'#191923',lineHeight:1,marginTop:4}}>{fmt(v.marge_ht)}<span style={{fontSize:14}}>€</span></div>
+                  <div style={{fontSize:9,opacity:.7,marginTop:3,fontWeight:700}}>par unité vendue</div>
+                </div>
+              )}
+            </div>
 
-            {isPrep ? (
-              <div style={{background:'#fff',borderRadius:12,padding:16,border:'2px solid #A06CD5',marginBottom:12}}>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                  <div style={{background:'#F3EBFA',borderRadius:8,padding:'10px 12px'}}>
-                    <div style={{fontSize:10,opacity:.6,textTransform:'uppercase',marginBottom:3,color:'#A06CD5',fontWeight:900}}>Food cost total</div>
-                    <div style={{fontWeight:900,fontSize:24,color:'#A06CD5'}}>{fmtPrep(v.food_cost_ht)}€</div>
-                    <div style={{fontSize:10,opacity:.6,marginTop:2}}>{v.ingredients.length} ingrédient{v.ingredients.length > 1 ? 's' : ''}</div>
-                  </div>
-                  <div style={{background:'#F8F9FF',borderRadius:8,padding:'10px 12px',border:'1.5px solid #DDEEFF'}}>
-                    <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginBottom:3}}>Usage</div>
-                    <div style={{fontWeight:900,fontSize:14,color:'#191923'}}>Préparation interne</div>
-                    <div style={{fontSize:10,opacity:.6,marginTop:2}}>Utilisée dans d&apos;autres recettes</div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div style={{background:'#fff',borderRadius:12,padding:16,border:'1.5px solid #EBEBEB',marginBottom:12}}>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:8}}>
-                  <div style={{background:'#F8F9FF',borderRadius:8,padding:'10px 12px',border:'1.5px solid #DDEEFF'}}>
-                    <div style={{fontSize:10,opacity:.5,textTransform:'uppercase',marginBottom:3}}>Prix de vente TTC</div>
-                    {editingPrixTTC === null && (
-                      <div>
-                        <div style={{fontWeight:900,fontSize:18,cursor:'pointer'}} onClick={function(){setEditingPrixTTC(v.prix_vente_ttc)}}>{fmt(v.prix_vente_ttc)}€</div>
-                        <div style={{fontSize:10,opacity:.4,marginTop:2}}>HT : {fmt(v.prix_vente_ht)}€</div>
-                      </div>
-                    )}
-                    {editingPrixTTC !== null && (
-                      <div style={{display:'flex',gap:4,alignItems:'center',marginTop:3,flexWrap:'wrap'}}>
-                        <input type="number" step="0.1" value={editingPrixTTC} onChange={function(e){setEditingPrixTTC(parseFloat(e.target.value)||0)}} style={{width:64,padding:'4px 6px',fontSize:14,fontWeight:900,border:'2px solid #005FFF',borderRadius:4}} autoFocus />
-                        <button className="btn btn-sm btn-y" style={{fontSize:10,padding:'4px 6px'}} onClick={function(){saveRecipePriceTTC(v.id, editingPrixTTC)}}>✓</button>
-                        <button className="btn btn-sm" style={{fontSize:10,padding:'4px 6px'}} onClick={function(){setEditingPrixTTC(null)}}>✕</button>
-                      </div>
-                    )}
-                  </div>
-                  <div style={{background:'#FFF5FB',borderRadius:8,padding:'10px 12px',border:'1.5px solid #FFD3EE'}}>
-                    <div style={{fontSize:10,opacity:.6,textTransform:'uppercase',marginBottom:3,color:'#CC0066'}}>Coût HT total</div>
-                    <div style={{fontWeight:900,fontSize:18,color:'#CC0066'}}>{fmt(v.food_cost_ht)}€</div>
-                    <div style={{fontSize:10,opacity:.6,marginTop:2}}>{v.ingredients.length} ingrédient{v.ingredients.length > 1 ? 's' : ''}</div>
-                  </div>
-                  <div style={{background:'#FFEB5A',borderRadius:8,padding:'10px 12px'}}>
-                    <div style={{fontSize:10,opacity:.6,textTransform:'uppercase',marginBottom:3}}>Coeff actuel</div>
-                    <div style={{fontWeight:900,fontSize:18}}>x{coeffActuel}</div>
-                    <div style={{fontSize:10,opacity:.6,marginTop:2}}>{v.food_cost_pct}% · Marge {fmt(v.marge_ht)}€</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-              <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:.5,opacity:.5}}>Ingrédients ({v.ingredients.length})</div>
-              <button className="btn btn-sm btn-y" style={{fontSize:10,fontWeight:900}} onClick={function(){
-                if (addIngOpen) {
-                  setAddIngOpen(false)
-                  setAddIngSearch('')
-                  setCreatingProduct(false)
-                  setNewProductDraft(null)
-                } else {
-                  setAddIngOpen(true)
-                  setAddIngSearch('')
-                }
-              }}>
-                {addIngOpen ? '✕ Fermer' : '+ Ajouter'}
+            {/* ============= COMPOSITION (ingrédients) ============= */}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,gap:8,flexWrap:'wrap'}}>
+              <div style={{fontFamily:"'Yellowtail',cursive",fontSize:24,color:'var(--p)',lineHeight:1}}>Composition</div>
+              <button onClick={function(){
+                if (addIngOpen) {setAddIngOpen(false);setAddIngSearch('');setCreatingProduct(false);setNewProductDraft(null)}
+                else {setAddIngOpen(true);setAddIngSearch('')}
+              }} style={{padding:'7px 14px',background:addIngOpen?'#191923':'var(--p)',color:addIngOpen?'var(--y)':'#FFFFFF',border:'2px solid #191923',borderRadius:18,fontWeight:900,fontSize:11,cursor:'pointer'}}>
+                {addIngOpen ? '✕ Fermer' : '+ Ajouter un ingrédient'}
               </button>
             </div>
 
+            {/* Recherche/création ingrédient — préservé tel quel */}
             {addIngOpen && !creatingProduct && (
-              <div style={{background:'#fff',borderRadius:10,padding:12,marginBottom:10,border:'2px solid #FFEB5A'}}>
-                <input className="inp" placeholder="Chercher un produit (pain, saumon, ketchup...)" value={addIngSearch} onChange={function(e){setAddIngSearch(e.target.value)}} style={{marginBottom:8}} autoFocus />
+              <div style={{background:'#FFFFFF',borderRadius:14,padding:14,marginBottom:12,border:'2px solid var(--y)',boxShadow:'3px 3px 0 #191923'}}>
+                <input className="inp" placeholder="🔍 Chercher un produit (pain, saumon, ketchup…)" value={addIngSearch} onChange={function(e){setAddIngSearch(e.target.value)}} style={{marginBottom:8}} autoFocus />
                 {addIngSearch.length >= 2 && (
-                  <div style={{maxHeight:220,overflowY:'auto',background:'#FAFAFA',borderRadius:6,border:'1px solid #EEE',marginBottom:8}}>
-                    {products.filter(function(p){
-                      return (p.name || '').toLowerCase().indexOf(addIngSearch.toLowerCase()) > -1
-                    }).slice(0, 10).map(function(p){
+                  <div style={{maxHeight:240,overflowY:'auto',background:'#FAFAFA',borderRadius:8,border:'1px solid #EEE',marginBottom:8}}>
+                    {products.filter(function(p){return (p.name || '').toLowerCase().indexOf(addIngSearch.toLowerCase()) > -1}).slice(0, 10).map(function(p){
                       var sup = ''
                       var si
-                      for (si = 0; si < suppliers.length; si++) {
-                        if (suppliers[si].id === p.supplier_id) { sup = suppliers[si].name; break }
-                      }
+                      for (si = 0; si < suppliers.length; si++) { if (suppliers[si].id === p.supplier_id) { sup = suppliers[si].name; break } }
                       return (
-                        <div key={p.id} onClick={function(){addIngredientFromProduct(p, v.id)}} style={{padding:'8px 10px',borderBottom:'1px solid #F5F5F5',cursor:'pointer',fontSize:12,background:'#fff'}}>
+                        <div key={p.id} onClick={function(){addIngredientFromProduct(p, v.id)}} style={{padding:'10px 12px',borderBottom:'1px solid #F0F0F0',cursor:'pointer',fontSize:12,background:'#FFFFFF'}}>
                           <div style={{fontWeight:900}}>{p.name}</div>
-                          <div style={{fontSize:10,opacity:.5}}>{sup} · {p.current_price}€/{p.unit}</div>
+                          <div style={{fontSize:10,opacity:.55,fontWeight:700,marginTop:2}}>{sup} · {p.current_price}€/{p.unit}</div>
                         </div>
                       )
                     })}
                     {products.filter(function(p){return (p.name || '').toLowerCase().indexOf(addIngSearch.toLowerCase()) > -1}).length === 0 && (
-                      <div style={{padding:12,fontSize:11,opacity:.5,textAlign:'center'}}>Aucun produit trouvé dans la base</div>
+                      <div style={{padding:16,fontSize:11,opacity:.55,textAlign:'center',fontWeight:700}}>Aucun produit trouvé — créer un nouveau ci-dessous ↓</div>
                     )}
                   </div>
                 )}
-                <button className="btn btn-sm" style={{width:'100%',background:'#FF82D7',color:'#fff',fontWeight:900,fontSize:12}} onClick={function(){openCreateProduct(addIngSearch)}}>
+                <button onClick={function(){openCreateProduct(addIngSearch)}} style={{width:'100%',padding:'9px 12px',background:'var(--p)',color:'#FFFFFF',border:'2px solid #191923',borderRadius:18,fontWeight:900,fontSize:12,cursor:'pointer'}}>
                   + Créer un nouveau produit{addIngSearch ? ' « ' + addIngSearch + ' »' : ''}
                 </button>
               </div>
             )}
 
+            {/* Création nouveau produit — préservé tel quel */}
             {addIngOpen && creatingProduct && newProductDraft && (
-              <div style={{background:'#fff',borderRadius:10,padding:14,marginBottom:10,border:'2px solid #FF82D7'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-                  <div style={{fontWeight:900,fontSize:13,textTransform:'uppercase',color:'#FF82D7'}}>+ Nouveau produit</div>
-                  <button style={{background:'none',border:'none',fontSize:18,cursor:'pointer',color:'#888'}} onClick={cancelCreateProduct} disabled={creatingProductSaving}>✕</button>
+              <div style={{background:'#FFFFFF',borderRadius:14,padding:14,marginBottom:12,border:'2px solid var(--p)',boxShadow:'3px 3px 0 #191923'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'var(--p)',lineHeight:1}}>+ Nouveau produit</div>
+                  <button style={{background:'none',border:'none',fontSize:20,cursor:'pointer',color:'#888'}} onClick={cancelCreateProduct} disabled={creatingProductSaving}>✕</button>
                 </div>
-
-                <div style={{marginBottom:8}}>
-                  <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Nom du produit *</div>
-                  <input className="inp" value={newProductDraft.name} onChange={function(e){
-                    var val = e.target.value
-                    setNewProductDraft(function(prev){return Object.assign({}, prev, {name: val})})
-                  }} placeholder="Ex : Saumon fumé, Pain Rye…" autoFocus />
+                <div style={{marginBottom:10}}>
+                  <div style={{fontSize:10,opacity:.55,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Nom du produit *</div>
+                  <input className="inp" value={newProductDraft.name} onChange={function(e){var val = e.target.value;setNewProductDraft(function(prev){return Object.assign({}, prev, {name: val})})}} placeholder="Ex : Saumon fumé, Pain Rye…" autoFocus />
                 </div>
-
-                <div style={{marginBottom:8}}>
-                  <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Fournisseur *</div>
+                <div style={{marginBottom:10}}>
+                  <div style={{fontSize:10,opacity:.55,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Fournisseur *</div>
                   <div style={{display:'flex',gap:4,marginBottom:6}}>
-                    <button className="btn btn-sm" style={{flex:1,fontSize:11,background:newProductDraft.supplier_mode==='existing'?'#191923':'#F5F5F5',color:newProductDraft.supplier_mode==='existing'?'#FFEB5A':'#555',fontWeight:900}} onClick={function(){
-                      setNewProductDraft(function(prev){return Object.assign({}, prev, {supplier_mode: 'existing'})})
-                    }}>Existant</button>
-                    <button className="btn btn-sm" style={{flex:1,fontSize:11,background:newProductDraft.supplier_mode==='new'?'#191923':'#F5F5F5',color:newProductDraft.supplier_mode==='new'?'#FFEB5A':'#555',fontWeight:900}} onClick={function(){
-                      setNewProductDraft(function(prev){return Object.assign({}, prev, {supplier_mode: 'new'})})
-                    }}>+ Nouveau</button>
+                    <button className="btn btn-sm" style={{flex:1,fontSize:11,background:newProductDraft.supplier_mode==='existing'?'#191923':'#F5F5F5',color:newProductDraft.supplier_mode==='existing'?'var(--y)':'#555',fontWeight:900}} onClick={function(){setNewProductDraft(function(prev){return Object.assign({}, prev, {supplier_mode: 'existing'})})}}>Existant</button>
+                    <button className="btn btn-sm" style={{flex:1,fontSize:11,background:newProductDraft.supplier_mode==='new'?'#191923':'#F5F5F5',color:newProductDraft.supplier_mode==='new'?'var(--y)':'#555',fontWeight:900}} onClick={function(){setNewProductDraft(function(prev){return Object.assign({}, prev, {supplier_mode: 'new'})})}}>+ Nouveau</button>
                   </div>
                   {newProductDraft.supplier_mode === 'existing' && (
-                    <select className="inp" value={newProductDraft.supplier_id} onChange={function(e){
-                      var val = e.target.value
-                      setNewProductDraft(function(prev){return Object.assign({}, prev, {supplier_id: val})})
-                    }}>
+                    <select className="inp" value={newProductDraft.supplier_id} onChange={function(e){var val = e.target.value;setNewProductDraft(function(prev){return Object.assign({}, prev, {supplier_id: val})})}}>
                       <option value="">— Sélectionner —</option>
-                      {suppliers.map(function(s){
-                        return <option key={s.id} value={s.id}>{s.name}</option>
-                      })}
+                      {suppliers.map(function(s){return <option key={s.id} value={s.id}>{s.name}</option>})}
                     </select>
                   )}
                   {newProductDraft.supplier_mode === 'new' && (
-                    <input className="inp" value={newProductDraft.new_supplier_name} onChange={function(e){
-                      var val = e.target.value
-                      setNewProductDraft(function(prev){return Object.assign({}, prev, {new_supplier_name: val})})
-                    }} placeholder="Nom du fournisseur (ex : Norbert, Foodflow…)" />
+                    <input className="inp" value={newProductDraft.new_supplier_name} onChange={function(e){var val = e.target.value;setNewProductDraft(function(prev){return Object.assign({}, prev, {new_supplier_name: val})})}} placeholder="Nom (Norbert, Foodflow…)" />
                   )}
                 </div>
-
-                <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:8,marginBottom:8}}>
+                <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:8,marginBottom:10}}>
                   <div>
-                    <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Prix HT *</div>
-                    <input type="number" step="0.01" className="inp" value={newProductDraft.current_price || ''} onChange={function(e){
-                      var val = parseFloat(e.target.value) || 0
-                      setNewProductDraft(function(prev){return Object.assign({}, prev, {current_price: val})})
-                    }} placeholder="0.00" />
+                    <div style={{fontSize:10,opacity:.55,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Prix HT *</div>
+                    <input type="number" step="0.01" className="inp" value={newProductDraft.current_price || ''} onChange={function(e){var val = parseFloat(e.target.value) || 0;setNewProductDraft(function(prev){return Object.assign({}, prev, {current_price: val})})}} placeholder="0.00" />
                   </div>
                   <div>
-                    <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>par</div>
-                    <select className="inp" value={newProductDraft.unit} onChange={function(e){
-                      var val = e.target.value
-                      setNewProductDraft(function(prev){return Object.assign({}, prev, {unit: val})})
-                    }}>
-                      <option value="kg">kg</option>
-                      <option value="L">L</option>
-                      <option value="U">unité</option>
+                    <div style={{fontSize:10,opacity:.55,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>par</div>
+                    <select className="inp" value={newProductDraft.unit} onChange={function(e){var val = e.target.value;setNewProductDraft(function(prev){return Object.assign({}, prev, {unit: val})})}}>
+                      <option value="kg">kg</option><option value="L">L</option><option value="U">unité</option>
                     </select>
                   </div>
                 </div>
-
                 <div style={{marginBottom:12}}>
-                  <div style={{fontSize:10,opacity:.5,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Catégorie</div>
-                  <select className="inp" value={newProductDraft.category} onChange={function(e){
-                    var val = e.target.value
-                    setNewProductDraft(function(prev){return Object.assign({}, prev, {category: val})})
-                  }}>
+                  <div style={{fontSize:10,opacity:.55,marginBottom:3,textTransform:'uppercase',fontWeight:900}}>Catégorie</div>
+                  <select className="inp" value={newProductDraft.category} onChange={function(e){var val = e.target.value;setNewProductDraft(function(prev){return Object.assign({}, prev, {category: val})})}}>
                     <option value="ingredient">Ingrédient</option>
                     <option value="packaging">Packaging</option>
                     <option value="consommable">Consommable</option>
                     <option value="boisson">Boisson</option>
                   </select>
                 </div>
-
-                <div style={{fontSize:10,opacity:.6,background:'#FAFAFA',padding:8,borderRadius:6,marginBottom:10}}>
-                  💡 Le produit sera ajouté à la base puis directement à cette recette. La quantité utilisée se renseigne ensuite (clic sur l&apos;ingrédient).
-                </div>
-
+                <div style={{fontSize:10,opacity:.6,background:'#FAFAFA',padding:8,borderRadius:6,marginBottom:10,fontWeight:700}}>💡 Le produit sera ajouté à la base puis directement à cette recette.</div>
                 <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
                   <button className="btn btn-sm" onClick={cancelCreateProduct} disabled={creatingProductSaving}>Annuler</button>
-                  <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){createProductAndAddToRecipe(v.id)}} disabled={creatingProductSaving}>
-                    {creatingProductSaving ? '…' : '✅ Créer + ajouter'}
-                  </button>
+                  <button className="btn btn-sm btn-y" style={{fontWeight:900}} onClick={function(){createProductAndAddToRecipe(v.id)}} disabled={creatingProductSaving}>{creatingProductSaving ? '…' : '✓ Créer et ajouter'}</button>
                 </div>
               </div>
             )}
 
-            {v.ingredients.map(function(ing){
+            {/* Liste des ingrédients avec barres de poids */}
+            {ingsWithCost.length === 0 && (
+              <div style={{padding:30,textAlign:'center',opacity:.5,fontSize:12,background:'#FFFFFF',borderRadius:12,border:'2px dashed #DDD',fontWeight:700}}>
+                Aucun ingrédient. Clique sur « + Ajouter un ingrédient » pour commencer.
+              </div>
+            )}
+            {ingsWithCost.map(function(ing){
+              var displayQte = ing.qte
+              var displayUnit = ing.unite
+              var isKg = ing.unite === 'kg'
+              if (isKg) { displayQte = ing.qte * 1000; displayUnit = 'g' }
+              var realCost = ing._cost
+              var weightPct = v.food_cost_ht > 0 ? (realCost / v.food_cost_ht * 100) : 0
+              var barWidth = (realCost / maxIngCost * 100)
               var isEdit = editingIngId === ing.id
-              var realCost = Number(ing.prix_achat || 0) * Number(ing.qte || 0)
-              var isKg = ing.unite === 'kg' || ing.unite === 'l' || ing.unite === 'L'
-              var displayQte, displayUnit
-              if (isEdit && editingIngDraft) {
-                displayQte = isKg ? Math.round(editingIngDraft.qte * 1000) : editingIngDraft.qte
-                displayUnit = isKg ? (ing.unite === 'kg' ? 'g' : 'ml') : (ing.unite || 'U')
-              } else {
-                displayQte = isKg ? Math.round(Number(ing.qte || 0) * 1000) : Number(ing.qte || 0)
-                displayUnit = isKg ? (ing.unite === 'kg' ? 'g' : 'ml') : (ing.unite || 'U')
-              }
+              // Couleur de la barre selon le poids dans la recette
+              var ingBarColor = weightPct >= 35 ? '#CC0066' : (weightPct >= 20 ? '#FF82D7' : '#191923')
 
+              if (isEdit && editingIngDraft) {
+                return (
+                  <div key={ing.id} style={{background:'#FFFFFF',borderRadius:12,padding:14,marginBottom:8,border:'2px solid #005FFF',boxShadow:'3px 3px 0 #005FFF'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                      <div style={{fontSize:14,fontWeight:900}}>{ing.article}</div>
+                      <button onClick={function(){if(confirm('Retirer cet ingrédient de la recette ?')) removeIngredient(ing)}} title="Retirer" style={{width:30,height:30,borderRadius:'50%',border:'2px solid #CC0066',background:'#FFE5E5',color:'#CC0066',fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>🗑️</button>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                      <div>
+                        <div style={{fontSize:10,opacity:.55,marginBottom:3,fontWeight:900,textTransform:'uppercase'}}>Prix (€/{ing.unite})</div>
+                        <input type="number" step="0.01" className="inp" style={{padding:'7px 9px',fontSize:14,fontWeight:700}} value={editingIngDraft.prix_achat} onChange={function(e){var val = parseFloat(e.target.value)||0;setEditingIngDraft(function(prev){return Object.assign({},prev,{prix_achat:val})})}} />
+                      </div>
+                      <div>
+                        <div style={{fontSize:10,opacity:.55,marginBottom:3,fontWeight:900,textTransform:'uppercase'}}>Quantité ({displayUnit})</div>
+                        <input type="number" step={isKg?'1':'0.01'} className="inp" style={{padding:'7px 9px',fontSize:14,fontWeight:700}} value={displayQte} onChange={function(e){var raw = parseFloat(e.target.value)||0;var val = isKg ? raw/1000 : raw;setEditingIngDraft(function(prev){return Object.assign({},prev,{qte:val})})}} />
+                      </div>
+                    </div>
+                    <div style={{display:'flex',gap:6,justifyContent:'space-between',alignItems:'center'}}>
+                      <div style={{fontSize:12,opacity:.7,fontWeight:700}}>
+                        Coût : <strong style={{color:'#191923'}}>{fmt(editingIngDraft.prix_achat * editingIngDraft.qte)}€</strong>
+                      </div>
+                      <div style={{display:'flex',gap:6}}>
+                        <button className="btn btn-sm" style={{fontSize:11}} onClick={cancelEditIng} disabled={savingIng}>Annuler</button>
+                        <button className="btn btn-sm btn-y" style={{fontSize:11,fontWeight:900}} onClick={saveEditIng} disabled={savingIng}>{savingIng ? '…' : '💾 Enregistrer'}</button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              }
+              // Vue lecture : ingrédient avec barre de poids
               return (
-                <div key={ing.id} style={{background:'#fff',border:'1.5px solid '+(isEdit?'#005FFF':'#EBEBEB'),borderRadius:8,padding:'10px 12px',marginBottom:6}}>
-                  {!isEdit && (
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',cursor:'pointer'}} onClick={function(){startEditIng(ing)}}>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:13,fontWeight:900}}>{ing.article}</div>
-                        <div style={{fontSize:10,opacity:.5}}>{ing.fournisseur} · {displayQte} {displayUnit} × {fmt(ing.prix_achat)}€/{ing.unite}</div>
-                      </div>
-                      <div style={{textAlign:'right',marginLeft:8}}>
-                        <div style={{fontSize:14,fontWeight:900,color:'#005FFF'}}>{fmt(realCost)}€</div>
-                        <div style={{fontSize:9,opacity:.5}}>clic pour modifier</div>
-                      </div>
+                <div key={ing.id} onClick={function(){startEditIng(ing)}} style={{background:'#FFFFFF',border:'2px solid #191923',borderRadius:12,padding:'12px 14px',marginBottom:8,cursor:'pointer',boxShadow:'2px 2px 0 #191923',transition:'transform .12s'}} onMouseEnter={function(e){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='2px 2px 0 #191923'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:8}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:900,marginBottom:2}}>{ing.article}</div>
+                      <div style={{fontSize:10,opacity:.55,fontWeight:700}}>{ing.fournisseur} · {displayQte} {displayUnit} × {fmt(ing.prix_achat)}€/{ing.unite}</div>
                     </div>
-                  )}
-                  {isEdit && editingIngDraft && (
-                    <div>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                        <div style={{fontSize:13,fontWeight:900}}>{ing.article}</div>
-                        <button style={{background:'#FFE5E5',border:'none',color:'#CC0066',fontSize:14,cursor:'pointer',borderRadius:6,padding:'4px 8px'}} onClick={function(){if(confirm('Retirer cet ingrédient de la recette ?')) removeIngredient(ing)}}>🗑️</button>
-                      </div>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
-                        <div>
-                          <div style={{fontSize:10,opacity:.5,marginBottom:3}}>Prix (€/{ing.unite})</div>
-                          <input type="number" step="0.01" className="inp" style={{padding:'6px 8px',fontSize:14,fontWeight:700}} value={editingIngDraft.prix_achat} onChange={function(e){
-                            var val = parseFloat(e.target.value)||0
-                            setEditingIngDraft(function(prev){return Object.assign({},prev,{prix_achat:val})})
-                          }} />
-                        </div>
-                        <div>
-                          <div style={{fontSize:10,opacity:.5,marginBottom:3}}>Quantité ({displayUnit})</div>
-                          <input type="number" step={isKg?'1':'0.01'} className="inp" style={{padding:'6px 8px',fontSize:14,fontWeight:700}} value={displayQte} onChange={function(e){
-                            var raw = parseFloat(e.target.value)||0
-                            var val = isKg ? raw/1000 : raw
-                            setEditingIngDraft(function(prev){return Object.assign({},prev,{qte:val})})
-                          }} />
-                        </div>
-                      </div>
-                      <div style={{display:'flex',gap:6,justifyContent:'space-between',alignItems:'center'}}>
-                        <div style={{fontSize:12,opacity:.6}}>
-                          Coût : <strong>{fmt(editingIngDraft.prix_achat * editingIngDraft.qte)}€</strong>
-                        </div>
-                        <div style={{display:'flex',gap:6}}>
-                          <button className="btn btn-sm" style={{fontSize:11}} onClick={cancelEditIng} disabled={savingIng}>Annuler</button>
-                          <button className="btn btn-sm btn-y" style={{fontSize:11,fontWeight:900}} onClick={saveEditIng} disabled={savingIng}>{savingIng ? '…' : '💾 Enregistrer'}</button>
-                        </div>
-                      </div>
+                    <div style={{textAlign:'right',flexShrink:0}}>
+                      <div style={{fontSize:16,fontWeight:900,color:'#191923',lineHeight:1}}>{fmt(realCost)}<span style={{fontSize:11}}>€</span></div>
+                      <div style={{fontSize:10,fontWeight:900,color:ingBarColor,marginTop:2}}>{weightPct.toFixed(0)}% du FC</div>
                     </div>
-                  )}
+                  </div>
+                  {/* Barre de poids */}
+                  <div style={{height:6,background:'#F0F0F0',borderRadius:3,overflow:'hidden'}}>
+                    <div style={{width:barWidth+'%',height:'100%',background:ingBarColor,transition:'width .2s'}} />
+                  </div>
                 </div>
               )
             })}
 
-            {v.ingredients.length === 0 && (
-              <div style={{padding:20,textAlign:'center',opacity:.5,fontSize:12,background:'#fff',borderRadius:8,border:'1px dashed #DDD'}}>Aucun ingrédient. Clique sur &quot;+ Ajouter&quot; pour commencer.</div>
+            {/* ============= PRIX CONSEILLÉ (en bas, discret) ============= */}
+            {!isPrep && (
+              <div style={{background:'#FFFFFF',borderRadius:14,padding:14,marginTop:18,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'var(--p)',marginBottom:8,lineHeight:1}}>💡 Prix conseillé</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  <div style={{background:'var(--y)',borderRadius:10,padding:'10px 12px',border:'2px solid #191923'}}>
+                    <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,opacity:.7}}>×4 — minimum</div>
+                    <div style={{fontSize:22,fontWeight:900,color:'#191923',marginTop:3,lineHeight:1}}>{fmt(conseilX4TTC)}<span style={{fontSize:13}}>€ TTC</span></div>
+                  </div>
+                  <div style={{background:'var(--p)',borderRadius:10,padding:'10px 12px',border:'2px solid #191923'}}>
+                    <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,color:'#FFFFFF',opacity:.85}}>×5 — confortable</div>
+                    <div style={{fontSize:22,fontWeight:900,color:'#FFFFFF',marginTop:3,lineHeight:1}}>{fmt(conseilX5TTC)}<span style={{fontSize:13}}>€ TTC</span></div>
+                  </div>
+                </div>
+                <div style={{fontSize:10,opacity:.55,marginTop:8,fontWeight:700}}>Sur la base de {fmt(v.food_cost_ht)}€ de food cost · TVA {(tvaRatio*100).toFixed(1)}%</div>
+              </div>
             )}
           </div>
         )
