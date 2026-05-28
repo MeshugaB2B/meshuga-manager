@@ -37,23 +37,25 @@ var OR = '#B8920A'
 var ORANGE = '#FF6B2B'
 
 var CATS = {
-  all:          { label:'Tous',         emoji:'☰' },
-  evenementiel: { label:'Événementiel', emoji:'🎉' },
-  avocats:      { label:'Avocats',      emoji:'⚖️' },
-  startup:      { label:'Startups',     emoji:'🚀' },
-  agence_pub:   { label:'Agences créa', emoji:'🎨' },
-  hotel:        { label:'Hôtels',       emoji:'🏨' },
-  immo:         { label:'Immobilier',   emoji:'🏢' },
-  medical:      { label:'Médical',      emoji:'🏥' },
-  production:   { label:'Tournages',    emoji:'🎬' },
-  ecole:        { label:'Écoles',       emoji:'🎓' },
-  institution:  { label:'Institutions', emoji:'🏛️' },
-  luxe:         { label:'Luxe & Mode',  emoji:'👜' },
-  tech:         { label:'Tech',         emoji:'💻' },
-  conseil:      { label:'Conseil',      emoji:'📊' },
-  medias:       { label:'Médias',       emoji:'📰' },
-  coworking:    { label:'Coworking',    emoji:'🏗️' },
-  banque:       { label:'Banques',      emoji:'🏦' }
+  all:            { label:'Tous',              emoji:'☰' },
+  evenementiel:   { label:'Événementiel',      emoji:'🎉' },
+  avocats:        { label:'Avocats',           emoji:'⚖️' },
+  startup:        { label:'Startups',          emoji:'🚀' },
+  agence_pub:     { label:'Agences créa',      emoji:'🎨' },
+  hotel:          { label:'Hôtels',            emoji:'🏨' },
+  immo:           { label:'Immobilier',        emoji:'🏢' },
+  medical:        { label:'Médical',           emoji:'🏥' },
+  production:     { label:'Tournages',         emoji:'🎬' },
+  ecole:          { label:'Écoles',            emoji:'🎓' },
+  institution:    { label:'Institutions',      emoji:'🏛️' },
+  luxe:           { label:'Luxe & Mode',       emoji:'👜' },
+  tech:           { label:'Tech',              emoji:'💻' },
+  conseil:        { label:'Conseil',           emoji:'📊' },
+  medias:         { label:'Médias',            emoji:'📰' },
+  coworking:      { label:'Coworking',         emoji:'🏗️' },
+  banque:         { label:'Banques',           emoji:'🏦' },
+  galerie:        { label:'Galeries & Ventes', emoji:'🖼️' },
+  sport_premium:  { label:'Sport premium',     emoji:'🏋️' }
 }
 var GEN_CATS = Object.keys(CATS).filter(function(k){ return k !== 'all' })
 
