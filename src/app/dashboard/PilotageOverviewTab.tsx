@@ -1,6 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import {
+  BarChart, Bar, ComposedChart,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  ReferenceLine, Cell, PieChart, Pie, Legend
+} from 'recharts'
 
 function sb() {
   return createClient(
@@ -10,893 +15,517 @@ function sb() {
 }
 
 // =============================================================================
-// PilotageOverviewTab V2 — refonte Meshuga premium (12 mai 2026)
-// Intègre : KPI YTD comparable · Top produits vue complète · Météo
-//           Bloc Conseils stratégiques · merge_group/display_name
+// PilotageOverviewTab V3 — Analytics Meshuga (refonte mai 2026)
+//
+// Sources :
+//   v_sales_daily_unified   : CA/tickets/panier/articles par jour
+//                             (tickets détaillés <= 11/05 + Z reports >= 14/05)
+//   v_sales_monthly_unified : agrégat mensuel unifié
+//   v_sales_ytd_comparison  : comparatif année à date
+//   v_sales_real_net        : CA net après commissions plateformes
+//   v_sales_by_mode         : répartition sur place / emporter / livraison
+//   v_sales_by_source       : Uber / Deliveroo / direct
+//   v_sales_heatmap         : CA par jour-de-semaine x heure
+//   v_sales_products_enriched : produits avec marge estimée
+//
+// Quotidien : alimenté auto par les Z de caisse.
+// Mensuel   : complété au CSV Zelty détaillé.
 // =============================================================================
 
-export default function PilotageOverviewTab(props) {
-  var [loading, setLoading] = useState(true)
-  var [overviews, setOverviews] = useState([])
-  var [monthlySales, setMonthlySales] = useState([])
-  var [selectedYear, setSelectedYear] = useState(null)
-  var [topProducts, setTopProducts] = useState([])
-  var [topMenus, setTopMenus] = useState([])
-  var [salesByMode, setSalesByMode] = useState([])
-  var [ytdData, setYtdData] = useState([])
-  var [netData, setNetData] = useState([])
-  var [weatherStats, setWeatherStats] = useState(null)
+var ROSE = '#FF82D7'
+var JAUNE = '#FFEB5A'
+var NOIR = '#191923'
+var BLEU = '#005FFF'
+var VERT = '#009D3A'
+var ROUGE = '#CC0066'
+var OR = '#B8920A'
 
-  useEffect(function(){
-    loadData()
+var MONTHS_FR = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
+var DOW_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+
+function fmtEur(v) {
+  if (v === null || v === undefined || isNaN(Number(v))) return '--'
+  return Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' \u20ac'
+}
+function fmtEurDec(v) {
+  if (v === null || v === undefined || isNaN(Number(v))) return '--'
+  return Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20ac'
+}
+function fmtShort(v) {
+  var n = Number(v) || 0
+  if (n >= 1000000) return (n / 1000000).toFixed(2) + ' M\u20ac'
+  if (n >= 1000) return (n / 1000).toFixed(1) + ' k\u20ac'
+  return Math.round(n) + ' \u20ac'
+}
+function fmtInt(v) {
+  if (v === null || v === undefined || isNaN(Number(v))) return '--'
+  return Math.round(Number(v)).toLocaleString('fr-FR')
+}
+function deltaPct(cur, prev) {
+  if (!prev || Number(prev) === 0) return null
+  return ((Number(cur) - Number(prev)) / Number(prev)) * 100
+}
+
+export default function PilotageOverviewTab(props) {
+  var toast = props.toast || function(){}
+
+  var [loading, setLoading] = useState(true)
+  var [daily, setDaily] = useState([])
+  var [monthly, setMonthly] = useState([])
+  var [ytd, setYtd] = useState([])
+  var [net, setNet] = useState([])
+  var [byMode, setByMode] = useState([])
+  var [bySource, setBySource] = useState([])
+  var [heatmap, setHeatmap] = useState([])
+  var [products, setProducts] = useState([])
+  var [isMobile, setIsMobile] = useState(false)
+
+  var [dailyRange, setDailyRange] = useState(30)
+  var [dailyMetric, setDailyMetric] = useState('ca_ttc')
+  var [prodSort, setProdSort] = useState('marge')
+
+  useEffect(function(){ loadData() }, [])
+  useEffect(function() {
+    function check() { setIsMobile(window.innerWidth <= 768) }
+    check()
+    window.addEventListener('resize', check)
+    return function() { window.removeEventListener('resize', check) }
   }, [])
 
   function loadData() {
     setLoading(true)
     var c = sb()
     Promise.all([
-      c.from('sales_overview').select('*').order('year', { ascending: false }),
-      c.from('v_sales_monthly').select('*').order('year_month', { ascending: true }),
-      c.from('v_top_products_full').select('*').order('qte_total', { ascending: false }),
-      c.from('v_sales_by_mode').select('*'),
+      c.from('v_sales_daily_unified').select('*').order('date', { ascending: true }),
+      c.from('v_sales_monthly_unified').select('*').order('year_month', { ascending: true }),
       c.from('v_sales_ytd_comparison').select('*').order('year', { ascending: false }),
       c.from('v_sales_real_net').select('*').order('year', { ascending: false }),
-      c.from('weather_daily').select('date, t_mean, sunshine_hours, precipitation_mm').gte('date', '2025-01-01')
-    ]).then(function(results){
-      var overviewData = results[0].data || []
-      setOverviews(overviewData)
-      if (overviewData.length > 0 && !selectedYear) {
-        setSelectedYear(overviewData[0].year)
-      }
-      setMonthlySales(results[1].data || [])
-      var allTops = results[2].data || []
-      setTopProducts(allTops.filter(function(p){ return p.product_type === 'produit' }))
-      setTopMenus(allTops.filter(function(p){ return p.product_type === 'menu' }))
-      setSalesByMode(results[3].data || [])
-      setYtdData(results[4].data || [])
-      setNetData(results[5].data || [])
-      setWeatherStats(results[6].data || [])
+      c.from('v_sales_by_mode').select('*'),
+      c.from('v_sales_by_source').select('*'),
+      c.from('v_sales_heatmap').select('*'),
+      c.from('sales_products_period').select('zelty_product_name, qte_total, ca_ttc, marge_brute, product_type')
+    ]).then(function(r){
+      setDaily(r[0].data || [])
+      setMonthly(r[1].data || [])
+      setYtd(r[2].data || [])
+      setNet(r[3].data || [])
+      setByMode(r[4].data || [])
+      setBySource(r[5].data || [])
+      setHeatmap(r[6].data || [])
+      setProducts(r[7].data || [])
       setLoading(false)
     })
   }
 
-  function fmtMoney(v) {
-    if (v === null || v === undefined) return '—'
-    return Number(v).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €'
-  }
-
-  function fmtMoneyShort(v) {
-    if (v === null || v === undefined) return '—'
-    var n = Number(v)
-    if (n >= 1000000) return (n / 1000000).toFixed(2) + ' M€'
-    if (n >= 1000) return (n / 1000).toFixed(1) + ' k€'
-    return n.toFixed(0) + ' €'
-  }
-
-  function fmtNumber(v) {
-    if (v === null || v === undefined) return '—'
-    return Number(v).toLocaleString('fr-FR')
-  }
-
-  function deltaVsPrev(current, prev) {
-    if (!current || !prev || prev === 0) return null
-    return ((Number(current) - Number(prev)) / Number(prev)) * 100
-  }
-
-  function fmtDelta(pct) {
-    if (pct === null || pct === undefined) return null
-    var sign = pct > 0 ? '+' : ''
-    return sign + pct.toFixed(1) + '%'
-  }
-
-  function getMonthName(m) {
-    var names = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
-    return names[m - 1] || '?'
-  }
-
   if (loading) {
-    return <div style={{padding: 40, textAlign: 'center', opacity: 0.6}}>⏳ Chargement des données...</div>
+    return <div style={{padding:40, textAlign:'center', color:'#888', fontSize:13, fontWeight:700}}>⏳ Chargement des analytics...</div>
   }
 
-  if (overviews.length === 0) {
-    return (
-      <div style={{padding: 50, textAlign: 'center', background: '#fff', borderRadius: 12, border: '2px dashed #DDD'}}>
-        <div style={{fontSize: 48, marginBottom: 12}}>📊</div>
-        <div style={{fontSize: 16, fontWeight: 900, color: '#191923', marginBottom: 6, fontFamily: 'Arial Narrow, Arial, sans-serif'}}>
-          AUCUNE DONNÉE IMPORTÉE
-        </div>
-        <div style={{fontSize: 13, color: '#888'}}>
-          Va dans l&apos;onglet « Imports » pour uploader tes CSV Zelty
-        </div>
-      </div>
-    )
+  var ytdCur = ytd.length > 0 ? ytd[0] : null
+  var ytdPrev = ytd.length > 1 ? ytd[1] : null
+  var caYtdDelta = ytdCur && ytdPrev ? deltaPct(ytdCur.ca_ttc_ytd, ytdPrev.ca_ttc_ytd) : null
+  var tkYtdDelta = ytdCur && ytdPrev ? deltaPct(ytdCur.nb_tickets_ytd, ytdPrev.nb_tickets_ytd) : null
+  var panierYtdDelta = ytdCur && ytdPrev ? deltaPct(ytdCur.panier_ytd, ytdPrev.panier_ytd) : null
+
+  var netCur = net.length > 0 ? net[0] : null
+
+  var dailyFiltered = dailyRange > 0 ? daily.slice(-dailyRange) : daily
+  var dailyChartData = dailyFiltered.map(function(d) {
+    var dt = new Date(d.date)
+    return {
+      date: dt.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'}),
+      weekday: DOW_FR[dt.getDay()],
+      value: Number(d[dailyMetric]) || 0,
+      source: d.source
+    }
+  })
+  var dailyVals = dailyChartData.map(function(d){ return d.value }).filter(function(v){ return v > 0 })
+  var dailyAvg = dailyVals.length > 0 ? dailyVals.reduce(function(a,b){return a+b},0) / dailyVals.length : 0
+  var metricMap = {
+    ca_ttc: {label:'CA TTC', unit:'eur', color:ROSE},
+    nb_tickets: {label:'Tickets', unit:'int', color:BLEU},
+    panier_moyen: {label:'Panier moyen', unit:'eur', color:OR},
+    nb_articles: {label:'Articles', unit:'int', color:VERT}
   }
+  var dailyMetricConf = metricMap[dailyMetric]
 
-  var currentOverview = overviews.filter(function(o){ return o.year === selectedYear })[0]
-  var prevOverview = overviews.filter(function(o){ return o.year === selectedYear - 1 })[0]
-  var availableYears = overviews.map(function(o){ return o.year }).sort()
+  var monthlyByYear = {}
+  monthly.forEach(function(m) {
+    if (!monthlyByYear[m.year]) monthlyByYear[m.year] = {}
+    monthlyByYear[m.year][m.month] = m
+  })
+  var years = Object.keys(monthlyByYear).map(Number).sort()
+  var monthlyChartData = MONTHS_FR.map(function(mn, idx) {
+    var row = { month: mn }
+    years.forEach(function(y) {
+      var mm = monthlyByYear[y] && monthlyByYear[y][idx + 1]
+      row['y' + y] = mm ? Number(mm.ca_ttc) : null
+    })
+    return row
+  })
 
-  var ytdCurrent = ytdData.filter(function(y){ return y.year === selectedYear })[0]
-  var ytdPrev = ytdData.filter(function(y){ return y.year === selectedYear - 1 })[0]
-  var dYtdCA = ytdCurrent && ytdPrev ? deltaVsPrev(ytdCurrent.ca_ttc_ytd, ytdPrev.ca_ttc_ytd) : null
-  var dYtdTickets = ytdCurrent && ytdPrev ? deltaVsPrev(ytdCurrent.nb_tickets_ytd, ytdPrev.nb_tickets_ytd) : null
+  var curYear = ytdCur ? ytdCur.year : (years.length > 0 ? years[years.length - 1] : new Date().getFullYear())
 
-  var netCurrent = netData.filter(function(n){ return n.year === selectedYear })[0]
+  var modeAgg = {}
+  byMode.filter(function(m){ return m.year === curYear }).forEach(function(m) {
+    if (!modeAgg[m.mode]) modeAgg[m.mode] = 0
+    modeAgg[m.mode] += Number(m.ca_ttc) || 0
+  })
+  var modeLabelMap = {sur_place:'Sur place', emporter:'À emporter', livraison:'Livraison'}
+  var modeColorMap = {sur_place:ROSE, emporter:JAUNE, livraison:BLEU}
+  var modeData = Object.keys(modeAgg).map(function(k) {
+    return { name: modeLabelMap[k] || k, value: Math.round(modeAgg[k]), color: modeColorMap[k] || '#888' }
+  }).sort(function(a,b){ return b.value - a.value })
 
-  var currentTopProducts = topProducts.filter(function(p){ return p.year === selectedYear }).slice(0, 8)
-  var currentTopMenus = topMenus.filter(function(p){ return p.year === selectedYear }).slice(0, 5)
+  var sourceAgg = {}
+  bySource.filter(function(m){ return m.year === curYear }).forEach(function(m) {
+    var s = m.source || 'Direct'
+    if (!sourceAgg[s]) sourceAgg[s] = 0
+    sourceAgg[s] += Number(m.ca_ttc) || 0
+  })
+  var sourcePalette = [NOIR, ROSE, JAUNE, BLEU, VERT, OR, ROUGE]
+  var sourceData = Object.keys(sourceAgg).map(function(k, i) {
+    return { name: k, value: Math.round(sourceAgg[k]), color: sourcePalette[i % sourcePalette.length] }
+  }).sort(function(a,b){ return b.value - a.value })
 
-  var currentMonthly = monthlySales.filter(function(m){ return m.year === selectedYear })
-  var prevMonthly = monthlySales.filter(function(m){ return m.year === selectedYear - 1 })
+  var heatGrid = {}
+  var heatMax = 0
+  heatmap.forEach(function(h) {
+    var key = h.day_of_week + '_' + h.hour_of_day
+    if (!heatGrid[key]) heatGrid[key] = 0
+    heatGrid[key] += Number(h.ca_ttc) || 0
+    if (heatGrid[key] > heatMax) heatMax = heatGrid[key]
+  })
+  var heatHours = []
+  for (var hh = 9; hh <= 23; hh++) heatHours.push(hh)
 
-  var modesData = currentOverview && currentOverview.modes_breakdown ? currentOverview.modes_breakdown : {}
+  var prodAgg = {}
+  products.forEach(function(p) {
+    var name = p.zelty_product_name
+    if (!name) return
+    if (!prodAgg[name]) prodAgg[name] = { name: name, qte: 0, ca: 0, marge: 0 }
+    prodAgg[name].qte += Number(p.qte_total) || 0
+    prodAgg[name].ca += Number(p.ca_ttc) || 0
+    prodAgg[name].marge += Number(p.marge_brute) || 0
+  })
+  var prodList = Object.keys(prodAgg).map(function(k){ return prodAgg[k] })
+  var topByMarge = prodList.slice().sort(function(a,b){ return b.marge - a.marge }).slice(0, 10)
+  var topByVolume = prodList.slice().sort(function(a,b){ return b.qte - a.qte }).slice(0, 10)
+  var topProds = prodSort === 'marge' ? topByMarge : topByVolume
 
-  var dPanier = currentOverview && prevOverview ? deltaVsPrev(currentOverview.panier_moyen_ttc, prevOverview.panier_moyen_ttc) : null
-
-  var maxMonthlyCA = Math.max.apply(null, currentMonthly.map(function(m){ return Number(m.ca_ttc) || 0 }).concat([0]))
-  if (maxMonthlyCA === 0) maxMonthlyCA = 1
-
-  var currentCalYear = new Date().getFullYear()
-  var isCurrentYearPartial = selectedYear === currentCalYear
+  var lastDataDate = daily.length > 0 ? new Date(daily[daily.length - 1].date).toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'}) : '—'
 
   return (
     <div>
-      {/* SÉLECTEUR D'ANNÉE */}
-      <div style={{display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center'}}>
-        <span style={{fontSize: 12, fontWeight: 900, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5}}>Année :</span>
-        {availableYears.map(function(y){
-          return (
-            <button key={y} type="button" onClick={function(){ setSelectedYear(y) }} style={{
-              padding: '8px 16px',
-              fontSize: 13,
-              fontWeight: 900,
-              border: '2px solid ' + (y === selectedYear ? '#191923' : '#DDD'),
-              background: y === selectedYear ? '#191923' : '#fff',
-              color: y === selectedYear ? '#FFEB5A' : '#555',
-              borderRadius: 20,
-              cursor: 'pointer',
-              fontFamily: 'Arial Narrow, Arial, sans-serif'
-            }}>{y}</button>
-          )
-        })}
+      {/* HEADER */}
+      <div className="ph">
+        <div>
+          <div style={{fontFamily:"'Yellowtail',cursive",fontSize:38,lineHeight:1,color:ROSE}}>Analytics</div>
+          <div style={{fontSize:11,opacity:0.55,marginTop:3,fontWeight:700}}>Vue stratégique · données jusqu&apos;au {lastDataDate}</div>
+        </div>
       </div>
 
-      {currentOverview && (
-        <>
-          {/* BANNIÈRE CA + KPI YTD COMPARABLE */}
-          <div style={{
-            background: 'linear-gradient(135deg, #FF82D7 0%, #FFB0D7 100%)',
-            borderRadius: 12,
-            padding: 24,
-            marginBottom: 14,
-            border: '2px solid #191923',
-            color: '#fff'
-          }}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16}}>
-              <div style={{flex: 1, minWidth: 280}}>
-                <div style={{fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.9}}>
-                  Chiffre d&apos;affaires {selectedYear} {isCurrentYearPartial ? '(en cours)' : ''}
-                </div>
-                <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 48, lineHeight: 1, marginTop: 4}}>
-                  {fmtMoney(currentOverview.ca_ttc)} TTC
-                </div>
-                <div style={{fontSize: 14, marginTop: 4, opacity: 0.9}}>
-                  {fmtMoney(currentOverview.ca_ht)} HT · {fmtNumber(currentOverview.nb_commandes)} commandes
-                </div>
-              </div>
+      {/* KPI YTD */}
+      {ytdCur && (
+        <div className="g4" style={{marginBottom:12}}>
+          <KpiTile label="CA TTC (année à date)" value={fmtEur(ytdCur.ca_ttc_ytd)} delta={caYtdDelta} bg={ROSE} txt="#FFFFFF" />
+          <KpiTile label="Tickets (YTD)" value={fmtInt(ytdCur.nb_tickets_ytd)} delta={tkYtdDelta} bg={JAUNE} txt={NOIR} />
+          <KpiTile label="Panier moyen" value={fmtEurDec(ytdCur.panier_ytd)} delta={panierYtdDelta} bg="#FFFFFF" txt={NOIR} accent={ROSE} />
+          <KpiTile label="Jours ouverts" value={fmtInt(ytdCur.jours_ouverts_ytd)} delta={null} bg="#FFFFFF" txt={NOIR} accent={OR} />
+        </div>
+      )}
 
-              {dYtdCA !== null && (
-                <div style={{
-                  background: '#191923',
-                  padding: '14px 20px',
-                  borderRadius: 10,
-                  minWidth: 240
-                }}>
-                  <div style={{fontSize: 10, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4}}>
-                    YTD au {ytdCurrent.jours_ouverts_ytd}e jour ouvré
-                  </div>
-                  <div style={{display: 'flex', alignItems: 'baseline', gap: 8}}>
-                    <span style={{
-                      fontSize: 24,
-                      fontWeight: 900,
-                      color: dYtdCA > 0 ? '#9DD3B0' : '#FFB3CD',
-                      fontFamily: 'Arial Narrow, Arial, sans-serif',
-                      lineHeight: 1
-                    }}>{fmtDelta(dYtdCA)}</span>
-                    <span style={{fontSize: 11, opacity: 0.7}}>vs même période {selectedYear - 1}</span>
-                  </div>
-                  <div style={{fontSize: 11, opacity: 0.7, marginTop: 6, lineHeight: 1.5}}>
-                    {fmtMoney(ytdCurrent.ca_ttc_ytd)} vs {fmtMoney(ytdPrev.ca_ttc_ytd)}
-                  </div>
-                  {dYtdTickets !== null && (
-                    <div style={{fontSize: 11, opacity: 0.7, marginTop: 2}}>
-                      Tickets : {fmtDelta(dYtdTickets)} ({fmtNumber(ytdCurrent.nb_tickets_ytd)} vs {fmtNumber(ytdPrev.nb_tickets_ytd)})
-                    </div>
-                  )}
-                </div>
-              )}
+      {/* CA NET RÉEL */}
+      {netCur && (
+        <div className="card" style={{background:'#F4FBF6', borderColor:VERT, borderWidth:2}}>
+          <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+            <span style={{fontSize:30}}>💸</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontFamily:"'Yellowtail',cursive",fontSize:18,color:VERT,lineHeight:1}}>CA net réel {curYear}</div>
+              <div style={{fontSize:11,opacity:0.7,marginTop:3,fontWeight:700}}>Après déduction des commissions plateformes (~35% sur livraison)</div>
             </div>
-
-            {netCurrent && (
-              <div style={{
-                marginTop: 14,
-                padding: '12px 16px',
-                background: 'rgba(25, 25, 35, 0.85)',
-                borderRadius: 8,
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr',
-                gap: 16
-              }}>
-                <div>
-                  <div style={{fontSize: 10, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.5}}>CA brut affiché</div>
-                  <div style={{fontSize: 18, fontWeight: 900, fontFamily: 'Arial Narrow, Arial, sans-serif'}}>{fmtMoney(netCurrent.ca_brut)}</div>
-                </div>
-                <div>
-                  <div style={{fontSize: 10, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.5, color: '#FFB3CD'}}>− Commissions Uber/Deliveroo</div>
-                  <div style={{fontSize: 18, fontWeight: 900, fontFamily: 'Arial Narrow, Arial, sans-serif', color: '#FFB3CD'}}>−{fmtMoney(netCurrent.commissions_estim)}</div>
-                  <div style={{fontSize: 10, opacity: 0.5, marginTop: 2}}>≈ 35% du CA livraison brut</div>
-                </div>
-                <div>
-                  <div style={{fontSize: 10, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.5, color: '#9DD3B0'}}>CA NET encaissé</div>
-                  <div style={{fontSize: 18, fontWeight: 900, fontFamily: 'Arial Narrow, Arial, sans-serif', color: '#9DD3B0'}}>{fmtMoney(netCurrent.ca_net_reel)}</div>
-                </div>
-              </div>
-            )}
+            <div style={{display:'flex',gap:18,flexWrap:'wrap'}}>
+              <MiniStat label="CA brut" value={fmtShort(netCur.ca_brut)} color={NOIR} />
+              <MiniStat label="Dont livraison" value={fmtShort(netCur.ca_livraison_brut)} color={BLEU} />
+              <MiniStat label="Commissions" value={'-' + fmtShort(netCur.commissions_estim)} color={ROUGE} />
+              <MiniStat label="CA NET" value={fmtShort(netCur.ca_net_reel)} color={VERT} big />
+            </div>
           </div>
+        </div>
+      )}
 
-          {/* GRID KPI */}
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 14}}>
-            <KpiCard
-              label="Panier moyen"
-              value={fmtMoney(currentOverview.panier_moyen_ttc)}
-              delta={fmtDelta(dPanier)}
-              deltaColor={dPanier > 0 ? '#009D3A' : '#CC0066'}
-              icon="🛒"
-            />
-            <KpiCard
-              label="Commandes"
-              value={fmtNumber(currentOverview.nb_commandes)}
-              delta={null}
-              icon="📋"
-            />
-            <KpiCard
-              label="Articles vendus"
-              value={fmtNumber(currentOverview.nb_articles)}
-              delta={null}
-              icon="🍔"
-            />
-            {ytdCurrent && (
-              <KpiCard
-                label="Jours ouverts (YTD)"
-                value={fmtNumber(ytdCurrent.jours_ouverts_ytd)}
-                delta={null}
-                icon="📅"
+      {/* ÉVOLUTION QUOTIDIENNE */}
+      <div className="card">
+        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
+          <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:ROSE,lineHeight:1}}>Évolution quotidienne</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            <Toggle active={dailyRange===30} onClick={function(){ setDailyRange(30) }}>30 j</Toggle>
+            <Toggle active={dailyRange===90} onClick={function(){ setDailyRange(90) }}>90 j</Toggle>
+            <Toggle active={dailyRange===0} onClick={function(){ setDailyRange(0) }}>Tout</Toggle>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
+          <Toggle active={dailyMetric==='ca_ttc'} onClick={function(){ setDailyMetric('ca_ttc') }} small>CA</Toggle>
+          <Toggle active={dailyMetric==='nb_tickets'} onClick={function(){ setDailyMetric('nb_tickets') }} small>Tickets</Toggle>
+          <Toggle active={dailyMetric==='panier_moyen'} onClick={function(){ setDailyMetric('panier_moyen') }} small>Panier</Toggle>
+          <Toggle active={dailyMetric==='nb_articles'} onClick={function(){ setDailyMetric('nb_articles') }} small>Articles</Toggle>
+        </div>
+        <div style={{width:'100%',height:isMobile?200:280}}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={dailyChartData} margin={{top:8,right:8,left:-12,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#EBEBEB" vertical={false} />
+              <XAxis dataKey="date" tick={{fontSize:9,fontWeight:700}} interval="preserveStartEnd" stroke={NOIR} minTickGap={20} />
+              <YAxis tick={{fontSize:9}} stroke={NOIR} tickFormatter={function(v){ return dailyMetricConf.unit==='eur' ? fmtShort(v) : Math.round(v) }} width={48} />
+              <Tooltip
+                contentStyle={{background:NOIR,border:'2px solid '+JAUNE,borderRadius:6,padding:'7px 11px'}}
+                labelStyle={{color:JAUNE,fontWeight:900,fontSize:11}}
+                itemStyle={{color:'#FFFFFF',fontWeight:900,fontSize:13}}
+                formatter={function(v){ return [dailyMetricConf.unit==='eur'?fmtEurDec(v):fmtInt(v), dailyMetricConf.label] }}
+                labelFormatter={function(l,p){ return (p && p[0] && p[0].payload ? p[0].payload.weekday+' ' : '') + l }}
+                cursor={{fill:'rgba(255,235,90,0.2)'}}
               />
-            )}
-          </div>
-
-          {/* GRAPHE CA MENSUEL */}
-          <div style={{background: '#fff', borderRadius: 12, padding: 18, marginBottom: 14, border: '2px solid #EBEBEB'}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8}}>
-              <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 22, color: '#191923'}}>
-                📈 CA mensuel {selectedYear}
-              </div>
-              <div style={{fontSize: 11, color: '#888'}}>
-                Comparaison vs {selectedYear - 1}
-              </div>
-            </div>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 4, alignItems: 'flex-end', height: 200, marginBottom: 8}}>
-              {[1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
-                var cur = currentMonthly.filter(function(x){ return x.month === m })[0]
-                var prev = prevMonthly.filter(function(x){ return x.month === m })[0]
-                var curCA = cur ? Number(cur.ca_ttc) : 0
-                var prevCA = prev ? Number(prev.ca_ttc) : 0
-                var hCur = (curCA / maxMonthlyCA) * 180
-                var hPrev = (prevCA / maxMonthlyCA) * 180
-                return (
-                  <div key={m} style={{display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end', gap: 2}}>
-                    <div style={{fontSize: 9, color: '#888', fontWeight: 900, marginBottom: 2}}>
-                      {curCA > 0 ? fmtMoneyShort(curCA) : ''}
-                    </div>
-                    <div style={{display: 'flex', alignItems: 'flex-end', gap: 2, height: 180, width: '100%', justifyContent: 'center'}}>
-                      {prevCA > 0 && (
-                        <div title={selectedYear - 1 + ' : ' + fmtMoney(prevCA)} style={{
-                          width: '40%',
-                          height: hPrev + 'px',
-                          background: '#FFB0D7',
-                          borderRadius: '2px 2px 0 0',
-                          minHeight: 1
-                        }}></div>
-                      )}
-                      {curCA > 0 && (
-                        <div title={selectedYear + ' : ' + fmtMoney(curCA)} style={{
-                          width: '40%',
-                          height: hCur + 'px',
-                          background: '#FF82D7',
-                          borderRadius: '2px 2px 0 0',
-                          minHeight: 1
-                        }}></div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 4, fontSize: 10, color: '#888', fontWeight: 900, textAlign: 'center'}}>
-              {[1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
-                return <div key={m}>{getMonthName(m)}</div>
-              })}
-            </div>
-            <div style={{display: 'flex', gap: 12, marginTop: 12, justifyContent: 'center', fontSize: 11}}>
-              <div style={{display: 'flex', alignItems: 'center', gap: 4}}>
-                <span style={{width: 10, height: 10, background: '#FF82D7', borderRadius: 2, display: 'inline-block'}}></span> {selectedYear}
-              </div>
-              {prevOverview && (
-                <div style={{display: 'flex', alignItems: 'center', gap: 4}}>
-                  <span style={{width: 10, height: 10, background: '#FFB0D7', borderRadius: 2, display: 'inline-block'}}></span> {selectedYear - 1}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* TOP PRODUITS — VUE COMPLÈTE */}
-          {currentTopProducts.length > 0 && (
-            <div style={{background: '#fff', borderRadius: 12, padding: 18, marginBottom: 14, border: '2px solid #EBEBEB'}}>
-              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8}}>
-                <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 22, color: '#191923'}}>
-                  🏆 Top produits — vue complète
-                </div>
-                <div style={{fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 900}}>
-                  Qte carte · menu · total · CA à la carte
-                </div>
-              </div>
-
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '30px 1fr 70px 70px 70px 80px 80px',
-                gap: 8,
-                padding: '8px 12px',
-                fontSize: 10,
-                fontWeight: 900,
-                textTransform: 'uppercase',
-                color: '#888',
-                letterSpacing: 0.5,
-                borderBottom: '1px solid #EBEBEB'
-              }}>
-                <div></div>
-                <div>Produit</div>
-                <div style={{textAlign: 'right'}}>Carte</div>
-                <div style={{textAlign: 'right'}}>En menu</div>
-                <div style={{textAlign: 'right'}}>Total</div>
-                <div style={{textAlign: 'right'}}>Prix moy</div>
-                <div style={{textAlign: 'right'}}>CA carte</div>
-              </div>
-
-              {currentTopProducts.map(function(p, idx){
-                return (
-                  <div key={p.group_id} style={{
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    marginTop: 4,
-                    background: idx === 0 ? '#FFEB5A' : '#FAFAFA',
-                    display: 'grid',
-                    gridTemplateColumns: '30px 1fr 70px 70px 70px 80px 80px',
-                    gap: 8,
-                    alignItems: 'center',
-                    fontVariantNumeric: 'tabular-nums'
-                  }}>
-                    <div style={{fontSize: 14, fontWeight: 900, color: idx === 0 ? '#191923' : '#888'}}>
-                      #{idx + 1}
-                    </div>
-                    <div>
-                      <div style={{fontSize: 13, fontWeight: 900, color: '#191923'}}>{p.display_name}</div>
-                      {p.category && p.category !== '—' && (
-                        <div style={{fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: 0.3, marginTop: 1}}>{p.category}</div>
-                      )}
-                    </div>
-                    <div style={{textAlign: 'right', fontSize: 12, color: '#191923'}}>{fmtNumber(p.qte_carte)}</div>
-                    <div style={{textAlign: 'right', fontSize: 12, fontWeight: 900, color: '#FF82D7'}}>{fmtNumber(p.qte_menu)}</div>
-                    <div style={{textAlign: 'right', fontSize: 13, fontWeight: 900, color: '#191923'}}>{fmtNumber(p.qte_total)}</div>
-                    <div style={{textAlign: 'right', fontSize: 12, color: '#555'}}>{fmtMoney(p.prix_moyen)}</div>
-                    <div style={{textAlign: 'right', fontSize: 12, fontWeight: 900, color: '#191923'}}>{fmtMoney(p.ca_carte_ttc)}</div>
-                  </div>
-                )
-              })}
-
-              <div style={{
-                marginTop: 10,
-                padding: '10px 12px',
-                background: '#FFFBE5',
-                borderLeft: '3px solid #FFEB5A',
-                borderRadius: 6,
-                fontSize: 12,
-                color: '#555'
-              }}>
-                <b style={{color: '#191923'}}>📌 Lecture :</b> &quot;Qte carte&quot; = vendu seul · &quot;En menu&quot; = inclus dans un menu · &quot;Total&quot; = volume cuisine total · &quot;CA carte&quot; = CA généré par les ventes à la carte uniquement (le CA des menus est compté dans le top menus).
-              </div>
-            </div>
-          )}
-
-          {/* TOP MENUS */}
-          {currentTopMenus.length > 0 && (
-            <div style={{background: '#fff', borderRadius: 12, padding: 18, marginBottom: 14, border: '2px solid #EBEBEB'}}>
-              <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 22, color: '#191923', marginBottom: 12}}>
-                🍽️ Top menus
-              </div>
-              <div>
-                {currentTopMenus.map(function(m, idx){
-                  var pct = currentOverview.ca_ttc ? (Number(m.ca_carte_ttc) / Number(currentOverview.ca_ttc) * 100) : 0
-                  return (
-                    <div key={m.group_id} style={{
-                      padding: '10px 12px',
-                      borderRadius: 8,
-                      marginBottom: 6,
-                      background: idx === 0 ? '#FFEB5A' : '#FAFAFA',
-                      display: 'grid',
-                      gridTemplateColumns: '30px 1fr 90px 90px',
-                      gap: 12,
-                      alignItems: 'center'
-                    }}>
-                      <div style={{fontSize: 18, fontWeight: 900, color: idx === 0 ? '#191923' : '#888'}}>
-                        #{idx + 1}
-                      </div>
-                      <div>
-                        <div style={{fontSize: 13, fontWeight: 900, color: '#191923'}}>{m.display_name}</div>
-                        <div style={{fontSize: 10, color: '#555', marginTop: 2}}>
-                          {fmtNumber(m.qte_total)} vendus · prix moyen {fmtMoney(m.prix_moyen)}
-                        </div>
-                      </div>
-                      <div style={{textAlign: 'right', fontWeight: 900, fontSize: 14, fontVariantNumeric: 'tabular-nums'}}>
-                        {fmtMoney(m.ca_carte_ttc)}
-                      </div>
-                      <div style={{textAlign: 'right', fontSize: 12, fontWeight: 900, color: '#555', fontVariantNumeric: 'tabular-nums'}}>
-                        {pct.toFixed(1)}%
-                      </div>
-                    </div>
-                  )
+              {dailyAvg > 0 && <ReferenceLine y={dailyAvg} stroke={BLEU} strokeWidth={1.5} strokeDasharray="5 3" />}
+              <Bar dataKey="value" radius={[3,3,0,0]} fill={dailyMetricConf.color}>
+                {dailyChartData.map(function(e, i){
+                  return <Cell key={i} fill={dailyMetricConf.color} fillOpacity={e.source === 'z' ? 1 : 0.55} />
                 })}
-              </div>
-            </div>
-          )}
-
-          {/* RÉPARTITION MODES */}
-          {Object.keys(modesData).length > 0 && (
-            <div style={{background: '#fff', borderRadius: 12, padding: 18, marginBottom: 14, border: '2px solid #EBEBEB'}}>
-              <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 22, color: '#191923', marginBottom: 12}}>
-                🚪 Répartition des modes
-              </div>
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10}}>
-                {Object.keys(modesData).map(function(mode){
-                  var data = modesData[mode]
-                  var pct = currentOverview.ca_ttc ? (Number(data.ttc) / Number(currentOverview.ca_ttc) * 100) : 0
-                  return (
-                    <div key={mode} style={{padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #EBEBEB'}}>
-                      <div style={{fontSize: 11, color: '#888', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.5}}>
-                        {mode.replace(/_/g, ' ')}
-                      </div>
-                      <div style={{fontSize: 22, fontWeight: 900, color: '#191923', marginTop: 4}}>
-                        {pct.toFixed(1)}%
-                      </div>
-                      <div style={{fontSize: 11, color: '#555', marginTop: 2}}>
-                        {fmtMoney(data.ttc)} · {fmtNumber(data.nb)} commandes
-                      </div>
-                      <div style={{marginTop: 6, height: 6, background: '#EBEBEB', borderRadius: 3, overflow: 'hidden'}}>
-                        <div style={{height: '100%', width: pct + '%', background: '#FF82D7'}}></div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* BLOC MÉTÉO */}
-          <MeteoBlock weatherStats={weatherStats} />
-
-          {/* BLOC CONSEILS STRATÉGIQUES */}
-          <ConseilsStrategiquesPanel
-            year={selectedYear}
-            caBrut={currentOverview.ca_ttc}
-            caNet={netCurrent ? netCurrent.ca_net_reel : null}
-            commissions={netCurrent ? netCurrent.commissions_estim : null}
-            ytdCurrent={ytdCurrent}
-            ytdPrev={ytdPrev}
-            dYtdCA={dYtdCA}
-          />
-        </>
-      )}
-    </div>
-  )
-}
-
-// =============================================================================
-function KpiCard(props) {
-  return (
-    <div style={{padding: 14, background: '#fff', borderRadius: 8, border: '1px solid #EBEBEB'}}>
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6}}>
-        <div style={{fontSize: 11, color: '#888', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.5}}>
-          {props.label}
+              </Bar>
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
-        {props.icon && <span style={{fontSize: 18}}>{props.icon}</span>}
+        <div style={{display:'flex',justifyContent:'space-between',marginTop:6,fontSize:9,fontWeight:900,opacity:0.6,flexWrap:'wrap',gap:8}}>
+          <span><span style={{display:'inline-block',width:10,height:8,background:dailyMetricConf.color,opacity:0.55,marginRight:3,verticalAlign:'middle',borderRadius:2}}></span>Détail Zelty</span>
+          <span><span style={{display:'inline-block',width:10,height:8,background:dailyMetricConf.color,marginRight:3,verticalAlign:'middle',borderRadius:2}}></span>Z de caisse</span>
+          <span><span style={{color:BLEU}}>┄</span> Moyenne {dailyMetricConf.unit==='eur'?fmtShort(dailyAvg):Math.round(dailyAvg)}</span>
+        </div>
       </div>
-      <div style={{fontSize: 22, fontWeight: 900, color: '#191923', fontFamily: 'Arial Narrow, Arial, sans-serif', lineHeight: 1.1}}>
-        {props.value}
-      </div>
-      {props.delta && (
-        <div style={{fontSize: 11, fontWeight: 900, marginTop: 4, color: props.deltaColor || '#888'}}>
-          {props.delta}
+
+      {/* CA MENSUEL PAR ANNÉE */}
+      {years.length > 0 && (
+        <div className="card">
+          <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:ROSE,lineHeight:1,marginBottom:12}}>CA mensuel par année</div>
+          <div style={{width:'100%',height:isMobile?220:300}}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyChartData} margin={{top:8,right:8,left:-12,bottom:0}}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#EBEBEB" vertical={false} />
+                <XAxis dataKey="month" tick={{fontSize:10,fontWeight:700}} stroke={NOIR} />
+                <YAxis tick={{fontSize:9}} stroke={NOIR} tickFormatter={fmtShort} width={48} />
+                <Tooltip
+                  contentStyle={{background:NOIR,border:'2px solid '+JAUNE,borderRadius:6,padding:'7px 11px'}}
+                  labelStyle={{color:JAUNE,fontWeight:900,fontSize:11}}
+                  itemStyle={{fontWeight:900,fontSize:12}}
+                  formatter={function(v, name){ return [fmtEur(v), String(name).replace('y','')] }}
+                  cursor={{fill:'rgba(255,235,90,0.2)'}}
+                />
+                <Legend formatter={function(v){ return String(v).replace('y','') }} wrapperStyle={{fontSize:11,fontWeight:900}} />
+                {years.map(function(y, i){
+                  var palette = [JAUNE, BLEU, ROSE, VERT]
+                  return <Bar key={y} dataKey={'y'+y} name={'y'+y} fill={palette[i % palette.length]} radius={[3,3,0,0]} stroke={NOIR} strokeWidth={1} />
+                })}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
-    </div>
-  )
-}
 
-// =============================================================================
-function MeteoBlock(props) {
-  var correlations = [
-    {
-      icon: '☀️',
-      label: 'Le soleil fait grimper TRÈS fortement ton CA boutique',
-      strength: 'TRÈS FORT',
-      strengthColor: '#009D3A',
-      barPct: 96,
-      barColor: '#FFC42E'
-    },
-    {
-      icon: '🌡️',
-      label: 'La chaleur dope FORTEMENT la boutique',
-      strength: 'FORT',
-      strengthColor: '#009D3A',
-      barPct: 80,
-      barColor: '#FF82D7'
-    },
-    {
-      icon: '🌧️',
-      label: 'La pluie tue MODÉRÉMENT le passage en boutique',
-      strength: 'MODÉRÉ',
-      strengthColor: '#CC0066',
-      barPct: 58,
-      barColor: '#85B7EB'
-    },
-    {
-      icon: '❄️',
-      label: 'À l\u2019inverse, la livraison MONTE quand il fait froid',
-      strength: 'MODÉRÉ (inverse)',
-      strengthColor: '#A06CD5',
-      barPct: 56,
-      barColor: '#A06CD5'
-    }
-  ]
-
-  var tempBuckets = [
-    { label: '<5°C', ca: 591, color: '#94D9FF' },
-    { label: '5-10°', ca: 695, color: '#85B7EB' },
-    { label: '10-15°', ca: 854, color: '#FFEB5A' },
-    { label: '15-20°', ca: 882, color: '#FFC42E' },
-    { label: '20-25°', ca: 1151, color: '#FF82D7' },
-    { label: '>25°', ca: 1068, color: '#D1448E' }
-  ]
-  var maxCa = 1200
-
-  return (
-    <div style={{background: '#fff', borderRadius: 12, padding: 18, marginBottom: 14, border: '2px solid #EBEBEB'}}>
-      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8}}>
-        <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 22, color: '#191923'}}>
-          🌤️ Météo &amp; CA
-        </div>
-        <div style={{fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 900}}>
-          Analyse 363 jours · Paris 6e · source Open-Meteo
-        </div>
+      {/* RÉPARTITIONS */}
+      <div className="g2">
+        {modeData.length > 0 && (
+          <div className="card">
+            <div style={{fontFamily:"'Yellowtail',cursive",fontSize:18,color:ROSE,lineHeight:1,marginBottom:10}}>Par mode de vente</div>
+            <DonutChart data={modeData} isMobile={isMobile} />
+          </div>
+        )}
+        {sourceData.length > 0 && (
+          <div className="card">
+            <div style={{fontFamily:"'Yellowtail',cursive",fontSize:18,color:ROSE,lineHeight:1,marginBottom:10}}>Par canal / plateforme</div>
+            <DonutChart data={sourceData} isMobile={isMobile} />
+          </div>
+        )}
       </div>
 
-      <div style={{marginBottom: 16}}>
-        {correlations.map(function(c, idx){
-          return (
-            <div key={idx} style={{marginBottom: 10}}>
-              <div style={{display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4}}>
-                <span style={{fontSize: 18}}>{c.icon}</span>
-                <span style={{flex: 1, fontSize: 13, fontWeight: 900, color: '#191923'}}>{c.label}</span>
-                <span style={{
-                  fontSize: 10,
-                  fontWeight: 900,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                  color: c.strengthColor,
-                  background: c.strengthColor + '15',
-                  padding: '3px 8px',
-                  borderRadius: 10
-                }}>{c.strength}</span>
-              </div>
-              <div style={{height: 8, background: '#F5F5F5', borderRadius: 4, overflow: 'hidden', marginLeft: 28}}>
-                <div style={{
-                  height: '100%',
-                  width: c.barPct + '%',
-                  background: c.barColor,
-                  borderRadius: 4,
-                  transition: 'width 0.4s'
-                }}></div>
-              </div>
+      {/* HEATMAP */}
+      {heatmap.length > 0 && (
+        <div className="card">
+          <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:ROSE,lineHeight:1,marginBottom:4}}>Quand tu fais ton CA</div>
+          <div style={{fontSize:11,opacity:0.55,marginBottom:12,fontWeight:700}}>Intensité du CA par jour et par heure (plus c&apos;est rose, plus tu vends)</div>
+          <Heatmap grid={heatGrid} max={heatMax} hours={heatHours} />
+        </div>
+      )}
+
+      {/* TOP PRODUITS */}
+      {topProds.length > 0 && (
+        <div className="card">
+          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
+            <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:ROSE,lineHeight:1}}>Top produits</div>
+            <div style={{display:'flex',gap:6}}>
+              <Toggle active={prodSort==='marge'} onClick={function(){ setProdSort('marge') }} small>Par marge</Toggle>
+              <Toggle active={prodSort==='volume'} onClick={function(){ setProdSort('volume') }} small>Par volume</Toggle>
             </div>
-          )
-        })}
-      </div>
-
-      <div style={{background: '#FAFAFA', padding: 12, borderRadius: 8, marginBottom: 12}}>
-        <div style={{fontSize: 11, color: '#555', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8}}>
-          📈 CA boutique moyen par tranche de T° moyenne
-        </div>
-        <div style={{display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6, alignItems: 'flex-end', height: 130}}>
-          {tempBuckets.map(function(b, idx){
-            var h = (b.ca / maxCa) * 110
+          </div>
+          {topProds.map(function(p, i){
+            var maxRef = prodSort === 'marge' ? (topProds[0].marge || 1) : (topProds[0].qte || 1)
+            var val = prodSort === 'marge' ? p.marge : p.qte
+            var pctBar = maxRef > 0 ? (val / maxRef) * 100 : 0
             return (
-              <div key={idx} style={{display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 4, height: '100%'}}>
-                <div style={{fontSize: 11, fontWeight: 900, color: '#191923', fontVariantNumeric: 'tabular-nums'}}>{b.ca}€</div>
-                <div style={{
-                  width: '70%',
-                  height: h + 'px',
-                  background: b.color,
-                  borderRadius: '4px 4px 0 0'
-                }}></div>
-                <div style={{fontSize: 10, color: '#555', fontWeight: 900}}>{b.label}</div>
+              <div key={p.name} style={{marginBottom:10}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:3,gap:8}}>
+                  <span style={{fontWeight:900,fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',minWidth:0}}>
+                    <span style={{display:'inline-block',width:20,opacity:0.4}}>{i+1}.</span>{p.name}
+                  </span>
+                  <span style={{whiteSpace:'nowrap',fontSize:12,fontWeight:900}}>
+                    {prodSort==='marge' ? fmtEur(p.marge) : (fmtInt(p.qte) + ' u.')}
+                    <span style={{fontSize:10,opacity:0.5,marginLeft:6,fontWeight:700}}>{prodSort==='marge' ? (fmtInt(p.qte)+' u.') : fmtEur(p.ca)}</span>
+                  </span>
+                </div>
+                <div style={{height:10,background:'#EBEBEB',borderRadius:3,border:'1.5px solid '+NOIR,overflow:'hidden'}}>
+                  <div style={{width:pctBar+'%',height:'100%',background: prodSort==='marge' ? VERT : ROSE}}></div>
+                </div>
               </div>
             )
           })}
+          <div style={{fontSize:10,opacity:0.5,marginTop:8,fontWeight:700,fontStyle:'italic'}}>
+            Marge estimée = CA produit − food cost. Détail issu du dernier CSV Zelty mensuel.
+          </div>
         </div>
-        <div style={{marginTop: 8, fontSize: 11, color: '#555', textAlign: 'center'}}>
-          De <b>591€/jour</b> (jours froids) à <b>1 151€/jour</b> (jours chauds 20-25°C) — quasi <b>×2</b>
-        </div>
-      </div>
-
-      <div style={{
-        padding: '12px 14px',
-        background: '#FF82D7',
-        color: '#fff',
-        borderRadius: 8,
-        fontSize: 12,
-        lineHeight: 1.5
-      }}>
-        <b>💡 Insight :</b> les beaux jours boostent la boutique et font chuter la part livraison. Ton modèle est saisonnier : forte boutique en été, dépendance livraison en hiver. À exploiter pour piloter le staff et les stocks.
-      </div>
+      )}
     </div>
   )
 }
 
 // =============================================================================
-function ConseilsStrategiquesPanel(props) {
-  var conseils = [
-    {
-      priority: 1,
-      color: '#FF82D7',
-      tag: 'PROTÉGER',
-      tagBg: '#fce4ef',
-      tagFg: '#b8316b',
-      impact: '🔥🔥🔥🔥🔥',
-      title: 'Menu Meshuga 9,50€ — ne jamais y toucher, ajouter de l\u2019upsell',
-      body: 'Le Menu Meshuga (Hot Dog ou Grilled Cheese + frites + soft) est ta vache sacrée : 15 836 menus en 2025, ~150k€ de CA boutique pur. 1€ de hausse = risque de cannibalisation par la concurrence. Le vrai levier : options upsell à coût marginal nul (+1€ frites doubles, +1,50€ soft 50cl, +2€ Pink Lemonade maison à la place du Coca).',
-      action: 'Ajouter 3 options upgrade payantes dans Zelty avant fin mai. Mesurer le taux d\u2019adoption sur 30 jours.'
-    },
-    {
-      priority: 2,
-      color: '#d85a30',
-      tag: 'DÉCROCHER',
-      tagBg: '#ffd6c4',
-      tagFg: '#d85a30',
-      impact: '🔥🔥🔥🔥',
-      title: 'Réduire progressivement Uber/Deliveroo — leur modèle coûte ~32k€/an',
-      body: 'Commission 30-35% + sponsored ads = ~40% du CA brut livraison en charges directes. Sur 91 593€ brut 2025, ~32 000€ partent en commissions. Le panier brut 23€ devient un panier net de 15€ — soit pile poil le panier boutique. Stratégie en 3 phases : (P1 mai-juin) +5% sur best-sellers livraison, (P2 juin-sept) couper sponsored ads, (P3 sept-dec) descendre à 10-12% du CA brut.',
-      action: 'Monter les prix Uber/Deliveroo de +5% dès juin. Couper progressivement les sponsored ads. Suivre mensuellement le ratio CA livraison net / CA boutique.'
-    },
-    {
-      priority: 3,
-      color: '#FF82D7',
-      tag: 'SCALER',
-      tagBg: '#fce4ef',
-      tagFg: '#b8316b',
-      impact: '🔥🔥🔥🔥🔥',
-      title: 'B2B catering — la sortie propre du modèle livraison',
-      body: 'Le catering remplace 1-pour-1 la livraison en mieux : pas de commission, marge à 70%+, panier 5-10× supérieur, fidélisation entreprise (cabinet d\u2019avocat 1×/mois pendant 3 ans = 15-25k€ récurrent). Business Lunch 15 pers à 18€/pers = 270€ HT. À 3 events/semaine × 45 semaines = 36 450€/an. Cible 2027 : 5 events/semaine = 60 750€/an.',
-      action: 'Finaliser Phase 4V3 (multi-option quote wizard) avant juin. Emy lance 100 prospects ciblés cabinets d\u2019avocats / fonds VC / agences Rive Gauche. Viser 8 events signés sur juin-juillet.'
-    },
-    {
-      priority: 4,
-      color: '#BA7517',
-      tag: 'RÉPARER',
-      tagBg: '#fff3e0',
-      tagFg: '#b85c00',
-      impact: '🔥🔥🔥',
-      title: 'Lundi & Mardi −25% vs Samedi — promo étudiante midi',
-      body: 'Samedi 66 766€ · Vendredi 59 367€ · Lundi 50 216€ · Mardi 48 463€. Mêmes coûts fixes → marge nette s\u2019effondre Lun-Mar. Bonus : Lundi 12h enregistre 1 189 tickets/an. Le quartier est plein d\u2019écoles/facs (Sorbonne, Sciences Po, École Alsacienne). Une promo "Menu Meshuga 8,50€ sur carte étudiante Lun-Mar" peut driver +15-20% de tickets.',
-      action: 'Test 4 semaines d\u2019une promo étudiant Lun/Mar 11h30-14h30. Flyers dans les facs. Mesurer ticket count vs panier.'
-    },
-    {
-      priority: 5,
-      color: '#FF82D7',
-      tag: 'EXPLOITER',
-      tagBg: '#fce4ef',
-      tagFg: '#b8316b',
-      impact: '🔥🔥🔥🔥',
-      title: 'Piloter la prévision météo — staff et stocks à 48h',
-      body: 'Soleil et chaleur sont tes leviers #1 sur le CA boutique. Le CA passe de 591€/jour (froid) à 1 151€/jour (20-25°C) = quasi ×2. Beau jour à venir → mobiliser 2e cuisinier, doubler stock pains et frites. Pluie forte → réduire équipe, optimiser périssables. Canicule → pousser Cole Slaw, Lobster Roll, Pink Lemonade.',
-      action: 'Intégrer un widget "Prévision météo 7 jours" dans le dashboard (Open-Meteo gratuit). Push notification dimanche soir avec la prévision et les actions à anticiper.'
-    },
-    {
-      priority: 6,
-      color: '#BA7517',
-      tag: 'ANTICIPER',
-      tagBg: '#fff3e0',
-      tagFg: '#b85c00',
-      impact: '🔥🔥🔥',
-      title: 'Saisonnalité : août creux (28k€) sous-exploité',
-      body: 'Pic 40 660€ en juillet, creux 24 074€ en décembre. Août sous-exploité : pause étudiants + chaleur, mais tu ne captes pas le touriste Rive Gauche (Saint-Germain, Luxembourg). Une carte d\u2019été visible en anglais + partenariats hôtels boutique du 6e/7e pourrait sauver le mois.',
-      action: 'Pour août : flyers anglais + carte "Summer specials" (Cole Slaw, Lobster Roll, Pink Lemonade). Partenariat 3-5 hôtels boutique. Pour nov-déc : opération "soupe maison" plat du jour.'
-    },
-    {
-      priority: 7,
-      color: '#444',
-      tag: 'OPTIMISER',
-      tagBg: '#f0f0f0',
-      tagFg: '#444',
-      impact: '🔥🔥',
-      title: 'Resserrer le food cost sauces et merch (1-3 pts de marge)',
-      body: 'Food cost moyen 22,4% (excellent), mais 2 catégories décrochent : sauce frites maison à 39,2% (portion 20g trop généreuse) et merch hoodie/casquettes à 45%. Sur 20 553 portions de frites/an, passer la sauce à 10g = ~600€/an d\u2019économie.',
-      action: 'Tester portion 10g de sauce. Renégocier hoodie nouveau sourcing (Lyon ou Portugal). Calculer les vrais coûts d\u2019achat actuels.'
-    }
-  ]
+// SOUS-COMPOSANTS
+// =============================================================================
 
+function KpiTile(props) {
+  var bg = props.bg || '#FFFFFF'
+  var txt = props.txt || NOIR
+  var accent = props.accent
+  var isPink = bg === ROSE
+  var delta = props.delta
+  var deltaStr = ''
+  var deltaCol = txt
+  if (delta !== null && delta !== undefined && !isNaN(Number(delta))) {
+    var n = Number(delta)
+    deltaStr = (n >= 0 ? '▲ +' : '▼ ') + n.toFixed(1) + '%'
+    if (isPink) deltaCol = '#FFFFFF'
+    else deltaCol = n >= 0 ? VERT : ROUGE
+  }
   return (
-    <div style={{background: '#FFEB5A', borderRadius: 12, padding: 22, marginBottom: 14, marginTop: 24, border: '2px solid #191923'}}>
-      <div style={{
-        background: 'linear-gradient(135deg, #191923 0%, #2a2a3a 100%)',
-        borderRadius: 12,
-        padding: 22,
-        color: '#fff',
-        marginBottom: 14
-      }}>
-        <div style={{display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8}}>
-          <span style={{fontSize: 28}}>📊</span>
-          <div>
-            <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 32, color: '#FFEB5A', lineHeight: 1}}>
-              Conseils stratégiques
-            </div>
-            <div style={{fontSize: 11, color: 'rgba(255,255,255,0.7)', letterSpacing: 1.5, fontWeight: 900, marginTop: 2, textTransform: 'uppercase'}}>
-              Analyse {props.year} · 7 recommandations priorisées
-            </div>
-          </div>
-        </div>
-        <div style={{fontSize: 13, lineHeight: 1.6, color: 'rgba(255,255,255,0.9)', marginTop: 10}}>
-          {props.dYtdCA !== null && props.dYtdCA < 0 ? (
-            <>Le YTD {props.year} amorce un repli de {Math.abs(props.dYtdCA).toFixed(1)}% vs même période {props.year - 1}. La météo Q1 2026 a été plus favorable (plus chaude et ensoleillée que 2025) — donc le repli n&apos;est PAS expliqué par le climat. C&apos;est un signal de concurrence/comportement à investiguer. Voici les 7 leviers prioritaires.</>
-          ) : (
-            <>Analyse stratégique basée sur les données 2025 complètes + Q1 2026. Sept leviers prioritaires identifiés.</>
-          )}
-        </div>
+    <div style={{background:bg,color:txt,border:'2px solid '+NOIR,borderRadius:7,padding:'12px 14px',boxShadow:'3px 3px 0 '+NOIR,position:'relative',overflow:'hidden'}}>
+      {accent && <span style={{position:'absolute',left:0,top:0,bottom:0,width:5,background:accent}} />}
+      <div style={{fontFamily:"'Yellowtail',cursive",fontSize:13,lineHeight:1.1,color:isPink?'#FFFFFF':(accent||ROSE),opacity:isPink?0.95:1}}>{props.label}</div>
+      <div style={{fontWeight:900,fontSize:24,marginTop:6,lineHeight:1,letterSpacing:-0.5}}>{props.value}</div>
+      {deltaStr && <div style={{fontSize:11,fontWeight:900,marginTop:5,color:deltaCol}}>{deltaStr} vs N-1</div>}
+    </div>
+  )
+}
+
+function MiniStat(props) {
+  return (
+    <div style={{textAlign:'right'}}>
+      <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',letterSpacing:0.4,opacity:0.55}}>{props.label}</div>
+      <div style={{fontWeight:900,fontSize:props.big?20:14,color:props.color,lineHeight:1.1,marginTop:2}}>{props.value}</div>
+    </div>
+  )
+}
+
+function Toggle(props) {
+  var active = props.active
+  return (
+    <div onClick={props.onClick} style={{
+      padding: props.small ? '4px 10px' : '5px 12px',
+      fontSize: props.small ? 10 : 11, fontWeight:900,
+      borderRadius:18, border:'2px solid '+NOIR,
+      background: active ? ROSE : '#FFFFFF',
+      color: active ? '#FFFFFF' : NOIR,
+      cursor:'pointer', whiteSpace:'nowrap',
+      boxShadow: active ? '2px 2px 0 '+NOIR : 'none',
+      textTransform:'uppercase', letterSpacing:0.3, transition:'all .1s'
+    }}>{props.children}</div>
+  )
+}
+
+function DonutChart(props) {
+  var data = props.data || []
+  var total = data.reduce(function(a,b){ return a + b.value }, 0)
+  return (
+    <div>
+      <div style={{width:'100%',height:props.isMobile?180:200}}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={props.isMobile?45:55} outerRadius={props.isMobile?70:85} paddingAngle={2} stroke={NOIR} strokeWidth={2}>
+              {data.map(function(e, i){ return <Cell key={i} fill={e.color} /> })}
+            </Pie>
+            <Tooltip
+              contentStyle={{background:NOIR,border:'2px solid '+JAUNE,borderRadius:6,padding:'6px 10px'}}
+              itemStyle={{color:'#FFFFFF',fontWeight:900,fontSize:12}}
+              formatter={function(v){ return [fmtEur(v) + ' (' + (total>0?Math.round(v/total*100):0) + '%)', ''] }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
       </div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:8,justifyContent:'center'}}>
+        {data.map(function(e){
+          return (
+            <div key={e.name} style={{display:'flex',alignItems:'center',gap:4,fontSize:10}}>
+              <span style={{width:10,height:10,background:e.color,border:'1.5px solid '+NOIR,borderRadius:2,display:'inline-block'}} />
+              <span style={{fontWeight:900}}>{e.name}</span>
+              <span style={{opacity:0.6}}>{total>0?Math.round(e.value/total*100):0}%</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
-      {props.caBrut && props.caNet && (
-        <div style={{background: '#fff', borderRadius: 12, padding: 16, marginBottom: 14}}>
-          <div style={{fontSize: 11, color: '#888', fontWeight: 900, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10}}>
-            🔎 La réalité économique {props.year}
-          </div>
-          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12}}>
-            <div style={{background: '#F5F5F5', padding: 12, borderRadius: 8}}>
-              <div style={{fontSize: 10, fontWeight: 900, color: '#888', textTransform: 'uppercase'}}>CA brut affiché</div>
-              <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 26, color: '#191923', lineHeight: 1, marginTop: 4}}>{Number(props.caBrut).toLocaleString('fr-FR')} €</div>
-            </div>
-            <div style={{background: '#ffefef', padding: 12, borderRadius: 8}}>
-              <div style={{fontSize: 10, fontWeight: 900, color: '#d85a30', textTransform: 'uppercase'}}>− Commissions Uber/Deliveroo</div>
-              <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 26, color: '#d85a30', lineHeight: 1, marginTop: 4}}>−{Number(props.commissions).toLocaleString('fr-FR')} €</div>
-              <div style={{fontSize: 10, color: '#d85a30', marginTop: 2}}>≈ 35% du CA livraison brut</div>
-            </div>
-            <div style={{background: '#e8f8e0', padding: 12, borderRadius: 8}}>
-              <div style={{fontSize: 10, fontWeight: 900, color: '#1a6b1a', textTransform: 'uppercase'}}>CA NET encaissé</div>
-              <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 26, color: '#1a6b1a', lineHeight: 1, marginTop: 4}}>{Number(props.caNet).toLocaleString('fr-FR')} €</div>
-            </div>
-          </div>
-          <div style={{
-            marginTop: 10,
-            padding: '8px 10px',
-            background: '#FFFBE5',
-            borderLeft: '3px solid #FFEB5A',
-            borderRadius: 6,
-            fontSize: 12,
-            color: '#555',
-            lineHeight: 1.5
-          }}>
-            <b>📌 Lecture :</b> tu paies l&apos;équivalent d&apos;un loyer annuel (~32k€) en commissions plateformes. Sans compter les budgets Uber Ads / Deliveroo Sponsored. La livraison ne crée AUCUNE valeur ajoutée par ticket vs l&apos;emporté.
-          </div>
+function Heatmap(props) {
+  var grid = props.grid || {}
+  var max = props.max || 1
+  var hours = props.hours || []
+  var dayOrder = [1, 2, 3, 4, 5, 6, 0]
+  function cellColor(v) {
+    if (!v || v === 0) return '#F7F7F7'
+    var ratio = v / max
+    if (ratio < 0.2) return '#FFF7D6'
+    if (ratio < 0.4) return '#FFE9A8'
+    if (ratio < 0.6) return '#FFD06B'
+    if (ratio < 0.8) return '#FFA8D5'
+    return ROSE
+  }
+  return (
+    <div style={{overflowX:'auto'}}>
+      <div style={{minWidth:520}}>
+        <div style={{display:'grid',gridTemplateColumns:'40px repeat('+hours.length+', 1fr)',gap:2,marginBottom:2}}>
+          <div></div>
+          {hours.map(function(h){ return <div key={h} style={{fontSize:8,fontWeight:900,textAlign:'center',opacity:0.6}}>{h}h</div> })}
         </div>
-      )}
-
-      {conseils.map(function(c){
-        return (
-          <div key={c.priority} style={{background: '#fff', borderRadius: 12, padding: 16, marginBottom: 10}}>
-            <div style={{display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap'}}>
-              <span style={{
-                display: 'inline-block',
-                width: 26,
-                height: 26,
-                borderRadius: 13,
-                lineHeight: '26px',
-                textAlign: 'center',
-                fontSize: 13,
-                fontWeight: 900,
-                color: '#fff',
-                background: c.color
-              }}>{c.priority}</span>
-              <span style={{
-                display: 'inline-block',
-                padding: '3px 10px',
-                borderRadius: 999,
-                fontSize: 10,
-                fontWeight: 900,
-                letterSpacing: 0.5,
-                textTransform: 'uppercase',
-                background: c.tagBg,
-                color: c.tagFg
-              }}>{c.tag}</span>
-              <span style={{
-                marginLeft: 'auto',
-                fontSize: 10,
-                fontWeight: 900,
-                color: '#888',
-                textTransform: 'uppercase',
-                letterSpacing: 0.5
-              }}>Impact : {c.impact}</span>
+        {dayOrder.map(function(dow){
+          return (
+            <div key={dow} style={{display:'grid',gridTemplateColumns:'40px repeat('+hours.length+', 1fr)',gap:2,marginBottom:2}}>
+              <div style={{fontSize:9,fontWeight:900,display:'flex',alignItems:'center'}}>{DOW_FR[dow]}</div>
+              {hours.map(function(h){
+                var v = grid[dow + '_' + h] || 0
+                return (
+                  <div key={h} title={DOW_FR[dow]+' '+h+'h : '+fmtEur(v)} style={{
+                    aspectRatio:'1', background:cellColor(v),
+                    border:'1px solid '+(v>0?'rgba(25,25,35,0.15)':'#EEE'),
+                    borderRadius:2, minHeight:18
+                  }}></div>
+                )
+              })}
             </div>
-            <div style={{fontSize: 15, fontWeight: 900, color: '#191923', marginBottom: 6, lineHeight: 1.3}}>
-              {c.title}
-            </div>
-            <div style={{fontSize: 12.5, color: '#444', lineHeight: 1.6, marginBottom: 8}}>
-              {c.body}
-            </div>
-            <div style={{
-              padding: '8px 10px',
-              background: '#FAFAFA',
-              borderRadius: 6,
-              fontSize: 12,
-              color: '#191923'
-            }}>
-              <b>→ À faire :</b> {c.action}
-            </div>
-          </div>
-        )
-      })}
-
-      <div style={{
-        background: 'linear-gradient(135deg, #FF82D7 0%, #D1448E 100%)',
-        borderRadius: 12,
-        padding: 20,
-        color: '#fff',
-        marginTop: 12
-      }}>
-        <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 32, color: '#fff', lineHeight: 1, marginBottom: 12}}>
-          🎯 Objectifs {props.year + 1} réajustés
-        </div>
-        <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10}}>
-          <div style={{background: 'rgba(255,255,255,0.18)', borderRadius: 8, padding: 12}}>
-            <div style={{fontSize: 10, opacity: 0.85, textTransform: 'uppercase', fontWeight: 900, letterSpacing: 1}}>CA NET cible</div>
-            <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 26, lineHeight: 1, marginTop: 4}}>410 k€</div>
-            <div style={{fontSize: 11, opacity: 0.9, marginTop: 2}}>+13% vs CA net 2025</div>
-          </div>
-          <div style={{background: 'rgba(255,255,255,0.18)', borderRadius: 8, padding: 12}}>
-            <div style={{fontSize: 10, opacity: 0.85, textTransform: 'uppercase', fontWeight: 900, letterSpacing: 1}}>Part B2B</div>
-            <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 26, lineHeight: 1, marginTop: 4}}>12%</div>
-            <div style={{fontSize: 11, opacity: 0.9, marginTop: 2}}>≈ 50k€ catering</div>
-          </div>
-          <div style={{background: 'rgba(255,255,255,0.18)', borderRadius: 8, padding: 12}}>
-            <div style={{fontSize: 10, opacity: 0.85, textTransform: 'uppercase', fontWeight: 900, letterSpacing: 1}}>Part livraison brute</div>
-            <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 26, lineHeight: 1, marginTop: 4}}>15%</div>
-            <div style={{fontSize: 11, opacity: 0.9, marginTop: 2}}>−8 pts vs 2025</div>
-          </div>
-          <div style={{background: 'rgba(255,255,255,0.18)', borderRadius: 8, padding: 12}}>
-            <div style={{fontSize: 10, opacity: 0.85, textTransform: 'uppercase', fontWeight: 900, letterSpacing: 1}}>Marge nette</div>
-            <div style={{fontFamily: "'Yellowtail', cursive", fontSize: 26, lineHeight: 1, marginTop: 4}}>+3 pts</div>
-            <div style={{fontSize: 11, opacity: 0.9, marginTop: 2}}>via mix B2B</div>
-          </div>
-        </div>
-        <div style={{marginTop: 12, fontSize: 12.5, lineHeight: 1.6, opacity: 0.95}}>
-          <b>Logique :</b> on substitue 18k€ de CA livraison brut (commissions sortantes) par 50k€ de CA catering B2B (marge pleine). Résultat : CA brut quasi stable, mais marge nette +12-15k€/an.
-        </div>
+          )
+        })}
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:6,marginTop:10,fontSize:9,fontWeight:900,opacity:0.7}}>
+        <span>Moins</span>
+        <span style={{width:14,height:14,background:'#FFF7D6',border:'1px solid #DDD',borderRadius:2}}></span>
+        <span style={{width:14,height:14,background:'#FFD06B',border:'1px solid #DDD',borderRadius:2}}></span>
+        <span style={{width:14,height:14,background:'#FFA8D5',border:'1px solid #DDD',borderRadius:2}}></span>
+        <span style={{width:14,height:14,background:ROSE,border:'1px solid #DDD',borderRadius:2}}></span>
+        <span>Plus</span>
       </div>
     </div>
   )
