@@ -237,7 +237,6 @@ export default function Sidebar(props) {
       <div className="sb-logo">
         <div className="sb-logo-text">
           <img src={LOGO_PINK} alt="meshuga" className="sb-logo-type" />
-          <div className="sb-logo-b2b">B2B Manager</div>
         </div>
       </div>
 
