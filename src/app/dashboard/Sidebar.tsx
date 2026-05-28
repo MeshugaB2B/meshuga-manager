@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { LOGO_PINK, STAMP_YELLOW } from './logos'
 
@@ -101,6 +101,51 @@ export default function Sidebar(props) {
   var [collapsed, setCollapsed] = useState({})
   var [search, setSearch] = useState('')
   var [counts, setCounts] = useState({})
+  var [width, setWidth] = useState(210)
+  var draggingRef = useRef(false)
+  var widthRef = useRef(210)
+
+  // Charger largeur sauvegardée + appliquer la variable CSS
+  useEffect(function() {
+    try {
+      var savedW = localStorage.getItem('meshuga.sidebar.width')
+      if (savedW) {
+        var w = parseInt(savedW, 10)
+        if (!isNaN(w) && w >= 168 && w <= 340) {
+          setWidth(w)
+          widthRef.current = w
+          document.documentElement.style.setProperty('--sb-w', w + 'px')
+        }
+      }
+    } catch (e) {}
+  }, [])
+
+  // Gestion du drag de redimensionnement
+  function startResize(e) {
+    e.preventDefault()
+    draggingRef.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('mousemove', onResize)
+    window.addEventListener('mouseup', stopResize)
+  }
+  function onResize(e) {
+    if (!draggingRef.current) return
+    var w = e.clientX
+    if (w < 168) w = 168
+    if (w > 340) w = 340
+    document.documentElement.style.setProperty('--sb-w', w + 'px')
+    widthRef.current = w
+    setWidth(w)
+  }
+  function stopResize() {
+    draggingRef.current = false
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    window.removeEventListener('mousemove', onResize)
+    window.removeEventListener('mouseup', stopResize)
+    try { localStorage.setItem('meshuga.sidebar.width', String(widthRef.current)) } catch (e) {}
+  }
 
   // Charger l'état des sections repliées
   useEffect(function() {
@@ -185,6 +230,9 @@ export default function Sidebar(props) {
 
   return (
     <div className={sidebarOpen ? 'sidebar open' : 'sidebar'}>
+      {/* Poignée de redimensionnement (desktop only, masquée en mobile via CSS) */}
+      <div className="sb-resizer" onMouseDown={startResize} title="Glisser pour redimensionner" />
+
       {/* Logo */}
       <div className="sb-logo">
         <img src={STAMP_YELLOW} alt="stamp" className="sb-logo-stamp" />
