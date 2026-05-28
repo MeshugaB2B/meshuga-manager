@@ -236,7 +236,7 @@ export default function Sidebar(props) {
       {/* Logo */}
       <div className="sb-logo">
         <div className="sb-logo-text">
-          <img src={LOGO_PINK} alt="meshuga" className="sb-logo-type" />
+          <img src="/logotype-pink.png" alt="meshuga" className="sb-logo-type" />
         </div>
       </div>
 
