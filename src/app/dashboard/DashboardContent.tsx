@@ -955,7 +955,7 @@ function DashboardImpl() {
       )}
 
       <div className="topbar">
-        <img src={LOGO_PINK} alt="meshuga" className="topbar-logo" />
+        <img src="/logotype-pink.png" alt="meshuga" className="topbar-logo" />
       </div>
 
       <div className="shell">
