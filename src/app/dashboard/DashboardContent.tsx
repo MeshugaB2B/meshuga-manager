@@ -948,17 +948,14 @@ function DashboardImpl() {
       <style dangerouslySetInnerHTML={{__html: G}} />
 
       {!profile && (
-        <div style={{position:'fixed',inset:0,background:'#FFEB5A',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999,flexDirection:'column',gap:14}}>
+        <div style={{position:'fixed',inset:0,background:'var(--y)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999,flexDirection:'column',gap:14}}>
           <img src="/stamp-pink.png" alt="meshuga" style={{width:130,height:130,objectFit:"contain"}} />
-          <div style={{fontFamily:"'Yellowtail',cursive",fontSize:30,color:'#FF82D7',lineHeight:1}}>Chargement…</div>
+          <div style={{fontFamily:"'Yellowtail',cursive",fontSize:30,color:'var(--p)',lineHeight:1}}>Chargement…</div>
         </div>
       )}
 
       <div className="topbar">
-        <img src={LOGO_YELLOW} alt="meshuga" className="topbar-logo" />
-        <div className="topbar-right">
-          <span className="topbar-b2b">B2B Manager</span>
-        </div>
+        <img src={LOGO_PINK} alt="meshuga" className="topbar-logo" />
       </div>
 
       <div className="shell">
