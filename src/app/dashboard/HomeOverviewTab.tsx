@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import ArticleDetailModal from './ArticleDetailModal'
@@ -80,6 +80,8 @@ export default function HomeOverviewTab(props) {
   var [devisActifs, setDevisActifs] = useState([])
   var [carouselIdx, setCarouselIdx] = useState(0)
   var [fcIdx, setFcIdx] = useState(0)
+  var [fcMobIdx, setFcMobIdx] = useState(0)
+  var fcScrollRef = useRef(null)
   var [isMobile, setIsMobile] = useState(false)
   var [loading, setLoading] = useState(true)
 
@@ -89,10 +91,20 @@ export default function HomeOverviewTab(props) {
   useEffect(function() { loadAll() }, [])
 
   useEffect(function() {
-    function check() { setIsMobile(window.innerWidth <= 768) }
+    function check() {
+      var w = window.innerWidth || document.documentElement.clientWidth || 0
+      var coarse = false
+      try { coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches } catch (e) {}
+      var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0)
+      setIsMobile(w <= 900 || coarse || touch)
+    }
     check()
     window.addEventListener('resize', check)
-    return function() { window.removeEventListener('resize', check) }
+    window.addEventListener('orientationchange', check)
+    return function() {
+      window.removeEventListener('resize', check)
+      window.removeEventListener('orientationchange', check)
+    }
   }, [])
 
   function loadAll() {
@@ -449,14 +461,37 @@ export default function HomeOverviewTab(props) {
               </div>
             )}
 
-            {/* MOBILE : scroll latéral, colonnes de 2 cards empilées */}
+            {/* MOBILE : scroll latéral fluide, colonnes de 2 cards empilées */}
             {isMobile && (
-              <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:6,scrollSnapType:'x mandatory',WebkitOverflowScrolling:'touch'}}>
+              <div
+                ref={fcScrollRef}
+                onScroll={function(e){
+                  var el = e.currentTarget
+                  var w = el.clientWidth || 1
+                  var idx = Math.round(el.scrollLeft / (w * 0.9))
+                  if (idx !== fcMobIdx) setFcMobIdx(idx)
+                }}
+                style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:6,scrollSnapType:'x proximity',WebkitOverflowScrolling:'touch',scrollbarWidth:'none'}}>
                 {fcColumns.map(function(col, ci) {
                   return (
-                    <div key={ci} style={{display:'flex',flexDirection:'column',gap:10,minWidth:'85%',scrollSnapAlign:'start',flexShrink:0}}>
+                    <div key={ci} style={{display:'flex',flexDirection:'column',gap:10,minWidth:'90%',scrollSnapAlign:'center',flexShrink:0}}>
                       {col.map(function(r) { return <FcCard key={r.recipe_id} recipe={r} nav={nav} /> })}
                     </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Dots MOBILE cliquables + suivent le scroll */}
+            {isMobile && fcColumns.length > 1 && (
+              <div style={{display:'flex',justifyContent:'center',gap:6,marginTop:10}}>
+                {fcColumns.map(function(_, i) {
+                  return (
+                    <span key={i} onClick={function(){
+                      setFcMobIdx(i)
+                      var el = fcScrollRef.current
+                      if (el) el.scrollTo({left: i * el.clientWidth * 0.9, behavior:'smooth'})
+                    }} style={{width:i===fcMobIdx?20:10,height:8,borderRadius:4,background:i===fcMobIdx?fcAccent:'#EBEBEB',border:'2px solid #191923',cursor:'pointer',transition:'width .2s'}} />
                   )
                 })}
               </div>
