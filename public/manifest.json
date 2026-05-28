@@ -4,7 +4,7 @@
   "description": "Tableau de bord B2B Meshuga Crazy Deli",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#191923",
+  "background_color": "#FFEB5A",
   "theme_color": "#FFEB5A",
   "orientation": "portrait",
   "icons": [
