@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { LOGO_PINK, STAMP_YELLOW } from './logos'
+import { LOGO_PINK } from './logos'
 
 // =============================================================================
 // Sidebar — Navigation principale réorganisée (Sprint UX-2)
@@ -235,7 +235,6 @@ export default function Sidebar(props) {
 
       {/* Logo */}
       <div className="sb-logo">
-        <img src={STAMP_YELLOW} alt="stamp" className="sb-logo-stamp" />
         <div className="sb-logo-text">
           <img src={LOGO_PINK} alt="meshuga" className="sb-logo-type" />
           <div className="sb-logo-b2b">B2B Manager</div>
