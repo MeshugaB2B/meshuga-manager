@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { LineChart, Line, ResponsiveContainer, ReferenceLine, YAxis } from 'recharts'
+import { LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import ArticleDetailModal from './ArticleDetailModal'
 import KpiHistoryModal from './KpiHistoryModal'
 
@@ -51,6 +51,15 @@ var DAYS_AGO = function(iso) {
   return Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
 }
 
+// Config par métrique (label, unité, couleur, titre de graph)
+var metricConf = function(m) {
+  if (m === 'ca_ttc') return {label:'CA TTC', unit:'eur', accent:'#FF82D7', title:'Évolution du CA TTC'}
+  if (m === 'nb_articles') return {label:'Articles vendus', unit:'int', accent:'#B8920A', title:'Évolution des articles vendus'}
+  if (m === 'nb_tickets') return {label:'Tickets', unit:'int', accent:'#005FFF', title:'Évolution des tickets'}
+  if (m === 'ticket_moyen') return {label:'Panier moyen', unit:'eur', accent:'#009D3A', title:'Évolution du panier moyen'}
+  return {label:m, unit:'int', accent:'#FF82D7', title:'Évolution'}
+}
+
 export default function HomeOverviewTab(props) {
   var profile = props.profile
   var isEmy = props.isEmy
@@ -61,6 +70,8 @@ export default function HomeOverviewTab(props) {
 
   var [zToday, setZToday] = useState(null)
   var [zPrev, setZPrev] = useState(null)
+  var [zHistory, setZHistory] = useState([])
+  var [caMetric, setCaMetric] = useState('ca_ttc')
   var [priceVariations, setPriceVariations] = useState([])
   var [productHistories, setProductHistories] = useState({})   // {product_id: [{date, price}, ...]}
   var [recipeAlerts, setRecipeAlerts] = useState([])
@@ -91,7 +102,7 @@ export default function HomeOverviewTab(props) {
     c.from('daily_z_reports')
       .select('z_date, ca_ttc, ca_ht, nb_tickets, nb_couverts, nb_articles, ticket_moyen, canaux, canaux_nb_tickets')
       .order('z_date', { ascending: false })
-      .limit(15)
+      .limit(30)
       .then(function(res) {
         var rows = res.data || []
         if (rows.length > 0) {
@@ -105,6 +116,8 @@ export default function HomeOverviewTab(props) {
           }
           if (!match && rows.length >= 7) match = rows[6]
           setZPrev(match)
+          // Historique chronologique (ancien → récent) pour le graph
+          setZHistory(rows.slice().reverse())
         }
       })
 
@@ -333,14 +346,13 @@ export default function HomeOverviewTab(props) {
         </div>
       )}
 
-      {/* ====== CA (ex Chiffres de la veille) ====== */}
+      {/* ====== CA — bloc visuel interactif ====== */}
       <div className="card">
-        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:8}}>
+        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
           <div>
-            <div style={{fontFamily:"'Yellowtail',cursive",fontSize:30,color:'#FF82D7',lineHeight:1}}>CA</div>
-            <div style={{fontSize:11,opacity:0.55,marginTop:3,textTransform:'capitalize',fontWeight:700}}>{zDateLabel}</div>
+            <div style={{fontFamily:"'Yellowtail',cursive",fontSize:30,color:'#FF82D7',lineHeight:1}}>Activité</div>
+            <div style={{fontSize:11,opacity:0.55,marginTop:3,textTransform:'capitalize',fontWeight:700}}>Veille : {zDateLabel}</div>
           </div>
-          <div style={{fontSize:10,opacity:0.5,fontWeight:900,textTransform:'uppercase',letterSpacing:0.5}}>↓ Clique sur un chiffre pour l&apos;historique</div>
         </div>
 
         {!zToday && (
@@ -351,37 +363,25 @@ export default function HomeOverviewTab(props) {
 
         {zToday && (
           <div>
-            <div className="g4">
-              {/* CA TTC : ROSE + texte BLANC */}
-              <KpiCard
-                bg="#FF82D7" textColor="#FFFFFF" labelColor="#FFFFFF" labelOpacity={1}
-                accentBar="#FFFFFF"
-                label="CA TTC" value={FMT_EUR(zToday.ca_ttc)} evol={caEvol}
-                icon="💰" onClick={function(){ openKpi('ca_ttc', 'CA TTC', 'eur', '#FF82D7') }}
-              />
-              {/* Articles vendus : JAUNE + texte NOIR (avec ratio art/tk en sous-info) */}
-              <KpiCard
-                bg="#FFEB5A" textColor="#191923" labelColor="#191923" labelOpacity={0.85}
-                accentBar="#191923"
-                label="Articles vendus" value={Number(zToday.nb_articles) > 0 ? FMT_INT(zToday.nb_articles) : '—'} evol={articlesEvol}
-                subInfo={articlesParTicket !== null ? articlesParTicket.toFixed(2) + ' art/ticket' : null}
-                icon="🥪" onClick={function(){ openKpi('nb_articles', 'Articles vendus', 'int', '#FFEB5A') }}
-              />
-              {/* Tickets : BLANC + accent rose */}
-              <KpiCard
-                bg="#FFFFFF" textColor="#191923" labelColor="#FF82D7" labelOpacity={1}
-                accentBar="#FF82D7"
-                label="Tickets" value={FMT_INT(zToday.nb_tickets)} evol={ticketsEvol}
-                icon="🎫" onClick={function(){ openKpi('nb_tickets', 'Tickets', 'int', '#FF82D7') }}
-              />
-              {/* Panier moyen : BLANC + accent jaune épais */}
-              <KpiCard
-                bg="#FFFFFF" textColor="#191923" labelColor="#B8920A" labelOpacity={1}
-                accentBar="#FFEB5A"
-                label="Panier moyen" value={FMT_EUR_DEC(zToday.ticket_moyen)} evol={panierEvol}
-                icon="🛒" onClick={function(){ openKpi('ticket_moyen', 'Panier moyen', 'eur', '#B8920A') }}
-              />
+            {/* Toggle métriques — mini KPI cliquables */}
+            <div style={{display:'flex',gap:8,marginBottom:14,overflowX:'auto',paddingBottom:4}}>
+              <MetricToggle active={caMetric==='ca_ttc'} onClick={function(){ setCaMetric('ca_ttc') }}
+                icon="💰" label="CA TTC" value={FMT_EUR(zToday.ca_ttc)} evol={caEvol} accent="#FF82D7" />
+              <MetricToggle active={caMetric==='nb_articles'} onClick={function(){ setCaMetric('nb_articles') }}
+                icon="🥪" label="Articles" value={Number(zToday.nb_articles) > 0 ? FMT_INT(zToday.nb_articles) : '—'} evol={articlesEvol} accent="#FFEB5A" />
+              <MetricToggle active={caMetric==='nb_tickets'} onClick={function(){ setCaMetric('nb_tickets') }}
+                icon="🎫" label="Tickets" value={FMT_INT(zToday.nb_tickets)} evol={ticketsEvol} accent="#005FFF" />
+              <MetricToggle active={caMetric==='ticket_moyen'} onClick={function(){ setCaMetric('ticket_moyen') }}
+                icon="🛒" label="Panier moy." value={FMT_EUR_DEC(zToday.ticket_moyen)} evol={panierEvol} accent="#B8920A" />
             </div>
+
+            {/* Graph d'évolution de la métrique sélectionnée */}
+            <CaChart history={zHistory} metric={caMetric} isMobile={isMobile} onExpand={function(){
+              var conf = metricConf(caMetric)
+              openKpi(caMetric, conf.label, conf.unit, conf.accent)
+            }} />
+
+            {/* Répartition par mode */}
             <CanauxBar canaux={zToday.canaux || {}} canalColor={canalColor} canalLabel={canalLabel} />
           </div>
         )}
@@ -557,43 +557,121 @@ export default function HomeOverviewTab(props) {
 // SOUS-COMPOSANTS (top-level — règle SWC)
 // =============================================================================
 
-function KpiCard(props) {
-  var label = props.label
-  var value = props.value
+function MetricToggle(props) {
+  var active = props.active
+  var accent = props.accent || '#FF82D7'
   var evol = props.evol
-  var bg = props.bg || '#FFFFFF'
-  var textColor = props.textColor || '#191923'
-  var labelColor = props.labelColor || '#FF82D7'
-  var labelOpacity = props.labelOpacity !== undefined ? props.labelOpacity : 1
-  var accentBar = props.accentBar || '#FF82D7'
-  var icon = props.icon || ''
-  var subInfo = props.subInfo || null
-
-  var evolStr = '—'
-  var evolBg = 'transparent'
+  var evolStr = ''
   var evolColor = '#888'
-  var evolBorder = '#888'
   if (evol !== null && evol !== undefined && !isNaN(Number(evol))) {
     var n = Number(evol)
-    evolStr = (n >= 0 ? '+' : '') + n.toFixed(1) + ' %'
-    if (n > 0) { evolBg = '#009D3A'; evolColor = '#FFFFFF'; evolBorder = '#191923' }
-    else if (n < 0) { evolBg = '#CC0066'; evolColor = '#FFFFFF'; evolBorder = '#191923' }
-    else { evolBg = '#EBEBEB'; evolColor = '#191923'; evolBorder = '#191923' }
+    evolStr = (n >= 0 ? '+' : '') + n.toFixed(1) + '%'
+    evolColor = n > 0 ? '#009D3A' : (n < 0 ? '#CC0066' : '#888')
+  }
+  // Sur fond rose actif → texte blanc (règle de contraste). Sinon fond blanc, texte noir.
+  var isPink = accent === '#FF82D7'
+  var bg = active ? accent : '#FFFFFF'
+  var txt = active ? (isPink ? '#FFFFFF' : '#191923') : '#191923'
+  return (
+    <div onClick={props.onClick} style={{
+      flex:'1 1 0', minWidth:120, cursor:'pointer',
+      background:bg, color:txt,
+      border:'2px solid #191923', borderRadius:7,
+      padding:'10px 12px',
+      boxShadow: active ? '3px 3px 0 #191923' : '2px 2px 0 #191923',
+      transform: active ? 'translate(-1px,-1px)' : 'none',
+      transition:'all .12s', position:'relative', overflow:'hidden'
+    }}>
+      <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:4}}>
+        <span style={{fontSize:14}}>{props.icon}</span>
+        <span style={{fontFamily:"'Yellowtail',cursive",fontSize:13,lineHeight:1,color: active && isPink ? '#FFFFFF' : accent}}>{props.label}</span>
+      </div>
+      <div style={{fontWeight:900,fontSize:18,lineHeight:1,letterSpacing:-0.3}}>{props.value}</div>
+      {evolStr && (
+        <div style={{fontSize:10,fontWeight:900,marginTop:3,color: active && isPink ? '#FFFFFF' : evolColor,opacity: active && isPink ? 0.95 : 1}}>{evolStr} vs J-7</div>
+      )}
+    </div>
+  )
+}
+
+function CaChart(props) {
+  var history = props.history || []
+  var metric = props.metric || 'ca_ttc'
+  var isMobile = props.isMobile
+  var onExpand = props.onExpand || function(){}
+  var conf = metricConf(metric)
+
+  if (history.length === 0) return null
+
+  // Moyenne sur les valeurs > 0
+  var vals = history.map(function(r) { return Number(r[metric]) || 0 })
+  var pos = vals.filter(function(v) { return v > 0 })
+  var avg = pos.length > 0 ? (pos.reduce(function(a,b){return a+b},0) / pos.length) : 0
+  var maxV = vals.length > 0 ? Math.max.apply(null, vals) : 0
+  var minV = pos.length > 0 ? Math.min.apply(null, pos) : 0
+
+  var data = history.map(function(r, idx) {
+    var d = new Date(r.z_date)
+    var wd = d.toLocaleDateString('fr-FR', { weekday: 'short' })
+    return {
+      date: d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'}),
+      weekday: wd.charAt(0).toUpperCase() + wd.slice(1),
+      value: Number(r[metric]) || 0,
+      isToday: idx === history.length - 1,
+      isWeekAgo: idx === history.length - 8
+    }
+  })
+
+  var fmtAxis = function(v) { return conf.unit === 'eur' ? (Math.round(v) + '\u00a0€') : Math.round(v) }
+  var fmtFull = function(v) {
+    if (conf.unit === 'eur') return Number(v).toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €'
+    return Math.round(Number(v)).toLocaleString('fr-FR')
   }
 
   return (
-    <div onClick={props.onClick} style={{background:bg,color:textColor,borderRadius:7,border:'2px solid #191923',padding:'14px 14px 12px 16px',position:'relative',boxShadow:'3px 3px 0 #191923',cursor:'pointer',transition:'transform .1s',overflow:'hidden'}}
-      onMouseEnter={function(e){ e.currentTarget.style.transform='translate(-2px,-2px)'; e.currentTarget.style.boxShadow='5px 5px 0 #191923' }}
-      onMouseLeave={function(e){ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='3px 3px 0 #191923' }}>
-      <span style={{position:'absolute',left:0,top:0,bottom:0,width:5,background:accentBar}} />
-      <div style={{display:'flex',alignItems:'center',gap:6}}>
-        {icon && <span style={{fontSize:16,lineHeight:1}}>{icon}</span>}
-        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:14,lineHeight:1,color:labelColor,opacity:labelOpacity}}>{label}</div>
+    <div style={{background:'#FFFFFF',border:'2px solid #191923',borderRadius:7,padding:'12px 12px 8px',boxShadow:'3px 3px 0 #191923'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:8,flexWrap:'wrap',gap:6}}>
+        <span style={{fontFamily:"'Yellowtail',cursive",fontSize:18,color:'#FF82D7'}}>{conf.title}</span>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:10,opacity:0.6,fontWeight:900}}>
+            <span style={{color:'#005FFF'}}>┄</span> Moy. {fmtAxis(avg)}
+          </span>
+          <button className="btn btn-sm" onClick={onExpand} style={{fontSize:9}}>Détail →</button>
+        </div>
       </div>
-      <div style={{fontWeight:900,fontSize:26,marginTop:6,lineHeight:1,letterSpacing:-0.5}}>{value}</div>
-      <div style={{marginTop:8,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-        <span style={{display:'inline-block',background:evolBg,color:evolColor,padding:'2px 8px',borderRadius:11,fontSize:10,fontWeight:900,border:'1.5px solid '+evolBorder}}>{evolStr} vs J-7</span>
-        {subInfo && <span style={{fontSize:10,fontWeight:900,opacity:0.65,whiteSpace:'nowrap'}}>· {subInfo}</span>}
+      <div style={{width:'100%',height:isMobile?180:230}}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{top:8, right:6, left:-12, bottom:0}}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#EBEBEB" vertical={false} />
+            <XAxis dataKey="date" tick={{fontSize:9, fontWeight:700}} interval="preserveStartEnd" stroke="#191923" />
+            <YAxis tick={{fontSize:9}} stroke="#191923" tickFormatter={fmtAxis} width={48} />
+            <Tooltip
+              contentStyle={{background:'#191923',border:'2px solid #FFEB5A',borderRadius:6,boxShadow:'3px 3px 0 #FFEB5A',padding:'7px 11px'}}
+              labelStyle={{color:'#FFEB5A',fontWeight:900,fontSize:11}}
+              itemStyle={{color:'#FFFFFF',fontWeight:900,fontSize:13}}
+              formatter={function(value){ return [fmtFull(value), conf.label] }}
+              labelFormatter={function(label, payload){
+                if (payload && payload.length > 0 && payload[0].payload) return payload[0].payload.weekday + ' ' + label
+                return label
+              }}
+              cursor={{fill:'rgba(255,235,90,0.25)'}}
+            />
+            {avg > 0 && <ReferenceLine y={avg} stroke="#005FFF" strokeWidth={2} strokeDasharray="5 3" />}
+            <Bar dataKey="value" radius={[3,3,0,0]}>
+              {data.map(function(entry, idx) {
+                var color = conf.accent
+                if (entry.isToday) color = '#191923'
+                else if (entry.isWeekAgo) color = '#005FFF'
+                return <Cell key={idx} fill={color} />
+              })}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={{display:'flex',justifyContent:'flex-end',gap:12,marginTop:4,fontSize:9,fontWeight:900,opacity:0.7,flexWrap:'wrap'}}>
+        <span><span style={{display:'inline-block',width:9,height:9,background:conf.accent,marginRight:3,verticalAlign:'middle',borderRadius:2,border:'1px solid #191923'}}></span>Jour</span>
+        <span><span style={{display:'inline-block',width:9,height:9,background:'#005FFF',marginRight:3,verticalAlign:'middle',borderRadius:2,border:'1px solid #191923'}}></span>J-7</span>
+        <span><span style={{display:'inline-block',width:9,height:9,background:'#191923',marginRight:3,verticalAlign:'middle',borderRadius:2,border:'1px solid #FFEB5A'}}></span>Veille</span>
       </div>
     </div>
   )
