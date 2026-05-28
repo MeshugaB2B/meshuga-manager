@@ -30,9 +30,9 @@ body{font-family:'Arial Narrow',Arial,sans-serif;background:#FFEB5A;color:#19192
 .sb-logo-b2b{font-family:'Yellowtail',cursive;font-size:12px;color:#FF82D7;margin-top:1px}
 .sb-nav{padding:6px 7px;flex:1;overflow-y:auto}
 .sb-sec{font-family:'Yellowtail',cursive;font-size:14px;color:#FF82D7;padding:6px 8px 2px;margin-top:4px}
-.ni{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:5px;cursor:pointer;font-size:13px;font-weight:700;letter-spacing:0;color:#191923;border:1.5px solid transparent;transition:all .1s;margin-bottom:0}
+.ni{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:5px;cursor:pointer;font-size:13px;font-weight:600;letter-spacing:0;color:#52525C;border:1.5px solid transparent;transition:all .1s;margin-bottom:0}
 .ni:hover{background:#FFEB5A;color:#191923;border-color:#191923}
-.ni.active{background:#FF82D7;color:#FFFFFF;border-color:#191923;font-weight:900}
+.ni.active{background:#FF82D7;color:#FFFFFF;border-color:#191923;font-weight:800}
 .ni .ni-ico{font-size:15px;flex-shrink:0}
 .nb{background:#191923;color:#FFEB5A;font-size:10px;font-weight:900;padding:1px 6px;border-radius:9px;margin-left:auto;border:1.5px solid #191923}
 .sb-user{padding:9px 9px;border-top:2px solid #191923;display:flex;align-items:center;gap:7px}
