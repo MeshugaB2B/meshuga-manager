@@ -123,6 +123,7 @@ export default function FloatingChat(props) {
       <button
         onClick={function() { setOpen(true) }}
         aria-label="Ouvrir la messagerie"
+        className="floating-chat-btn"
         style={{
           position:'fixed', bottom:24, right:24,
           width:60, height:60, borderRadius:'50%',
@@ -154,7 +155,7 @@ export default function FloatingChat(props) {
 
   // === OUVERT : panel chat ===
   return (
-    <div style={{
+    <div className="floating-chat-panel" style={{
       position:'fixed', bottom:24, right:24,
       width:360, height:520,
       background:'#FFFFFF', border:'3px solid #191923', borderRadius:12,
