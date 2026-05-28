@@ -23,6 +23,7 @@ import Sidebar from './Sidebar'
 import FloatingChat from './FloatingChat'
 import TasksTab from './TasksTab'
 import CrmTab from './CrmTab'
+import ProspectionTab from './ProspectionTab'
 import { G } from './styles'
 import { LOGO_PINK, LOGO_YELLOW, STAMP_YELLOW, STAMP_PINK } from './logos'
 import {
@@ -665,6 +666,40 @@ function DashboardImpl() {
     var w=window.open('','_blank'); w.document.write(html); w.document.close(); w.focus()
   }
 
+  function sendChasseToCrm(pros) {
+    if (!pros) return
+    var today = new Date().toISOString().split('T')[0]
+    var rel = new Date(); rel.setDate(rel.getDate() + 3)
+    var relStr = rel.toISOString().split('T')[0]
+    var alreadyInCrm = prospects.find(function(p) { return p.name === pros.name })
+    if (alreadyInCrm) {
+      setProspects(function(prev) { return prev.map(function(p) { return p.name === pros.name ? Object.assign({}, p, {status: 'nego', temperature: 'chaud'}) : p }) })
+      toast('Déjà dans le CRM — passé en négo')
+      return
+    }
+    var newProspect = {
+      id: 'crm-' + pros.id + '-' + Date.now(),
+      name: pros.name,
+      email: pros.contact_email && pros.contact_email !== '—' ? pros.contact_email : '',
+      phone: pros.contact_phone && pros.contact_phone !== '—' ? pros.contact_phone : '',
+      size: pros.taille || '',
+      category: (pros.cat && pros.cat.charAt(0).toUpperCase() + pros.cat.slice(1)) || 'Autre',
+      status: 'nego',
+      temperature: 'chaud',
+      nextDate: relStr,
+      nextAction: 'Envoyer le devis',
+      notes: pros.pitch || '',
+      ca: Number(pros.vm) || 0,
+      estimated_monthly_revenue: Number(pros.vm) || 0,
+      score: pros.score || 5,
+      files: [],
+      chasseId: pros.id,
+      contactedDate: today,
+    }
+    setProspects(function(prev) { return prev.concat([newProspect]) })
+    logActivity('prospect_contacte', 'Lead envoyé au CRM : ' + pros.name, pros.name, null)
+  }
+
   function contactProspect(id) {
     var pros = chasse.find(function(x) { return x.id === id })
     var today = new Date().toISOString().split('T')[0]
@@ -885,7 +920,7 @@ function DashboardImpl() {
   const NAV = [
     {id: 'pilotage', label: '📊 Pilotage', icon: '📊'},
     {id: 'dash', label: 'Dashboard', icon: '⚡'},
-    {id: 'chasse', label: 'Tableau de chasse', icon: '🎯'},
+    {id: 'chasse', label: 'Prospection', icon: '🔍'},
     {id: 'crm', label: 'CRM Prospects', icon: '◎'},
     {id: 'devis', label: 'Devis', icon: '📄'},
     {id: 'annuaire', label: 'Annuaire', icon: '📒'},
@@ -953,89 +988,14 @@ function DashboardImpl() {
           {page === 'dash' && <HomeOverviewTab profile={profile} isEmy={isEmy} tasks={tasks} nav={nav} toast={toast} openModal={openModal} />}
 
           {page === 'chasse' && (
-            <div>
-              <div className="ph">
-                <div>
-                  <div className="pt">Tableau de Chasse 🎯</div>
-                  <div className="ps">{chasse.filter(function(p) { return p.status === 'to_contact' }).length} a contacter · {chasse.length} total</div>
-                </div>
-                <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-                  {isEmy && <span style={{fontWeight:900,fontSize:11}}>{contactedToday}/5 auj.</span>}
-                </div>
-              </div>
-              <div style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
-                <input className="inp" style={{flex:1,minWidth:140}} value={chasseSearch} onChange={function(e) { setChasseSearch(e.target.value) }} placeholder="Rechercher..." />
-                <select className="inp" style={{width:130}} value={chasseSort} onChange={function(e) { setChasseSort(e.target.value) }}>
-                  <option value="score">Score</option>
-                  <option value="valeur">Valeur</option>
-                  <option value="name">A-Z</option>
-                </select>
-                <select className="inp" style={{width:130}} value={chasseStatus} onChange={function(e) { setChasseStatus2(e.target.value) }}>
-                  <option value="all">Tous statuts</option>
-                  <option value="to_contact">A contacter</option>
-                  <option value="contacted">Contacte</option>
-                  <option value="nego">Nego</option>
-                  <option value="won">Gagne</option>
-                  <option value="lost">Perdu</option>
-                </select>
-              </div>
-              <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:10}}>
-                {Object.keys(CATS_MAP).map(function(k) {
-                  return (
-                    <div key={k} className={chasseCat === k ? 'tag on' : 'tag'} onClick={function() { setChasseChasse(k) }}>
-                      {CATS_MAP[k].emoji} {CATS_MAP[k].label}
-                    </div>
-                  )
-                })}
-              </div>
-              {chasseFiltered.map(function(p) {
-                return (
-                  <div key={p.id} className="chasse-card">
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8,gap:10}}>
-                      <div style={{flex:1}}>
-                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:4}}>
-                          <span style={{fontSize:9,fontWeight:900,textTransform:'uppercase',padding:'2px 6px',border:'1.5px solid #191923',borderRadius:3,background:'#FFEB5A'}}>{CATS_MAP[p.cat] ? CATS_MAP[p.cat].emoji+' '+CATS_MAP[p.cat].label : p.cat}</span>
-                          <span style={{fontSize:9,fontWeight:900,background:p.score>=9?'#191923':'#EBEBEB',color:p.score>=9?'#FFEB5A':'#191923',border:'1.5px solid #191923',borderRadius:3,padding:'2px 6px'}}>{p.score}/10</span>
-                          {p.status !== 'to_contact' && <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>}
-                        </div>
-                        <div style={{fontWeight:900,fontSize:15}}>{p.name}</div>
-                        <div style={{fontSize:11,opacity:.5}}>{p.arrondissement} · {p.taille} emp.</div>
-                      </div>
-                      <div style={{textAlign:'right',flexShrink:0}}>
-                        {p.valeur_event > 0 && <div style={{fontWeight:900,fontSize:13}}>~{p.valeur_event.toLocaleString()}€/event</div>}
-                        {p.valeur_mois > 0 && <div style={{fontWeight:900,fontSize:13}}>~{p.valeur_mois.toLocaleString()}€/mois</div>}
-                      </div>
-                    </div>
-                    <div style={{background:'#FFEB5A',border:'1.5px solid #191923',borderRadius:5,padding:'8px 10px',marginBottom:8,fontSize:12}}>
-                      💡 {p.pitch}
-                    </div>
-                    <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:11,marginBottom:8,opacity:.7}}>
-                      {p.email && <span>✉️ {p.email}</span>}
-                      {p.phone && <span>📞 {p.phone}</span>}
-                      {p.site && <a href={'https://'+p.site} target="_blank" rel="noopener noreferrer" style={{color:'#005FFF',textDecoration:'none'}}>🌐 {p.site}</a>}
-                      {p.linkedin && <a href={p.linkedin.indexOf('http') === 0 ? p.linkedin : 'https://'+p.linkedin} target="_blank" rel="noopener noreferrer" style={{color:'#0077B5',fontWeight:900,textDecoration:'none'}}>🔗 LinkedIn</a>}
-                    </div>
-                    <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-                      <button className="btn btn-p btn-sm" onClick={function() { generateEmail(p) }}>✉️ Email IA</button>
-                      <button className="btn btn-sm" style={{fontSize:10,background:'#FFEB5A',border:'2px solid #191923'}} onClick={function() { openModal('editChasse', Object.assign({},p)) }}>✏️ Modifier</button>
-                      {p.status === 'to_contact' && <button className="btn btn-g btn-sm" onClick={function() { contactProspect(p.id) }}>📞 Contacté</button>}
-                      {p.status === 'contacted' && (
-                        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                          {(!p.relanceStatut || p.relanceStatut === 'en_attente') && <button className="btn btn-sm" style={{background:'#005FFF',color:'#fff',fontSize:11}} onClick={function() { relanceProspect(p.id) }}>↩ Relancer</button>}
-                          {p.relanceStatut === 'relance' && <span style={{fontSize:9,fontWeight:900,padding:'3px 7px',background:'#FF6B2B',color:'#fff',borderRadius:3}}>↩ Relancé</span>}
-                          <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function() { reponseProspect(p.id,'interesse') }}>✅ Intéressé</button>
-                          <button className="btn btn-sm" style={{background:'#FF6B2B',color:'#fff',fontSize:10}} onClick={function() { reponseProspect(p.id,'rappeler') }}>📞 Rappeler</button>
-                          <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function() { reponseProspect(p.id,'lost') }}>✗ Non</button>
-                        </div>
-                      )}
-                      {p.status === 'nego' && <button className="btn btn-g btn-sm" onClick={function() { setChasse(function(prev) { return prev.map(function(x) { return x.id===p.id ? Object.assign({},x,{status:'won'}) : x }) }); sendPushToAll('🏆 Prospect gagné !', p.name + ' rejoint la liste clients !', 'all'); toast('🎉 Gagné!') }}>🏆 Gagné!</button>}
-                      {p.status === 'won' && <span style={{fontSize:9,fontWeight:900,padding:'3px 8px',background:'#009D3A',color:'#fff',borderRadius:3}}>🏆 Client</span>}
-                    </div>
-                    {p.lastAction && <div style={{fontSize:9,opacity:.45,marginTop:4,fontStyle:'italic'}}>{'→ '+p.lastAction+(p.relanceDate?' · relance '+p.relanceDate:'')}</div>}
-                  </div>
-                )
-              })}
-            </div>
+            <ProspectionTab
+              generateEmail={generateEmail}
+              toast={toast}
+              sendPushToAll={sendPushToAll}
+              nav={nav}
+              isEmy={isEmy}
+              onSendToCrm={sendChasseToCrm}
+            />
           )}
 
           {page === 'crm' && (
@@ -1956,7 +1916,7 @@ function DashboardImpl() {
         <div className="mms-sec">Commercial B2B</div>
         <div className="mms-grid">
           <div className={page === "crm" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("crm"); setMenuOpen(false) }}><div className="mms-tile-ico">{"◎"}</div><div className="mms-tile-lbl">CRM</div></div>
-          <div className={page === "chasse" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("chasse"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🎯"}</div><div className="mms-tile-lbl">Chasse</div></div>
+          <div className={page === "chasse" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("chasse"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔍"}</div><div className="mms-tile-lbl">Prospection</div></div>
           <div className={page === "devis" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("devis"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📄"}</div><div className="mms-tile-lbl">Devis</div></div>
           {!isEmy && <div className={page === "reporting" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("reporting"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📋"}</div><div className="mms-tile-lbl">Reporting</div></div>}
         </div>
