@@ -647,26 +647,38 @@ export default function FoodCostTab(props) {
             {showKPIs && (
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:18}}>
                 <div style={{background:'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
-                  <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>Food cost moyen</div>
-                  <div style={{fontSize:30,fontWeight:900,color:kpis.avg>fcSeuil?'#CC0066':'#009D3A',lineHeight:1.1,marginTop:4}}>{kpis.avg.toFixed(1)}<span style={{fontSize:16}}>%</span></div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <span style={{width:9,height:9,borderRadius:'50%',background:kpis.avg>fcSeuil?'var(--p)':'#009D3A',flexShrink:0}}></span>
+                    <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>Food cost moyen</div>
+                  </div>
+                  <div style={{fontSize:30,fontWeight:900,color:kpis.avg>fcSeuil?'var(--p)':'#009D3A',lineHeight:1.1,marginTop:4}}>{kpis.avg.toFixed(1)}<span style={{fontSize:16}}>%</span></div>
                 </div>
-                <div style={{background:kpis.alerts.length>0?'#FFE5E5':'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid '+(kpis.alerts.length>0?'#CC0066':'#191923'),boxShadow:'3px 3px 0 '+(kpis.alerts.length>0?'#CC0066':'#191923')}}>
-                  <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>⚠️ En alerte ({fcSeuil}%+)</div>
-                  <div style={{fontSize:30,fontWeight:900,color:kpis.alerts.length>0?'#CC0066':'#009D3A',lineHeight:1.1,marginTop:4}}>{kpis.alerts.length}</div>
-                  <div style={{fontSize:9,opacity:.55,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{kpis.alerts.length>0?kpis.alerts.slice(0,2).map(function(v){return v.name}).join(' · '):'Tout est OK ✅'}</div>
+                <div style={{background:'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <span style={{width:9,height:9,borderRadius:'50%',background:kpis.alerts.length>0?'var(--p)':'#009D3A',flexShrink:0}}></span>
+                    <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>À surveiller</div>
+                  </div>
+                  <div style={{fontSize:30,fontWeight:900,color:kpis.alerts.length>0?'var(--p)':'#009D3A',lineHeight:1.1,marginTop:4}}>{kpis.alerts.length}</div>
+                  <div style={{fontSize:9,opacity:.55,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',fontWeight:700}}>{kpis.alerts.length>0?kpis.alerts.slice(0,2).map(function(v){return v.name}).join(' · '):'Tout est OK ✅'}</div>
                 </div>
                 {kpis.best && (
-                  <div style={{background:'var(--y)',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
-                    <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.7,letterSpacing:.5}}>🏆 Meilleure marge</div>
+                  <div style={{background:'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                      <span style={{fontSize:11,lineHeight:1}}>🏆</span>
+                      <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>Meilleure marge</div>
+                    </div>
                     <div style={{fontSize:14,fontWeight:900,lineHeight:1.15,marginTop:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{kpis.best.name}</div>
-                    <div style={{fontSize:11,opacity:.7,marginTop:2,fontWeight:700}}>{kpis.best.food_cost_pct}% FC · {fmt(kpis.best.marge_ht)}€</div>
+                    <div style={{fontSize:11,marginTop:2,fontWeight:700,color:'#009D3A'}}>{fmt(kpis.best.marge_ht)}€ · {kpis.best.food_cost_pct}% FC</div>
                   </div>
                 )}
                 {kpis.worst && (
                   <div style={{background:'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
-                    <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>📊 Plus chargée</div>
+                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                      <span style={{fontSize:11,lineHeight:1}}>📊</span>
+                      <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>Plus chargée</div>
+                    </div>
                     <div style={{fontSize:14,fontWeight:900,lineHeight:1.15,marginTop:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{kpis.worst.name}</div>
-                    <div style={{fontSize:11,marginTop:2,fontWeight:700,color:kpis.worst.food_cost_pct>fcSeuil?'#CC0066':'#555'}}>{kpis.worst.food_cost_pct}% FC</div>
+                    <div style={{fontSize:11,marginTop:2,fontWeight:700,color:kpis.worst.food_cost_pct>fcSeuil?'var(--p)':'#555'}}>{kpis.worst.food_cost_pct}% FC</div>
                   </div>
                 )}
               </div>
