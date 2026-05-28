@@ -333,37 +333,75 @@ function DashboardImpl() {
     }
     setPushLoading(true)
     navigator.serviceWorker.register('/sw.js').then(function(reg) {
+      // Attendre que le SW soit prêt (évite les états intermédiaires)
+      return navigator.serviceWorker.ready.then(function() { return reg })
+    }).then(function(reg) {
       return Notification.requestPermission().then(function(perm) {
         if (perm !== 'granted') { toast('Notifications refusées'); setPushLoading(false); return }
-        return reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        // 1. Révoquer toute souscription existante (évite la réutilisation fantôme)
+        return reg.pushManager.getSubscription().then(function(existing) {
+          var cleanup = existing ? existing.unsubscribe().catch(function(){ return null }) : Promise.resolve(null)
+          return cleanup.then(function() {
+            // 2. Créer une souscription neuve
+            return reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+            })
+          })
         }).then(function(sub) {
+          // 3. Enregistrer en base — on attend vraiment la réponse
+          var subJson = sub.toJSON()
           return fetch('/api/push-subscribe', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-              subscription: sub.toJSON(),
+              subscription: subJson,
               userRole: (profile && profile.role) || 'edward',
               userName: (profile && profile.full_name) || ''
             })
           }).then(function(res) {
-            if (res.ok) { setPushEnabled(true); toast('🔔 Notifications activées !') }
-            setPushLoading(false)
+            return res.json().then(function(data) {
+              if (res.ok && data && data.ok) {
+                setPushEnabled(true)
+                toast('🔔 Notifications activées !')
+              } else {
+                toast('Erreur enregistrement: ' + ((data && data.error) || res.status))
+              }
+              setPushLoading(false)
+            })
           })
         })
       })
-    }).catch(function(e) { toast('Erreur: ' + (e.message||e)); setPushLoading(false) })
+    }).catch(function(e) {
+      console.error('registerPush error:', e)
+      toast('Erreur push: ' + (e.message || e))
+      setPushLoading(false)
+    })
   }
 
   function unregisterPush() {
+    setPushLoading(true)
     navigator.serviceWorker.getRegistration('/sw.js').then(function(reg) {
-      if (!reg) { setPushEnabled(false); toast('Notifications désactivées'); return }
-      reg.pushManager.getSubscription().then(function(sub) {
-        if (!sub) { setPushEnabled(false); toast('Notifications désactivées'); return }
-        fetch('/api/push-subscribe', {method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})})
-        sub.unsubscribe().then(function() { setPushEnabled(false); toast('Notifications désactivées') })
+      if (!reg) { setPushEnabled(false); setPushLoading(false); toast('Notifications désactivées'); return }
+      return reg.pushManager.getSubscription().then(function(sub) {
+        if (!sub) { setPushEnabled(false); setPushLoading(false); toast('Notifications désactivées'); return }
+        // Supprimer en base PUIS désinscrire le navigateur
+        return fetch('/api/push-subscribe', {
+          method: 'DELETE',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({endpoint: sub.endpoint})
+        }).then(function() {
+          return sub.unsubscribe()
+        }).then(function() {
+          setPushEnabled(false)
+          setPushLoading(false)
+          toast('Notifications désactivées')
+        })
       })
+    }).catch(function(e) {
+      console.error('unregisterPush error:', e)
+      setPushEnabled(false)
+      setPushLoading(false)
     })
   }
 
