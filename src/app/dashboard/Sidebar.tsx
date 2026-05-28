@@ -308,26 +308,24 @@ export default function Sidebar(props) {
       </nav>
 
       {/* Footer user */}
-      <div className="sb-user" style={{flexDirection:'column',alignItems:'stretch',gap:6,padding:'8px 8px 12px'}}>
-        <div style={{display:'flex',alignItems:'center',gap:6}}>
-          <div className="sb-avatar">{avatarLetter}</div>
-          <div style={{minWidth:0,flex:1}}>
-            <div className="sb-uname" style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{userName}</div>
-            <div className="yt sb-urole" style={{color:'#FF82D7',opacity:0.8}}>{roleLabel}</div>
-          </div>
+      <div className="sb-user" style={{display:'flex',alignItems:'center',gap:8}}>
+        <div className="sb-avatar">{avatarLetter}</div>
+        <div style={{minWidth:0,flex:1}}>
+          <div className="sb-uname" style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{userName}</div>
+          <div className="yt sb-urole" style={{color:'#FF82D7',opacity:0.8}}>{roleLabel}</div>
         </div>
         <button
-          className="btn btn-sm"
-          style={{width:'100%',justifyContent:'center',background:pushEnabled?'#009D3A':'#FFFFFF',color:pushEnabled?'#FFFFFF':'#191923',opacity:pushLoading?0.6:1}}
+          title={pushEnabled ? 'Notifications activées' : 'Activer les notifications'}
           onClick={pushEnabled?unregisterPush:registerPush}
-          disabled={pushLoading}>
-          {pushLoading ? '⏳' : (pushEnabled ? '🔔 Notifs ON' : '🔕 Notifs OFF')}
+          disabled={pushLoading}
+          style={{width:30,height:30,flexShrink:0,borderRadius:'50%',border:'2px solid #191923',background:pushEnabled?'#009D3A':'#FFFFFF',cursor:pushLoading?'default':'pointer',fontSize:13,lineHeight:1,display:'flex',alignItems:'center',justifyContent:'center',opacity:pushLoading?0.5:1,padding:0}}>
+          {pushLoading ? '⏳' : (pushEnabled ? '🔔' : '🔕')}
         </button>
         <button
-          className="btn btn-sm"
-          style={{width:'100%',justifyContent:'center',background:'#191923',color:'#FFEB5A',opacity:0.85}}
-          onClick={onLogout}>
-          ↩ Déconnexion
+          title="Déconnexion"
+          onClick={onLogout}
+          style={{width:30,height:30,flexShrink:0,borderRadius:'50%',border:'2px solid #191923',background:'#191923',color:'#FFEB5A',cursor:'pointer',fontSize:14,lineHeight:1,display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>
+          ↩
         </button>
       </div>
     </div>
