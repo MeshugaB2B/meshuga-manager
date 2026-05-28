@@ -976,7 +976,6 @@ function DashboardImpl() {
           />
 
         <div className="main">
-          <div className="strip" />
 
           {page === 'pilotage' && (
             <PilotageTab toast={toast} />
