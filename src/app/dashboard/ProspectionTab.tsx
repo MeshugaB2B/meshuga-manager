@@ -83,6 +83,9 @@ export default function ProspectionTab(props) {
   var [genCount, setGenCount] = useState(15)
   var [genLoading, setGenLoading] = useState(false)
 
+  // Modal fiche
+  var [editLead, setEditLead] = useState(null)
+
   useEffect(function(){ loadLeads() }, [])
 
   function loadLeads() {
@@ -119,6 +122,13 @@ export default function ProspectionTab(props) {
   function patchLead(id, patch) {
     setLeads(function(prev){ return prev.map(function(x){ return x.id === id ? Object.assign({}, x, patch) : x }) })
     sb().from('chasse_prospects').update(patch).eq('id', id).then(function(){})
+  }
+  function saveLead(id, fields) {
+    setLeads(function(prev){ return prev.map(function(x){ return x.id === id ? Object.assign({}, x, fields) : x }) })
+    sb().from('chasse_prospects').update(fields).eq('id', id).then(function(r){
+      if (r.error) { toast('Erreur sauvegarde : ' + r.error.message) }
+      else { toast('Fiche enregistrée ✓'); setEditLead(null) }
+    })
   }
   function markContacted(p) {
     var rel = new Date(); rel.setDate(rel.getDate() + 7)
@@ -269,6 +279,7 @@ export default function ProspectionTab(props) {
         <div className="g-cards">
           {filtered.map(function(p){
             return <LeadCard key={p.id} p={p}
+              onOpen={function(){ setEditLead(p) }}
               onEmail={function(){ generateEmail(p) }}
               onContacted={function(){ markContacted(p) }}
               onRelance={function(){ relance(p) }}
@@ -282,6 +293,16 @@ export default function ProspectionTab(props) {
       )}
 
       <style>{'.g-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}@media(max-width:520px){.g-cards{grid-template-columns:1fr}}'}</style>
+
+      {/* ===== MODAL FICHE ÉDITABLE ===== */}
+      {editLead && (
+        <LeadModal
+          lead={editLead}
+          onClose={function(){ setEditLead(null) }}
+          onSave={function(fields){ saveLead(editLead.id, fields) }}
+          onSendCrm={onSendToCrm ? function(){ sendToCrm(editLead); setEditLead(null) } : null}
+        />
+      )}
     </div>
   )
 }
@@ -330,44 +351,55 @@ function LeadCard(props) {
 
   return (
     <div style={{background:'#FFFFFF',border:'2px solid '+NOIR,borderRadius:9,padding:14,boxShadow:'3px 3px 0 '+NOIR,display:'flex',flexDirection:'column',gap:10}}>
-      {/* Ligne badges */}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
-        <span style={{fontSize:9,fontWeight:900,textTransform:'uppercase',padding:'3px 8px',border:'2px solid '+NOIR,borderRadius:4,background:JAUNE}}>{cat.emoji} {cat.label}</span>
-        <div style={{display:'flex',gap:4,alignItems:'center',flexShrink:0}}>
-          <span style={{fontSize:11,fontWeight:900,background:scoreHot?ROSE:'#EBEBEB',color:scoreHot?'#FFFFFF':NOIR,border:'2px solid '+NOIR,borderRadius:4,padding:'2px 7px'}}>{p.score}/10</span>
-          {p.status !== 'to_contact' && <span style={{fontSize:9,fontWeight:900,color:STATUS_COLORS[p.status],border:'1.5px solid '+STATUS_COLORS[p.status],borderRadius:10,padding:'2px 7px'}}>{STATUS_LABELS[p.status]}</span>}
+      {/* --- Zone cliquable (ouvre la fiche) --- */}
+      <div onClick={props.onOpen} style={{cursor:'pointer',display:'flex',flexDirection:'column',gap:10}}>
+        {/* Ligne badges */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+          <span style={{fontSize:9,fontWeight:900,textTransform:'uppercase',padding:'3px 8px',border:'2px solid '+NOIR,borderRadius:4,background:JAUNE}}>{cat.emoji} {cat.label}</span>
+          <div style={{display:'flex',gap:4,alignItems:'center',flexShrink:0}}>
+            <span style={{fontSize:11,fontWeight:900,background:scoreHot?ROSE:'#EBEBEB',color:scoreHot?'#FFFFFF':NOIR,border:'2px solid '+NOIR,borderRadius:4,padding:'2px 7px'}}>{p.score}/10</span>
+            {p.status !== 'to_contact' && <span style={{fontSize:9,fontWeight:900,color:STATUS_COLORS[p.status],border:'1.5px solid '+STATUS_COLORS[p.status],borderRadius:10,padding:'2px 7px'}}>{STATUS_LABELS[p.status]}</span>}
+          </div>
         </div>
+
+        {/* Nom + meta */}
+        <div>
+          <div style={{fontWeight:900,fontSize:16,lineHeight:1.15}}>{p.name}</div>
+          <div style={{fontSize:11,opacity:0.5,marginTop:2,fontWeight:600}}>{p.arr}{p.taille?' · '+p.taille+' emp.':''}</div>
+        </div>
+
+        {/* Décideur (si renseigné) */}
+        {p.contact_name && p.contact_name !== '—' && (
+          <div style={{fontSize:11,fontWeight:700}}>
+            👤 {p.contact_name}{p.contact_role && p.contact_role !== '—' ? ' · ' + p.contact_role : ''}
+          </div>
+        )}
+
+        {/* Valeurs */}
+        {(p.ve > 0 || p.vm > 0) && (
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {p.ve > 0 && <span style={{fontSize:12,fontWeight:900,color:VERT}}>~{Number(p.ve).toLocaleString('fr-FR')}€/event</span>}
+            {p.vm > 0 && <span style={{fontSize:12,fontWeight:900,color:VERT}}>~{Number(p.vm).toLocaleString('fr-FR')}€/mois</span>}
+          </div>
+        )}
+
+        {/* Pitch */}
+        {p.pitch && <div style={{background:JAUNE,border:'2px solid '+NOIR,borderRadius:6,padding:'8px 10px',fontSize:12,lineHeight:1.4}}>💡 {p.pitch}</div>}
+
+        {/* Dernière action */}
+        {p.last_action && <div style={{fontSize:9,opacity:0.45,fontStyle:'italic'}}>→ {p.last_action}{p.relance_date?' · relance '+p.relance_date:''}</div>}
       </div>
 
-      {/* Nom + meta */}
-      <div>
-        <div style={{fontWeight:900,fontSize:16,lineHeight:1.15}}>{p.name}</div>
-        <div style={{fontSize:11,opacity:0.5,marginTop:2,fontWeight:600}}>{p.arr}{p.taille?' · '+p.taille+' emp.':''}</div>
-      </div>
-
-      {/* Valeurs */}
-      {(p.ve > 0 || p.vm > 0) && (
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-          {p.ve > 0 && <span style={{fontSize:12,fontWeight:900,color:VERT}}>~{Number(p.ve).toLocaleString('fr-FR')}€/event</span>}
-          {p.vm > 0 && <span style={{fontSize:12,fontWeight:900,color:VERT}}>~{Number(p.vm).toLocaleString('fr-FR')}€/mois</span>}
-        </div>
-      )}
-
-      {/* Pitch */}
-      {p.pitch && <div style={{background:JAUNE,border:'2px solid '+NOIR,borderRadius:6,padding:'8px 10px',fontSize:12,lineHeight:1.4}}>💡 {p.pitch}</div>}
-
-      {/* Contacts */}
+      {/* Contacts (cliquables vers mail/tel, hors zone d'ouverture) */}
       <div style={{display:'flex',gap:8,flexWrap:'wrap',fontSize:11,opacity:0.75}}>
         {p.contact_email && p.contact_email !== '—' && <a href={'mailto:'+p.contact_email} style={{color:NOIR,textDecoration:'none'}}>✉️ {p.contact_email}</a>}
         {p.contact_phone && p.contact_phone !== '—' && <a href={'tel:'+p.contact_phone} style={{color:NOIR,textDecoration:'none'}}>📞 {p.contact_phone}</a>}
         {siteUrl && <a href={siteUrl} target="_blank" rel="noopener noreferrer" style={{color:BLEU,textDecoration:'none',fontWeight:700}}>🌐 Site</a>}
       </div>
 
-      {/* Dernière action */}
-      {p.last_action && <div style={{fontSize:9,opacity:0.45,fontStyle:'italic'}}>→ {p.last_action}{p.relance_date?' · relance '+p.relance_date:''}</div>}
-
       {/* Actions */}
-      <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:'auto',paddingTop:4}}>
+      <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:'auto',paddingTop:4,borderTop:'1px solid #EEE'}}>
+        <button className="btn btn-sm" style={{fontSize:10,fontWeight:900,background:'#FFF',border:'2px solid '+NOIR}} onClick={props.onOpen}>✏️ Fiche</button>
         <button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={props.onEmail}>✉️ Email IA</button>
         {p.status === 'to_contact' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={props.onContacted}>📞 Contacté</button>}
         {p.status === 'contacted' && (
@@ -378,15 +410,185 @@ function LeadCard(props) {
             <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){ props.onReponse('lost') }}>✗ Non</button>
           </span>
         )}
-        {p.status === 'nego' && (
-          <span style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-            {props.onSendCrm && !p.sent_to_crm && <button className="btn btn-sm" style={{background:ROSE,color:'#fff',fontSize:10,fontWeight:900}} onClick={props.onSendCrm}>→ Envoyer au CRM</button>}
-            <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={props.onWon}>🏆 Gagné</button>
-          </span>
+        {p.status === 'nego' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={props.onWon}>🏆 Gagné</button>}
+        {/* Bouton CRM : visible tant que pas déjà envoyé, gagné ou perdu */}
+        {props.onSendCrm && !p.sent_to_crm && p.status !== 'won' && p.status !== 'lost' && (
+          <button className="btn btn-sm" style={{background:ROSE,color:'#fff',fontSize:10,fontWeight:900}} onClick={props.onSendCrm}>→ CRM</button>
         )}
         {p.sent_to_crm && p.status !== 'won' && <span style={{fontSize:9,fontWeight:900,padding:'3px 8px',background:'#EBF3FF',color:BLEU,border:'1.5px solid '+BLEU,borderRadius:10}}>↗ Dans le CRM</span>}
         {p.status === 'won' && <span style={{fontSize:9,fontWeight:900,padding:'3px 8px',background:'#F0FFF4',color:VERT,border:'1.5px solid '+VERT,borderRadius:10}}>🏆 Client</span>}
         <button className="btn btn-sm btn-red" style={{fontSize:10,marginLeft:'auto'}} onClick={props.onDelete} title="Supprimer">✕</button>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// MODAL FICHE ÉDITABLE
+// =============================================================================
+
+function LeadModal(props) {
+  var lead = props.lead
+  var [f, setF] = useState({
+    name: lead.name || '',
+    cat: lead.cat || 'evenementiel',
+    score: lead.score || 5,
+    status: lead.status || 'to_contact',
+    contact_name: lead.contact_name && lead.contact_name !== '—' ? lead.contact_name : '',
+    contact_role: lead.contact_role && lead.contact_role !== '—' ? lead.contact_role : '',
+    contact_email: lead.contact_email && lead.contact_email !== '—' ? lead.contact_email : '',
+    contact_phone: lead.contact_phone && lead.contact_phone !== '—' ? lead.contact_phone : '',
+    site: lead.site && lead.site !== '—' ? lead.site : '',
+    arr: lead.arr || '',
+    adresse: lead.adresse || '',
+    taille: lead.taille || '',
+    type: lead.type || '',
+    ve: lead.ve || 0,
+    vm: lead.vm || 0,
+    pitch: lead.pitch || '',
+    notes: lead.notes || ''
+  })
+
+  function set(k, v) { setF(function(prev){ var n = Object.assign({}, prev); n[k] = v; return n }) }
+
+  function handleSave() {
+    props.onSave({
+      name: f.name, cat: f.cat, score: parseInt(f.score) || 5, status: f.status,
+      contact_name: f.contact_name || '—', contact_role: f.contact_role || '—',
+      contact_email: f.contact_email || '—', contact_phone: f.contact_phone || '—',
+      site: f.site || '—', arr: f.arr, adresse: f.adresse, taille: f.taille,
+      type: f.type, ve: parseInt(f.ve) || 0, vm: parseInt(f.vm) || 0,
+      pitch: f.pitch, notes: f.notes, updated_at: new Date().toISOString()
+    })
+  }
+
+  var lblStyle = { fontSize:10, fontWeight:900, textTransform:'uppercase', letterSpacing:0.3, opacity:0.6, display:'block', marginBottom:3 }
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(25,25,35,.6)',zIndex:300,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'20px',overflowY:'auto'}} onClick={props.onClose}>
+      <div style={{background:'#FFFFFF',borderRadius:12,width:'100%',maxWidth:560,border:'3px solid '+NOIR,boxShadow:'5px 5px 0 '+NOIR,marginTop:20,marginBottom:40}} onClick={function(e){ e.stopPropagation() }}>
+
+        {/* En-tête */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',borderBottom:'2px solid '+NOIR,position:'sticky',top:0,background:'#FFF7FC',borderRadius:'9px 9px 0 0'}}>
+          <div style={{fontFamily:"'Yellowtail',cursive",fontSize:24,color:ROSE,lineHeight:1}}>Fiche prospect</div>
+          <button style={{background:'#FFFFFF',border:'2px solid '+NOIR,borderRadius:'50%',width:32,height:32,cursor:'pointer',fontWeight:900}} onClick={props.onClose}>✕</button>
+        </div>
+
+        <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
+
+          {/* Entreprise */}
+          <div>
+            <label style={lblStyle}>Nom de l&apos;entreprise</label>
+            <input className="inp" value={f.name} onChange={function(e){ set('name', e.target.value) }} style={{width:'100%',fontWeight:900,fontSize:15}} />
+          </div>
+
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+            <div style={{flex:'1 1 160px'}}>
+              <label style={lblStyle}>Catégorie</label>
+              <select className="inp" value={f.cat} onChange={function(e){ set('cat', e.target.value) }} style={{width:'100%'}}>
+                {Object.keys(CATS).filter(function(k){ return k!=='all' }).map(function(k){ return <option key={k} value={k}>{CATS[k].emoji + ' ' + CATS[k].label}</option> })}
+              </select>
+            </div>
+            <div style={{flex:'0 0 80px'}}>
+              <label style={lblStyle}>Score</label>
+              <select className="inp" value={f.score} onChange={function(e){ set('score', e.target.value) }} style={{width:'100%'}}>
+                {[1,2,3,4,5,6,7,8,9,10].map(function(n){ return <option key={n} value={n}>{n}/10</option> })}
+              </select>
+            </div>
+            <div style={{flex:'1 1 140px'}}>
+              <label style={lblStyle}>Statut</label>
+              <select className="inp" value={f.status} onChange={function(e){ set('status', e.target.value) }} style={{width:'100%'}}>
+                <option value="to_contact">À contacter</option>
+                <option value="contacted">Contacté</option>
+                <option value="nego">En négo</option>
+                <option value="won">Gagné</option>
+                <option value="lost">Perdu</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Bloc décideur — mis en avant */}
+          <div style={{background:'#FFF7FC',border:'2px solid '+ROSE,borderRadius:8,padding:'14px'}}>
+            <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:0.5,marginBottom:10,color:ROSE}}>👤 Le décideur</div>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+              <div style={{flex:'1 1 180px'}}>
+                <label style={lblStyle}>Prénom &amp; nom</label>
+                <input className="inp" value={f.contact_name} onChange={function(e){ set('contact_name', e.target.value) }} placeholder="Marie Dupont" style={{width:'100%'}} />
+              </div>
+              <div style={{flex:'1 1 160px'}}>
+                <label style={lblStyle}>Rôle / poste</label>
+                <input className="inp" value={f.contact_role} onChange={function(e){ set('contact_role', e.target.value) }} placeholder="Office Manager" style={{width:'100%'}} />
+              </div>
+            </div>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:10}}>
+              <div style={{flex:'1 1 180px'}}>
+                <label style={lblStyle}>Email direct</label>
+                <input className="inp" value={f.contact_email} onChange={function(e){ set('contact_email', e.target.value) }} placeholder="marie@entreprise.fr" style={{width:'100%'}} />
+              </div>
+              <div style={{flex:'1 1 140px'}}>
+                <label style={lblStyle}>Téléphone</label>
+                <input className="inp" value={f.contact_phone} onChange={function(e){ set('contact_phone', e.target.value) }} placeholder="06 12 34 56 78" style={{width:'100%'}} />
+              </div>
+            </div>
+          </div>
+
+          {/* Coordonnées entreprise */}
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+            <div style={{flex:'1 1 140px'}}>
+              <label style={lblStyle}>Arrondissement / zone</label>
+              <input className="inp" value={f.arr} onChange={function(e){ set('arr', e.target.value) }} placeholder="Paris 8e" style={{width:'100%'}} />
+            </div>
+            <div style={{flex:'1 1 120px'}}>
+              <label style={lblStyle}>Taille (employés)</label>
+              <input className="inp" value={f.taille} onChange={function(e){ set('taille', e.target.value) }} placeholder="50-100" style={{width:'100%'}} />
+            </div>
+            <div style={{flex:'1 1 140px'}}>
+              <label style={lblStyle}>Site web</label>
+              <input className="inp" value={f.site} onChange={function(e){ set('site', e.target.value) }} placeholder="entreprise.fr" style={{width:'100%'}} />
+            </div>
+          </div>
+
+          <div>
+            <label style={lblStyle}>Adresse</label>
+            <input className="inp" value={f.adresse} onChange={function(e){ set('adresse', e.target.value) }} placeholder="12 rue de la Paix, 75002 Paris" style={{width:'100%'}} />
+          </div>
+
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+            <div style={{flex:'1 1 130px'}}>
+              <label style={lblStyle}>Valeur / event (€)</label>
+              <input className="inp" type="number" value={f.ve} onChange={function(e){ set('ve', e.target.value) }} style={{width:'100%'}} />
+            </div>
+            <div style={{flex:'1 1 130px'}}>
+              <label style={lblStyle}>Valeur / mois (€)</label>
+              <input className="inp" type="number" value={f.vm} onChange={function(e){ set('vm', e.target.value) }} style={{width:'100%'}} />
+            </div>
+            <div style={{flex:'1 1 160px'}}>
+              <label style={lblStyle}>Type de besoin</label>
+              <input className="inp" value={f.type} onChange={function(e){ set('type', e.target.value) }} placeholder="Plateaux déjeuner" style={{width:'100%'}} />
+            </div>
+          </div>
+
+          {/* Pitch */}
+          <div>
+            <label style={lblStyle}>💡 Pitch / angle d&apos;approche</label>
+            <textarea className="inp" value={f.pitch} onChange={function(e){ set('pitch', e.target.value) }} rows={2} style={{width:'100%',resize:'vertical',fontFamily:'inherit'}} />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label style={lblStyle}>📝 Notes (échanges, infos, contexte...)</label>
+            <textarea className="inp" value={f.notes} onChange={function(e){ set('notes', e.target.value) }} rows={4} placeholder="Tout ce que tu sais sur ce prospect : historique, préférences, objections, dates clés..." style={{width:'100%',resize:'vertical',fontFamily:'inherit'}} />
+          </div>
+        </div>
+
+        {/* Footer actions */}
+        <div style={{display:'flex',gap:8,padding:'14px 20px',borderTop:'2px solid '+NOIR,position:'sticky',bottom:0,background:'#FFFFFF',borderRadius:'0 0 9px 9px',flexWrap:'wrap'}}>
+          <button className="btn btn-p" style={{flex:1,minWidth:140,justifyContent:'center',fontWeight:900}} onClick={handleSave}>💾 Enregistrer</button>
+          {props.onSendCrm && !lead.sent_to_crm && (
+            <button className="btn" style={{background:ROSE,color:'#fff',fontWeight:900,justifyContent:'center'}} onClick={props.onSendCrm}>→ Envoyer au CRM</button>
+          )}
+          <button className="btn" style={{background:'#FFFFFF',border:'2px solid '+NOIR,justifyContent:'center'}} onClick={props.onClose}>Annuler</button>
+        </div>
       </div>
     </div>
   )
