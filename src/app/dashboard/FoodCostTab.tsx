@@ -59,6 +59,7 @@ export default function FoodCostTab(props) {
 
   var [drinkEdit, setDrinkEdit] = useState(null)
   var [alertsModalOpen, setAlertsModalOpen] = useState(false)
+  var [uploadingPhoto, setUploadingPhoto] = useState(false)
 
   // ============= LOAD DATA =============
   function loadData() {
@@ -141,7 +142,14 @@ export default function FoodCostTab(props) {
         ingredients: rIngs,
         food_cost_ht: totalCost,
         food_cost_pct: fcPct,
-        marge_ht: marge
+        marge_ht: marge,
+        photo_url: r.photo_url || '',
+        allergenes: r.allergenes || [],
+        conseils: r.conseils || ''
+      }
+      // Photo parent = photo de la variante standard si dispo
+      if ((r.variant_key === 'standard' || !grouped[r.parent_slug].photo_url) && r.photo_url) {
+        grouped[r.parent_slug].photo_url = r.photo_url
       }
     }
     return grouped
@@ -205,6 +213,69 @@ export default function FoodCostTab(props) {
     return { avg: avg, alerts: alerts, best: sorted[0], worst: sorted[sorted.length - 1] }
   }
 
+  // ============= UPLOAD RECIPE PHOTO =============
+  function compressImage(file, maxSize, quality) {
+    return new Promise(function(resolve, reject) {
+      var img = new Image()
+      var url = URL.createObjectURL(file)
+      img.onload = function() {
+        URL.revokeObjectURL(url)
+        var w = img.width
+        var h = img.height
+        if (w > maxSize || h > maxSize) {
+          if (w > h) { h = Math.round(h * maxSize / w); w = maxSize }
+          else { w = Math.round(w * maxSize / h); h = maxSize }
+        }
+        var canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        var ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, w, h)
+        canvas.toBlob(function(blob) {
+          if (!blob) { reject(new Error('Compression failed')); return }
+          resolve(blob)
+        }, 'image/jpeg', quality)
+      }
+      img.onerror = function() { URL.revokeObjectURL(url); reject(new Error('Image load failed')) }
+      img.src = url
+    })
+  }
+
+  function uploadRecipePhoto(file, parentSlug, variantId) {
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) { toast('Image > 10 MB, choisis une plus petite'); return }
+    setUploadingPhoto(true)
+    compressImage(file, 1200, 0.85).then(function(blob) {
+      var fname = parentSlug + '_' + Date.now() + '.jpg'
+      var path = parentSlug + '/' + fname
+      sb().storage.from('recipe-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true }).then(function(r) {
+        if (r.error) { setUploadingPhoto(false); toast('Erreur upload: ' + r.error.message); return }
+        // URL publique
+        var pub = sb().storage.from('recipe-photos').getPublicUrl(path)
+        var publicUrl = pub.data.publicUrl + '?t=' + Date.now()
+        // Sauvegarder dans la recette (toutes les variantes du parent)
+        sb().from('recipes').update({ photo_url: publicUrl }).eq('parent_slug', parentSlug).then(function(r2) {
+          setUploadingPhoto(false)
+          if (r2.error) { toast('Erreur sauvegarde: ' + r2.error.message); return }
+          toast('✅ Photo enregistrée')
+          loadData()
+        })
+      })
+    }).catch(function(e) {
+      setUploadingPhoto(false)
+      toast('Erreur compression: ' + (e.message || String(e)))
+    })
+  }
+
+  function deleteRecipePhoto(parentSlug) {
+    if (!confirm('Supprimer la photo de cette recette ?')) return
+    sb().from('recipes').update({ photo_url: null }).eq('parent_slug', parentSlug).then(function(r) {
+      if (r.error) { toast('Erreur: ' + r.error.message); return }
+      toast('✅ Photo supprimée')
+      loadData()
+    })
+  }
+
   // ============= PRINT RECIPE (fiche cuisine) =============
   function printRecipe(parent, variant) {
     var ings = (variant.ingredients || []).slice().map(function(ing){
@@ -226,34 +297,73 @@ export default function FoodCostTab(props) {
     var emojiByCat = { classique:'🥪', mini:'🥖', salade:'🥗', accompagnement:'🍟', boisson:'🥤', dessert:'🍪', sous_recette:'⚙️', sauce:'🥫' }
     var emoji = emojiByCat[variant.categorie] || '🍴'
     var dateStr = new Date().toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric' })
+
+    // Photo HTML (si dispo)
+    var photoUrl = parent.photo_url || variant.photo_url || ''
+    var photoHtml = photoUrl
+      ? '<div class="photo-wrap"><img src="' + photoUrl + '" alt="" class="photo" /></div>'
+      : ''
+
+    // Allergènes HTML (array → chips)
+    var allergenes = variant.allergenes || []
+    if (!Array.isArray(allergenes)) allergenes = []
+    var allergenesHtml = ''
+    if (allergenes.length > 0) {
+      var chips = allergenes.map(function(a) { return '<span class="chip">' + a + '</span>' }).join('')
+      allergenesHtml = '<div class="section-title">Allergènes</div><div class="chips">' + chips + '</div>'
+    }
+
+    // Conseils HTML (string → post-it jaune)
+    var conseils = variant.conseils || ''
+    var conseilsHtml = ''
+    if (conseils && conseils.trim()) {
+      // Préserver les retours à la ligne
+      var safeConseils = conseils.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')
+      conseilsHtml = '<div class="section-title">Conseils</div><div class="conseils">' + safeConseils + '</div>'
+    }
+
     var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Fiche - ' + (parent.name || '') + '</title>' +
       '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">' +
       '<style>' +
-      '@page { size: A4; margin: 16mm 14mm }' +
+      '@page { size: A4; margin: 14mm 14mm }' +
       'body { font-family: Arial Narrow, Arial, sans-serif; color: #191923; margin:0; padding:0 }' +
       '.wrap { max-width: 720px; margin: 0 auto; padding: 14px 0 }' +
+      '.header-row { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 14px }' +
+      '.header-text { flex: 1; min-width: 0 }' +
       '.cat-row { font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; color: #FF82D7 }' +
-      '.title { font-family: Yellowtail, cursive; font-size: 56px; color: #FF82D7; line-height: 1; margin: 4px 0 16px }' +
-      '.variant { display: inline-block; background: #191923; color: #FFEB5A; padding: 4px 12px; border-radius: 14px; font-weight: 900; font-size: 12px; margin-bottom: 18px; letter-spacing: 1px }' +
-      '.section-title { font-family: Yellowtail, cursive; font-size: 30px; color: #FF82D7; line-height:1; margin: 18px 0 10px }' +
+      '.title { font-family: Yellowtail, cursive; font-size: 52px; color: #FF82D7; line-height: 1; margin: 4px 0 10px }' +
+      '.variant { display: inline-block; background: #FF82D7; color: #FFF; padding: 4px 12px; border-radius: 14px; font-weight: 900; font-size: 12px; letter-spacing: 1px }' +
+      '.photo-wrap { width: 200px; flex-shrink: 0; border: 2px solid #191923; border-radius: 12px; overflow: hidden; box-shadow: 3px 3px 0 #191923 }' +
+      '.photo { width: 100%; height: 200px; object-fit: cover; display: block }' +
+      '.section-title { font-family: Yellowtail, cursive; font-size: 28px; color: #FF82D7; line-height:1; margin: 20px 0 8px }' +
       'table { width: 100%; border-collapse: collapse; border: 2px solid #191923; border-radius: 8px; overflow: hidden }' +
       'th { background: #FFEB5A; color: #191923; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; padding: 8px 12px; text-align: left; border-bottom: 2px solid #191923 }' +
       'td { padding: 10px 12px; border-bottom: 1px solid #EEE; font-size: 14px }' +
       'tr:last-child td { border-bottom: none }' +
       'td.qt { text-align: right; font-weight: 900; font-size: 16px; white-space: nowrap }' +
       'td.ing { font-weight: 700 }' +
+      '.chips { display: flex; flex-wrap: wrap; gap: 6px }' +
+      '.chip { display: inline-block; background: #FFE5E5; color: #CC0066; border: 1.5px solid #CC0066; padding: 4px 10px; border-radius: 14px; font-weight: 900; font-size: 11px; text-transform: uppercase; letter-spacing: .5px }' +
+      '.conseils { background: #FFEB5A; border: 2px solid #191923; border-radius: 10px; padding: 12px 14px; font-size: 13px; font-weight: 700; line-height: 1.5; box-shadow: 2px 2px 0 #191923 }' +
       '.footer { margin-top: 28px; padding-top: 12px; border-top: 1px dashed #999; font-size: 10px; color: #666; display: flex; justify-content: space-between }' +
-      '.emoji { font-size: 36px; vertical-align: middle; margin-right: 6px }' +
-      '@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact } .noprint { display: none } }' +
+      '.emoji { font-size: 28px; vertical-align: middle; margin-right: 6px }' +
+      '@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact } .noprint { display: none } .photo-wrap { box-shadow: none } .conseils { box-shadow: none } }' +
       '.noprint { position: fixed; top: 14px; right: 14px; padding: 10px 16px; background: #FF82D7; color: #fff; border: 2px solid #191923; border-radius: 18px; font-weight: 900; cursor: pointer; box-shadow: 3px 3px 0 #191923; font-family: inherit }' +
       '</style></head><body>' +
       '<button class="noprint" onclick="window.print()">🖨️ Imprimer</button>' +
       '<div class="wrap">' +
+      '<div class="header-row">' +
+      '<div class="header-text">' +
       '<div class="cat-row"><span class="emoji">' + emoji + '</span>' + (variant.categorie || '').replace('_', ' ') + '</div>' +
       '<div class="title">' + (parent.name || '') + '</div>' +
       (variant.variant_label && variant.variant_label !== 'Standard' ? '<div class="variant">' + variant.variant_label + '</div>' : '') +
+      '</div>' +
+      photoHtml +
+      '</div>' +
       '<div class="section-title">Ingrédients</div>' +
       '<table><thead><tr><th>Article</th><th style="text-align:right">Quantité</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>' +
+      allergenesHtml +
+      conseilsHtml +
       '<div class="footer"><span>Meshuga Crazy Deli · 3 rue Vavin 75006 Paris</span><span>Fiche éditée le ' + dateStr + '</span></div>' +
       '</div></body></html>'
     var w = window.open('', '_blank')
@@ -474,7 +584,9 @@ export default function FoodCostTab(props) {
       recipe_id: v.id,
       name: v.name,
       categorie: parent.category,
-      tva: v.tva_ratio * 100
+      tva: v.tva_ratio * 100,
+      allergenes: Array.isArray(v.allergenes) ? v.allergenes.slice() : [],
+      conseils: v.conseils || ''
     })
   }
 
@@ -485,6 +597,8 @@ export default function FoodCostTab(props) {
       name: editingMeta.name,
       categorie: editingMeta.categorie,
       tva: editingMeta.tva,
+      allergenes: editingMeta.allergenes || [],
+      conseils: editingMeta.conseils || '',
       updated_at: new Date().toISOString()
     }
     sb().from('recipes').update(payload).eq('id', editingMeta.recipe_id).then(function(res){
@@ -743,8 +857,10 @@ export default function FoodCostTab(props) {
                 return (
                   <div key={parent.parent_slug} onClick={function(){setFcSelectedParent(parent.parent_slug);setFcSelectedVariant(p.variant_key)}} style={{background:'#FFFFFF',borderRadius:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',overflow:'hidden',cursor:'pointer',display:'flex',flexDirection:'column',transition:'transform .12s'}} onMouseEnter={function(e){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='4px 4px 0 #191923'}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}}>
                     {/* Photo / placeholder */}
-                    <div style={{height:110,background:'linear-gradient(135deg, var(--y) 0%, #FFF5C2 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:54,position:'relative',borderBottom:'2px solid #191923'}}>
-                      {catEmoji(p.categorie)}
+                    <div style={{height:110,background:parent.photo_url ? '#F5F5F5' : 'linear-gradient(135deg, var(--y) 0%, #FFF5C2 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:54,position:'relative',borderBottom:'2px solid #191923',overflow:'hidden'}}>
+                      {parent.photo_url ? (
+                        <img src={parent.photo_url} alt={parent.name} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
+                      ) : catEmoji(p.categorie)}
                       {sec && (
                         <div style={{position:'absolute',top:6,right:6,background:'var(--p)',color:'#FFF',fontSize:9,fontWeight:900,padding:'3px 7px',borderRadius:6,letterSpacing:.5}}>STD + MINI</div>
                       )}
@@ -862,10 +978,63 @@ export default function FoodCostTab(props) {
                     </select>
                   </div>
                 </div>
+                {/* Allergènes */}
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:10,opacity:.55,marginBottom:6,textTransform:'uppercase',fontWeight:900,letterSpacing:.5}}>Allergènes</div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                    {['Gluten','Œufs','Lait','Soja','Poisson','Crustacés','Mollusques','Fruits à coque','Cacahuètes','Sésame','Céleri','Moutarde','Sulfites','Lupin'].map(function(a){
+                      var arr = editingMeta.allergenes || []
+                      var on = arr.indexOf(a) > -1
+                      return (
+                        <button key={a} type="button" onClick={function(){
+                          setEditingMeta(function(p){
+                            var cur = (p.allergenes || []).slice()
+                            var i = cur.indexOf(a)
+                            if (i > -1) cur.splice(i, 1); else cur.push(a)
+                            return Object.assign({}, p, {allergenes: cur})
+                          })
+                        }} style={{padding:'5px 10px',fontSize:10,fontWeight:900,border:'1.5px solid '+(on?'var(--p)':'#DDD'),background:on?'#FFE5F5':'#FFF',color:on?'var(--p)':'#555',borderRadius:14,cursor:'pointer',textTransform:'uppercase',letterSpacing:.3}}>{a}</button>
+                      )
+                    })}
+                  </div>
+                </div>
+                {/* Conseils */}
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:10,opacity:.55,marginBottom:4,textTransform:'uppercase',fontWeight:900,letterSpacing:.5}}>Conseils cuisine</div>
+                  <textarea className="inp" rows={3} value={editingMeta.conseils || ''} onChange={function(e){var v=e.target.value;setEditingMeta(function(p){return Object.assign({},p,{conseils:v})})}} placeholder="Ex : Pain à toaster légèrement, montage à froid, servir dans les 2h…" style={{width:'100%',resize:'vertical',padding:'8px 10px',fontSize:12,fontFamily:'inherit',fontWeight:600,border:'2px solid #191923',borderRadius:8}} />
+                </div>
                 <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>
                   <button className="btn btn-sm" onClick={function(){setEditingMeta(null)}}>Annuler</button>
                   <button className="btn btn-sm btn-y" style={{fontWeight:900}} onClick={saveEditMeta}>💾 Enregistrer</button>
                 </div>
+              </div>
+            )}
+
+            {/* ============= PHOTO DE LA RECETTE ============= */}
+            {!isPrep && (
+              <div style={{marginBottom:14}}>
+                {parent.photo_url ? (
+                  <div style={{position:'relative',borderRadius:14,overflow:'hidden',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                    <img src={parent.photo_url} alt={parent.name} style={{width:'100%',maxHeight:280,objectFit:'cover',display:'block',background:'#F5F5F5'}} />
+                    <div style={{position:'absolute',top:8,right:8,display:'flex',gap:6}}>
+                      <label htmlFor={'photo-upload-'+parent.parent_slug} title="Remplacer" style={{width:34,height:34,borderRadius:'50%',border:'2px solid #191923',background:'rgba(255,255,255,.95)',cursor:'pointer',fontSize:13,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center'}}>📷</label>
+                      <input id={'photo-upload-'+parent.parent_slug} type="file" accept="image/*" style={{display:'none'}} disabled={uploadingPhoto} onChange={function(e){var f=e.target.files&&e.target.files[0];if(f)uploadRecipePhoto(f,parent.parent_slug,v.id);e.target.value=''}} />
+                      <button title="Supprimer" onClick={function(){deleteRecipePhoto(parent.parent_slug)}} style={{width:34,height:34,borderRadius:'50%',border:'2px solid var(--p)',background:'rgba(255,229,245,.95)',color:'var(--p)',cursor:'pointer',fontSize:13,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>🗑️</button>
+                    </div>
+                    {uploadingPhoto && (
+                      <div style={{position:'absolute',inset:0,background:'rgba(255,255,255,.8)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:14}}>⏳ Upload…</div>
+                    )}
+                  </div>
+                ) : (
+                  <label htmlFor={'photo-upload-empty-'+parent.parent_slug} style={{display:'block',cursor:'pointer'}}>
+                    <div style={{padding:'24px 18px',background:'#FFFFFF',border:'2px dashed #191923',borderRadius:14,textAlign:'center',color:'#191923'}}>
+                      <div style={{fontSize:32,marginBottom:6}}>📷</div>
+                      <div style={{fontSize:13,fontWeight:900}}>{uploadingPhoto ? '⏳ Upload en cours…' : 'Ajouter une photo'}</div>
+                      <div style={{fontSize:10,opacity:.55,fontWeight:700,marginTop:3}}>Tape pour choisir une image (max 10 MB)</div>
+                    </div>
+                    <input id={'photo-upload-empty-'+parent.parent_slug} type="file" accept="image/*" style={{display:'none'}} disabled={uploadingPhoto} onChange={function(e){var f=e.target.files&&e.target.files[0];if(f)uploadRecipePhoto(f,parent.parent_slug,v.id);e.target.value=''}} />
+                  </label>
+                )}
               </div>
             )}
 
