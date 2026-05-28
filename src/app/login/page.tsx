@@ -55,7 +55,7 @@ export default function LoginPage() {
         <div style={{ textAlign:'center', marginBottom:40 }}>
           <img src="/stamp-pink.png" alt="Meshuga" width={130} height={130}
             style={{ margin:'0 auto 14px', display:'block', objectFit:'contain' }} />
-          <img src={LOGO_PINK} alt="meshuga" style={{ display:'block', width:230, maxWidth:'80%', margin:'0 auto' }} />
+          <img src="/logotype-pink.png" alt="meshuga" style={{ display:'block', width:230, maxWidth:'80%', margin:'0 auto' }} />
           <p style={{ fontFamily:"'Yellowtail', sans-serif", fontSize:24, color:'#FF82D7', marginTop:2, lineHeight:1 }}>B2B Manager</p>
         </div>
 
