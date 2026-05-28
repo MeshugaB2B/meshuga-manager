@@ -276,6 +276,40 @@ export default function FoodCostTab(props) {
     })
   }
 
+  // ============= UPLOAD DRINK PHOTO =============
+  function uploadDrinkPhoto(file, drinkId, drinkSlug) {
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) { toast('Image > 10 MB, choisis une plus petite'); return }
+    setUploadingPhoto(true)
+    compressImage(file, 1200, 0.85).then(function(blob) {
+      var fname = (drinkSlug || drinkId) + '_' + Date.now() + '.jpg'
+      var path = 'drinks/' + fname
+      sb().storage.from('recipe-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true }).then(function(r) {
+        if (r.error) { setUploadingPhoto(false); toast('Erreur upload: ' + r.error.message); return }
+        var pub = sb().storage.from('recipe-photos').getPublicUrl(path)
+        var publicUrl = pub.data.publicUrl + '?t=' + Date.now()
+        sb().from('drinks_resale').update({ photo_url: publicUrl }).eq('id', drinkId).then(function(r2) {
+          setUploadingPhoto(false)
+          if (r2.error) { toast('Erreur sauvegarde: ' + r2.error.message); return }
+          toast('✅ Photo enregistrée')
+          loadData()
+        })
+      })
+    }).catch(function(e) {
+      setUploadingPhoto(false)
+      toast('Erreur compression: ' + (e.message || String(e)))
+    })
+  }
+
+  function deleteDrinkPhoto(drinkId) {
+    if (!confirm('Supprimer la photo de cette boisson ?')) return
+    sb().from('drinks_resale').update({ photo_url: null }).eq('id', drinkId).then(function(r) {
+      if (r.error) { toast('Erreur: ' + r.error.message); return }
+      toast('✅ Photo supprimée')
+      loadData()
+    })
+  }
+
   // ============= PRINT RECIPE (fiche cuisine) =============
   function printRecipe(parent, variant) {
     var ings = (variant.ingredients || []).slice().map(function(ing){
@@ -823,8 +857,22 @@ export default function FoodCostTab(props) {
                   var dColor = fcColor(it.fcPct)
                   return (
                     <div key={'drk_'+d.id} style={{background:'#FFFFFF',borderRadius:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',overflow:'hidden',display:'flex',flexDirection:'column'}}>
-                      <div style={{height:90,background:'linear-gradient(135deg, #FFE5F5 0%, #FFE5E5 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:42,position:'relative'}}>
-                        🥤
+                      <div style={{height:90,background:d.photo_url ? '#F5F5F5' : 'linear-gradient(135deg, #FFE5F5 0%, #FFE5E5 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:42,position:'relative',overflow:'hidden'}}>
+                        {d.photo_url ? (
+                          <>
+                            <img src={d.photo_url} alt={d.name} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
+                            <div style={{position:'absolute',top:6,left:6,display:'flex',gap:4}}>
+                              <label htmlFor={'drk-upload-'+d.id} title="Remplacer" style={{width:26,height:26,borderRadius:'50%',border:'2px solid #191923',background:'rgba(255,255,255,.95)',cursor:'pointer',fontSize:10,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center'}}>📷</label>
+                              <button onClick={function(e){e.stopPropagation();deleteDrinkPhoto(d.id)}} title="Supprimer la photo" style={{width:26,height:26,borderRadius:'50%',border:'2px solid var(--p)',background:'rgba(255,229,245,.95)',color:'var(--p)',cursor:'pointer',fontSize:10,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>✕</button>
+                            </div>
+                          </>
+                        ) : (
+                          <label htmlFor={'drk-upload-'+d.id} title="Ajouter une photo" style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:42}}>
+                            🥤
+                            <div style={{position:'absolute',bottom:6,left:6,fontSize:9,fontWeight:900,background:'rgba(255,255,255,.95)',padding:'3px 7px',borderRadius:10,border:'1.5px solid #191923'}}>📷 photo</div>
+                          </label>
+                        )}
+                        <input id={'drk-upload-'+d.id} type="file" accept="image/*" style={{display:'none'}} disabled={uploadingPhoto} onChange={function(e){var f=e.target.files&&e.target.files[0];if(f)uploadDrinkPhoto(f,d.id,d.slug);e.target.value=''}} />
                         <div style={{position:'absolute',top:6,right:6,background:'var(--p)',color:'#FFF',fontSize:9,fontWeight:900,padding:'2px 6px',borderRadius:6,letterSpacing:.5}}>REVENTE</div>
                       </div>
                       <div style={{padding:'10px 12px',flex:1,display:'flex',flexDirection:'column',gap:6}}>
