@@ -14,15 +14,15 @@ body{font-family:'Arial Narrow',Arial,sans-serif;background:var(--y);color:#1919
 .shell-inner{display:flex;flex:1;overflow:hidden}
 
 /* === TOPBAR MOBILE === */
-.topbar{display:none;background:#FFFFFF;padding:10px 14px;align-items:center;justify-content:center;border-bottom:2px solid #191923;flex-shrink:0}
+.topbar{display:none;background:#FFFFFF;padding:10px 14px;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(25,25,35,.07);flex-shrink:0;position:relative;z-index:2}
 .topbar-logo{height:28px}
 .hamburger{background:none;border:2px solid rgba(25,25,35,.3);border-radius:4px;padding:4px 8px;cursor:pointer;color:#191923;font-size:16px}
 
 /* === SIDEBAR DESKTOP === */
-.sidebar{width:var(--sb-w,210px);min-width:168px;max-width:340px;background:#FFFFFF;border-right:3px solid #191923;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;position:relative}
+.sidebar{width:var(--sb-w,210px);min-width:168px;max-width:340px;background:#FFFFFF;box-shadow:4px 0 18px rgba(25,25,35,.08);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;position:relative;z-index:2}
 .sb-resizer{position:absolute;top:0;right:0;bottom:0;width:6px;cursor:col-resize;z-index:5;background:transparent;transition:background .15s}
 .sb-resizer:hover,.sb-resizer.dragging{background:var(--p)}
-.sb-logo{padding:14px 10px;border-bottom:2px solid #191923;display:flex;align-items:center}
+.sb-logo{padding:16px 10px 10px;display:flex;align-items:center}
 .sb-logo-text{min-width:0;width:100%}
 .sb-logo-type{width:180px;max-width:100%;display:block;margin:0 auto}
 .sb-nav{padding:6px 7px;flex:1;overflow-y:auto}
@@ -32,7 +32,7 @@ body{font-family:'Arial Narrow',Arial,sans-serif;background:var(--y);color:#1919
 .ni.active{background:var(--p);color:#FFFFFF;border-color:#191923;font-weight:800}
 .ni .ni-ico{font-size:15px;flex-shrink:0}
 .nb{background:#191923;color:var(--y);font-size:10px;font-weight:900;padding:1px 6px;border-radius:9px;margin-left:auto;border:1.5px solid #191923}
-.sb-user{padding:9px 9px;border-top:2px solid #191923;display:flex;align-items:center;gap:7px}
+.sb-user{padding:10px 9px;margin:6px;border-radius:10px;background:#FAFAFA;border:1px solid #EFEFEF;display:flex;align-items:center;gap:7px}
 .sb-avatar{width:30px;height:30px;border-radius:50%;background:var(--y);border:2px solid #191923;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;flex-shrink:0}
 .sb-uname{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.3px}
 .sb-urole{font-size:11px;opacity:.7}
