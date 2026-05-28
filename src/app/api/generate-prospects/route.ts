@@ -3,6 +3,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const maxDuration = 60
+
 export async function POST(req: NextRequest) {
   try {
     const { cat, zone, count = 15 } = await req.json()
@@ -68,18 +70,39 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte ni markdown avant ou après 
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2500,
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 8000,
         messages: [{ role: 'user', content: prompt }],
       }),
     })
 
     const aiData = await aiRes.json()
+    if (aiData.error) return NextResponse.json({ error: 'IA: ' + (aiData.error.message || 'erreur') }, { status: 500 })
     const text = aiData.content?.[0]?.text || ''
-    const jsonMatch = text.match(/\[[\s\S]*\]/)
-    if (!jsonMatch) return NextResponse.json({ error: 'Format IA invalide' }, { status: 500 })
 
-    const prospects = JSON.parse(jsonMatch[0])
+    // Extraction JSON robuste : on cherche [ et on prend jusqu'au dernier } trouvable,
+    // pour récupérer même un tableau tronqué (on coupera proprement au dernier objet complet).
+    function parseRobust(raw: string): any[] {
+      const start = raw.indexOf('[')
+      if (start < 0) throw new Error('Pas de tableau JSON trouvé')
+      let body = raw.slice(start)
+      const endBracket = body.lastIndexOf(']')
+      if (endBracket > 0) {
+        try { return JSON.parse(body.slice(0, endBracket + 1)) } catch (e) {}
+      }
+      // Tronqué : on coupe au dernier objet complet et on ferme le tableau
+      const lastObj = body.lastIndexOf('}')
+      if (lastObj < 0) throw new Error('Aucun objet JSON complet')
+      const truncated = body.slice(0, lastObj + 1) + ']'
+      return JSON.parse(truncated)
+    }
+
+    let prospects: any[] = []
+    try { prospects = parseRobust(text) }
+    catch (e: any) { return NextResponse.json({ error: 'Format IA invalide : ' + e.message }, { status: 500 }) }
+    if (!Array.isArray(prospects) || prospects.length === 0) {
+      return NextResponse.json({ error: 'IA a renvoyé 0 prospect' }, { status: 500 })
+    }
 
     // Supabase avec service role key (bypass RLS)
     const supabase = createClient(
