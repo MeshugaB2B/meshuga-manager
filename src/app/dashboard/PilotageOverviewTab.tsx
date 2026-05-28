@@ -83,6 +83,7 @@ export default function PilotageOverviewTab(props) {
   var [dailyRange, setDailyRange] = useState(30)
   var [dailyMetric, setDailyMetric] = useState('ca_ttc')
   var [prodSort, setProdSort] = useState('marge')
+  var [synthOpen, setSynthOpen] = useState(false)
 
   useEffect(function(){ loadData() }, [])
   useEffect(function() {
@@ -168,13 +169,20 @@ export default function PilotageOverviewTab(props) {
 
   var modeAgg = {}
   byMode.filter(function(m){ return m.year === curYear }).forEach(function(m) {
-    if (!modeAgg[m.mode]) modeAgg[m.mode] = 0
-    modeAgg[m.mode] += Number(m.ca_ttc) || 0
+    var k = m.mode || 'Autre'
+    if (!modeAgg[k]) modeAgg[k] = 0
+    modeAgg[k] += Number(m.ca_ttc) || 0
   })
-  var modeLabelMap = {sur_place:'Sur place', emporter:'À emporter', livraison:'Livraison'}
-  var modeColorMap = {sur_place:ROSE, emporter:JAUNE, livraison:BLEU}
+  // Couleurs par mode — match insensible à la casse/accents (libellés FR ou clés techniques)
+  var modeColor = function(label) {
+    var s = (label || '').toLowerCase()
+    if (s.indexOf('place') > -1) return ROSE
+    if (s.indexOf('emporter') > -1 || s.indexOf('emport') > -1) return JAUNE
+    if (s.indexOf('livraison') > -1 || s.indexOf('livr') > -1) return BLEU
+    return '#888'
+  }
   var modeData = Object.keys(modeAgg).map(function(k) {
-    return { name: modeLabelMap[k] || k, value: Math.round(modeAgg[k]), color: modeColorMap[k] || '#888' }
+    return { name: k, value: Math.round(modeAgg[k]), color: modeColor(k) }
   }).sort(function(a,b){ return b.value - a.value })
 
   var sourceAgg = {}
@@ -214,6 +222,49 @@ export default function PilotageOverviewTab(props) {
   var topProds = prodSort === 'marge' ? topByMarge : topByVolume
 
   var lastDataDate = daily.length > 0 ? new Date(daily[daily.length - 1].date).toLocaleDateString('fr-FR', {day:'2-digit', month:'long', year:'numeric'}) : '—'
+
+  // ---- Synthèse automatique ----
+  var synthLines = []
+  // 1. Tendance CA YTD
+  if (caYtdDelta !== null) {
+    if (caYtdDelta >= 0) synthLines.push({icon:'📈', txt:'CA en hausse de ' + caYtdDelta.toFixed(1) + '% par rapport à l\'an dernier (année à date). Continue sur cette lancée.'})
+    else synthLines.push({icon:'📉', txt:'CA en baisse de ' + Math.abs(caYtdDelta).toFixed(1) + '% vs l\'an dernier. À surveiller : regarde si c\'est lié à la météo, la concurrence ou les jours d\'ouverture.'})
+  }
+  // 2. Panier moyen
+  if (panierYtdDelta !== null && Math.abs(panierYtdDelta) >= 2) {
+    if (panierYtdDelta >= 0) synthLines.push({icon:'🛒', txt:'Panier moyen en progression (+' + panierYtdDelta.toFixed(1) + '%) : tes clients dépensent plus par commande.'})
+    else synthLines.push({icon:'🛒', txt:'Panier moyen en recul (' + panierYtdDelta.toFixed(1) + '%) : pense à pousser les accompagnements / boissons / desserts en vente additionnelle.'})
+  }
+  // 3. Meilleur jour de semaine (via heatmap)
+  var dowAgg = {}
+  heatmap.forEach(function(h) {
+    var d = h.day_of_week
+    if (!dowAgg[d]) dowAgg[d] = 0
+    dowAgg[d] += Number(h.ca_ttc) || 0
+  })
+  var bestDow = null; var bestDowVal = 0
+  Object.keys(dowAgg).forEach(function(d) { if (dowAgg[d] > bestDowVal) { bestDowVal = dowAgg[d]; bestDow = d } })
+  if (bestDow !== null) synthLines.push({icon:'📅', txt:'Ton meilleur jour est le ' + ({0:'dimanche',1:'lundi',2:'mardi',3:'mercredi',4:'jeudi',5:'vendredi',6:'samedi'}[bestDow]) + '. Assure-toi d\'avoir le staff et le stock en conséquence.'})
+  // 4. Meilleure heure
+  var hourAgg = {}
+  heatmap.forEach(function(h) {
+    var hr = h.hour_of_day
+    if (!hourAgg[hr]) hourAgg[hr] = 0
+    hourAgg[hr] += Number(h.ca_ttc) || 0
+  })
+  var bestHour = null; var bestHourVal = 0
+  Object.keys(hourAgg).forEach(function(hr) { if (hourAgg[hr] > bestHourVal) { bestHourVal = hourAgg[hr]; bestHour = hr } })
+  if (bestHour !== null) synthLines.push({icon:'⏰', txt:'Ton pic d\'activité est autour de ' + bestHour + 'h. Tout doit être prêt avant ce créneau.'})
+  // 5. Mode dominant
+  if (modeData.length > 0) {
+    var totalMode = modeData.reduce(function(a,b){ return a + b.value }, 0)
+    var dom = modeData[0]
+    if (totalMode > 0) synthLines.push({icon:'🍽️', txt:'Ton canal n°1 est « ' + dom.name + ' » (' + Math.round(dom.value/totalMode*100) + '% du CA).'})
+  }
+  // 6. Top produit marge
+  if (topByMarge.length > 0) {
+    synthLines.push({icon:'🏆', txt:'Ton produit le plus rentable : ' + topByMarge[0].name.replace(/\?/g,'').trim() + '. Mets-le en avant.'})
+  }
 
   return (
     <div>
@@ -387,6 +438,37 @@ export default function PilotageOverviewTab(props) {
           <div style={{fontSize:10,opacity:0.5,marginTop:8,fontWeight:700,fontStyle:'italic'}}>
             Marge estimée = CA produit − food cost. Détail issu du dernier CSV Zelty mensuel.
           </div>
+        </div>
+      )}
+
+      {/* ===== SYNTHÈSE / CONSEILS (dépliable) ===== */}
+      {synthLines.length > 0 && (
+        <div className="card" style={{background:NOIR, borderColor:JAUNE, padding:0, overflow:'hidden'}}>
+          <div onClick={function(){ setSynthOpen(!synthOpen) }} style={{
+            padding:'14px 18px', cursor:'pointer',
+            display:'flex', alignItems:'center', gap:12
+          }}>
+            <span style={{fontSize:26}}>💡</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:JAUNE,lineHeight:1}}>Synthèse &amp; conseils</div>
+              <div style={{fontSize:11,opacity:0.7,marginTop:3,fontWeight:700,color:'#FFFFFF'}}>
+                {synthOpen ? 'Clique pour replier' : synthLines.length + ' insights basés sur tes données'}
+              </div>
+            </div>
+            <span style={{fontSize:20,color:JAUNE,transition:'transform .2s',transform:synthOpen?'rotate(180deg)':'rotate(0deg)',display:'inline-block'}}>▾</span>
+          </div>
+          {synthOpen && (
+            <div style={{padding:'4px 18px 18px', background:NOIR}}>
+              {synthLines.map(function(line, i){
+                return (
+                  <div key={i} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'9px 0',borderTop:'1px solid rgba(255,235,90,0.2)'}}>
+                    <span style={{fontSize:18,flexShrink:0}}>{line.icon}</span>
+                    <span style={{fontSize:13,lineHeight:1.45,color:'#FFFFFF',fontWeight:600}}>{line.txt}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
