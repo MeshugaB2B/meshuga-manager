@@ -626,7 +626,7 @@ export default function FoodCostTab(props) {
               <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                 <button className="btn btn-sm" style={{background:'var(--p)',color:'#fff',fontWeight:900,fontSize:11}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
                 <button className="btn btn-sm" style={{background:'var(--p)',color:'#fff',fontWeight:900,fontSize:11}} onClick={function(){setNewDrinkModal({name:'',supplier_name:'',purchase_price_ht:0,selling_price_ttc:0})}}>+ Boisson</button>
-                <button className="btn btn-sm" style={{background:'#191923',color:'var(--y)',fontWeight:900,fontSize:11}} onClick={function(){setFcInvoiceModal(true)}}>📄 Facture</button>
+                <button className="btn btn-sm" style={{background:'var(--p)',color:'#fff',fontWeight:900,fontSize:11}} onClick={function(){setFcInvoiceModal(true)}}>📄 Facture</button>
               </div>
             </div>
 
@@ -635,7 +635,7 @@ export default function FoodCostTab(props) {
               {allCats.map(function(cat){
                 var active = fcCatFilter === cat.id
                 return (
-                  <button key={cat.id} onClick={function(){setFcCatFilter(cat.id)}} style={{flexShrink:0,padding:'8px 14px',background:active?'#191923':'#FFFFFF',color:active?'var(--y)':'#191923',border:'2px solid #191923',borderRadius:20,fontWeight:900,fontSize:12,cursor:'pointer',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
+                  <button key={cat.id} onClick={function(){setFcCatFilter(cat.id)}} style={{flexShrink:0,padding:'8px 14px',background:active?'var(--p)':'#FFFFFF',color:active?'#FFFFFF':'#191923',border:'2px solid #191923',borderRadius:20,fontWeight:900,fontSize:12,cursor:'pointer',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
                     <span style={{fontSize:14}}>{cat.emoji}</span>
                     {cat.label}
                   </button>
@@ -693,7 +693,7 @@ export default function FoodCostTab(props) {
                     <div key={'drk_'+d.id} style={{background:'#FFFFFF',borderRadius:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',overflow:'hidden',display:'flex',flexDirection:'column'}}>
                       <div style={{height:90,background:'linear-gradient(135deg, #FFE5F5 0%, #FFE5E5 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:42,position:'relative'}}>
                         🥤
-                        <div style={{position:'absolute',top:6,right:6,background:'#191923',color:'#FFF',fontSize:9,fontWeight:900,padding:'2px 6px',borderRadius:6,letterSpacing:.5}}>REVENTE</div>
+                        <div style={{position:'absolute',top:6,right:6,background:'var(--p)',color:'#FFF',fontSize:9,fontWeight:900,padding:'2px 6px',borderRadius:6,letterSpacing:.5}}>REVENTE</div>
                       </div>
                       <div style={{padding:'10px 12px',flex:1,display:'flex',flexDirection:'column',gap:6}}>
                         <div style={{fontWeight:900,fontSize:13,lineHeight:1.2}}>{d.name}</div>
@@ -728,7 +728,7 @@ export default function FoodCostTab(props) {
                     <div style={{height:110,background:'linear-gradient(135deg, var(--y) 0%, #FFF5C2 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:54,position:'relative',borderBottom:'2px solid #191923'}}>
                       {catEmoji(p.categorie)}
                       {sec && (
-                        <div style={{position:'absolute',top:6,right:6,background:'#191923',color:'var(--y)',fontSize:9,fontWeight:900,padding:'3px 7px',borderRadius:6,letterSpacing:.5}}>STD + MINI</div>
+                        <div style={{position:'absolute',top:6,right:6,background:'var(--p)',color:'#FFF',fontSize:9,fontWeight:900,padding:'3px 7px',borderRadius:6,letterSpacing:.5}}>STD + MINI</div>
                       )}
                       {isPrep && (
                         <div style={{position:'absolute',top:6,right:6,background:'var(--p)',color:'#FFF',fontSize:9,fontWeight:900,padding:'3px 7px',borderRadius:6,letterSpacing:.5}}>SOUS-RECETTE</div>
@@ -857,7 +857,7 @@ export default function FoodCostTab(props) {
                 {variantsList.map(function(vv){
                   var active = vv.variant_key === fcSelectedVariant
                   return (
-                    <button key={vv.variant_key} onClick={function(){setFcSelectedVariant(vv.variant_key);setEditingIngId(null);setAddIngOpen(false);setEditingPrixTTC(null);setCreatingProduct(false);setNewProductDraft(null)}} style={{flex:1,padding:'10px 14px',background:active?'#191923':'#FFFFFF',color:active?'var(--y)':'#191923',border:'2px solid #191923',borderRadius:20,fontWeight:900,fontSize:13,cursor:'pointer',display:'flex',justifyContent:'center',alignItems:'center',gap:6}}>
+                    <button key={vv.variant_key} onClick={function(){setFcSelectedVariant(vv.variant_key);setEditingIngId(null);setAddIngOpen(false);setEditingPrixTTC(null);setCreatingProduct(false);setNewProductDraft(null)}} style={{flex:1,padding:'10px 14px',background:active?'var(--p)':'#FFFFFF',color:active?'#FFFFFF':'#191923',border:'2px solid #191923',borderRadius:20,fontWeight:900,fontSize:13,cursor:'pointer',display:'flex',justifyContent:'center',alignItems:'center',gap:6}}>
                       {vv.variant_label} · <span style={{fontSize:14}}>{fmt(vv.prix_vente_ttc)}€</span>
                     </button>
                   )
@@ -890,16 +890,20 @@ export default function FoodCostTab(props) {
                 <div style={{fontSize:26,fontWeight:900,color:'#191923',lineHeight:1,marginTop:4}}>{isPrep ? fmtPrep(v.food_cost_ht) : fmt(v.food_cost_ht)}<span style={{fontSize:14}}>€</span></div>
                 <div style={{fontSize:9,opacity:.55,marginTop:3,fontWeight:700}}>{v.ingredients.length} ingrédient{v.ingredients.length > 1 ? 's' : ''}</div>
               </div>
-              {!isPrep && (
+              {!isPrep && (function(){
+                var coeffOk = coeffActuel >= 4
+                var coeffDotColor = coeffOk ? '#009D3A' : '#FF82D7'
+                return (
                 <div style={{background:'#FFFFFF',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
                   <div style={{display:'flex',alignItems:'center',gap:6}}>
-                    <span style={{width:9,height:9,borderRadius:'50%',background:fcMainColor,flexShrink:0}}></span>
+                    <span style={{width:9,height:9,borderRadius:'50%',background:coeffDotColor,flexShrink:0}}></span>
                     <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Coefficient</div>
                   </div>
-                  <div style={{fontSize:34,fontWeight:900,color:'#191923',lineHeight:1,marginTop:4}}>×{coeffActuel}</div>
+                  <div style={{fontSize:34,fontWeight:900,color:coeffDotColor,lineHeight:1,marginTop:4}}>×{coeffActuel}</div>
                   <div style={{fontSize:9,opacity:.55,marginTop:3,fontWeight:700}}>Food cost : {v.food_cost_pct}%</div>
                 </div>
-              )}
+                )
+              })()}
               {!isPrep && (
                 <div style={{background:'#FFFFFF',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
                   <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Marge HT</div>
