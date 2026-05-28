@@ -948,9 +948,9 @@ function DashboardImpl() {
       <style dangerouslySetInnerHTML={{__html: G}} />
 
       {!profile && (
-        <div style={{position:'fixed',inset:0,background:'#FFEB5A',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999,flexDirection:'column',gap:16}}>
-          <img src="/stamp-yellow.png" alt="meshuga" style={{width:120,height:120,objectFit:"contain"}} />
-          <div style={{fontWeight:900,fontSize:13,textTransform:'uppercase',letterSpacing:3,color:'#191923'}}>Chargement...</div>
+        <div style={{position:'fixed',inset:0,background:'#FFEB5A',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999,flexDirection:'column',gap:14}}>
+          <img src="/stamp-pink.png" alt="meshuga" style={{width:130,height:130,objectFit:"contain"}} />
+          <div style={{fontFamily:"'Yellowtail',cursive",fontSize:30,color:'#FF82D7',lineHeight:1}}>Chargement…</div>
         </div>
       )}
 
