@@ -495,285 +495,219 @@ export default function FoodCostTab(props) {
 
   return (
     <div>
-      {/* HEADER */}
-      <div className="ph">
-        <div>
-          <div className="pt">Food Cost 🥩</div>
-          <div className="ps">{(function(){
-            var total = 0
-            groupedList.forEach(function(p){
-              Object.keys(p.variants).forEach(function(vk){
-                if (!isPrepCat(p.variants[vk].categorie)) total++
-              })
-            })
-            return total
-          })()} recettes · {drinks.length} boissons · Seuil alerte : {fcSeuil}%</div>
-        </div>
-        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-          <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
-          <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff',fontWeight:900}} onClick={function(){setNewDrinkModal({name:'',supplier_name:'',purchase_price_ht:0,selling_price_ttc:0})}}>+ Boisson</button>
-          <button className="btn btn-sm" style={{background:'#009D3A',color:'#fff'}} onClick={function(){setFcInvoiceModal(true)}}>📄 Importer facture</button>
-        </div>
-      </div>
+      {/* ========== CATALOGUE V2 (Sprint 1) ========== */}
+      {fcView === 'recettes' && !fcSelectedParent && (function(){
+        var allCats = [
+          {id:'tous', label:'Tout', emoji:'☰'},
+          {id:'classique', label:'Sandwichs', emoji:'🥪'},
+          {id:'mini', label:'Minis', emoji:'🥖'},
+          {id:'salade', label:'Salades', emoji:'🥗'},
+          {id:'accompagnement', label:'Accompagn.', emoji:'🍟'},
+          {id:'boisson', label:'Boissons', emoji:'🥤'},
+          {id:'dessert', label:'Desserts', emoji:'🍪'},
+          {id:'merchandising', label:'Merch.', emoji:'🛍️'},
+          {id:'sous_recette', label:'Sous-recettes', emoji:'⚙️'}
+        ]
+        function catMatches(catId, item){
+          if (catId === 'tous') return !isPrepCat(item.categorie)
+          if (catId === 'sous_recette') return item.categorie === 'sous_recette' || item.categorie === 'sauce'
+          return item.categorie === catId
+        }
+        // Construire la liste à afficher : items = {type:'recipe'|'drink', parent?, variant?, drink?, name, fcPct, margeHt, prixTtc}
+        var items = []
+        groupedList.forEach(function(parent){
+          var vStd = parent.variants.standard
+          var vMini = parent.variants.mini
+          var displayItems = []
+          if (vStd) displayItems.push({variant:vStd, parent:parent})
+          if (vMini && fcCatFilter==='mini') displayItems.push({variant:vMini, parent:parent})
+          // Si le filtre est "mini", on n'affiche que les minis
+          if (fcCatFilter==='mini') {
+            if (vMini) items.push({type:'recipe', parent:parent, primary:vMini, secondary:null})
+            return
+          }
+          // Sinon : on affiche la STD comme carte principale, et la mini en badge secondaire
+          var primary = vStd || vMini
+          var secondary = (vStd && vMini) ? vMini : null
+          if (!primary) return
+          if (!catMatches(fcCatFilter, primary)) return
+          items.push({type:'recipe', parent:parent, primary:primary, secondary:secondary})
+        })
+        // Boissons revente
+        if (fcCatFilter==='tous' || fcCatFilter==='boisson') {
+          drinks.forEach(function(d){
+            var tvaR = tvaToRatio(d.tva_rate); if (tvaR===0) tvaR = 0.20
+            var prixHT = Number(d.selling_price_ttc) / (1+tvaR)
+            var marge = Math.round((prixHT - Number(d.purchase_price_ht))*100)/100
+            var pct = prixHT > 0 ? Math.round(Number(d.purchase_price_ht)/prixHT*1000)/10 : 0
+            items.push({type:'drink', drink:d, name:d.name, fcPct:pct, margeHt:marge, prixTtc:Number(d.selling_price_ttc), supplier:d.supplier_name})
+          })
+        }
+        // Couleur jauge food cost (vert/jaune/rouge selon seuil)
+        function fcColor(pct){
+          if (pct > fcSeuil) return '#CC0066'
+          if (pct > fcSeuil - 5) return '#FFA500'
+          return '#009D3A'
+        }
+        // Emoji par catégorie (pour placeholder photo)
+        function catEmoji(cat){
+          var m = {classique:'🥪', mini:'🥖', salade:'🥗', accompagnement:'🍟', boisson:'🥤', dessert:'🍪', merchandising:'🛍️', sous_recette:'⚙️', sauce:'🥫'}
+          return m[cat] || '🍴'
+        }
 
-      {/* SEUIL CONFIG */}
-      {fcView === 'recettes' && !fcSelectedParent && (
-        <div style={{display:'flex',alignItems:'center',gap:8,padding:'0 0 12px',flexWrap:'wrap'}}>
-          <span style={{fontSize:11,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,opacity:.5}}>Seuil alerte food cost :</span>
-          {[20,25,30,35].map(function(s){return(
-            <button key={s} className="btn btn-sm" style={{fontSize:10,background:fcSeuil===s?'#CC0066':'#F5F5F5',color:fcSeuil===s?'#fff':'#555',border:'1.5px solid '+(fcSeuil===s?'#CC0066':'#DDD')}} onClick={function(){if(setFcSeuil)setFcSeuil(s)}}>{s}%</button>
-          )})}
-        </div>
-      )}
+        var showKPIs = fcCatFilter !== 'preparations' && fcCatFilter !== 'sous_recette'
 
-      {/* CATEGORY FILTER */}
-      {fcView === 'recettes' && !fcSelectedParent && (
-        <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
-          {[
-            {id:'tous',label:'Tous'},
-            {id:'classique',label:'🥪 Sandwichs'},
-            {id:'mini',label:'🥨 Minis'},
-            {id:'salade',label:'🥗 Salades'},
-            {id:'accompagnement',label:'🍟 Accomp.'},
-            {id:'boisson',label:'🥤 Boissons'},
-            {id:'preparations',label:'🧪 Préparations'}
-          ].map(function(cat){
-            var count = 0
-            groupedList.forEach(function(p){
-              Object.keys(p.variants).forEach(function(vk){
-                var vv = p.variants[vk]
-                if (cat.id === 'tous') {
-                  if (!isPrepCat(vv.categorie)) count++
-                } else if (cat.id === 'preparations') {
-                  if (isPrepCat(vv.categorie)) count++
-                } else if ((vv.categorie || '') === cat.id) {
-                  count++
-                }
-              })
-            })
-            return (
-              <button key={cat.id} className="btn btn-sm" style={{fontSize:10,background:fcCatFilter===cat.id?'#191923':'#F5F5F5',color:fcCatFilter===cat.id?'#FFEB5A':'#555',border:'1.5px solid '+(fcCatFilter===cat.id?'#191923':'#DDD')}} onClick={function(){setFcCatFilter(cat.id)}}>
-                {cat.label} <span style={{opacity:.5}}>({count})</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      {/* ========== VUE RECETTES (liste) ========== */}
-      {fcView === 'recettes' && !fcSelectedParent && (
-        <div>
-          {/* KPIs - cachés en vue préparations */}
-          {fcCatFilter !== 'preparations' && (
-            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8,marginBottom:12}}>
-              <div style={{background:'#fff',borderRadius:10,padding:'12px 14px',border:'1.5px solid #EBEBEB'}}>
-                <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.5,marginBottom:4}}>Food cost moyen</div>
-                <div style={{fontSize:24,fontWeight:900,color:kpis.avg>fcSeuil?'#CC0066':'#009D3A'}}>{kpis.avg.toFixed(1)}%</div>
+        return (
+          <div>
+            {/* Barre actions (titre + boutons) */}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14,gap:10,flexWrap:'wrap'}}>
+              <div>
+                <div style={{fontFamily:"'Yellowtail',cursive",fontSize:32,color:'var(--p)',lineHeight:1}}>Recettes</div>
+                <div style={{fontSize:11,opacity:.55,fontWeight:700,marginTop:2}}>{(function(){var n=0;groupedList.forEach(function(p){Object.values(p.variants).forEach(function(vv){if(!isPrepCat(vv.categorie))n++})});return n})()} recettes · {drinks.length} boissons revente</div>
               </div>
-              <div style={{background:'#fff',borderRadius:10,padding:'12px 14px',border:'1.5px solid '+(kpis.alerts.length>0?'#CC0066':'#EBEBEB')}}>
-                <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.5,marginBottom:4}}>⚠️ Au-dessus du seuil</div>
-                <div style={{fontSize:24,fontWeight:900,color:kpis.alerts.length>0?'#CC0066':'#009D3A'}}>{kpis.alerts.length}</div>
-                <div style={{fontSize:10,opacity:.5}}>{kpis.alerts.length>0?kpis.alerts.slice(0,3).map(function(v){return v.name}).join(', '):'Tout est OK ✅'}</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                <button className="btn btn-sm" style={{background:'var(--p)',color:'#fff',fontWeight:900,fontSize:11}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
+                <button className="btn btn-sm" style={{background:'var(--p)',color:'#fff',fontWeight:900,fontSize:11}} onClick={function(){setNewDrinkModal({name:'',supplier_name:'',purchase_price_ht:0,selling_price_ttc:0})}}>+ Boisson</button>
+                <button className="btn btn-sm" style={{background:'#191923',color:'var(--y)',fontWeight:900,fontSize:11}} onClick={function(){setFcInvoiceModal(true)}}>📄 Facture</button>
               </div>
-              {kpis.best && (
-                <div style={{background:'#FFEB5A',borderRadius:10,padding:'12px 14px',border:'1.5px solid rgba(0,0,0,.1)'}}>
-                  <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.7,marginBottom:4}}>🏆 Meilleure marge</div>
-                  <div style={{fontSize:14,fontWeight:900}}>{kpis.best.name}</div>
-                  <div style={{fontSize:12,opacity:.7}}>{kpis.best.food_cost_pct}% food cost</div>
-                </div>
-              )}
-              {kpis.worst && (
-                <div style={{background:'#fff',borderRadius:10,padding:'12px 14px',border:'1.5px solid #EBEBEB'}}>
-                  <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',opacity:.5,marginBottom:4}}>📊 Plus chargé</div>
-                  <div style={{fontSize:14,fontWeight:900}}>{kpis.worst.name}</div>
-                  <div style={{fontSize:12,color:kpis.worst.food_cost_pct>fcSeuil?'#CC0066':'#555'}}>{kpis.worst.food_cost_pct}% food cost</div>
-                </div>
-              )}
             </div>
-          )}
 
-          {/* LISTE RECETTES — organisée en rubriques séparées */}
-          {(function(){
-            var flatList = []
-            groupedList.forEach(function(parent){
-              Object.keys(parent.variants).forEach(function(vk){
-                var vv = parent.variants[vk]
-                if (!vv) return
-                flatList.push({parent: parent, variant: vv})
-              })
-            })
+            {/* Chips catégories scrollables */}
+            <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,marginBottom:14,scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}}>
+              {allCats.map(function(cat){
+                var active = fcCatFilter === cat.id
+                return (
+                  <button key={cat.id} onClick={function(){setFcCatFilter(cat.id)}} style={{flexShrink:0,padding:'8px 14px',background:active?'#191923':'#FFFFFF',color:active?'var(--y)':'#191923',border:'2px solid #191923',borderRadius:20,fontWeight:900,fontSize:12,cursor:'pointer',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
+                    <span style={{fontSize:14}}>{cat.emoji}</span>
+                    {cat.label}
+                  </button>
+                )
+              })}
+            </div>
 
-            var sections = [
-              {
-                key: 'sandwichs_std',
-                label: '🥪 Sandwichs standards',
-                color: '#FF82D7',
-                showWhen: ['tous','classique'],
-                filter: function(v){ return v.categorie === 'classique' && v.variant_key !== 'mini' }
-              },
-              {
-                key: 'sandwichs_mini',
-                label: '🥨 Sandwichs minis',
-                color: '#FFEB5A',
-                showWhen: ['tous','mini'],
-                filter: function(v){ return v.categorie === 'mini' }
-              },
-              {
-                key: 'salades_std',
-                label: '🥗 Salades standards',
-                color: '#009D3A',
-                showWhen: ['tous','salade'],
-                filter: function(v){ return v.categorie === 'salade' && v.variant_key !== 'mini' }
-              },
-              {
-                key: 'salades_mini',
-                label: '🥗 Salades minis',
-                color: '#FFEB5A',
-                showWhen: ['tous','salade','mini'],
-                filter: function(v){ return v.categorie === 'salade' && v.variant_key === 'mini' }
-              },
-              {
-                key: 'accomp',
-                label: '🍟 Accompagnements',
-                color: '#191923',
-                showWhen: ['tous','accompagnement'],
-                filter: function(v){ return v.categorie === 'accompagnement' }
-              },
-              {
-                key: 'boissons_maison',
-                label: '🏡 Boissons maison',
-                color: '#FF82D7',
-                showWhen: ['tous','boisson'],
-                filter: function(v){ return v.categorie === 'boisson' }
-              },
-              {
-                key: 'preparations_maison',
-                label: '🧪 Préparations maison',
-                color: '#A06CD5',
-                showWhen: ['preparations'],
-                filter: function(v){ return isPrepCat(v.categorie) }
-              }
-            ]
-
-            var visibleSections = sections.filter(function(s){ return s.showWhen.indexOf(fcCatFilter) > -1 })
-
-            return visibleSections.map(function(section){
-              var items = flatList.filter(function(it){ return section.filter(it.variant) })
-              if (items.length === 0) return null
-              items.sort(function(a,b){ return (b.variant.food_cost_pct || 0) - (a.variant.food_cost_pct || 0) })
-              return (
-                <div key={section.key} style={{marginBottom:20}}>
-                  <div style={{
-                    fontFamily:'Yellowtail',fontSize:22,color:'#191923',
-                    marginTop:18,marginBottom:10,paddingBottom:6,
-                    borderBottom:'3px solid '+section.color,
-                    display:'flex',alignItems:'baseline',gap:8
-                  }}>
-                    <span>{section.label}</span>
-                    <span style={{fontFamily:'Arial Narrow, Arial, sans-serif',fontSize:12,fontWeight:900,color:'#888'}}>({items.length})</span>
+            {/* KPI Tuiles : 4 cartes santé */}
+            {showKPIs && (
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:18}}>
+                <div style={{background:'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                  <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>Food cost moyen</div>
+                  <div style={{fontSize:30,fontWeight:900,color:kpis.avg>fcSeuil?'#CC0066':'#009D3A',lineHeight:1.1,marginTop:4}}>{kpis.avg.toFixed(1)}<span style={{fontSize:16}}>%</span></div>
+                </div>
+                <div style={{background:kpis.alerts.length>0?'#FFE5E5':'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid '+(kpis.alerts.length>0?'#CC0066':'#191923'),boxShadow:'3px 3px 0 '+(kpis.alerts.length>0?'#CC0066':'#191923')}}>
+                  <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>⚠️ En alerte ({fcSeuil}%+)</div>
+                  <div style={{fontSize:30,fontWeight:900,color:kpis.alerts.length>0?'#CC0066':'#009D3A',lineHeight:1.1,marginTop:4}}>{kpis.alerts.length}</div>
+                  <div style={{fontSize:9,opacity:.55,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{kpis.alerts.length>0?kpis.alerts.slice(0,2).map(function(v){return v.name}).join(' · '):'Tout est OK ✅'}</div>
+                </div>
+                {kpis.best && (
+                  <div style={{background:'var(--y)',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                    <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.7,letterSpacing:.5}}>🏆 Meilleure marge</div>
+                    <div style={{fontSize:14,fontWeight:900,lineHeight:1.15,marginTop:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{kpis.best.name}</div>
+                    <div style={{fontSize:11,opacity:.7,marginTop:2,fontWeight:700}}>{kpis.best.food_cost_pct}% FC · {fmt(kpis.best.marge_ht)}€</div>
                   </div>
-                  {items.map(function(it){
-                    var parent = it.parent
-                    var v = it.variant
-                    var isPrep = isPrepCat(v.categorie)
-                    var alert = !isPrep && v.food_cost_pct > fcSeuil
-                    var barColor = isPrep ? '#A06CD5' : (alert ? '#CC0066' : '#009D3A')
-                    var displayName = v.name || parent.name
-                    var fournisseurs = v.ingredients.reduce(function(acc, i){
-                      return acc.indexOf(i.fournisseur) > -1 ? acc : acc.concat([i.fournisseur])
-                    }, []).slice(0, 2).filter(function(f){ return f && f.length > 0 })
-                    return (
-                      <div key={parent.parent_slug + '__' + v.variant_key} className="card" style={{marginBottom:8,borderLeft:'4px solid '+barColor,cursor:'pointer'}} onClick={function(){setFcSelectedParent(parent.parent_slug);setFcSelectedVariant(v.variant_key)}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                          <div style={{flex:1,minHeight:44,display:'flex',flexDirection:'column',justifyContent:'center'}}>
-                            <div style={{fontWeight:900,fontSize:14,display:'flex',alignItems:'center',gap:6}}>
-                              {displayName}
-                              {isPrep && <span style={{fontSize:9,background:'#F3EBFA',color:'#A06CD5',padding:'2px 6px',borderRadius:4,fontWeight:900}}>🧪 MAISON</span>}
-                            </div>
-                            <div style={{fontSize:11,opacity:.6}}>
-                              {fournisseurs.length > 0 ? fournisseurs.join(', ') : (isPrep ? 'Préparation interne' : '')}
-                              {isPrep
-                                ? (' · Food cost ' + fmtPrep(v.food_cost_ht) + '€')
-                                : (' · PV ' + fmt(v.prix_vente_ttc) + '€ TTC · Marge HT ' + fmt(v.marge_ht) + '€')
-                              }
-                            </div>
+                )}
+                {kpis.worst && (
+                  <div style={{background:'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                    <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>📊 Plus chargée</div>
+                    <div style={{fontSize:14,fontWeight:900,lineHeight:1.15,marginTop:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{kpis.worst.name}</div>
+                    <div style={{fontSize:11,marginTop:2,fontWeight:700,color:kpis.worst.food_cost_pct>fcSeuil?'#CC0066':'#555'}}>{kpis.worst.food_cost_pct}% FC</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Seuil discret */}
+            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:14,fontSize:10,fontWeight:700,opacity:.6}}>
+              <span>Seuil alerte :</span>
+              {[20,25,30,35].map(function(s){return(
+                <button key={s} onClick={function(){if(setFcSeuil)setFcSeuil(s)}} style={{padding:'3px 8px',fontSize:10,fontWeight:900,border:'1.5px solid '+(fcSeuil===s?'#CC0066':'#DDD'),background:fcSeuil===s?'#CC0066':'#FFF',color:fcSeuil===s?'#FFF':'#555',borderRadius:10,cursor:'pointer'}}>{s}%</button>
+              )})}
+            </div>
+
+            {/* Galerie de cartes */}
+            {items.length === 0 && (
+              <div style={{textAlign:'center',padding:40,opacity:.5,fontWeight:700}}>Aucune recette dans cette catégorie</div>
+            )}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:14}}>
+              {items.map(function(it, idx){
+                if (it.type === 'drink') {
+                  var d = it.drink
+                  var dColor = fcColor(it.fcPct)
+                  return (
+                    <div key={'drk_'+d.id} style={{background:'#FFFFFF',borderRadius:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',overflow:'hidden',display:'flex',flexDirection:'column'}}>
+                      <div style={{height:90,background:'linear-gradient(135deg, #FFE5F5 0%, #FFE5E5 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:42,position:'relative'}}>
+                        🥤
+                        <div style={{position:'absolute',top:6,right:6,background:'#191923',color:'#FFF',fontSize:9,fontWeight:900,padding:'2px 6px',borderRadius:6,letterSpacing:.5}}>REVENTE</div>
+                      </div>
+                      <div style={{padding:'10px 12px',flex:1,display:'flex',flexDirection:'column',gap:6}}>
+                        <div style={{fontWeight:900,fontSize:13,lineHeight:1.2}}>{d.name}</div>
+                        <div style={{fontSize:10,opacity:.55,fontWeight:700}}>{d.supplier_name}</div>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginTop:'auto',paddingTop:8}}>
+                          <div>
+                            <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase'}}>Food cost</div>
+                            <div style={{fontSize:22,fontWeight:900,color:dColor,lineHeight:1}}>{it.fcPct}<span style={{fontSize:12}}>%</span></div>
                           </div>
-                          <div style={{textAlign:'right',padding:'4px 8px'}}>
-                            {isPrep ? (
-                              <div>
-                                <div style={{fontSize:18,fontWeight:900,color:'#A06CD5'}}>{fmtPrep(v.food_cost_ht)}€</div>
-                                <div style={{fontSize:10,opacity:.5}}>food cost</div>
-                              </div>
-                            ) : (
-                              <div>
-                                <div style={{fontSize:20,fontWeight:900,color:barColor}}>{v.food_cost_pct}%</div>
-                                <div style={{fontSize:10,opacity:.5}}>food cost</div>
-                              </div>
-                            )}
+                          <div style={{textAlign:'right'}}>
+                            <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase'}}>Marge</div>
+                            <div style={{fontSize:14,fontWeight:900,color:'#009D3A',lineHeight:1.1}}>{fmt(it.margeHt)}€</div>
                           </div>
-                          <button style={{background:'#FFE5E5',border:'none',color:'#CC0066',fontSize:14,cursor:'pointer',borderRadius:6,padding:'6px 10px',flexShrink:0,marginLeft:4}} onClick={function(e){e.stopPropagation();deleteRecipeParent(parent.parent_slug, parent.name)}}>🗑️</button>
+                        </div>
+                        <div style={{height:5,background:'#F0F0F0',borderRadius:3,overflow:'hidden'}}>
+                          <div style={{width:Math.min(it.fcPct,50)/50*100+'%',height:'100%',background:dColor}} />
+                        </div>
+                        <div style={{fontSize:10,opacity:.6,fontWeight:700}}>PV {fmt(d.selling_price_ttc)}€ TTC</div>
+                      </div>
+                    </div>
+                  )
+                }
+                // Recette
+                var p = it.primary
+                var sec = it.secondary
+                var parent = it.parent
+                var c = fcColor(p.food_cost_pct)
+                var isPrep = isPrepCat(p.categorie)
+                return (
+                  <div key={parent.parent_slug} onClick={function(){setFcSelectedParent(parent.parent_slug);setFcSelectedVariant(p.variant_key)}} style={{background:'#FFFFFF',borderRadius:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',overflow:'hidden',cursor:'pointer',display:'flex',flexDirection:'column',transition:'transform .12s'}} onMouseEnter={function(e){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='4px 4px 0 #191923'}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}}>
+                    {/* Photo / placeholder */}
+                    <div style={{height:110,background:'linear-gradient(135deg, var(--y) 0%, #FFF5C2 100%)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:54,position:'relative',borderBottom:'2px solid #191923'}}>
+                      {catEmoji(p.categorie)}
+                      {sec && (
+                        <div style={{position:'absolute',top:6,right:6,background:'#191923',color:'var(--y)',fontSize:9,fontWeight:900,padding:'3px 7px',borderRadius:6,letterSpacing:.5}}>STD + MINI</div>
+                      )}
+                      {isPrep && (
+                        <div style={{position:'absolute',top:6,right:6,background:'var(--p)',color:'#FFF',fontSize:9,fontWeight:900,padding:'3px 7px',borderRadius:6,letterSpacing:.5}}>SOUS-RECETTE</div>
+                      )}
+                    </div>
+                    <div style={{padding:'10px 12px',flex:1,display:'flex',flexDirection:'column',gap:6}}>
+                      <div style={{fontWeight:900,fontSize:14,lineHeight:1.2}}>{parent.name}</div>
+                      <div style={{fontSize:10,opacity:.55,fontWeight:700,textTransform:'capitalize'}}>{p.categorie.replace('_',' ')}</div>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginTop:'auto',paddingTop:8}}>
+                        <div>
+                          <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase'}}>Food cost</div>
+                          <div style={{fontSize:22,fontWeight:900,color:c,lineHeight:1}}>{p.food_cost_pct}<span style={{fontSize:12}}>%</span></div>
                         </div>
                         {!isPrep && (
-                          <div style={{background:'#F0F0F0',borderRadius:20,height:6,overflow:'hidden'}}>
-                            <div style={{width:Math.min(v.food_cost_pct,60)/60*100+'%',background:barColor,height:'100%',borderRadius:20}} />
+                          <div style={{textAlign:'right'}}>
+                            <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase'}}>Marge</div>
+                            <div style={{fontSize:14,fontWeight:900,color:'#009D3A',lineHeight:1.1}}>{fmt(p.marge_ht)}€</div>
                           </div>
                         )}
-                        {alert && <div style={{fontSize:10,color:'#CC0066',fontWeight:900,marginTop:4}}>⚠️ Au-dessus du seuil de {fcSeuil}%</div>}
                       </div>
-                    )
-                  })}
-                </div>
-              )
-            })
-          })()}
-
-          {/* BOISSONS REVENTE */}
-          {(fcCatFilter === 'tous' || fcCatFilter === 'boisson') && drinks.map(function(d){
-            var tvaR = tvaToRatio(d.tva_rate)
-            if (tvaR === 0) tvaR = 0.20
-            var prixHT = Number(d.selling_price_ttc) / (1 + tvaR)
-            var marge = Math.round((prixHT - Number(d.purchase_price_ht)) * 100) / 100
-            var pct = prixHT > 0 ? Math.round(Number(d.purchase_price_ht) / prixHT * 1000) / 10 : 0
-            var isEdit = drinkEdit && drinkEdit.id === d.id
-            var alert = pct > fcSeuil
-            var barColor = alert ? '#CC0066' : '#009D3A'
-            return (
-              <div key={'drink_'+d.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(alert?'#CC0066':'#009D3A')}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                  <div style={{flex:1,minHeight:44,display:'flex',flexDirection:'column',justifyContent:'center'}}>
-                    <div style={{fontWeight:900,fontSize:14,display:'flex',alignItems:'center',gap:6}}>
-                      {d.name}
-                      <span style={{fontSize:9,background:'#F0F0F0',color:'#555',padding:'2px 6px',borderRadius:4,fontWeight:900}}>📦 REVENTE</span>
-                    </div>
-                    <div style={{fontSize:11,opacity:.6}}>
-                      {d.supplier_name} · PV {fmt(d.selling_price_ttc)}€ TTC · Marge HT {fmt(marge)}€
-                      {' · Achat : '}
-                      {!isEdit && (
-                        <span style={{fontWeight:900,cursor:'pointer',color:'#005FFF',textDecoration:'underline'}} onClick={function(e){e.stopPropagation();setDrinkEdit({id:d.id, price: Number(d.purchase_price_ht)})}}>{fmt(d.purchase_price_ht)}€ HT</span>
-                      )}
-                      {isEdit && (
-                        <span onClick={function(e){e.stopPropagation()}} style={{display:'inline-flex',gap:4,alignItems:'center',marginLeft:4}}>
-                          <input type="number" step="0.01" value={drinkEdit.price} onChange={function(e){setDrinkEdit({id:d.id,price:parseFloat(e.target.value)||0})}} style={{width:60,padding:'2px 4px',fontSize:11,fontWeight:700,border:'2px solid #005FFF',borderRadius:4,textAlign:'right'}} autoFocus />
-                          <button className="btn btn-sm btn-y" style={{fontSize:9,padding:'2px 6px'}} onClick={function(){saveDrinkPrice(d, drinkEdit.price)}}>✓</button>
-                          <button className="btn btn-sm" style={{fontSize:9,padding:'2px 6px'}} onClick={function(){setDrinkEdit(null)}}>✕</button>
-                        </span>
-                      )}
+                      {/* Barre proportion FC */}
+                      <div style={{height:5,background:'#F0F0F0',borderRadius:3,overflow:'hidden'}}>
+                        <div style={{width:Math.min(p.food_cost_pct,50)/50*100+'%',height:'100%',background:c}} />
+                      </div>
+                      {/* Prix de vente : STD et MINI si présents */}
+                      <div style={{fontSize:10,opacity:.7,fontWeight:700,display:'flex',gap:8,flexWrap:'wrap'}}>
+                        {!isPrep && <span>Std <span style={{fontWeight:900,color:'#191923'}}>{fmt(p.prix_vente_ttc)}€</span></span>}
+                        {sec && <span>Mini <span style={{fontWeight:900,color:'#191923'}}>{fmt(sec.prix_vente_ttc)}€</span></span>}
+                      </div>
                     </div>
                   </div>
-                  <div style={{textAlign:'right',padding:'4px 8px'}}>
-                    <div style={{fontSize:20,fontWeight:900,color:barColor}}>{pct}%</div>
-                    <div style={{fontSize:10,opacity:.5}}>food cost</div>
-                  </div>
-                  <button style={{background:'#FFE5E5',border:'none',color:'#CC0066',fontSize:14,cursor:'pointer',borderRadius:6,padding:'6px 10px',flexShrink:0,marginLeft:4}} onClick={function(e){e.stopPropagation();deleteDrink(d)}}>🗑️</button>
-                </div>
-                <div style={{background:'#F0F0F0',borderRadius:20,height:6,overflow:'hidden'}}>
-                  <div style={{width:Math.min(pct,60)/60*100+'%',background:barColor,height:'100%',borderRadius:20}} />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ========== DETAIL RECETTE ========== */}
       {fcView === 'recettes' && selectedParent && (function(){
