@@ -891,10 +891,13 @@ export default function FoodCostTab(props) {
                 <div style={{fontSize:9,opacity:.55,marginTop:3,fontWeight:700}}>{v.ingredients.length} ingrédient{v.ingredients.length > 1 ? 's' : ''}</div>
               </div>
               {!isPrep && (
-                <div style={{background:fcMainColor === '#009D3A' ? '#E8F8EE' : (fcMainColor === '#FFA500' ? '#FFF5E5' : '#FFE5E5'),borderRadius:14,padding:'12px 14px',border:'2px solid '+fcMainColor,boxShadow:'3px 3px 0 '+fcMainColor}}>
-                  <div style={{fontSize:9,fontWeight:900,opacity:.75,textTransform:'uppercase',letterSpacing:.5,color:fcMainColor}}>Coefficient</div>
-                  <div style={{fontSize:32,fontWeight:900,color:fcMainColor,lineHeight:1,marginTop:4}}>×{coeffActuel}</div>
-                  <div style={{fontSize:9,opacity:.75,marginTop:3,fontWeight:700,color:fcMainColor}}>Food cost : {v.food_cost_pct}%</div>
+                <div style={{background:'#FFFFFF',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <span style={{width:9,height:9,borderRadius:'50%',background:fcMainColor,flexShrink:0}}></span>
+                    <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Coefficient</div>
+                  </div>
+                  <div style={{fontSize:34,fontWeight:900,color:'#191923',lineHeight:1,marginTop:4}}>×{coeffActuel}</div>
+                  <div style={{fontSize:9,opacity:.55,marginTop:3,fontWeight:700}}>Food cost : {v.food_cost_pct}%</div>
                 </div>
               )}
               {!isPrep && (
