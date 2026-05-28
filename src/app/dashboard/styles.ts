@@ -14,8 +14,8 @@ body{font-family:'Arial Narrow',Arial,sans-serif;background:var(--y);color:#1919
 .shell-inner{display:flex;flex:1;overflow:hidden}
 
 /* === TOPBAR MOBILE === */
-.topbar{display:none;background:#FFFFFF;padding:10px 14px;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(25,25,35,.07);flex-shrink:0;position:relative;z-index:2}
-.topbar-logo{height:28px}
+.topbar{display:none;background:transparent;padding:12px 14px 6px;align-items:center;justify-content:center;flex-shrink:0;position:relative;z-index:2}
+.topbar-logo{height:34px}
 .hamburger{background:none;border:2px solid rgba(25,25,35,.3);border-radius:4px;padding:4px 8px;cursor:pointer;color:#191923;font-size:16px}
 
 /* === SIDEBAR DESKTOP === */
