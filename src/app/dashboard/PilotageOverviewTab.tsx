@@ -328,9 +328,9 @@ export default function PilotageOverviewTab(props) {
               <XAxis dataKey="date" tick={{fontSize:9,fontWeight:700}} interval="preserveStartEnd" stroke={NOIR} minTickGap={20} />
               <YAxis tick={{fontSize:9}} stroke={NOIR} tickFormatter={function(v){ return dailyMetricConf.unit==='eur' ? fmtShort(v) : Math.round(v) }} width={48} />
               <Tooltip
-                contentStyle={{background:NOIR,border:'2px solid '+JAUNE,borderRadius:6,padding:'7px 11px'}}
-                labelStyle={{color:JAUNE,fontWeight:900,fontSize:11}}
-                itemStyle={{color:'#FFFFFF',fontWeight:900,fontSize:13}}
+                contentStyle={{background:'#FFFFFF',border:'2px solid '+ROSE,borderRadius:6,padding:'7px 11px',boxShadow:'3px 3px 0 '+NOIR}}
+                labelStyle={{color:ROSE,fontWeight:900,fontSize:11}}
+                itemStyle={{color:NOIR,fontWeight:900,fontSize:13}}
                 formatter={function(v){ return [dailyMetricConf.unit==='eur'?fmtEurDec(v):fmtInt(v), dailyMetricConf.label] }}
                 labelFormatter={function(l,p){ return (p && p[0] && p[0].payload ? p[0].payload.weekday+' ' : '') + l }}
                 cursor={{fill:'rgba(255,235,90,0.2)'}}
@@ -362,8 +362,8 @@ export default function PilotageOverviewTab(props) {
                 <XAxis dataKey="month" tick={{fontSize:10,fontWeight:700}} stroke={NOIR} />
                 <YAxis tick={{fontSize:9}} stroke={NOIR} tickFormatter={fmtShort} width={48} />
                 <Tooltip
-                  contentStyle={{background:NOIR,border:'2px solid '+JAUNE,borderRadius:6,padding:'7px 11px'}}
-                  labelStyle={{color:JAUNE,fontWeight:900,fontSize:11}}
+                  contentStyle={{background:'#FFFFFF',border:'2px solid '+ROSE,borderRadius:6,padding:'7px 11px',boxShadow:'3px 3px 0 '+NOIR}}
+                  labelStyle={{color:ROSE,fontWeight:900,fontSize:11}}
                   itemStyle={{fontWeight:900,fontSize:12}}
                   formatter={function(v, name){ return [fmtEur(v), String(name).replace('y','')] }}
                   cursor={{fill:'rgba(255,235,90,0.2)'}}
@@ -443,27 +443,28 @@ export default function PilotageOverviewTab(props) {
 
       {/* ===== SYNTHÈSE / CONSEILS (dépliable) ===== */}
       {synthLines.length > 0 && (
-        <div className="card" style={{background:NOIR, borderColor:JAUNE, padding:0, overflow:'hidden'}}>
+        <div className="card" style={{borderColor:ROSE, borderWidth:3, padding:0, overflow:'hidden'}}>
           <div onClick={function(){ setSynthOpen(!synthOpen) }} style={{
             padding:'14px 18px', cursor:'pointer',
-            display:'flex', alignItems:'center', gap:12
+            display:'flex', alignItems:'center', gap:12,
+            background: synthOpen ? '#FFF7FC' : '#FFFFFF'
           }}>
             <span style={{fontSize:26}}>💡</span>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:JAUNE,lineHeight:1}}>Synthèse &amp; conseils</div>
-              <div style={{fontSize:11,opacity:0.7,marginTop:3,fontWeight:700,color:'#FFFFFF'}}>
+              <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:ROSE,lineHeight:1}}>Synthèse &amp; conseils</div>
+              <div style={{fontSize:11,opacity:0.6,marginTop:3,fontWeight:700}}>
                 {synthOpen ? 'Clique pour replier' : synthLines.length + ' insights basés sur tes données'}
               </div>
             </div>
-            <span style={{fontSize:20,color:JAUNE,transition:'transform .2s',transform:synthOpen?'rotate(180deg)':'rotate(0deg)',display:'inline-block'}}>▾</span>
+            <span style={{fontSize:20,color:ROSE,transition:'transform .2s',transform:synthOpen?'rotate(180deg)':'rotate(0deg)',display:'inline-block'}}>▾</span>
           </div>
           {synthOpen && (
-            <div style={{padding:'4px 18px 18px', background:NOIR}}>
+            <div style={{padding:'4px 18px 14px', background:'#FFFFFF'}}>
               {synthLines.map(function(line, i){
                 return (
-                  <div key={i} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'9px 0',borderTop:'1px solid rgba(255,235,90,0.2)'}}>
+                  <div key={i} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'10px 0',borderTop:'1px solid #EBEBEB'}}>
                     <span style={{fontSize:18,flexShrink:0}}>{line.icon}</span>
-                    <span style={{fontSize:13,lineHeight:1.45,color:'#FFFFFF',fontWeight:600}}>{line.txt}</span>
+                    <span style={{fontSize:13,lineHeight:1.45,color:NOIR,fontWeight:600}}>{line.txt}</span>
                   </div>
                 )
               })}
@@ -540,8 +541,8 @@ function DonutChart(props) {
               {data.map(function(e, i){ return <Cell key={i} fill={e.color} /> })}
             </Pie>
             <Tooltip
-              contentStyle={{background:NOIR,border:'2px solid '+JAUNE,borderRadius:6,padding:'6px 10px'}}
-              itemStyle={{color:'#FFFFFF',fontWeight:900,fontSize:12}}
+              contentStyle={{background:'#FFFFFF',border:'2px solid '+ROSE,borderRadius:6,padding:'6px 10px',boxShadow:'3px 3px 0 '+NOIR}}
+              itemStyle={{color:NOIR,fontWeight:900,fontSize:12}}
               formatter={function(v){ return [fmtEur(v) + ' (' + (total>0?Math.round(v/total*100):0) + '%)', ''] }}
             />
           </PieChart>
