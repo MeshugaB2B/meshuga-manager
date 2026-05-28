@@ -43,7 +43,7 @@ var NAV_SECTIONS = [
     label: 'Commercial B2B',
     items: [
       { id: 'crm', label: 'CRM Prospects', icon: '◎', badgeKey: 'crm' },
-      { id: 'chasse', label: 'Tableau de chasse', icon: '🎯' },
+      { id: 'chasse', label: 'Prospection', icon: '🔍' },
       { id: 'devis', label: 'Devis', icon: '📄', badgeKey: 'devis' },
       { id: 'reporting', label: 'Reporting CR', icon: '📋', edwardOnly: true },
     ]
