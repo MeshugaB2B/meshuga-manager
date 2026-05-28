@@ -26,7 +26,7 @@ body{font-family:'Arial Narrow',Arial,sans-serif;background:var(--y);color:#1919
 .sb-logo-text{min-width:0;width:100%}
 .sb-logo-type{width:180px;max-width:100%;display:block;margin:0 auto}
 .sb-nav{padding:6px 7px;flex:1;overflow-y:auto}
-.sb-sec{font-family:'Yellowtail',cursive;font-size:14px;color:var(--p);padding:6px 8px 2px;margin-top:4px}
+.sb-sec{font-family:'Yellowtail',cursive;font-size:21px;line-height:1.15;color:var(--p);padding:9px 8px 3px;margin-top:5px}
 .ni{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:5px;cursor:pointer;font-size:13px;font-weight:600;letter-spacing:0;color:#52525C;border:1.5px solid transparent;transition:all .1s;margin-bottom:0}
 .ni:hover{background:var(--y);color:#191923;border-color:#191923}
 .ni.active{background:var(--p);color:#FFFFFF;border-color:#191923;font-weight:800}
