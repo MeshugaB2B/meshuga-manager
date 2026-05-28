@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import IngredientPopup from './IngredientPopup'
 import FoodCostInvoiceWizard from './FoodCostInvoiceWizard'
 import ProductRecipeAssignment from './ProductRecipeAssignment'
+import RecipeWizard from './RecipeWizard'
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
@@ -51,6 +52,7 @@ export default function FoodCostTab(props) {
   var [editingMeta, setEditingMeta] = useState(null)
 
   var [newRecipeModal, setNewRecipeModal] = useState(null)
+  var [wizardOpen, setWizardOpen] = useState(false)
   var [newDrinkModal, setNewDrinkModal] = useState(null)
 
   var [fcInvoiceModal, setFcInvoiceModal] = useState(false)
@@ -625,7 +627,7 @@ export default function FoodCostTab(props) {
                 <div style={{fontSize:11,opacity:.55,fontWeight:700,marginTop:2}}>{(function(){var n=0;groupedList.forEach(function(p){Object.values(p.variants).forEach(function(vv){if(!isPrepCat(vv.categorie))n++})});return n})()} recettes · {drinks.length} boissons revente</div>
               </div>
               <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                <button className="btn btn-sm" style={{background:'var(--p)',color:'#fff',fontWeight:900,fontSize:11}} onClick={function(){setNewRecipeModal({name:'',categorie:'classique',prix_vente_ttc:0,tva:5.5})}}>+ Recette</button>
+                <button className="btn btn-sm" style={{background:'var(--p)',color:'#fff',fontWeight:900,fontSize:11}} onClick={function(){setWizardOpen(true)}}>+ Recette</button>
                 <button className="btn btn-sm" style={{background:'var(--p)',color:'#fff',fontWeight:900,fontSize:11}} onClick={function(){setNewDrinkModal({name:'',supplier_name:'',purchase_price_ht:0,selling_price_ttc:0})}}>+ Boisson</button>
                 <button className="btn btn-sm" style={{background:'var(--p)',color:'#fff',fontWeight:900,fontSize:11}} onClick={function(){setFcInvoiceModal(true)}}>📄 Facture</button>
               </div>
@@ -1231,6 +1233,21 @@ export default function FoodCostTab(props) {
       )}
 
       {ingPopup && <IngredientPopup ing={ingPopup} onClose={function(){setIngPopup(null)}} />}
+
+      {/* ========== WIZARD CRÉATION RECETTE (Sprint 3) ========== */}
+      {wizardOpen && (
+        <RecipeWizard
+          products={products}
+          suppliers={suppliers}
+          toast={toast}
+          onClose={function(){setWizardOpen(false)}}
+          onCreated={function(slug){
+            setWizardOpen(false)
+            loadData()
+            setTimeout(function(){ setFcSelectedParent(slug); setFcSelectedVariant('standard') }, 400)
+          }}
+        />
+      )}
 
       {/* ========== MODAL RECETTES À SURVEILLER ========== */}
       {alertsModalOpen && (function(){
