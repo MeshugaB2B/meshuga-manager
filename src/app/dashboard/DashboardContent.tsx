@@ -2322,21 +2322,21 @@ function DashboardImpl() {
       />
         </div>
       <div className="bottom-bar">
-        <div className={page === "dash" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("dash") }}><span className="bb-ico">{"📊"}</span><span className="bb-lbl">Accueil</span></div>
-        <div className={page === "crm" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("crm") }}><span className="bb-ico">{"🎯"}</span><span className="bb-lbl">CRM</span></div>
-        <div className={page === "devis" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("devis") }}><span className="bb-ico">{"📋"}</span><span className="bb-lbl">Devis</span></div>
+        <div className={page === "dash" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("dash") }}><span className="bb-ico">{"⚡"}</span><span className="bb-lbl">Accueil</span></div>
+        <div className={page === "crm" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("crm") }}><span className="bb-ico">{"◎"}</span><span className="bb-lbl">CRM</span></div>
         <div className="bb-menu" onClick={function(){ setMenuOpen(true) }}>
           <div className="bb-menu-circle"><img src={STAMP_PINK} alt="menu" /></div>
           <span className="bb-menu-lbl">Menu</span>
         </div>
-        <div className={(page === "recipes" || page === "purchases") ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("recipes") }}><span className="bb-ico">{"🥪"}</span><span className="bb-lbl">Recettes</span></div>        <div className={page === "tasks" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("tasks") }}><span className="bb-ico">{"✅"}</span><span className="bb-lbl">Tasks</span></div>
+        <div className={page === "devis" ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("devis") }}><span className="bb-ico">{"📄"}</span><span className="bb-lbl">Devis</span></div>
+        <div className={(page === "recipes" || page === "purchases") ? "bb-btn active" : "bb-btn"} onClick={function(){ nav("recipes") }}><span className="bb-ico">{"🥪"}</span><span className="bb-lbl">Recettes</span></div>
       </div>
       <div className={menuOpen ? "mms-overlay open" : "mms-overlay"} onClick={function(){ setMenuOpen(false) }}></div>
       <div className={menuOpen ? "mms-sheet open" : "mms-sheet"}>
         <div className="mms-handle" onClick={function(){ setMenuOpen(false) }}></div>
         <div className="mms-header">
-          <div className="mms-title">Menu</div>
-          <div className="mms-subtitle">Navigation</div>
+          <div className="mms-title">{isEmy ? 'Bonjour Emy' : 'Bonjour Edward'}</div>
+          <div className="mms-subtitle">Où veux-tu aller ?</div>
         </div>
         <div className="mms-sec">Accueil</div>
         <div className="mms-grid">
