@@ -41,12 +41,13 @@ body{font-family:'Arial Narrow',Arial,sans-serif;background:#FFEB5A;color:#19192
 .sb-urole{font-size:11px;opacity:.7}
 
 /* === BOTTOM BAR MOBILE === */
-.bottom-bar{display:none;background:#FFEB5A;align-items:flex-end;justify-content:space-around;padding:4px 2px 12px;border-top:1.5px solid rgba(25,25,35,.1);flex-shrink:0}
-.bb-btn{display:flex;flex-direction:column;align-items:center;gap:1px;padding:3px 5px;border-radius:5px;cursor:pointer;min-width:38px;border:1.5px solid transparent;transition:all .1s}
-.bb-btn .bb-ico{font-size:16px}
-.bb-btn .bb-lbl{font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.2px;color:#191923;opacity:.25}
-.bb-btn.active{background:#FF82D7;border-color:#191923;border-radius:6px}
-.bb-btn.active .bb-lbl{opacity:1}
+.bottom-bar{display:none;background:#FFEB5A;align-items:flex-end;justify-content:space-around;padding:6px 4px 16px;border-top:2px solid #191923;flex-shrink:0}
+.bb-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 8px;border-radius:8px;cursor:pointer;min-width:52px;border:1.5px solid transparent;transition:all .12s}
+.bb-btn .bb-ico{font-size:19px;line-height:1}
+.bb-btn .bb-lbl{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.2px;color:#191923;opacity:.55}
+.bb-btn.active{background:#FF82D7;border-color:#191923;box-shadow:2px 2px 0 #191923}
+.bb-btn.active .bb-ico{transform:scale(1.05)}
+.bb-btn.active .bb-lbl{opacity:1;color:#FFFFFF}
 .bb-center{width:42px;height:42px;border-radius:50%;background:#FFFFFF;border:2.5px solid #191923;display:flex;align-items:center;justify-content:center;cursor:pointer;margin-bottom:4px;box-shadow:2px 2px 0 #191923;overflow:hidden;transition:transform .1s;flex-shrink:0}
 .bb-center:hover{transform:scale(1.05)}
 .bb-center:active{transform:scale(0.95)}
@@ -161,12 +162,12 @@ textarea.inp{min-height:70px;resize:vertical}
 
 /* === RESPONSIVE MOBILE === */
 /* === BOTTOM BAR MENU BUTTON (replaces .bb-center) === */
-.bb-menu{display:flex;flex-direction:column;align-items:center;padding:3px 4px;cursor:pointer;border-radius:5px;min-width:52px}
-.bb-menu-circle{width:50px;height:50px;border-radius:50%;background:#FFFFFF;border:2.5px solid #191923;display:flex;align-items:center;justify-content:center;margin-bottom:2px;box-shadow:2px 2px 0 #191923;overflow:hidden;transition:transform .1s;flex-shrink:0}
+.bb-menu{display:flex;flex-direction:column;align-items:center;padding:3px 4px;cursor:pointer;border-radius:5px;min-width:56px}
+.bb-menu-circle{width:54px;height:54px;border-radius:50%;background:#FFFFFF;border:3px solid #191923;display:flex;align-items:center;justify-content:center;margin-bottom:3px;box-shadow:2px 2px 0 #191923;overflow:hidden;transition:transform .1s;flex-shrink:0}
 .bb-menu-circle:hover{transform:scale(1.05)}
 .bb-menu-circle:active{transform:scale(0.95)}
-.bb-menu-circle img{width:42px;height:42px;object-fit:contain}
-.bb-menu-lbl{font-family:'Arial Narrow',Arial,sans-serif;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.3px;color:#191923}
+.bb-menu-circle img{width:46px;height:46px;object-fit:contain}
+.bb-menu-lbl{font-family:'Arial Narrow',Arial,sans-serif;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.3px;color:#191923}
 
 /* === MOBILE MENU SHEET (bottom sheet overlay) === */
 .mms-overlay{position:fixed;inset:0;background:rgba(25,25,35,0);pointer-events:none;z-index:60;transition:background .3s}
@@ -177,13 +178,14 @@ textarea.inp{min-height:70px;resize:vertical}
 .mms-header{text-align:center;margin-bottom:14px;padding:0 4px}
 .mms-title{font-family:'Yellowtail',cursive;font-size:32px;color:#191923;line-height:1}
 .mms-subtitle{font-family:'Yellowtail',cursive;font-size:14px;color:#FF82D7;margin-top:2px}
-.mms-sec{font-family:'Yellowtail',cursive;font-size:18px;color:#FF82D7;margin:14px 2px 8px;padding-left:2px}
-.mms-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.mms-tile{background:#FFFFFF;border:2px solid #191923;border-radius:10px;padding:14px 6px;text-align:center;cursor:pointer;box-shadow:2px 2px 0 #191923;transition:all .1s;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:74px}
-.mms-tile:active{transform:translate(1px,1px);box-shadow:1px 1px 0 #191923}
-.mms-tile.active{background:#FF82D7}
-.mms-tile-ico{font-size:24px;line-height:1;margin-bottom:6px}
-.mms-tile-lbl{font-family:'Arial Narrow',Arial,sans-serif;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.3px;color:#191923;line-height:1.1}
+.mms-sec{font-family:'Yellowtail',cursive;font-size:18px;color:#FF82D7;margin:16px 2px 8px;padding-left:2px}
+.mms-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.mms-tile{background:#FFFFFF;border:2px solid #191923;border-radius:11px;padding:14px 6px;text-align:center;cursor:pointer;box-shadow:2px 2px 0 #191923;transition:all .12s;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:76px}
+.mms-tile:active{transform:translate(2px,2px);box-shadow:0 0 0 #191923}
+.mms-tile.active{background:#FF82D7;border-color:#191923}
+.mms-tile.active .mms-tile-lbl{color:#FFFFFF}
+.mms-tile-ico{font-size:25px;line-height:1;margin-bottom:7px}
+.mms-tile-lbl{font-family:'Arial Narrow',Arial,sans-serif;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.3px;color:#191923;line-height:1.1}
 
 
 @media(max-width:768px){
@@ -201,7 +203,10 @@ textarea.inp{min-height:70px;resize:vertical}
   .fg2{grid-template-columns:1fr}
   .ph{flex-direction:column;gap:8px}
   .kpi-bar{gap:5px}
-  .toast{bottom:90px;right:12px;left:12px;max-width:none;text-align:center}
+  .toast{bottom:160px;right:12px;left:12px;max-width:none;text-align:center}
+  /* Chat flottant remonté au-dessus de la bottom-bar (sinon chevauche Recettes) */
+  .floating-chat-btn{bottom:94px !important;right:14px !important;width:52px !important;height:52px !important}
+  .floating-chat-panel{bottom:94px !important;right:10px !important;left:10px !important;width:auto !important;max-width:none !important;height:70vh !important}
 }
 @media(max-width:480px){
   .g3,.g4{grid-template-columns:1fr 1fr}
