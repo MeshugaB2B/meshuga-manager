@@ -23,11 +23,10 @@ body{font-family:'Arial Narrow',Arial,sans-serif;background:#FFEB5A;color:#19192
 .sidebar{width:var(--sb-w,210px);min-width:168px;max-width:340px;background:#FFFFFF;border-right:3px solid #191923;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;position:relative}
 .sb-resizer{position:absolute;top:0;right:0;bottom:0;width:6px;cursor:col-resize;z-index:5;background:transparent;transition:background .15s}
 .sb-resizer:hover,.sb-resizer.dragging{background:#FF82D7}
-.sb-logo{padding:11px 9px;border-bottom:2px solid #191923;display:flex;align-items:center;gap:8px}
-.sb-logo-stamp{width:38px;height:38px;flex-shrink:0}
-.sb-logo-text{min-width:0}
-.sb-logo-type{width:110px;max-width:100%;display:block}
-.sb-logo-b2b{font-family:'Yellowtail',cursive;font-size:12px;color:#FF82D7;margin-top:1px}
+.sb-logo{padding:13px 11px;border-bottom:2px solid #191923;display:flex;align-items:center}
+.sb-logo-text{min-width:0;width:100%}
+.sb-logo-type{width:150px;max-width:100%;display:block}
+.sb-logo-b2b{font-family:'Yellowtail',cursive;font-size:13px;color:#FF82D7;margin-top:2px}
 .sb-nav{padding:6px 7px;flex:1;overflow-y:auto}
 .sb-sec{font-family:'Yellowtail',cursive;font-size:14px;color:#FF82D7;padding:6px 8px 2px;margin-top:4px}
 .ni{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:5px;cursor:pointer;font-size:13px;font-weight:600;letter-spacing:0;color:#52525C;border:1.5px solid transparent;transition:all .1s;margin-bottom:0}
