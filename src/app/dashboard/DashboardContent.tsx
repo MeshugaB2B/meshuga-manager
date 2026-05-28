@@ -22,6 +22,7 @@ import HomeOverviewTab from './HomeOverviewTab'
 import Sidebar from './Sidebar'
 import FloatingChat from './FloatingChat'
 import TasksTab from './TasksTab'
+import CrmTab from './CrmTab'
 import { G } from './styles'
 import { LOGO_PINK, LOGO_YELLOW, STAMP_YELLOW, STAMP_PINK } from './logos'
 import {
@@ -90,9 +91,6 @@ function DashboardImpl() {
   const [devisNotes, setDevisNotes] = useState('')
   const [devisNumero, setDevisNumero] = useState('DEV-2026-001')
   const [crmFilter, setCrmFilter] = useState('all')
-  const [crmPeriod, setCrmPeriod] = useState('all')
-  const [crmSearch, setCrmSearch] = useState('')
-  const [crmView, setCrmView] = useState('list')
   const [scriptProspect, setScriptProspect] = useState(null)
   const [scriptContent, setScriptContent] = useState('')
   const [scriptLoading, setScriptLoading] = useState(false)
@@ -1041,374 +1039,26 @@ function DashboardImpl() {
           )}
 
           {page === 'crm' && (
-            <div>
-              <div className="ph">
-                <div><div className="pt">CRM Prospects</div><div className="ps">{prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length} actifs · {prospects.length} total</div></div>
-                <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                  <button className="btn btn-y btn-sm" style={{background:crmView==='list'?'#191923':'transparent',color:crmView==='list'?'#FFEB5A':'#191923'}} onClick={function(){setCrmView('list')}}>Liste</button>
-                  <button className="btn btn-y btn-sm" style={{background:crmView==='kanban'?'#191923':'transparent',color:crmView==='kanban'?'#FFEB5A':'#191923'}} onClick={function(){setCrmView('kanban')}}>Kanban</button>
-                  <button className="btn btn-y btn-sm" onClick={function() { openModal('prospect', {status:'contacted',temperature:'tiede',ca:0,files:[]}) }}>+ Nouveau</button>
-                </div>
-              </div>
-              <div style={{padding:'0 0 10px'}}>
-                <input className="inp" placeholder="🔍 Rechercher un prospect..." value={crmSearch} onChange={function(e){setCrmSearch(e.target.value)}} style={{width:'100%'}} />
-              </div>
-
-              {/* COMMISSION EMY + OBJECTIF + SCORING */}
-              {(function(){
-                var now = new Date()
-                var mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-                var yStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]
-                var filterFn = function(d) {
-                  if (crmPeriod === 'month') return d.created_at && d.created_at >= mStart && (d.statut==='paye'||d.statut==='facture'||d.statut==='accepte')
-                  if (crmPeriod === 'year') return d.created_at && d.created_at >= yStart && (d.statut==='paye'||d.statut==='facture'||d.statut==='accepte')
-                  return d.statut==='paye'||d.statut==='facture'||d.statut==='accepte'
-                }
-                var caTotal = devisList.filter(filterFn).reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0)
-                var commission = caTotal * 0.10
-                var periodLabel = crmPeriod==='month'?'Ce mois':crmPeriod==='year'?'Cette année':'Total'
-                var pipeCA = devisList.filter(function(d){return d.statut==='envoye'}).reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0)
-                var objectifMensuel = crmPeriod === 'month' ? commissionObjectif : crmPeriod === 'year' ? commissionObjectif * 12 : null
-                var progress = objectifMensuel ? Math.min(100, Math.round(commission / objectifMensuel * 100)) : null
-                var progressColor = progress === null ? '#FFEB5A' : progress >= 100 ? '#009D3A' : progress >= 50 ? '#FFEB5A' : '#FF82D7'
-                return (
-                  <div style={{background:'#FFFFFF',borderRadius:10,padding:'18px 20px',marginBottom:12,border:'1.5px solid #EBEBEB',boxShadow:'0 2px 8px rgba(0,0,0,.06)'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:10}}>
-                      <div>
-                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:20,color:'#191923',marginBottom:4}}>💰 Commission Emy</div>
-                        <div style={{fontSize:11,color:'rgba(25,25,35,.7)',textTransform:'uppercase',letterSpacing:1}}>{periodLabel} · 10% du CA HT signé</div>
-                      </div>
-                      <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                        {['month','year','all'].map(function(per){return(
-                          <button key={per} className="btn btn-sm" style={{fontSize:9,padding:'3px 8px',background:crmPeriod===per?'#191923':'#F5F5F5',color:crmPeriod===per?'#FFEB5A':'#555',border:'1.5px solid '+(crmPeriod===per?'#191923':'#DDD')}} onClick={function(){setCrmPeriod(per)}}>{per==='month'?'Mois':per==='year'?'Année':'Total'}</button>
-                        )})
-                      }
-                      </div>
-                    </div>
-
-                    {/* BARRE DE PROGRESSION OBJECTIF */}
-                    {objectifMensuel && (
-                      <div style={{marginTop:14,marginBottom:4}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                          <div style={{fontSize:11,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,color:'#555'}}>
-                            Objectif {crmPeriod==='month'?'mensuel':'annuel'} · {progress}%
-                          </div>
-                          <div style={{display:'flex',alignItems:'center',gap:6}}>
-                            {editObjectif ? (
-                              <div style={{display:'flex',gap:4,alignItems:'center'}}>
-                                <input type="number" style={{width:70,fontSize:11,padding:'2px 6px',border:'1px solid #DDD',borderRadius:4}} defaultValue={commissionObjectif} id="obj-input" />
-                                <button className="btn btn-sm" style={{fontSize:10,background:'#191923',color:'#FFEB5A'}} onClick={function(){
-                                  var el = document.getElementById('obj-input')
-                                  var val = el ? parseInt(el.value) : commissionObjectif
-                                  if (val > 0) setCommissionObjectif(val)
-                                  setEditObjectif(false)
-                                  toast('Objectif mis à jour !')
-                                }}>OK</button>
-                              </div>
-                            ) : (
-                              <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){setEditObjectif(true)}}>
-                                🎯 {commissionObjectif.toLocaleString('fr-FR')} €/mois
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        <div style={{background:'#F0F0F0',borderRadius:20,height:10,overflow:'hidden'}}>
-                          <div style={{width:progress+'%',background:progressColor,height:'100%',borderRadius:20,transition:'width .5s ease'}} />
-                        </div>
-                        {progress >= 100 && <div style={{fontSize:11,color:'#009D3A',fontWeight:900,marginTop:4,textAlign:'center'}}>🏆 Objectif atteint ! Félicitations Emy !</div>}
-                        {progress >= 50 && progress < 100 && <div style={{fontSize:11,color:'#555',marginTop:4,textAlign:'center'}}>Mi-chemin — encore {(objectifMensuel - commission).toLocaleString('fr-FR',{maximumFractionDigits:0})} € à aller !</div>}
-                      </div>
-                    )}
-
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:14}}>
-                      <div style={{background:'#F8F9FF',border:'1.5px solid #DDEEFF',borderRadius:7,padding:'12px 14px'}}>
-                        <div style={{fontSize:12,color:'rgba(25,25,35,.7)',fontWeight:900,marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>CA B2B signé</div>
-                        <div style={{fontWeight:900,fontSize:24,color:'#191923'}}>{caTotal.toLocaleString('fr-FR',{minimumFractionDigits:0})} <span style={{fontSize:12,opacity:.5}}>€ HT</span></div>
-                        <div style={{fontSize:10,color:'#444',fontWeight:600,marginTop:2}}>{devisList.filter(filterFn).length} contrats</div>
-                      </div>
-                      <div style={{background:'#FFEB5A',borderRadius:7,padding:'12px 14px',border:'2px solid rgba(255,255,255,.3)'}}>
-                        <div style={{fontSize:12,color:'rgba(25,25,35,.7)',fontWeight:900,marginBottom:3,textTransform:'uppercase',letterSpacing:.5}}>🎉 Commission</div>
-                        <div style={{fontWeight:900,fontSize:24,color:'#191923'}}>{commission.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} <span style={{fontSize:12,opacity:.5}}>€</span></div>
-                        <div style={{fontSize:10,color:'#333',fontWeight:700,marginTop:2}}>{progress !== null ? progress + "% de l'objectif" : 'Bravo Emy 🚀'}</div>
-                      </div>
-                    </div>
-
-                  {pipeCA>0&&(
-                    <div style={{marginTop:10,padding:'8px 12px',background:'#EBF3FF',borderRadius:6,border:'1.5px solid #005FFF',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                      <div>
-                        <div style={{fontSize:10,fontWeight:900,color:'#005FFF',textTransform:'uppercase',letterSpacing:.5}}>🔄 Pipeline en attente</div>
-                        <div style={{fontSize:11,color:'#555',marginTop:2}}>{devisList.filter(function(d){return d.statut==='envoye'}).length} devis non signés</div>
-                      </div>
-                      <div style={{fontWeight:900,fontSize:20,color:'#005FFF'}}>{pipeCA.toLocaleString('fr-FR',{maximumFractionDigits:0})} € <span style={{fontSize:10,opacity:.5}}>HT</span></div>
-                    </div>
-                  )}
-
-                  {/* BOUTON SCORING */}
-                  <button className="btn btn-sm" style={{marginTop:12,width:'100%',background:'#191923',color:'#FFEB5A',fontWeight:900,opacity:scoringLoading?0.5:1}} disabled={scoringLoading} onClick={autoScore}>
-                    {scoringLoading ? '⏳ Scoring en cours...' : '🎯 Recalculer le scoring IA'}
-                  </button>
-                </div>
-                )
-              })()}
-
-              {/* ACTIONS PRIORITAIRES */}
-              <div style={{background:'#FFF9E5',borderRadius:7,padding:'12px 14px',marginBottom:10,border:'1.5px solid #FFEB5A'}}>
-                <div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',letterSpacing:1,marginBottom:8,color:'#191923'}}>💡 Actions prioritaires</div>
-                {(function(){
-                  var acts=[];var tod=new Date().toISOString().split('T')[0];
-                  var late=prospects.filter(function(p){return p.nextDate&&p.nextDate<=tod&&p.status!=='won'&&p.status!=='lost'})
-                  var denv=devisList.filter(function(d){return d.statut==='envoye'})
-                  var neg=prospects.filter(function(p){return p.status==='nego'})
-                  var chaud=prospects.filter(function(p){return p.temperature==='chaud'&&p.status!=='won'&&p.status!=='lost'})
-                  if(late.length>0)acts.push({e:'🔴',t:'URGENT — '+late.length+' relance(s) en retard : '+late.slice(0,2).map(function(p){return p.name}).join(', ')})
-                  if(denv.length>0)acts.push({e:'💶',t:'Relancer '+denv.length+' devis — '+denv.reduce(function(s,d){return s+(parseFloat(d.total_ht)||0)},0).toLocaleString('fr-FR')+'€ HT'})
-                  if(chaud.length>0)acts.push({e:'🔥',t:chaud.length+' prospects CHAUDS à travailler : '+chaud.slice(0,2).map(function(p){return p.name}).join(', ')})
-                  if(neg.length>0)acts.push({e:'🤝',t:neg.length+' en négo — envoie le devis vite !'})
-                  if(acts.length===0)acts.push({e:'✅',t:'Pipeline en bonne santé !'})
-                  return acts.map(function(a,idx2){return(
-                    <div key={idx2} style={{display:'flex',gap:8,alignItems:'flex-start',marginBottom:4,paddingBottom:4,borderBottom:idx2<acts.length-1?'1px solid rgba(255,255,255,.08)':'none'}}>
-                      <span style={{fontSize:14,flexShrink:0}}>{a.e}</span>
-                      <span style={{fontSize:12,lineHeight:1.4,opacity:.85}}>{a.t}</span>
-                    </div>
-                  )})
-                })()}
-              </div>
-
-              {/* FILTRES */}
-              <div style={{display:'flex',gap:6,marginBottom:10,flexWrap:'wrap'}}>
-                {['all','contacted','nego','chaud','froid','tiede'].map(function(f){
-                  var labels={all:'Tous',contacted:'Contactés',nego:'En négo',chaud:'🔥 Chauds',froid:'🧊 Froids',tiede:'😐 Tièdes'}
-                  var count = f==='all' ? prospects.filter(function(p){return p.status!=='won'&&p.status!=='lost'}).length : prospects.filter(function(p){return f==='contacted'||f==='nego'?p.status===f:p.temperature===f&&p.status!=='won'&&p.status!=='lost'}).length
-                  return(
-                    <button key={f} className={'btn btn-sm'+(crmFilter===f?' btn-p':'')} onClick={function(){setCrmFilter(f)}} style={{fontSize:10}}>
-                      {labels[f]} <span style={{opacity:.5,fontSize:9}}>({count})</span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* LISTE PROSPECTS ACTIFS */}
-              {crmView === 'list' && prospects.filter(function(p){
-                if(p.status==='won'||p.status==='lost') return false
-                if(crmSearch && !p.name.toLowerCase().includes(crmSearch.toLowerCase()) && !(p.category||'').toLowerCase().includes(crmSearch.toLowerCase())) return false
-                if(crmFilter==='all') return true
-                if(crmFilter==='contacted'||crmFilter==='nego') return p.status===crmFilter
-                return p.temperature===crmFilter
-              }).map(function(p) {
-                var tempColors = {chaud:'#CC0066',tiede:'#FF6B2B',froid:'#005FFF'}
-                var tempLabel = {chaud:'🔥 Chaud',tiede:'😐 Tiède',froid:'🧊 Froid'}
-                var isLate = p.nextDate && p.nextDate <= new Date().toISOString().split('T')[0]
-                return (
-                  <div key={p.id} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(isLate?'#CC0066':tempColors[p.temperature]||'#EBEBEB')}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:6}}>
-                      <div style={{flex:1}}>
-                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:3}}>
-                          <div style={{display:'flex',alignItems:'center',gap:6}}>
-                            <div style={{fontWeight:900,fontSize:14,cursor:'pointer'}} onClick={function(){openModal('prospect',Object.assign({},p))}}>{p.name}</div>
-                            {p.score && <div style={{background:p.score>=8?'#009D3A':p.score>=6?'#FFEB5A':'#FF82D7',color:p.score>=8?'#fff':p.score>=6?'#191923':'#fff',borderRadius:20,padding:'1px 7px',fontSize:10,fontWeight:900,flexShrink:0}} title={p.scoreReason||''}>{p.score}/10</div>}
-                          </div>
-                          <span className="badge" style={{color:STATUS_PC[p.status],borderColor:STATUS_PC[p.status]}}>{STATUS_P[p.status]}</span>
-                          {p.temperature && <span style={{fontSize:12,fontWeight:900,color:tempColors[p.temperature]||'#888'}}>{tempLabel[p.temperature]||''}</span>}
-                        </div>
-                        <div style={{fontSize:12,opacity:.8,fontWeight:500}}>{p.category} · {p.email}</div>
-                      </div>
-                      <div style={{display:'flex',gap:4,flexShrink:0}}>
-                        <button className="btn btn-sm" style={{fontSize:10}} onClick={function(){openModal('prospect',Object.assign({},p))}}>✏️</button>
-                        <button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={function(e){e.stopPropagation();generateEmail(Object.assign({},p,{cat:'crm',arrondissement:'',taille:p.size,pitch:p.notes||'',type:p.category}),p.status==='contacted'||p.status==='nego'?'relance':'first')}}>{p.status==='contacted'||p.status==='nego'?'✉️ Relance':'✉️ Email'}</button>
-                        <button className="btn btn-sm" style={{fontSize:10,background:'#FF82D7',color:'#fff'}} onClick={function(e){e.stopPropagation();generateScript(p)}}>📞 Script</button>
-                      </div>
-                    </div>
-
-                    {/* TEMPÉRATURE */}
-                    <div style={{display:'flex',gap:4,marginBottom:8}}>
-                      <div style={{fontSize:10,fontWeight:900,marginRight:4,opacity:.5}}>Température :</div>
-                      {['chaud','tiede','froid'].map(function(t){return(
-                        <button key={t} className="btn btn-sm" style={{fontSize:9,padding:'2px 8px',background:p.temperature===t?tempColors[t]:'transparent',color:p.temperature===t?'#fff':'inherit',border:'1.5px solid '+(tempColors[t])}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{temperature:t}):x})})}}>
-                          {tempLabel[t]}
-                        </button>
-                      )})}
-                    </div>
-
-                    {/* STATUT ÉDITABLE */}
-                    <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:8,flexWrap:'wrap'}}>
-                      <div style={{fontSize:10,fontWeight:900,opacity:.5,textTransform:'uppercase'}}>Statut :</div>
-                      {['to_contact','contacted','nego','won','lost'].map(function(st){
-                        var stLabels={to_contact:'À contacter',contacted:'Contacté',nego:'En négo',won:'🏆 Gagné',lost:'✗ Perdu'}
-                        var stColors={to_contact:'#888',contacted:'#005FFF',nego:'#FF82D7',won:'#009D3A',lost:'#CC0066'}
-                        return(
-                          <button key={st} className="btn btn-sm" style={{fontSize:9,padding:'2px 7px',background:p.status===st?stColors[st]:'#F5F5F5',color:p.status===st?'#fff':'#555',border:'1px solid '+(p.status===st?stColors[st]:'#DDD'),fontWeight:p.status===st?900:400}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:st}):x})})}}>
-                            {stLabels[st]}
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    {p.nextDate && <div style={{fontSize:13,fontWeight:600,marginBottom:6,color:isLate?'#CC0066':'#555',fontWeight:isLate?900:400}}>{isLate?'⚠️ RETARD — ':''}{p.nextAction} — {p.nextDate}</div>}
-
-                    {/* NOTES */}
-                    {p.notes&&<div style={{fontSize:12,color:'#444',background:'#FAFAFA',border:'1px solid #EEE',borderRadius:5,padding:'6px 10px',marginBottom:6,lineHeight:1.5}}>{p.notes}</div>}
-                    <div style={{display:'flex',gap:4,marginBottom:8}}>
-                      <input className="inp" placeholder="Ajouter une note..." style={{flex:1,fontSize:11,padding:'5px 8px'}} id={'note-'+p.id} defaultValue="" />
-                      <button className="btn btn-sm" style={{flexShrink:0}} onClick={function(){
-                        var el = document.getElementById('note-'+p.id)
-                        var note = el ? el.value.trim() : ''
-                        if(!note) return
-                        var ts = new Date().toLocaleDateString('fr-FR')
-                        var newNote = (p.notes ? p.notes+'\n' : '') + '['+ts+'] '+note
-                        setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{notes:newNote}):x})})
-                        if(el) el.value = ''
-                        toast('Note ajoutée ✓')
-                      }}>+ Note</button>
-                    </div>
-
-                    <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                      <button className="btn btn-y btn-sm" style={{fontSize:10}} onClick={function(){
-                        setDevisView('edit');setCurrentDevisId(null);setDevisItems([])
-                        setDevisNumero('DEV-'+new Date().getFullYear()+'-'+String(devisList.length+1).padStart(3,'0'))
-                        setDevisClient({nom:p.name,email:p.email||'',phone:p.phone||'',contact:'',date:'',lieu:'',prospectId:p.id})
-                        setDevisNbPersonnes(50);setDevisFormat('normal');setDevisMiseEnPlace(1500)
-                        setDevisMiseEnPlacePct(0);setDevisRemiseTotal(0);setDevisNotes('');setDevisLivraison(0)
-                        setDevisLivraisonOffert(false);setDevisMepOffert(false)
-                        nav('devis')
-                      }}>📄 Devis</button>
-                      {p.status==='contacted' && <button className="btn btn-sm" style={{background:'#005FFF',color:'#fff',fontSize:11}} onClick={function(){
-                        var rel=new Date();rel.setDate(rel.getDate()+7)
-                        setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{nextDate:rel.toISOString().split('T')[0],nextAction:'2ème relance'}):x})})
-                        toast('Relancé ✓')
-                      }}>↩ Relancer</button>}
-                      {p.status==='contacted' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'nego',temperature:'chaud'}):x})});toast('🔥 En négo !')}}>✅ Intéressé → Négo</button>}
-                      {p.status==='contacted' && <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'lost',temperature:'froid'}):x})});toast('Archivé')}}>✗ Perdu</button>}
-                      {p.status==='nego' && <button className="btn btn-y btn-sm" style={{fontSize:10}} onClick={function(){nav('devis')}}>📄 Créer devis</button>}
-                      {p.status==='nego' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'won'}):x})});sendPushToAll('🏆 Prospect gagné !', p.name + ' est maintenant client !', 'all');toast('🏆 Gagné !')}}>🏆 Gagné</button>}
-                      {p.status==='nego' && <button className="btn btn-red btn-sm" style={{fontSize:10}} onClick={function(){setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:'lost'}):x})});toast('Perdu')}}>✗ Perdu</button>}
-                    </div>
-                  </div>
-                )
-              })}
-
-              {/* VUE KANBAN */}
-              {crmView === 'kanban' && (function(){
-                var cols = [
-                  {id:'to_contact', label:'À contacter', color:'#888', icon:'📋'},
-                  {id:'contacted', label:'Contacté', color:'#005FFF', icon:'📞'},
-                  {id:'nego', label:'En négo', color:'#FF82D7', icon:'🤝'},
-                  {id:'won', label:'Gagné', color:'#009D3A', icon:'🏆'},
-                  {id:'lost', label:'Perdu', color:'#CC0066', icon:'✗'},
-                ]
-                var search = crmSearch.toLowerCase()
-                return (
-                  <div style={{paddingBottom:12}}>
-                    <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                      {cols.map(function(col){
-                        var colProspects = prospects.filter(function(p){
-                          var matchSearch = !search || p.name.toLowerCase().includes(search) || (p.category||'').toLowerCase().includes(search)
-                          return p.status === col.id && matchSearch
-                        })
-                        return (
-                          <div key={col.id} style={{width:'100%',background:'#F8F8F8',borderRadius:10,padding:10,border:'1.5px solid #EEE'}}>
-                            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10,paddingBottom:8,borderBottom:'2px solid '+col.color}}>
-                              <span style={{fontSize:14}}>{col.icon}</span>
-                              <div>
-                                <div style={{fontWeight:900,fontSize:12,color:col.color,textTransform:'uppercase',letterSpacing:.5}}>{col.label}</div>
-                                <div style={{fontSize:10,color:'#888'}}>{colProspects.length} prospect{colProspects.length!==1?'s':''}</div>
-                              </div>
-                            </div>
-                            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
-                            {colProspects.map(function(p){
-                              var tempColors = {chaud:'#CC0066',tiede:'#FF6B2B',froid:'#005FFF'}
-                              var isLate = p.nextDate && p.nextDate <= new Date().toISOString().split('T')[0]
-                              return (
-                                <div key={p.id} style={{background:'#fff',borderRadius:8,padding:'10px',border:'1px solid #EEE',borderLeft:'3px solid '+(isLate?'#CC0066':tempColors[p.temperature]||col.color),cursor:'pointer'}}
-                                  onClick={function(){openModal('prospect',Object.assign({},p))}}>
-                                  <div style={{fontWeight:900,fontSize:13,marginBottom:3}}>{p.name}</div>
-                                  <div style={{fontSize:10,color:'#888',marginBottom:6}}>{p.category}</div>
-                                  {isLate && <div style={{fontSize:10,color:'#CC0066',fontWeight:900,marginBottom:4}}>⚠️ Relance en retard</div>}
-                                  {p.nextDate && !isLate && <div style={{fontSize:10,color:'#555',marginBottom:4}}>📅 {p.nextDate}</div>}
-                                  <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                                    <button className="btn btn-sm" style={{fontSize:9,padding:'2px 6px',background:'#FF82D7',color:'#fff'}} onClick={function(e){e.stopPropagation();generateScript(p)}}>📞 Script</button>
-                                    <button className="btn btn-sm" style={{fontSize:9,padding:'2px 6px'}} onClick={function(e){e.stopPropagation();generateEmail(Object.assign({},p,{cat:'crm',taille:p.size,pitch:p.notes||'',type:p.category}),'first')}}>✉️</button>
-                                  </div>
-                                  {/* Drag statut rapide */}
-                                  <div style={{display:'flex',gap:3,marginTop:6,flexWrap:'wrap'}}>
-                                    {col.id !== 'won' && col.id !== 'lost' && (
-                                      <select style={{fontSize:9,border:'1px solid #EEE',borderRadius:4,padding:'2px 4px',background:'#fafafa',color:'#555',width:'100%'}}
-                                        value={p.status}
-                                        onChange={function(e){
-                                          var newStatus = e.target.value
-                                          setProspects(function(prev){return prev.map(function(x){return x.id===p.id?Object.assign({},x,{status:newStatus}):x})})
-                                          if(newStatus==='won') sendPushToAll('🏆 Gagné !', p.name+' est client !', 'all')
-                                          toast('Statut mis à jour ✓')
-                                        }}>
-                                        <option value="to_contact">→ À contacter</option>
-                                        <option value="contacted">→ Contacté</option>
-                                        <option value="nego">→ En négo</option>
-                                        <option value="won">→ 🏆 Gagné</option>
-                                        <option value="lost">→ Perdu</option>
-                                      </select>
-                                    )}
-                                  </div>
-                                </div>
-                              )
-                            })}
-                            </div>
-                            {colProspects.length === 0 && (
-                              <div style={{textAlign:'center',padding:'20px 10px',color:'#CCC',fontSize:11}}>Aucun prospect</div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })()}
-
-              {/* SCRIPT APPEL MODAL */}
-              {scriptProspect && (
-                <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:200,display:'flex',alignItems:'flex-end',justifyContent:'center'}} onClick={function(){setScriptProspect(null);setScriptContent('')}}>
-                  <div style={{background:'#fff',borderRadius:'16px 16px 0 0',padding:20,width:'100%',maxWidth:520,maxHeight:'80vh',overflowY:'auto'}} onClick={function(e){e.stopPropagation()}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-                      <div>
-                        <div style={{fontFamily:'Yellowtail,cursive',fontSize:22,color:'#191923'}}>📞 Script d&apos;appel</div>
-                        <div style={{fontSize:12,color:'#888',marginTop:2}}>{scriptProspect.name}</div>
-                      </div>
-                      <button style={{background:'none',border:'none',fontSize:22,cursor:'pointer',color:'#888'}} onClick={function(){setScriptProspect(null);setScriptContent('')}}>✕</button>
-                    </div>
-                    {scriptLoading && (
-                      <div style={{textAlign:'center',padding:40}}>
-                        <div style={{fontSize:32,marginBottom:8}}>🧠</div>
-                        <div style={{fontSize:13,color:'#888'}}>L&apos;IA prépare ton script...</div>
-                      </div>
-                    )}
-                    {!scriptLoading && scriptContent && (
-                      <div>
-                        <div style={{background:'#FFFBEA',border:'1.5px solid #FFEB5A',borderRadius:10,padding:16,fontSize:13,lineHeight:1.7,whiteSpace:'pre-wrap',color:'#191923'}}>
-                          {scriptContent}
-                        </div>
-                        <div style={{display:'flex',gap:8,marginTop:12}}>
-                          <button className="btn btn-y" style={{flex:1,fontWeight:900}} onClick={function(){
-                            navigator.clipboard.writeText(scriptContent).then(function(){toast('Script copié ✓')})
-                          }}>📋 Copier le script</button>
-                          <button className="btn btn-sm" style={{background:'#FF82D7',color:'#fff'}} onClick={function(){generateScript(scriptProspect)}}>🔄 Regénérer</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* GAGNÉS */}
-              {prospects.filter(function(p){return p.status==='won'}).length > 0 && (
-                <div style={{marginTop:16}}>
-                  <div className="yt" style={{fontSize:16,marginBottom:8,color:'#009D3A'}}>🏆 Clients gagnés ({prospects.filter(function(p){return p.status==='won'}).length})</div>
-                  {prospects.filter(function(p){return p.status==='won'}).map(function(p){return(
-                    <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',background:'#F0FFF4',border:'1.5px solid #009D3A',borderRadius:5,marginBottom:4}}>
-                      <span style={{fontWeight:900,fontSize:13}}>{p.name}</span>
-                      <span style={{fontSize:11,color:'#009D3A',fontWeight:900}}>✅ Client</span>
-                    </div>
-                  )})}
-                </div>
-              )}
-            </div>
+            <CrmTab
+              prospects={prospects}
+              setProspects={setProspects}
+              devisList={devisList}
+              commissionObjectif={commissionObjectif}
+              setCommissionObjectif={setCommissionObjectif}
+              scoringLoading={scoringLoading}
+              autoScore={autoScore}
+              openModal={openModal}
+              toast={toast}
+              nav={nav}
+              generateEmail={generateEmail}
+              generateScript={generateScript}
+              sendPushToAll={sendPushToAll}
+              scriptProspect={scriptProspect}
+              setScriptProspect={setScriptProspect}
+              scriptContent={scriptContent}
+              scriptLoading={scriptLoading}
+              isEmy={isEmy}
+            />
           )}
 
           {page === 'annuaire' && (
