@@ -430,7 +430,7 @@ export default function PilotageOverviewTab(props) {
                   </span>
                 </div>
                 <div style={{height:10,background:'#EBEBEB',borderRadius:3,border:'1.5px solid '+NOIR,overflow:'hidden'}}>
-                  <div style={{width:pctBar+'%',height:'100%',background: prodSort==='marge' ? VERT : ROSE}}></div>
+                  <div style={{width:pctBar+'%',height:'100%',background: prodSort==='marge' ? ROSE : JAUNE}}></div>
                 </div>
               </div>
             )
