@@ -68,12 +68,21 @@ export default function HomeOverviewTab(props) {
   var [signaturesPending, setSignaturesPending] = useState([])
   var [devisActifs, setDevisActifs] = useState([])
   var [carouselIdx, setCarouselIdx] = useState(0)
+  var [fcIdx, setFcIdx] = useState(0)
+  var [isMobile, setIsMobile] = useState(false)
   var [loading, setLoading] = useState(true)
 
   var [openArticle, setOpenArticle] = useState(null)
   var [openKpiModal, setOpenKpiModal] = useState(null)
 
   useEffect(function() { loadAll() }, [])
+
+  useEffect(function() {
+    function check() { setIsMobile(window.innerWidth <= 768) }
+    check()
+    window.addEventListener('resize', check)
+    return function() { window.removeEventListener('resize', check) }
+  }, [])
 
   function loadAll() {
     setLoading(true)
@@ -152,7 +161,7 @@ export default function HomeOverviewTab(props) {
           else if (p > 3) s.surveillance++
         })
         setRecipeStats(s)
-        setRecipeAlerts(mains.filter(function(r){ return Number(r.ecart_pct) > 3 }).slice(0, 5))
+        setRecipeAlerts(mains.filter(function(r){ return Number(r.ecart_pct) > 3 }).slice(0, 10))
       })
 
     c.from('hr_contracts')
@@ -247,6 +256,17 @@ export default function HomeOverviewTab(props) {
   function carouselPrev() { setCarouselIdx(function(i) { return i > 0 ? i - 1 : 0 }) }
   function carouselNext() { setCarouselIdx(function(i) { return i < carouselTotal - 1 ? i + 1 : carouselTotal - 1 }) }
   var visibleVariations = priceVariations.slice(carouselIdx * 2, carouselIdx * 2 + 2)
+
+  // Carrousel food cost (desktop : pages de 2 ; mobile : scroll latéral colonnes de 2)
+  var fcTotal = Math.ceil(recipeAlerts.length / 2)
+  function fcPrev() { setFcIdx(function(i) { return i > 0 ? i - 1 : 0 }) }
+  function fcNext() { setFcIdx(function(i) { return i < fcTotal - 1 ? i + 1 : fcTotal - 1 }) }
+  var visibleFc = recipeAlerts.slice(fcIdx * 2, fcIdx * 2 + 2)
+  // Découper recipeAlerts en colonnes de 2 (pour le scroll mobile)
+  var fcColumns = []
+  for (var fi = 0; fi < recipeAlerts.length; fi += 2) {
+    fcColumns.push(recipeAlerts.slice(fi, fi + 2))
+  }
 
   // Canaux
   var canalColor = function(k) {
@@ -386,28 +406,54 @@ export default function HomeOverviewTab(props) {
           )}
         </div>
         {recipeAlerts.length > 0 && (
-          <div style={{borderTop:'2px solid '+fcAccent,background:'#FFFFFF'}}>
-            {recipeAlerts.map(function(r) {
-              var p = Number(r.ecart_pct)
-              var color = p > 15 ? '#CC0066' : (p > 8 ? '#B8920A' : '#191923')
-              var emoji = p > 15 ? '🔥' : (p > 8 ? '⚠️' : '👁')
-              return (
-                <div key={r.recipe_id} onClick={function(){ nav('recipes') }} style={{display:'grid',gridTemplateColumns:'30px 1fr auto auto',gap:12,padding:'10px 18px',borderBottom:'1px solid #EBEBEB',cursor:'pointer',alignItems:'center',transition:'background .1s'}}
-                  onMouseEnter={function(e){ e.currentTarget.style.background='#FFEB5A' }}
-                  onMouseLeave={function(e){ e.currentTarget.style.background='transparent' }}>
-                  <span style={{fontSize:18}}>{emoji}</span>
-                  <div style={{minWidth:0}}>
-                    <div style={{fontWeight:900,fontSize:13}}>{r.recipe_name}</div>
-                    <div style={{fontSize:10,opacity:0.5,marginTop:1}}>FC actuel {FMT_EUR_DEC(r.food_cost_actuel)} · moy. {FMT_EUR_DEC(r.food_cost_moyenne)}</div>
-                  </div>
-                  <div style={{textAlign:'right',whiteSpace:'nowrap'}}>
-                    <div style={{fontWeight:900,fontSize:14,color:color}}>{FMT_PCT(p, true)}</div>
-                    <div style={{fontSize:9,opacity:0.5}}>+{FMT_EUR_DEC(r.ecart_eur)} / portion</div>
-                  </div>
-                  <span style={{fontSize:14,opacity:0.4}}>→</span>
+          <div style={{borderTop:'2px solid '+fcAccent,background:'#FFFFFF',padding:'12px 14px'}}>
+            <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:10,flexWrap:'wrap',gap:6}}>
+              <div style={{fontWeight:900,fontSize:11,textTransform:'uppercase',letterSpacing:0.5,opacity:0.6}}>
+                Top {recipeAlerts.length} recettes en dérive
+              </div>
+              {/* Boutons carrousel : desktop uniquement */}
+              {!isMobile && fcTotal > 1 && (
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  <button className="btn btn-sm" onClick={fcPrev} disabled={fcIdx === 0} style={{opacity:fcIdx===0?0.4:1,minWidth:32}}>◀</button>
+                  <span style={{fontSize:11,fontWeight:900,opacity:0.6,padding:'0 6px'}}>{fcIdx + 1} / {fcTotal}</span>
+                  <button className="btn btn-sm" onClick={fcNext} disabled={fcIdx === fcTotal - 1} style={{opacity:fcIdx===fcTotal-1?0.4:1,minWidth:32}}>▶</button>
                 </div>
-              )
-            })}
+              )}
+              {isMobile && fcColumns.length > 1 && (
+                <div style={{fontSize:10,fontWeight:900,opacity:0.45,textTransform:'uppercase',letterSpacing:0.3}}>← Glisse →</div>
+              )}
+            </div>
+
+            {/* DESKTOP : 2 cards visibles, pagination par boutons */}
+            {!isMobile && (
+              <div className="g2" style={{marginBottom:0}}>
+                {visibleFc.map(function(r) { return <FcCard key={r.recipe_id} recipe={r} nav={nav} /> })}
+              </div>
+            )}
+
+            {/* MOBILE : scroll latéral, colonnes de 2 cards empilées */}
+            {isMobile && (
+              <div style={{display:'flex',gap:10,overflowX:'auto',paddingBottom:6,scrollSnapType:'x mandatory',WebkitOverflowScrolling:'touch'}}>
+                {fcColumns.map(function(col, ci) {
+                  return (
+                    <div key={ci} style={{display:'flex',flexDirection:'column',gap:10,minWidth:'85%',scrollSnapAlign:'start',flexShrink:0}}>
+                      {col.map(function(r) { return <FcCard key={r.recipe_id} recipe={r} nav={nav} /> })}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Dots desktop */}
+            {!isMobile && fcTotal > 1 && (
+              <div style={{display:'flex',justifyContent:'center',gap:6,marginTop:12}}>
+                {Array.from({length: fcTotal}).map(function(_, i) {
+                  return (
+                    <span key={i} onClick={function(){ setFcIdx(i) }} style={{width:i===fcIdx?20:10,height:8,borderRadius:4,background:i===fcIdx?fcAccent:'#EBEBEB',border:'2px solid #191923',cursor:'pointer',transition:'width .2s'}} />
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -602,6 +648,30 @@ function CanauxBar(props) {
 function Pill(props) {
   return (
     <span style={{display:'inline-flex',alignItems:'center',padding:'4px 10px',background:props.bg,color:props.color,border:'2px solid #191923',borderRadius:14,fontWeight:900,fontSize:11,whiteSpace:'nowrap',boxShadow:'1.5px 1.5px 0 #191923'}}>{props.children}</span>
+  )
+}
+
+function FcCard(props) {
+  var r = props.recipe
+  var nav = props.nav
+  var p = Number(r.ecart_pct)
+  var color = p > 15 ? '#CC0066' : (p > 8 ? '#B8920A' : '#191923')
+  var bg = p > 15 ? '#FFE6E6' : (p > 8 ? '#FFF4D6' : '#FAFAFA')
+  var emoji = p > 15 ? '🔥' : (p > 8 ? '⚠️' : '👁')
+  return (
+    <div onClick={function(){ nav('recipes') }} style={{background:'#FFFFFF',border:'2px solid #191923',borderRadius:7,padding:'10px 12px',boxShadow:'3px 3px 0 #191923',cursor:'pointer',transition:'transform .1s',display:'flex',alignItems:'center',gap:10}}
+      onMouseEnter={function(e){ e.currentTarget.style.transform='translate(-2px,-2px)'; e.currentTarget.style.boxShadow='5px 5px 0 #191923' }}
+      onMouseLeave={function(e){ e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='3px 3px 0 #191923' }}>
+      <span style={{fontSize:22,lineHeight:1,flexShrink:0}}>{emoji}</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontWeight:900,fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.recipe_name}</div>
+        <div style={{fontSize:10,opacity:0.5,marginTop:1}}>FC {FMT_EUR_DEC(r.food_cost_actuel)} · moy. {FMT_EUR_DEC(r.food_cost_moyenne)}</div>
+      </div>
+      <div style={{textAlign:'right',whiteSpace:'nowrap',flexShrink:0}}>
+        <div style={{background:bg,border:'2px solid '+color,color:color,padding:'2px 8px',borderRadius:11,fontWeight:900,fontSize:12}}>{FMT_PCT(p, true)}</div>
+        <div style={{fontSize:9,opacity:0.5,marginTop:2}}>+{FMT_EUR_DEC(r.ecart_eur)}/port.</div>
+      </div>
+    </div>
   )
 }
 
