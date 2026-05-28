@@ -116,8 +116,26 @@ export default function HomeOverviewTab(props) {
           }
           if (!match && rows.length >= 7) match = rows[6]
           setZPrev(match)
-          // Historique chronologique (ancien → récent) pour le graph
-          setZHistory(rows.slice().reverse())
+          // Fallback : historique court depuis les Z
+          var fallback = rows.slice().reverse()
+          // Historique long depuis la vue unifiée (remonte bien plus loin)
+          c.from('v_sales_daily_unified')
+            .select('*')
+            .order('date', { ascending: false })
+            .limit(42)
+            .then(function(r2) {
+              if (r2.error || !r2.data || r2.data.length === 0) { setZHistory(fallback); return }
+              var long = r2.data.map(function(r) {
+                return {
+                  z_date: r.z_date || r.date || r.jour,
+                  ca_ttc: Number(r.ca_ttc) || 0,
+                  nb_tickets: Number(r.nb_tickets) || 0,
+                  nb_articles: Number(r.nb_articles) || 0,
+                  ticket_moyen: Number(r.ticket_moyen != null ? r.ticket_moyen : r.panier_moyen) || 0
+                }
+              })
+              setZHistory(long.slice().reverse())
+            })
         }
       })
 
@@ -676,7 +694,7 @@ function CaChart(props) {
       <div style={{display:'flex',justifyContent:'flex-end',gap:12,marginTop:4,fontSize:9,fontWeight:900,opacity:0.7,flexWrap:'wrap'}}>
         <span><span style={{display:'inline-block',width:9,height:9,background:conf.accent,marginRight:3,verticalAlign:'middle',borderRadius:2,border:'1px solid #191923'}}></span>Jour</span>
         <span><span style={{display:'inline-block',width:9,height:9,background:'#191923',marginRight:3,verticalAlign:'middle',borderRadius:2,border:'1px solid #FFEB5A'}}></span>Aujourd&apos;hui</span>
-        <span><span style={{display:'inline-block',width:14,height:0,marginRight:3,verticalAlign:'middle',borderTop:'2px dashed #191923'}}></span>J-7 (même jour)</span>
+        <span><span style={{display:'inline-block',position:'relative',width:16,height:10,background:'#FF82D7',marginRight:3,verticalAlign:'middle',borderRadius:2,border:'1px solid #191923'}}><span style={{position:'absolute',left:1,right:1,top:'50%',borderTop:'2px dashed #FFFFFF'}}></span></span>J-7 (même jour)</span>
       </div>
     </div>
   )
@@ -697,12 +715,10 @@ function CaBar(props) {
   // Position du repère J-7 (proportionnel à la barre, baseline = 0)
   var refY = null
   if (v7 !== null && v > 0) refY = y + h * (1 - v7 / v)
-  // Repère lisible : jaune sur barre foncée, noir sinon
-  var refColor = (color === '#191923') ? '#FFEB5A' : '#191923'
   return (
     <g>
       {h > 0 && <path d={path} fill={color} />}
-      {refY !== null && <line x1={x-1.5} x2={x+w+1.5} y1={refY} y2={refY} stroke={refColor} strokeWidth={2} strokeDasharray="3 2" strokeLinecap="round" />}
+      {refY !== null && <line x1={x} x2={x+w} y1={refY} y2={refY} stroke="#FFFFFF" strokeWidth={2} strokeDasharray="3 2" strokeLinecap="butt" />}
     </g>
   )
 }
