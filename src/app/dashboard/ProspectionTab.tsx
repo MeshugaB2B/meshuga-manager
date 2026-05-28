@@ -351,17 +351,18 @@ function LeadCard(props) {
 
   return (
     <div style={{background:'#FFFFFF',border:'2px solid '+NOIR,borderRadius:9,padding:14,boxShadow:'3px 3px 0 '+NOIR,display:'flex',flexDirection:'column',gap:10}}>
+      {/* Ligne badges + bouton Fiche (hors zone cliquable) */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+        <span style={{fontSize:9,fontWeight:900,textTransform:'uppercase',padding:'3px 8px',border:'2px solid '+NOIR,borderRadius:4,background:JAUNE}}>{cat.emoji} {cat.label}</span>
+        <div style={{display:'flex',gap:4,alignItems:'center',flexShrink:0}}>
+          <span style={{fontSize:11,fontWeight:900,background:scoreHot?ROSE:'#EBEBEB',color:scoreHot?'#FFFFFF':NOIR,border:'2px solid '+NOIR,borderRadius:4,padding:'2px 7px'}}>{p.score}/10</span>
+          {p.status !== 'to_contact' && <span style={{fontSize:9,fontWeight:900,color:STATUS_COLORS[p.status],border:'1.5px solid '+STATUS_COLORS[p.status],borderRadius:10,padding:'2px 7px'}}>{STATUS_LABELS[p.status]}</span>}
+          <button onClick={props.onOpen} title="Modifier la fiche" style={{fontSize:13,fontWeight:900,background:'#FFFFFF',border:'2px solid '+NOIR,borderRadius:5,padding:'1px 7px',cursor:'pointer',lineHeight:1.4}}>✏️</button>
+        </div>
+      </div>
+
       {/* --- Zone cliquable (ouvre la fiche) --- */}
       <div onClick={props.onOpen} style={{cursor:'pointer',display:'flex',flexDirection:'column',gap:10}}>
-        {/* Ligne badges */}
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
-          <span style={{fontSize:9,fontWeight:900,textTransform:'uppercase',padding:'3px 8px',border:'2px solid '+NOIR,borderRadius:4,background:JAUNE}}>{cat.emoji} {cat.label}</span>
-          <div style={{display:'flex',gap:4,alignItems:'center',flexShrink:0}}>
-            <span style={{fontSize:11,fontWeight:900,background:scoreHot?ROSE:'#EBEBEB',color:scoreHot?'#FFFFFF':NOIR,border:'2px solid '+NOIR,borderRadius:4,padding:'2px 7px'}}>{p.score}/10</span>
-            {p.status !== 'to_contact' && <span style={{fontSize:9,fontWeight:900,color:STATUS_COLORS[p.status],border:'1.5px solid '+STATUS_COLORS[p.status],borderRadius:10,padding:'2px 7px'}}>{STATUS_LABELS[p.status]}</span>}
-          </div>
-        </div>
-
         {/* Nom + meta */}
         <div>
           <div style={{fontWeight:900,fontSize:16,lineHeight:1.15}}>{p.name}</div>
@@ -397,9 +398,8 @@ function LeadCard(props) {
         {siteUrl && <a href={siteUrl} target="_blank" rel="noopener noreferrer" style={{color:BLEU,textDecoration:'none',fontWeight:700}}>🌐 Site</a>}
       </div>
 
-      {/* Actions */}
-      <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:'auto',paddingTop:4,borderTop:'1px solid #EEE'}}>
-        <button className="btn btn-sm" style={{fontSize:10,fontWeight:900,background:'#FFF',border:'2px solid '+NOIR}} onClick={props.onOpen}>✏️ Fiche</button>
+      {/* Actions — séquence de contact */}
+      <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:'auto',paddingTop:8,borderTop:'1px solid #EEE'}}>
         <button className="btn btn-p btn-sm" style={{fontSize:10}} onClick={props.onEmail}>✉️ Email IA</button>
         {p.status === 'to_contact' && <button className="btn btn-g btn-sm" style={{fontSize:10}} onClick={props.onContacted}>📞 Contacté</button>}
         {p.status === 'contacted' && (
