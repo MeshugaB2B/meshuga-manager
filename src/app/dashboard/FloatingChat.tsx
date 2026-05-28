@@ -196,7 +196,7 @@ export default function FloatingChat(props) {
         style={{
           flex:1, overflowY:'auto', padding:'12px 12px 14px',
           display:'flex', flexDirection:'column', gap:8,
-          background:'#FFEB5A'
+          background:'#FFFFFF'
         }}>
         {loading && (
           <div style={{textAlign:'center', opacity:0.5, padding:20, fontSize:11, fontWeight:700}}>⏳ Chargement...</div>
@@ -231,8 +231,8 @@ export default function FloatingChat(props) {
               <div style={{display:'flex', flexDirection:'column', alignItems: isMe ? 'flex-end' : 'flex-start'}}>
                 <div style={{
                   maxWidth:'82%',
-                  background: isMe ? '#191923' : '#FFFFFF',
-                  color: isMe ? '#FFEB5A' : '#191923',
+                  background: isMe ? '#191923' : '#FF82D7',
+                  color: isMe ? '#FFEB5A' : '#FFFFFF',
                   border:'2px solid #191923',
                   borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
                   padding:'8px 12px',
