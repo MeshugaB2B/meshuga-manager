@@ -613,12 +613,14 @@ function CaChart(props) {
   var data = history.map(function(r, idx) {
     var d = new Date(r.z_date)
     var wd = d.toLocaleDateString('fr-FR', { weekday: 'short' })
+    var v7 = idx >= 7 ? (Number(history[idx-7][metric]) || 0) : null
     return {
       date: d.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'}),
       weekday: wd.charAt(0).toUpperCase() + wd.slice(1),
       value: Number(r[metric]) || 0,
-      isToday: idx === history.length - 1,
-      isWeekAgo: idx === history.length - 8
+      v7: v7,
+      fill: idx === history.length - 1 ? '#191923' : conf.accent,
+      isToday: idx === history.length - 1
     }
   })
 
@@ -634,7 +636,7 @@ function CaChart(props) {
         <span style={{fontFamily:"'Yellowtail',cursive",fontSize:18,color:'#FF82D7'}}>{conf.title}</span>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <span style={{fontSize:10,opacity:0.6,fontWeight:900}}>
-            <span style={{color:'#005FFF'}}>┄</span> Moy. {fmtAxis(avg)}
+            <span style={{color:'#B8B8C2'}}>┄</span> Moy. {fmtAxis(avg)}
           </span>
           <button className="btn btn-sm" onClick={onExpand} style={{fontSize:9}}>Détail →</button>
         </div>
@@ -649,31 +651,59 @@ function CaChart(props) {
               contentStyle={{background:'#191923',border:'2px solid #FFEB5A',borderRadius:6,boxShadow:'3px 3px 0 #FFEB5A',padding:'7px 11px'}}
               labelStyle={{color:'#FFEB5A',fontWeight:900,fontSize:11}}
               itemStyle={{color:'#FFFFFF',fontWeight:900,fontSize:13}}
-              formatter={function(value){ return [fmtFull(value), conf.label] }}
+              formatter={function(value, name, item){
+                var pl = (item && item.payload) ? item.payload : {}
+                var txt = fmtFull(value)
+                if (typeof pl.v7 === 'number' && pl.v7 > 0) {
+                  var diff = Number(value) - pl.v7
+                  var pct = Math.round(diff / pl.v7 * 100)
+                  var sign = diff >= 0 ? '+' : ''
+                  txt += '   (J-7\u00a0: ' + fmtFull(pl.v7) + '  ' + sign + pct + '%)'
+                }
+                return [txt, conf.label]
+              }}
               labelFormatter={function(label, payload){
                 if (payload && payload.length > 0 && payload[0].payload) return payload[0].payload.weekday + ' ' + label
                 return label
               }}
               cursor={{fill:'rgba(255,235,90,0.25)'}}
             />
-            {avg > 0 && <ReferenceLine y={avg} stroke="#005FFF" strokeWidth={2} strokeDasharray="5 3" />}
-            <Bar dataKey="value" radius={[3,3,0,0]}>
-              {data.map(function(entry, idx) {
-                var color = conf.accent
-                if (entry.isToday) color = '#191923'
-                else if (entry.isWeekAgo) color = '#005FFF'
-                return <Cell key={idx} fill={color} />
-              })}
-            </Bar>
+            {avg > 0 && <ReferenceLine y={avg} stroke="#B8B8C2" strokeWidth={1.5} strokeDasharray="5 3" />}
+            <Bar dataKey="value" shape={<CaBar />} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>
       <div style={{display:'flex',justifyContent:'flex-end',gap:12,marginTop:4,fontSize:9,fontWeight:900,opacity:0.7,flexWrap:'wrap'}}>
         <span><span style={{display:'inline-block',width:9,height:9,background:conf.accent,marginRight:3,verticalAlign:'middle',borderRadius:2,border:'1px solid #191923'}}></span>Jour</span>
-        <span><span style={{display:'inline-block',width:9,height:9,background:'#005FFF',marginRight:3,verticalAlign:'middle',borderRadius:2,border:'1px solid #191923'}}></span>J-7</span>
-        <span><span style={{display:'inline-block',width:9,height:9,background:'#191923',marginRight:3,verticalAlign:'middle',borderRadius:2,border:'1px solid #FFEB5A'}}></span>Veille</span>
+        <span><span style={{display:'inline-block',width:9,height:9,background:'#191923',marginRight:3,verticalAlign:'middle',borderRadius:2,border:'1px solid #FFEB5A'}}></span>Aujourd&apos;hui</span>
+        <span><span style={{display:'inline-block',width:14,height:0,marginRight:3,verticalAlign:'middle',borderTop:'2px dashed #191923'}}></span>J-7 (même jour)</span>
       </div>
     </div>
+  )
+}
+
+function CaBar(props) {
+  var x = props.x, y = props.y, w = props.width, h = props.height
+  var pl = props.payload || {}
+  var v = Number(pl.value) || 0
+  var v7 = (typeof pl.v7 === 'number') ? pl.v7 : null
+  var color = pl.fill || '#FF82D7'
+  if (!(w > 0)) return null
+  // Barre à coins supérieurs arrondis
+  var r = Math.min(3, w/2, h > 0 ? h : 3)
+  var path = h > 0
+    ? 'M'+x+','+(y+h)+' L'+x+','+(y+r)+' Q'+x+','+y+' '+(x+r)+','+y+' L'+(x+w-r)+','+y+' Q'+(x+w)+','+y+' '+(x+w)+','+(y+r)+' L'+(x+w)+','+(y+h)+' Z'
+    : ''
+  // Position du repère J-7 (proportionnel à la barre, baseline = 0)
+  var refY = null
+  if (v7 !== null && v > 0) refY = y + h * (1 - v7 / v)
+  // Repère lisible : jaune sur barre foncée, noir sinon
+  var refColor = (color === '#191923') ? '#FFEB5A' : '#191923'
+  return (
+    <g>
+      {h > 0 && <path d={path} fill={color} />}
+      {refY !== null && <line x1={x-1.5} x2={x+w+1.5} y1={refY} y2={refY} stroke={refColor} strokeWidth={2} strokeDasharray="3 2" strokeLinecap="round" />}
+    </g>
   )
 }
 
