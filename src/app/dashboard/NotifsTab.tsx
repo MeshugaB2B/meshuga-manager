@@ -31,6 +31,10 @@ function fmtDate(s) {
 export default function NotifsTab(props) {
   var toast = props.toast || function(){}
   var fcSeuil = Number(props.fcSeuil || 30) // seuil food cost % depuis DashboardContent
+  var pushEnabled = !!props.pushEnabled
+  var pushLoading = !!props.pushLoading
+  var registerPush = props.registerPush || function(){}
+  var unregisterPush = props.unregisterPush || function(){}
 
   var [loading, setLoading] = useState(true)
   var [variations, setVariations] = useState([])  // hausses + baisses fusionnées
@@ -173,6 +177,40 @@ export default function NotifsTab(props) {
 
   return (
     <div>
+      {/* ENCART PUSH — activation notifications visible et accessible (desktop + iPhone) */}
+      <div style={{
+        background: pushEnabled ? '#E6F7E9' : '#FFFFFF',
+        border: '3px solid ' + (pushEnabled ? '#009D3A' : '#FF82D7'),
+        borderRadius: 8, padding: '14px 16px', marginBottom: 14,
+        boxShadow: '4px 4px 0 #191923',
+        display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap'
+      }}>
+        <span style={{fontSize: 32, lineHeight: 1}}>{pushEnabled ? '🔔' : '🔕'}</span>
+        <div style={{flex: 1, minWidth: 0}}>
+          <div style={{fontWeight: 900, fontSize: 15, textTransform: 'uppercase', letterSpacing: 0.5, color: pushEnabled ? '#009D3A' : '#FF82D7'}}>
+            {pushEnabled ? 'Notifications activées' : 'Notifications désactivées'}
+          </div>
+          <div style={{fontSize: 12, opacity: 0.7, marginTop: 3, fontWeight: 700}}>
+            {pushEnabled
+              ? 'Tu reçois les alertes tâches, devis et prix sur cet appareil.'
+              : 'Active pour recevoir les alertes sur cet appareil (à faire sur chaque appareil).'}
+          </div>
+        </div>
+        <button
+          onClick={pushEnabled ? unregisterPush : registerPush}
+          disabled={pushLoading}
+          className={pushEnabled ? 'btn btn-sm' : 'btn btn-p btn-sm'}
+          style={{
+            flexShrink: 0,
+            background: pushEnabled ? '#FFFFFF' : '#FF82D7',
+            color: pushEnabled ? '#191923' : '#FFFFFF',
+            opacity: pushLoading ? 0.6 : 1,
+            fontSize: 12, padding: '8px 16px'
+          }}>
+          {pushLoading ? '⏳ ...' : (pushEnabled ? '🔕 Désactiver' : '🔔 Activer')}
+        </button>
+      </div>
+
       {/* Header */}
       <div style={{marginBottom:14}}>
         <div style={{fontSize:13,opacity:.6,marginBottom:8}}>
