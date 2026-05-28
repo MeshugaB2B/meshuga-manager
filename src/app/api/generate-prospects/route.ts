@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       hotel: 'Hôtels et établissements hôteliers',
       immo: 'Agences et promoteurs immobiliers',
       medical: 'Cliniques et centres médicaux',
-      production: 'Maisons de production audiovisuelle',
+      production: "Sociétés de production audiovisuelle (films/séries/pub) — cible la régie repas tournage : 30-150 personnes nourries par jour sur plusieurs semaines. Donne la production company, mais oriente le pitch sur la régie/catering de tournage",
       ecole: 'Grandes écoles et universités',
       institution: 'Institutions publiques et culturelles',
       luxe: 'Maisons de luxe et de mode',
@@ -31,6 +31,8 @@ export async function POST(req: NextRequest) {
       banque: 'Banques, assurances et fonds',
       sport: 'Clubs sportifs et fédérations',
       pharma: 'Laboratoires pharmaceutiques',
+      galerie: 'Galeries d\'art et maisons de ventes (Christie\'s, Sotheby\'s, Drouot, galeries du Marais et de Saint-Germain) — vernissages, ventes, cocktails clients',
+      sport_premium: 'Salles de sport et studios premium (Klay, Ken Club, BodyOpus, studios pilates haut de gamme) — événements membres, brunches healthy, ouvertures',
     }
 
     const prompt = `Tu es un expert en prospection B2B pour Meshuga Crazy Deli (3 rue Vavin, Paris 6e) — restaurant new-yorkais premium spécialisé en plateaux déjeuner B2B livrés et catering événementiel haut de gamme.
