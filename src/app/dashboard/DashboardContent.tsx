@@ -21,6 +21,7 @@ import ZdeCaisseWidget from './ZdeCaisseWidget'
 import HomeOverviewTab from './HomeOverviewTab'
 import Sidebar from './Sidebar'
 import FloatingChat from './FloatingChat'
+import TasksTab from './TasksTab'
 import { G } from './styles'
 import { LOGO_PINK, LOGO_YELLOW, STAMP_YELLOW, STAMP_PINK } from './logos'
 import {
@@ -1487,55 +1488,13 @@ function DashboardImpl() {
           )}
 
           {page === 'tasks' && (
-            <div>
-              <div className="ph">
-                <div><div className="pt">Taches</div><div className="ps">{tasks.filter(function(t) { return t.status!=='done' }).length} actives</div></div>
-                <button className="btn btn-y btn-sm" onClick={function() { openModal('task', {assignee:'emy',priority:'medium',status:'todo',checklist:[],files:[]}) }}>+ Nouvelle</button>
-              </div>
-              {tasks.map(function(t) {
-                return (
-                  <div key={t.id} className="card" style={{padding:0,overflow:'hidden',marginBottom:8}}>
-                    <div style={{display:'flex',alignItems:'stretch'}}>
-                      <div style={{width:6,background:t.priority==='high'?'#FF82D7':t.priority==='medium'?'#005FFF':'#009D3A',flexShrink:0}} />
-                      <div style={{padding:'12px 14px',flex:1}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
-                          <div style={{flex:1}}>
-                            <div style={{fontSize:13,fontWeight:900}}>{t.title}</div>
-                            <div style={{fontSize:10,opacity:.5,marginTop:2}}>{t.deadline} · {t.assignee}</div>
-                          </div>
-                          <div style={{display:'flex',gap:4}}>
-                            <span className="badge" style={{color:t.status==='done'?'#009D3A':'#888',borderColor:t.status==='done'?'#009D3A':'#ccc'}}>{TASK_S[t.status]}</span>
-                            <button className="btn btn-y btn-sm" onClick={function() {
-                              var o = ['todo','in_progress','done']
-                              sb().from('tasks').update({status: o[Math.min(o.indexOf(t.status)+1,2)]}).eq('id',t.id).then(function(){loadTasks(); if(t.status==="in_progress") logActivity("tache_terminee", "Tache terminee : " + t.title, null, null)})
-                            }}>→</button>
-                            <button className="btn btn-sm" onClick={function() { openModal('task', Object.assign({}, t)) }}>✏️</button>
-                            <button className="btn btn-sm btn-red" onClick={function() { sb().from('tasks').delete().eq('id', t.id).then(function(){loadTasks()}) }}>✕</button>
-                          </div>
-                        </div>
-                        {t.checklist && t.checklist.filter(function(c) { return c }).length > 0 && (
-                          <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid #EBEBEB'}}>
-                            {t.checklist.filter(function(c) { return c }).map(function(item, ci) {
-                              return (
-                                <div key={ci} style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
-                                  <input type="checkbox" checked={item.indexOf('✓ ') === 0} style={{width:13,height:13,cursor:'pointer'}}
-                                    onChange={function(e) {
-                                      var nl2 = t.checklist.slice()
-                                      nl2[ci] = e.target.checked ? '✓ '+item.replace('✓ ','') : item.replace('✓ ','')
-                                      sb().from('tasks').update({checklist:nl2}).eq('id',t.id).then(function(){loadTasks()})
-                                    }} />
-                                  <span style={{fontSize:11,textDecoration:item.indexOf('✓ ')===0?'line-through':'none',opacity:item.indexOf('✓ ')===0?.4:1}}>{item.replace('✓ ','')}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            <TasksTab
+              tasks={tasks}
+              loadTasks={loadTasks}
+              openModal={openModal}
+              toast={toast}
+              isEmy={isEmy}
+            />
           )}
 
           {page === 'calendrier' && (
