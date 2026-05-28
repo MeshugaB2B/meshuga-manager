@@ -202,6 +202,64 @@ export default function FoodCostTab(props) {
     return { avg: avg, alerts: alerts, best: sorted[0], worst: sorted[sorted.length - 1] }
   }
 
+  // ============= PRINT RECIPE (fiche cuisine) =============
+  function printRecipe(parent, variant) {
+    var ings = (variant.ingredients || []).slice().map(function(ing){
+      var qte = Number(ing.qte) || 0
+      var unit = ing.unite
+      var qStr = ''
+      if (unit === 'kg') {
+        qStr = (qte >= 1 ? qte.toFixed(2) + ' kg' : (qte * 1000).toFixed(0) + ' g')
+      } else if (unit === 'L') {
+        qStr = (qte >= 1 ? qte.toFixed(2) + ' L' : (qte * 1000).toFixed(0) + ' ml')
+      } else {
+        qStr = qte + ' ' + unit
+      }
+      return { article: ing.article, qStr: qStr, fournisseur: ing.fournisseur || '' }
+    })
+    var rowsHtml = ings.map(function(it){
+      return '<tr><td class="ing">' + (it.article || '') + '</td><td class="qt">' + it.qStr + '</td></tr>'
+    }).join('')
+    var emojiByCat = { classique:'🥪', mini:'🥖', salade:'🥗', accompagnement:'🍟', boisson:'🥤', dessert:'🍪', sous_recette:'⚙️', sauce:'🥫' }
+    var emoji = emojiByCat[variant.categorie] || '🍴'
+    var dateStr = new Date().toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric' })
+    var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Fiche - ' + (parent.name || '') + '</title>' +
+      '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">' +
+      '<style>' +
+      '@page { size: A4; margin: 16mm 14mm }' +
+      'body { font-family: Arial Narrow, Arial, sans-serif; color: #191923; margin:0; padding:0 }' +
+      '.wrap { max-width: 720px; margin: 0 auto; padding: 14px 0 }' +
+      '.cat-row { font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; color: #FF82D7 }' +
+      '.title { font-family: Yellowtail, cursive; font-size: 56px; color: #FF82D7; line-height: 1; margin: 4px 0 16px }' +
+      '.variant { display: inline-block; background: #191923; color: #FFEB5A; padding: 4px 12px; border-radius: 14px; font-weight: 900; font-size: 12px; margin-bottom: 18px; letter-spacing: 1px }' +
+      '.section-title { font-family: Yellowtail, cursive; font-size: 30px; color: #FF82D7; line-height:1; margin: 18px 0 10px }' +
+      'table { width: 100%; border-collapse: collapse; border: 2px solid #191923; border-radius: 8px; overflow: hidden }' +
+      'th { background: #FFEB5A; color: #191923; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; padding: 8px 12px; text-align: left; border-bottom: 2px solid #191923 }' +
+      'td { padding: 10px 12px; border-bottom: 1px solid #EEE; font-size: 14px }' +
+      'tr:last-child td { border-bottom: none }' +
+      'td.qt { text-align: right; font-weight: 900; font-size: 16px; white-space: nowrap }' +
+      'td.ing { font-weight: 700 }' +
+      '.footer { margin-top: 28px; padding-top: 12px; border-top: 1px dashed #999; font-size: 10px; color: #666; display: flex; justify-content: space-between }' +
+      '.emoji { font-size: 36px; vertical-align: middle; margin-right: 6px }' +
+      '@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact } .noprint { display: none } }' +
+      '.noprint { position: fixed; top: 14px; right: 14px; padding: 10px 16px; background: #FF82D7; color: #fff; border: 2px solid #191923; border-radius: 18px; font-weight: 900; cursor: pointer; box-shadow: 3px 3px 0 #191923; font-family: inherit }' +
+      '</style></head><body>' +
+      '<button class="noprint" onclick="window.print()">🖨️ Imprimer</button>' +
+      '<div class="wrap">' +
+      '<div class="cat-row"><span class="emoji">' + emoji + '</span>' + (variant.categorie || '').replace('_', ' ') + '</div>' +
+      '<div class="title">' + (parent.name || '') + '</div>' +
+      (variant.variant_label && variant.variant_label !== 'Standard' ? '<div class="variant">' + variant.variant_label + '</div>' : '') +
+      '<div class="section-title">Ingrédients</div>' +
+      '<table><thead><tr><th>Article</th><th style="text-align:right">Quantité</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>' +
+      '<div class="footer"><span>Meshuga Crazy Deli · 3 rue Vavin 75006 Paris</span><span>Fiche éditée le ' + dateStr + '</span></div>' +
+      '</div></body></html>'
+    var w = window.open('', '_blank')
+    if (!w) { toast('Activez les pop-ups pour imprimer'); return }
+    w.document.open()
+    w.document.write(html)
+    w.document.close()
+  }
+
   // ============= INLINE INGREDIENT EDIT =============
   function startEditIng(ing) {
     setEditingIngId(ing.id)
@@ -750,6 +808,7 @@ export default function FoodCostTab(props) {
                 </div>
               </div>
               <div style={{display:'flex',gap:6}}>
+                <button onClick={function(){printRecipe(parent, v)}} title="Imprimer la fiche cuisine" style={{width:36,height:36,borderRadius:'50%',border:'2px solid #191923',background:'#FFFFFF',cursor:'pointer',fontSize:14,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>🖨️</button>
                 <button onClick={function(){startEditMeta(v, parent)}} title="Modifier" style={{width:36,height:36,borderRadius:'50%',border:'2px solid #191923',background:'var(--y)',cursor:'pointer',fontSize:14,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>✏️</button>
                 <button onClick={function(){deleteRecipeParent(parent.parent_slug, parent.name)}} title="Supprimer" style={{width:36,height:36,borderRadius:'50%',border:'2px solid #CC0066',background:'#FFE5E5',color:'#CC0066',cursor:'pointer',fontSize:14,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>🗑️</button>
               </div>
@@ -833,16 +892,16 @@ export default function FoodCostTab(props) {
               </div>
               {!isPrep && (
                 <div style={{background:fcMainColor === '#009D3A' ? '#E8F8EE' : (fcMainColor === '#FFA500' ? '#FFF5E5' : '#FFE5E5'),borderRadius:14,padding:'12px 14px',border:'2px solid '+fcMainColor,boxShadow:'3px 3px 0 '+fcMainColor}}>
-                  <div style={{fontSize:9,fontWeight:900,opacity:.7,textTransform:'uppercase',letterSpacing:.5,color:fcMainColor}}>Food cost</div>
-                  <div style={{fontSize:26,fontWeight:900,color:fcMainColor,lineHeight:1,marginTop:4}}>{v.food_cost_pct}<span style={{fontSize:14}}>%</span></div>
-                  <div style={{fontSize:9,opacity:.7,marginTop:3,fontWeight:700,color:fcMainColor}}>Coeff actuel : ×{coeffActuel}</div>
+                  <div style={{fontSize:9,fontWeight:900,opacity:.75,textTransform:'uppercase',letterSpacing:.5,color:fcMainColor}}>Coefficient</div>
+                  <div style={{fontSize:32,fontWeight:900,color:fcMainColor,lineHeight:1,marginTop:4}}>×{coeffActuel}</div>
+                  <div style={{fontSize:9,opacity:.75,marginTop:3,fontWeight:700,color:fcMainColor}}>Food cost : {v.food_cost_pct}%</div>
                 </div>
               )}
               {!isPrep && (
-                <div style={{background:'var(--y)',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
-                  <div style={{fontSize:9,fontWeight:900,opacity:.7,textTransform:'uppercase',letterSpacing:.5}}>Marge HT</div>
-                  <div style={{fontSize:26,fontWeight:900,color:'#191923',lineHeight:1,marginTop:4}}>{fmt(v.marge_ht)}<span style={{fontSize:14}}>€</span></div>
-                  <div style={{fontSize:9,opacity:.7,marginTop:3,fontWeight:700}}>par unité vendue</div>
+                <div style={{background:'#FFFFFF',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                  <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Marge HT</div>
+                  <div style={{fontSize:26,fontWeight:900,color:'#009D3A',lineHeight:1,marginTop:4}}>{fmt(v.marge_ht)}<span style={{fontSize:14}}>€</span></div>
+                  <div style={{fontSize:9,opacity:.55,marginTop:3,fontWeight:700}}>par unité vendue</div>
                 </div>
               )}
             </div>
@@ -942,12 +1001,14 @@ export default function FoodCostTab(props) {
               </div>
             )}
 
-            {/* Liste des ingrédients avec barres de poids */}
+            {/* Liste des ingrédients avec barres de poids — grille 2 colonnes */}
             {ingsWithCost.length === 0 && (
               <div style={{padding:30,textAlign:'center',opacity:.5,fontSize:12,background:'#FFFFFF',borderRadius:12,border:'2px dashed #DDD',fontWeight:700}}>
                 Aucun ingrédient. Clique sur « + Ajouter un ingrédient » pour commencer.
               </div>
             )}
+            {ingsWithCost.length > 0 && (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:10}}>
             {ingsWithCost.map(function(ing){
               var displayQte = ing.qte
               var displayUnit = ing.unite
@@ -962,7 +1023,7 @@ export default function FoodCostTab(props) {
 
               if (isEdit && editingIngDraft) {
                 return (
-                  <div key={ing.id} style={{background:'#FFFFFF',borderRadius:12,padding:14,marginBottom:8,border:'2px solid #005FFF',boxShadow:'3px 3px 0 #005FFF'}}>
+                  <div key={ing.id} style={{background:'#FFFFFF',borderRadius:12,padding:14,border:'2px solid #005FFF',boxShadow:'3px 3px 0 #005FFF',gridColumn:'1 / -1'}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
                       <div style={{fontSize:14,fontWeight:900}}>{ing.article}</div>
                       <button onClick={function(){if(confirm('Retirer cet ingrédient de la recette ?')) removeIngredient(ing)}} title="Retirer" style={{width:30,height:30,borderRadius:'50%',border:'2px solid #CC0066',background:'#FFE5E5',color:'#CC0066',fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>🗑️</button>
@@ -991,7 +1052,7 @@ export default function FoodCostTab(props) {
               }
               // Vue lecture : ingrédient avec barre de poids
               return (
-                <div key={ing.id} onClick={function(){startEditIng(ing)}} style={{background:'#FFFFFF',border:'2px solid #191923',borderRadius:12,padding:'12px 14px',marginBottom:8,cursor:'pointer',boxShadow:'2px 2px 0 #191923',transition:'transform .12s'}} onMouseEnter={function(e){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='2px 2px 0 #191923'}}>
+                <div key={ing.id} onClick={function(){startEditIng(ing)}} style={{background:'#FFFFFF',border:'2px solid #191923',borderRadius:12,padding:'12px 14px',cursor:'pointer',boxShadow:'2px 2px 0 #191923',transition:'transform .12s'}} onMouseEnter={function(e){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='2px 2px 0 #191923'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:8}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:14,fontWeight:900,marginBottom:2}}>{ing.article}</div>
@@ -1009,6 +1070,8 @@ export default function FoodCostTab(props) {
                 </div>
               )
             })}
+            </div>
+            )}
 
             {/* ============= PRIX CONSEILLÉ (en bas, discret) ============= */}
             {!isPrep && (
