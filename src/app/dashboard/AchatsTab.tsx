@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import PhotoPicker from './PhotoPicker'
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
@@ -44,6 +45,7 @@ export default function AchatsTab(props) {
   var [showOrphansToggle, setShowOrphansToggle] = useState(true)
   var [catalogSort, setCatalogSort] = useState('recent')
   var [selectedSupplier, setSelectedSupplier] = useState(null)
+  var [photoPickerOpen, setPhotoPickerOpen] = useState(false)
 
   useEffect(function() { loadData() }, [])
 
@@ -515,6 +517,36 @@ export default function AchatsTab(props) {
     return (
       <div>
         <div onClick={function(){setSelectedProduct(null)}} style={{cursor:'pointer',fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginBottom:12}}>← Retour</div>
+
+        {/* PHOTO PRODUIT */}
+        <div style={{marginBottom:14}}>
+          {prod.photo_url ? (
+            <div style={{position:'relative',borderRadius:14,overflow:'hidden',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',maxWidth:280}}>
+              <img src={prod.photo_url} alt={prod.name} style={{width:'100%',aspectRatio:'1/1',objectFit:'cover',display:'block',background:'#F5F5F5'}} />
+              <div style={{position:'absolute',top:8,right:8,display:'flex',gap:6}}>
+                <button onClick={function(){setPhotoPickerOpen(true)}} title="Remplacer" style={{width:32,height:32,borderRadius:'50%',border:'2px solid #191923',background:'rgba(255,255,255,.95)',cursor:'pointer',fontSize:12,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>📷</button>
+                <button title="Supprimer" onClick={function(){
+                  if (!confirm('Supprimer la photo de ce produit ?')) return
+                  sb().from('products').update({photo_url:null}).eq('id',prod.id).then(function(r){
+                    if (r.error) { toast('Erreur : ' + r.error.message); return }
+                    toast('✅ Photo supprimée')
+                    loadData()
+                    setSelectedProduct(Object.assign({}, prod, {photo_url:null}))
+                  })
+                }} style={{width:32,height:32,borderRadius:'50%',border:'2px solid var(--p)',background:'rgba(255,229,245,.95)',color:'var(--p)',cursor:'pointer',fontSize:12,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>🗑️</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={function(){setPhotoPickerOpen(true)}} style={{padding:'18px 14px',background:'#FFFFFF',border:'2px dashed #191923',borderRadius:14,cursor:'pointer',width:'100%',maxWidth:280,display:'flex',alignItems:'center',gap:10,textAlign:'left'}}>
+              <div style={{fontSize:28}}>📷</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:900}}>Ajouter une photo</div>
+                <div style={{fontSize:10,opacity:.55,fontWeight:700}}>Upload ou Unsplash · détourage auto</div>
+              </div>
+            </button>
+          )}
+        </div>
+
         <div style={{background:'#fff',border:'2px solid #FF82D7',borderRadius:12,padding:20}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:12}}>
             <div>
@@ -1364,9 +1396,11 @@ export default function AchatsTab(props) {
                 else if (tr.pct <= -5) { trendColor = '#009D3A'; trendArrow = '↘' }
                 return (
                   <div key={p.id} onClick={function(){setSelectedProduct(p)}} style={{background:'#FFFFFF',borderRadius:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',overflow:'hidden',cursor:'pointer',display:'flex',flexDirection:'column',transition:'transform .12s',opacity:p.is_active?1:0.6}} onMouseEnter={function(e){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='4px 4px 0 #191923'}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}}>
-                    {/* Placeholder photo */}
-                    <div style={{height:90,background:catGradient(supCat),display:'flex',alignItems:'center',justifyContent:'center',fontSize:42,position:'relative',borderBottom:'2px solid #191923'}}>
-                      {catEmoji(supCat)}
+                    {/* Photo / placeholder */}
+                    <div style={{height:90,background:p.photo_url ? '#F5F5F5' : catGradient(supCat),display:'flex',alignItems:'center',justifyContent:'center',fontSize:42,position:'relative',borderBottom:'2px solid #191923',overflow:'hidden'}}>
+                      {p.photo_url ? (
+                        <img src={p.photo_url} alt={p.name} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
+                      ) : catEmoji(supCat)}
                       {/* Badge fournisseur */}
                       {sup && (
                         <div style={{position:'absolute',top:6,left:6,background:'rgba(255,255,255,.95)',color:'#191923',fontSize:9,fontWeight:900,padding:'3px 8px',borderRadius:6,border:'1.5px solid #191923',letterSpacing:.3,maxWidth:'70%',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{sup.name}</div>
@@ -1553,6 +1587,21 @@ export default function AchatsTab(props) {
             Comparez les conditionnements (poche, colis, sachet) pour valider l'écart de prix · Échap pour fermer
           </div>
         </div>
+      )}
+
+      {/* ========== PHOTO PICKER MODAL ========== */}
+      {photoPickerOpen && selectedProduct && (
+        <PhotoPicker
+          productId={selectedProduct.id}
+          productName={selectedProduct.name}
+          toast={toast}
+          onClose={function(){setPhotoPickerOpen(false)}}
+          onUploaded={function(url){
+            setPhotoPickerOpen(false)
+            loadData()
+            setSelectedProduct(Object.assign({}, selectedProduct, {photo_url:url}))
+          }}
+        />
       )}
     </div>
   )
