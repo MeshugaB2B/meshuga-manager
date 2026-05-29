@@ -43,6 +43,7 @@ export default function AchatsTab(props) {
   var [showInactiveProducts, setShowInactiveProducts] = useState(false)
   var [showOrphansToggle, setShowOrphansToggle] = useState(true)
   var [catalogSort, setCatalogSort] = useState('recent')
+  var [selectedSupplier, setSelectedSupplier] = useState(null)
 
   useEffect(function() { loadData() }, [])
 
@@ -633,7 +634,7 @@ export default function AchatsTab(props) {
 
       {/* ============ ONGLETS PILOTAGE / CATALOGUE ============ */}
       <div style={{display:'flex',gap:6,marginBottom:18}}>
-        {[{id:'pilotage',label:'Pilotage',emoji:'📊'},{id:'catalogue',label:'Catalogue',emoji:'📦'}].map(function(t){
+        {[{id:'pilotage',label:'Pilotage',emoji:'📊'},{id:'fournisseurs',label:'Fournisseurs',emoji:'🏢'},{id:'catalogue',label:'Catalogue',emoji:'📦'}].map(function(t){
           var active = achatsView === t.id
           return <button key={t.id} onClick={function(){setAchatsView(t.id)}} style={{padding:'8px 18px',background:active?'var(--p)':'#FFFFFF',color:active?'#FFFFFF':'#191923',border:'2px solid #191923',borderRadius:20,fontWeight:900,fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',gap:6,boxShadow:active?'2px 2px 0 #191923':'none'}}>
             <span style={{fontSize:14}}>{t.emoji}</span>{t.label}
@@ -870,6 +871,313 @@ export default function AchatsTab(props) {
         )
       })()}
 
+      {/* ============ VUE FOURNISSEURS V1 (Sprint 3) ============ */}
+      {achatsView === 'fournisseurs' && (function(){
+        // Calcul agrégé par fournisseur
+        // 1. Total payé ce mois (calendaire) + nb factures + dernière date
+        var now = new Date()
+        var firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+        var firstOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime()
+        var firstOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime()
+
+        // Pour chaque fournisseur : agréger via products → product_prices
+        var bySupplier = {}
+        suppliers.forEach(function(s){
+          if (s.archived) return
+          bySupplier[s.id] = {
+            supplier: s,
+            nbProductsActive: 0,
+            totalThisMonth: 0,
+            totalPrevMonth: 0,
+            nbInvoicesThisMonth: 0,
+            lastInvoiceDate: null,
+            monthly6: [0,0,0,0,0,0], // 6 derniers mois (du plus ancien au plus récent)
+            products: []
+          }
+        })
+
+        products.forEach(function(p){
+          if (!bySupplier[p.supplier_id]) return
+          var bucket = bySupplier[p.supplier_id]
+          if (p.is_active) bucket.nbProductsActive++
+          bucket.products.push(p)
+        })
+
+        // Invoice dates uniques par fournisseur pour le mois
+        var invoicesSeenThisMonth = {} // {supId: {filename: true}}
+        prices.forEach(function(pp){
+          var product = products.filter(function(x){ return x.id === pp.product_id })[0]
+          if (!product) return
+          var bucket = bySupplier[product.supplier_id]
+          if (!bucket) return
+          var d = new Date(pp.invoice_date).getTime()
+          var packTotal = Number(pp.pack_price || 0)
+          // Mois en cours
+          if (d >= firstOfMonth && d < firstOfNextMonth) {
+            bucket.totalThisMonth += packTotal
+            if (pp.invoice_filename) {
+              if (!invoicesSeenThisMonth[product.supplier_id]) invoicesSeenThisMonth[product.supplier_id] = {}
+              invoicesSeenThisMonth[product.supplier_id][pp.invoice_filename] = true
+            }
+          }
+          // Mois précédent
+          if (d >= firstOfPrevMonth && d < firstOfMonth) {
+            bucket.totalPrevMonth += packTotal
+          }
+          // Dernière facture (toute date)
+          var dateMs = new Date(pp.invoice_date).getTime()
+          if (!bucket.lastInvoiceDate || dateMs > bucket.lastInvoiceDate) bucket.lastInvoiceDate = dateMs
+          // Sparkline 6 derniers mois
+          var deltaMonths = (now.getFullYear() - new Date(pp.invoice_date).getFullYear()) * 12 + (now.getMonth() - new Date(pp.invoice_date).getMonth())
+          if (deltaMonths >= 0 && deltaMonths < 6) {
+            bucket.monthly6[5 - deltaMonths] += packTotal
+          }
+        })
+        // Compter nb factures du mois
+        Object.keys(invoicesSeenThisMonth).forEach(function(supId){
+          if (bySupplier[supId]) bySupplier[supId].nbInvoicesThisMonth = Object.keys(invoicesSeenThisMonth[supId]).length
+        })
+
+        var supplierCards = Object.values(bySupplier)
+          .filter(function(b){ return b.nbProductsActive > 0 })
+          .sort(function(a,b){ return b.totalThisMonth - a.totalThisMonth })
+
+        // Catégorie : gradient + emoji
+        function catGradient(cat){
+          if (cat === 'boisson') return 'linear-gradient(135deg, #FFE5F5 0%, #FFE5E5 100%)'
+          if (cat === 'packaging') return 'linear-gradient(135deg, #F0F4FF 0%, #DCE7FF 100%)'
+          if (cat === 'consommable') return 'linear-gradient(135deg, #F0FFF4 0%, #DCF7E3 100%)'
+          return 'linear-gradient(135deg, var(--y) 0%, #FFF5C2 100%)'
+        }
+        function catEmoji(cat){
+          if (cat === 'boisson') return '🥤'
+          if (cat === 'packaging') return '📦'
+          if (cat === 'consommable') return '🧽'
+          return '🥬'
+        }
+        function fmtEur(n){ return Math.round(Number(n || 0)).toLocaleString('fr-FR') + '€' }
+        function fmtDate(ms){ if(!ms) return '—'; var d = new Date(ms); var dt = (now.getTime() - ms) / (24*3600*1000); if (dt < 1) return "aujourd'hui"; if (dt < 2) return 'hier'; if (dt < 30) return 'il y a ' + Math.floor(dt) + 'j'; return d.toLocaleDateString('fr-FR', {day:'2-digit', month:'short'}) }
+
+        // Mini sparkline (réutilisable)
+        function Sparkline(p){
+          var data = p.data || []
+          if (data.length < 2) return null
+          var mn = Math.min.apply(null, data); var mx = Math.max.apply(null, data)
+          var range = mx - mn || 1
+          var w = p.w || 60; var h = p.h || 22
+          var step = w / (data.length - 1)
+          var pts = data.map(function(v, i){
+            var x = i * step
+            var y = h - ((v - mn) / range) * h
+            return x.toFixed(1) + ',' + y.toFixed(1)
+          }).join(' ')
+          var color = p.color || '#191923'
+          return <svg width={w} height={h} style={{flexShrink:0}}>
+            <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        }
+
+        // =========== VUE DÉTAIL FOURNISSEUR ===========
+        if (selectedSupplier) {
+          var b = bySupplier[selectedSupplier.id]
+          if (!b) { setSelectedSupplier(null); return null }
+          var s = b.supplier
+
+          // Variation panier mois vs mois précédent
+          var diff = b.totalThisMonth - b.totalPrevMonth
+          var diffPct = b.totalPrevMonth > 0 ? (diff / b.totalPrevMonth * 100) : 0
+          var diffColor = diffPct > 5 ? 'var(--p)' : (diffPct < -5 ? '#009D3A' : '#191923')
+          var diffArrow = diffPct > 5 ? '↗' : (diffPct < -5 ? '↘' : '→')
+
+          // Produits triés par variation récente |%|
+          var prodTrends = b.products.filter(function(p){ return p.is_active }).map(function(p){
+            var arr = prices.filter(function(pp){ return pp.product_id === p.id }).slice().sort(function(a,b){ return new Date(a.invoice_date).getTime() - new Date(b.invoice_date).getTime() })
+            var pct = 0
+            if (arr.length >= 2) {
+              var last = Number(arr[arr.length-1].master_unit_price)
+              var prev = Number(arr[arr.length-2].master_unit_price)
+              if (prev > 0) pct = (last - prev) / prev * 100
+            }
+            return { product: p, pct: pct, lastDate: arr.length > 0 ? arr[arr.length-1].invoice_date : null }
+          })
+          prodTrends.sort(function(a,b){ return Math.abs(b.pct) - Math.abs(a.pct) })
+
+          // Dernières factures
+          var lastInvoices = []
+          var seen = {}
+          prices.slice().sort(function(a,b){ return new Date(b.invoice_date).getTime() - new Date(a.invoice_date).getTime() }).forEach(function(pp){
+            var product = products.filter(function(x){ return x.id === pp.product_id })[0]
+            if (!product || product.supplier_id !== s.id) return
+            if (!pp.invoice_filename) return
+            if (seen[pp.invoice_filename]) return
+            seen[pp.invoice_filename] = true
+            lastInvoices.push({ filename: pp.invoice_filename, date: pp.invoice_date, path: pp.invoice_path })
+          })
+          lastInvoices = lastInvoices.slice(0, 8)
+
+          return (
+            <div>
+              {/* Header fournisseur */}
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
+                <button onClick={function(){setSelectedSupplier(null)}} style={{width:36,height:36,borderRadius:'50%',border:'2px solid #191923',background:'#FFFFFF',cursor:'pointer',fontSize:16,fontWeight:900,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,padding:0}}>←</button>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:32,color:'var(--p)',lineHeight:1}}>{s.name}</div>
+                  <div style={{fontSize:10,fontWeight:700,opacity:.55,marginTop:2,textTransform:'capitalize'}}>{catEmoji(s.category)} {s.category || 'ingredient'} · {b.nbProductsActive} produits actifs</div>
+                </div>
+              </div>
+
+              {/* 4 KPIs */}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:18}}>
+                <div style={{background:'#FFFFFF',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                  <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Ce mois</div>
+                  <div style={{fontSize:24,fontWeight:900,lineHeight:1.1,marginTop:4}}>{fmtEur(b.totalThisMonth)}</div>
+                  <div style={{fontSize:9,opacity:.55,marginTop:2,fontWeight:700}}>{b.nbInvoicesThisMonth} facture{b.nbInvoicesThisMonth>1?'s':''}</div>
+                </div>
+                <div style={{background:'#FFFFFF',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                  <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Mois précédent</div>
+                  <div style={{fontSize:24,fontWeight:900,lineHeight:1.1,marginTop:4,opacity:.65}}>{fmtEur(b.totalPrevMonth)}</div>
+                </div>
+                <div style={{background:'#FFFFFF',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <span style={{width:9,height:9,borderRadius:'50%',background:diffColor,flexShrink:0}}></span>
+                    <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Variation</div>
+                  </div>
+                  <div style={{fontSize:22,fontWeight:900,color:diffColor,lineHeight:1.1,marginTop:4}}>{diffArrow} {diffPct >= 0 ? '+' : ''}{diffPct.toFixed(0)}%</div>
+                </div>
+                <div style={{background:'#FFFFFF',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                  <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Dernière facture</div>
+                  <div style={{fontSize:16,fontWeight:900,lineHeight:1.15,marginTop:4}}>{fmtDate(b.lastInvoiceDate)}</div>
+                </div>
+              </div>
+
+              {/* Graphe 6 mois */}
+              <div style={{background:'#FFFFFF',borderRadius:14,padding:16,marginBottom:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'var(--p)',lineHeight:1,marginBottom:8}}>Évolution panier — 6 derniers mois</div>
+                {(function(){
+                  var maxVal = Math.max.apply(null, b.monthly6) || 1
+                  return (
+                    <div style={{display:'flex',alignItems:'flex-end',gap:8,height:120,padding:'10px 0'}}>
+                      {b.monthly6.map(function(v, i){
+                        var d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
+                        var label = d.toLocaleDateString('fr-FR', { month:'short' })
+                        var pct = (v / maxVal) * 100
+                        var isCurrent = i === 5
+                        return (
+                          <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4,minWidth:0}}>
+                            <div style={{fontSize:11,fontWeight:900,color:isCurrent?'var(--p)':'#191923',whiteSpace:'nowrap'}}>{v >= 1 ? fmtEur(v) : '—'}</div>
+                            <div style={{width:'100%',height:80,background:'#F5F5F5',borderRadius:6,position:'relative',overflow:'hidden'}}>
+                              <div style={{position:'absolute',bottom:0,left:0,right:0,height:pct+'%',background:isCurrent?'var(--p)':'var(--y)',borderTop:'2px solid #191923',transition:'height .3s'}}></div>
+                            </div>
+                            <div style={{fontSize:10,fontWeight:700,opacity:.55,textTransform:'uppercase'}}>{label}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
+              </div>
+
+              {/* Produits triés par variation */}
+              <div style={{background:'#FFFFFF',borderRadius:14,padding:16,marginBottom:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,gap:8,flexWrap:'wrap'}}>
+                  <div>
+                    <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'var(--p)',lineHeight:1}}>Produits</div>
+                    <div style={{fontSize:10,fontWeight:700,opacity:.55,marginTop:2}}>{prodTrends.length} actifs · triés par variation récente</div>
+                  </div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {prodTrends.slice(0, 12).map(function(pt){
+                    var pct = pt.pct
+                    var color = '#191923'
+                    var arrow = '→'
+                    if (pct >= 5) { color = 'var(--p)'; arrow = '↗' }
+                    else if (pct <= -5) { color = '#009D3A'; arrow = '↘' }
+                    return (
+                      <div key={pt.product.id} onClick={function(){setSelectedProduct(pt.product);setSelectedSupplier(null)}} style={{display:'flex',alignItems:'center',gap:10,padding:'9px 12px',background:'#FFFFFF',border:'1.5px solid #EEE',borderRadius:10,cursor:'pointer'}} onMouseEnter={function(e){e.currentTarget.style.background='#FAFAFA'}} onMouseLeave={function(e){e.currentTarget.style.background='#FFFFFF'}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:900,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pt.product.name}</div>
+                          <div style={{fontSize:10,opacity:.55,fontWeight:700,marginTop:2}}>{Number(pt.product.current_price).toFixed(2)}€/{pt.product.unit}</div>
+                        </div>
+                        {pct !== 0 && (
+                          <div style={{fontSize:13,fontWeight:900,color:color,whiteSpace:'nowrap'}}>{arrow} {pct >= 0 ? '+' : ''}{pct.toFixed(0)}%</div>
+                        )}
+                        <div style={{fontSize:14,opacity:.55,fontWeight:900}}>›</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Dernières factures */}
+              {lastInvoices.length > 0 && (
+                <div style={{background:'#FFFFFF',borderRadius:14,padding:16,marginBottom:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                  <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'var(--p)',lineHeight:1,marginBottom:10}}>Dernières factures</div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                    {lastInvoices.map(function(inv, i){
+                      var d = new Date(inv.date).toLocaleDateString('fr-FR', {day:'2-digit', month:'short', year:'2-digit'})
+                      return (
+                        <div key={i} onClick={function(){setPdfViewer({filename:inv.filename,fournisseur:s.name,date:inv.date,productName:'Facture',price:0,unit:''})}} style={{padding:'8px 12px',background:'var(--y)',border:'2px solid #191923',borderRadius:10,cursor:'pointer',fontSize:11,fontWeight:900,display:'flex',alignItems:'center',gap:6}}>
+                          <span>📄</span>
+                          <span>{d}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        // =========== VUE LISTE FOURNISSEURS ===========
+        return (
+          <div>
+            <div style={{fontSize:11,fontWeight:700,opacity:.55,marginBottom:14}}>{supplierCards.length} fournisseur{supplierCards.length>1?'s':''} actif{supplierCards.length>1?'s':''} · triés par € achats du mois</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:14}}>
+              {supplierCards.map(function(b){
+                var s = b.supplier
+                var diff = b.totalThisMonth - b.totalPrevMonth
+                var diffPct = b.totalPrevMonth > 0 ? (diff / b.totalPrevMonth * 100) : 0
+                var diffColor = diffPct > 5 ? 'var(--p)' : (diffPct < -5 ? '#009D3A' : '#191923')
+                var diffArrow = diffPct > 5 ? '↗' : (diffPct < -5 ? '↘' : '→')
+                return (
+                  <div key={s.id} onClick={function(){setSelectedSupplier(s)}} style={{background:'#FFFFFF',borderRadius:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',overflow:'hidden',cursor:'pointer',display:'flex',flexDirection:'column',transition:'transform .12s'}} onMouseEnter={function(e){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='4px 4px 0 #191923'}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}}>
+                    {/* Header coloré par catégorie avec nom */}
+                    <div style={{padding:'14px 14px 12px',background:catGradient(s.category),borderBottom:'2px solid #191923',position:'relative'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                        <div style={{fontFamily:"'Yellowtail',cursive",fontSize:24,color:'#191923',lineHeight:1,flex:1,minWidth:0,wordBreak:'break-word'}}>{s.name}</div>
+                        <span style={{fontSize:22,flexShrink:0}}>{catEmoji(s.category)}</span>
+                      </div>
+                      <div style={{fontSize:9,fontWeight:900,opacity:.7,textTransform:'uppercase',letterSpacing:.5,marginTop:4}}>{s.category || 'ingredient'}</div>
+                    </div>
+                    {/* Stats */}
+                    <div style={{padding:'12px 14px',flex:1,display:'flex',flexDirection:'column',gap:10}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
+                        <div>
+                          <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Ce mois</div>
+                          <div style={{fontSize:22,fontWeight:900,lineHeight:1,marginTop:2}}>{fmtEur(b.totalThisMonth)}</div>
+                        </div>
+                        {b.totalPrevMonth > 0 && (
+                          <div style={{fontSize:13,fontWeight:900,color:diffColor,whiteSpace:'nowrap'}}>
+                            {diffArrow} {diffPct >= 0 ? '+' : ''}{diffPct.toFixed(0)}%
+                          </div>
+                        )}
+                      </div>
+                      <div style={{display:'flex',justifyContent:'space-between',fontSize:10,fontWeight:700,opacity:.7,paddingTop:6,borderTop:'1px solid #EEE'}}>
+                        <span>{b.nbProductsActive} produits</span>
+                        <span>📄 {fmtDate(b.lastInvoiceDate)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            {supplierCards.length === 0 && (
+              <div style={{padding:40,textAlign:'center',opacity:.5,fontSize:13,background:'#FFFFFF',borderRadius:14,border:'2px dashed #DDD',fontWeight:700}}>Aucun fournisseur actif</div>
+            )}
+          </div>
+        )
+      })()}
       {/* ============ VUE CATALOGUE V2 (Sprint 2) ============ */}
       {achatsView === 'catalogue' && (function(){
         // États de filtrage avancé via state (déjà déclarés en haut)
