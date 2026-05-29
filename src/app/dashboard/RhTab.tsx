@@ -3,10 +3,21 @@
 // FILE PATH dans le repo :
 //   src/app/dashboard/RhTab.tsx
 // ============================================================
-// v2 (27/05/2026) — Refonte UX SignaturesPendingWidget :
-//   AJOUT : listener sur l'event "meshuga:open-employee" pour permettre au
-//   widget compact de demander l'ouverture d'une fiche salarié sans prop drilling.
-//   Tout le reste du fichier est identique à la version actuelle en prod.
+// v3 (29/05/2026) — REFONTE UX « RESSOURCES HUMAINES »
+//   Direction : HUB centré ÉQUIPE + barre « À TRAITER » + sous-nav 5 sections.
+//   - Header ROSE « Salut Edward » + bouton embauche
+//   - Barre À TRAITER (jaune) : avenants à signer, brouillons, dossiers incomplets,
+//     régularisations welcome pack — chips cliquables qui basculent de section.
+//   - 4 KPIs + rond de progression « dossiers OK x/7 »
+//   - Sous-nav en pills : Équipe / Contrats & avenants / Coffre docs / Conformité / Congés
+//   - Cartes salariés : AVATAR COULEUR PAR POSTE (cuisine rouge, caisse bleu,
+//     salle vert, commercial rose, direction noir) + point de statut en coin.
+//   - Carte « Embaucher / extra » en pointillés.
+//   ON NE JETTE RIEN : tout le moteur existant (RhWizard, EmployeeDetail, avenants,
+//   welcome pack, signature, offboarding, retro-import, SignaturesPendingWidget,
+//   ContractPreview, WelcomePackPreview) est conservé et rebranché à l'identique.
+// SWC-safe : var partout, pas de generics, function(){}, pas d'optional chaining
+//   en deps useEffect, sous-composants top-level, &apos; dans le texte JSX.
 // ============================================================
 
 import { useState, useEffect, useRef } from "react"
@@ -19,31 +30,176 @@ import RetroUploadWizard from "./rh/RetroUploadWizard"
 import OffboardingWizard from "./rh/OffboardingWizard"
 import { buildContract } from "./rh/contractBuilders"
 import { buildWelcomePack } from "./rh/welcomePackBuilder"
-import { getContractTypeMeta } from "./rh/rhConstants"
-
-// ============================================================
-// Meshuga RH — Vue salarié-centrée
-// ============================================================
-// Page principale : liste de salariés (pas de contrats à la racine)
-// Clic sur un salarié → fiche complète déroulée
-// SWC-safe : var dans JSX, pas de generics, function(){}, pas de optional chaining
-// ============================================================
+import { getContractTypeMeta, MESHUGA_LEGAL } from "./rh/rhConstants"
 
 var supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 )
 
+// ============================================================
+// CODE COULEUR PAR POSTE
+// Cuisine → rouge #CC0066 | Caisse/accueil → bleu #005FFF |
+// Salle/équipier → vert #009D3A | Commercial B2B → rose #FF82D7 |
+// Direction/admin → noir #191923 (initiale jaune)
+// Résolution : fonction (prioritaire) puis type de contrat (fallback).
+// ============================================================
+function getPosteMeta(fonction, type) {
+  var f = (fonction || "").toLowerCase()
+  var t = (type || "").toLowerCase()
+
+  // Direction / admin
+  if (f.indexOf("directeur") >= 0 || f.indexOf("directrice") >= 0 || f.indexOf("direction") >= 0
+      || f.indexOf("gérant") >= 0 || f.indexOf("gerant") >= 0 || f.indexOf("président") >= 0
+      || f.indexOf("president") >= 0 || f.indexOf("administr") >= 0) {
+    return { key: "direction", label: "Direction / admin", color: "#191923", textColor: "#FFEB5A" }
+  }
+  // Commercial B2B (inclut développement commercial / agent de maîtrise / cadre)
+  if (f.indexOf("commercial") >= 0 || f.indexOf("b2b") >= 0 || f.indexOf("business") >= 0
+      || f.indexOf("développement") >= 0 || f.indexOf("developpement") >= 0 || f.indexOf("vente") >= 0
+      || t === "cdi_agent_maitrise" || t === "cdi_cadre") {
+    return { key: "commercial", label: "Commercial B2B", color: "#FF82D7", textColor: "#191923" }
+  }
+  // Cuisine
+  if (f.indexOf("cuisin") >= 0 || f.indexOf("chef") >= 0 || f.indexOf("plonge") >= 0
+      || t === "cdi_cuisinier") {
+    return { key: "cuisine", label: "Cuisine", color: "#CC0066", textColor: "#FFFFFF" }
+  }
+  // Caisse / accueil (la responsabilité caisse prime sur le service en salle)
+  if (f.indexOf("caiss") >= 0 || f.indexOf("vendeu") >= 0 || f.indexOf("accueil") >= 0
+      || f.indexOf("comptoir") >= 0 || t === "cdi_caissier") {
+    return { key: "caisse", label: "Caisse / accueil", color: "#005FFF", textColor: "#FFFFFF" }
+  }
+  // Salle / équipier
+  if (f.indexOf("serveu") >= 0 || f.indexOf("salle") >= 0 || f.indexOf("équipier") >= 0
+      || f.indexOf("equipier") >= 0 || f.indexOf("runner") >= 0) {
+    return { key: "salle", label: "Salle / équipier", color: "#009D3A", textColor: "#FFFFFF" }
+  }
+  // Fallback
+  return { key: "autre", label: "Équipe", color: "#191923", textColor: "#FFEB5A" }
+}
+
+var POSTE_LEGEND = [
+  { color: "#CC0066", label: "Cuisine" },
+  { color: "#005FFF", label: "Caisse / accueil" },
+  { color: "#009D3A", label: "Salle / équipier" },
+  { color: "#FF82D7", label: "Commercial B2B" },
+  { color: "#191923", label: "Direction" }
+]
+
+function getInitials(prenom, nom) {
+  var p = (prenom || "").trim()
+  var n = (nom || "").trim()
+  var a = p ? p.charAt(0) : ""
+  var b = n ? n.charAt(0) : ""
+  var res = (a + b).toUpperCase()
+  return res || "?"
+}
+
+// Critères de complétude « dossier » (on ignore volontairement les champs
+// systématiquement vides à ce stade — HACCP / contact d'urgence — qui sont
+// suivis à part dans CONFORMITÉ pour ne pas plomber artificiellement le score).
+function dossierState(e) {
+  var hasSecu = !!(e.num_secu && String(e.num_secu).trim())
+  var hasAdresse = !!(e.adresse && String(e.adresse).trim())
+  var hasNaissance = !!e.date_naissance
+  var hasContact = !!((e.email && String(e.email).trim()) || (e.telephone && String(e.telephone).trim()))
+  var hasWelcome = e.welcome_pack_signed === true
+  var checks = [hasSecu, hasAdresse, hasNaissance, hasContact, hasWelcome]
+  var done = 0
+  var missing = []
+  if (hasSecu) { done++ } else { missing.push("N° sécurité sociale") }
+  if (hasAdresse) { done++ } else { missing.push("Adresse") }
+  if (hasNaissance) { done++ } else { missing.push("Date de naissance") }
+  if (hasContact) { done++ } else { missing.push("Email ou téléphone") }
+  if (hasWelcome) { done++ } else { missing.push("Dossier de bienvenue signé") }
+  return { done: done, total: checks.length, ok: done === checks.length, missing: missing }
+}
+
+// ============================================================
+// COMPOSANTS PRÉSENTATIONNELS (top-level, SWC-safe)
+// ============================================================
+function PosteAvatar(props) {
+  var meta = props.meta
+  var size = props.size || 46
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <div style={{
+        width: size, height: size, borderRadius: "50%",
+        background: meta.color, color: meta.textColor,
+        border: "2px solid #191923", boxShadow: "2px 2px 0 #191923",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontWeight: 900, fontSize: Math.round(size * 0.36), letterSpacing: ".5px",
+        fontFamily: "'Arial Narrow', Arial, sans-serif"
+      }}>
+        {props.initials || "?"}
+      </div>
+      {props.statusColor ? (
+        <div title={props.statusLabel || ""} style={{
+          position: "absolute", right: -2, bottom: -2, width: 14, height: 14,
+          borderRadius: "50%", background: props.statusColor,
+          border: "2px solid #FFFFFF", boxShadow: "0 0 0 1.5px #191923"
+        }}></div>
+      ) : null}
+    </div>
+  )
+}
+
+function ProgressRing(props) {
+  var size = props.size || 78
+  var stroke = 9
+  var r = (size - stroke) / 2
+  var circ = 2 * Math.PI * r
+  var pct = props.total > 0 ? (props.done / props.total) : 0
+  var dash = circ * pct
+  return (
+    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={"0 0 " + size + " " + size}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#EBEBEB" strokeWidth={stroke}></circle>
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none"
+          stroke={pct >= 1 ? "#009D3A" : "#191923"} strokeWidth={stroke} strokeLinecap="round"
+          strokeDasharray={dash + " " + circ}
+          transform={"rotate(-90 " + (size / 2) + " " + (size / 2) + ")"}
+        ></circle>
+      </svg>
+      <div style={{
+        position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center", lineHeight: 1
+      }}>
+        <div style={{ fontWeight: 900, fontSize: 19 }}>
+          {props.done}<span style={{ opacity: 0.4, fontSize: 12 }}>/{props.total}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Petite tuile KPI
+function KpiTile(props) {
+  return (
+    <div className="kpi-mini" style={{ cursor: props.onClick ? "pointer" : "default" }} onClick={props.onClick}>
+      <div style={{ fontWeight: 900, fontSize: 24, lineHeight: 1 }}>{props.value}</div>
+      <div className="yt" style={{ fontSize: 13, color: "#FF82D7", marginTop: 2 }}>{props.label}</div>
+    </div>
+  )
+}
+
+// ============================================================
+// COMPOSANT PRINCIPAL — HUB RH
+// ============================================================
 export default function RhTab() {
   var [employees, setEmployees] = useState([])
   var [contracts, setContracts] = useState([])
-  var [docCounts, setDocCounts] = useState({})           // { employeeId: nb_docs_perso }
-  var [contractDocCounts, setContractDocCounts] = useState({}) // { employeeId: nb_docs_contrat }
+  var [amendments, setAmendments] = useState([])
+  var [docCounts, setDocCounts] = useState({})
+  var [contractDocCounts, setContractDocCounts] = useState({})
   var [loading, setLoading] = useState(true)
+  var [section, setSection] = useState("equipe") // equipe | contrats | coffre | conformite | conges
   var [showWizard, setShowWizard] = useState(false)
   var [showRetroImport, setShowRetroImport] = useState(false)
   var [offboardingEmployee, setOffboardingEmployee] = useState(null)
-  var [activeTab, setActiveTab] = useState("actifs")  // actifs | anciens | tous
+  var [teamFilter, setTeamFilter] = useState("actifs") // actifs | anciens | tous
   var [editingContract, setEditingContract] = useState(null)
   var [wizardForEmployee, setWizardForEmployee] = useState(null)
   var [viewingEmployeeId, setViewingEmployeeId] = useState(null)
@@ -67,8 +223,6 @@ export default function RhTab() {
       .from("hr_contracts")
       .select("*, hr_contract_vacations(*)")
       .order("created_at", { ascending: false })
-    // Charger les cycles d'emploi pour pouvoir résoudre l'employee_id des contrats
-    // créés via régularisation rétroactive (qui ont seulement cycle_id)
     var resCyc = await supabase
       .from("hr_employment_cycles")
       .select("id, employee_id")
@@ -78,14 +232,16 @@ export default function RhTab() {
     var resCDocs = await supabase
       .from("hr_contract_documents")
       .select("contract_id")
+    var resAmd = await supabase
+      .from("hr_contract_amendments")
+      .select("id, contract_id, type, objet, status, signature_status, created_at, signature_date")
+      .order("created_at", { ascending: false })
 
-    // Construire mapping cycleId → employeeId
     var cycleToEmp = {}
     ;(resCyc.data || []).forEach(function (cyc) {
       cycleToEmp[cyc.id] = cyc.employee_id
     })
 
-    // Enrichir chaque contrat avec _employee_id effectif (fusion des deux schémas)
     var contracts_ = (resC.data || []).map(function (c) {
       var effectiveEmpId = c.employee_id
         || (c.cycle_id ? cycleToEmp[c.cycle_id] : null)
@@ -93,14 +249,12 @@ export default function RhTab() {
       return Object.assign({}, c, { _employee_id: effectiveEmpId })
     })
 
-    // Compteur docs perso par employé
     var counts = {}
     if (resDocs.data) {
       resDocs.data.forEach(function (d) {
         counts[d.employee_id] = (counts[d.employee_id] || 0) + 1
       })
     }
-    // Compteur docs contractuels par employé (via contrat → _employee_id effectif)
     var contractIdToEmpId = {}
     contracts_.forEach(function (c) { contractIdToEmpId[c.id] = c._employee_id })
     var cCounts = {}
@@ -111,8 +265,14 @@ export default function RhTab() {
       })
     }
 
+    // Enrichir les avenants avec l'employee_id résolu via leur contrat
+    var amendments_ = (resAmd.data || []).map(function (a) {
+      return Object.assign({}, a, { _employee_id: contractIdToEmpId[a.contract_id] || null })
+    })
+
     setEmployees(resE.data || [])
     setContracts(contracts_)
+    setAmendments(amendments_)
     setDocCounts(counts)
     setContractDocCounts(cCounts)
     setLoading(false)
@@ -120,12 +280,7 @@ export default function RhTab() {
 
   useEffect(function () { loadAll() }, [])
 
-  // ============================================================
-  // 🔥 v2 (27/05/2026) — Listener pour le SignaturesPendingWidget
-  // Quand l'utilisateur clique sur une carte dans le widget compact,
-  // le widget dispatch un CustomEvent "meshuga:open-employee" avec
-  // l'employeeId dans le detail. On l'écoute ici pour ouvrir la fiche.
-  // ============================================================
+  // Listener pour le SignaturesPendingWidget (ouvre une fiche salarié)
   useEffect(function () {
     var handler = function (ev) {
       var empId = ev && ev.detail && ev.detail.employeeId
@@ -135,8 +290,7 @@ export default function RhTab() {
     return function () { window.removeEventListener("meshuga:open-employee", handler) }
   }, [])
 
-  // Détermine le contrat principal d'un employé (CDI le plus récent, sinon dernier extra)
-  // Utilise _employee_id pour gérer aussi les contrats rattachés via cycle_id
+  // Contrat principal d'un employé (CDI le plus récent, sinon dernier extra)
   function getMainContract(empId) {
     var empContracts = contracts.filter(function (c) { return c._employee_id === empId })
     if (empContracts.length === 0) return null
@@ -145,295 +299,591 @@ export default function RhTab() {
     return empContracts[0]
   }
 
-  // Filtrage par onglet (actifs / anciens / tous)
-  var filtered = employees
-  if (activeTab === "actifs") {
-    filtered = employees.filter(function (e) { return !e.date_sortie })
-  } else if (activeTab === "anciens") {
-    filtered = employees.filter(function (e) { return !!e.date_sortie })
+  function posteForEmployee(empId) {
+    var c = getMainContract(empId)
+    if (!c) return getPosteMeta("", "")
+    return getPosteMeta(c.fonction, c.type)
   }
-  // Filtrage par recherche (s'applique après le filtre onglet)
+
+  // Statut visuel (point en coin de l'avatar)
+  function statusForEmployee(e) {
+    if (e.date_sortie) return { color: "#9AA0A6", label: "Sorti" }
+    if (e.needs_regularization || !dossierState(e).ok) return { color: "#FF6B2B", label: "Dossier incomplet" }
+    return { color: "#009D3A", label: "Actif · dossier complet" }
+  }
+
+  // === Découpages ===
+  var actifs = employees.filter(function (e) { return !e.date_sortie })
+  var anciens = employees.filter(function (e) { return !!e.date_sortie })
+
+  // Liste affichée dans la grille ÉQUIPE (filtre actifs/anciens/tous + recherche)
+  var teamList = employees
+  if (teamFilter === "actifs") teamList = actifs
+  else if (teamFilter === "anciens") teamList = anciens
   if (search.trim()) {
     var q = search.toLowerCase()
-    filtered = filtered.filter(function (e) {
+    teamList = teamList.filter(function (e) {
       var hay = ((e.prenom || "") + " " + (e.nom || "") + " " + (e.email || "") + " " + (e.telephone || "")).toLowerCase()
       return hay.indexOf(q) >= 0
     })
   }
 
-  // Comptes par catégorie pour les badges des onglets
-  var nbActifsList = employees.filter(function (e) { return !e.date_sortie }).length
-  var nbAnciensList = employees.filter(function (e) { return !!e.date_sortie }).length
-
-  // Stats header
-  var nbCdi = contracts.filter(function (c) {
-    return c.type !== "extra" && c.status !== "archived"
+  // === KPIs ===
+  var now = new Date()
+  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  var monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+  var kpiEffectif = actifs.length
+  var kpiExtrasMois = contracts.filter(function (c) {
+    if (c.type !== "extra" || !c.date_debut) return false
+    var d = new Date(c.date_debut)
+    return d >= monthStart && d <= monthEnd
   }).length
-  var nbExtras = contracts.filter(function (c) {
-    return c.type === "extra" && c.date_fin && new Date(c.date_fin) >= new Date()
+  var kpiContrats = contracts.filter(function (c) {
+    return c.is_current === true && c.type !== "extra"
   }).length
+  var kpiConges = 0 // hr_leave_requests vide pour l'instant
 
+  // Rond de progression : dossiers actifs complets / total actifs
+  var dossiersOk = actifs.filter(function (e) { return dossierState(e).ok }).length
+
+  // === À TRAITER ===
+  var avenantsASigner = amendments.filter(function (a) {
+    return a.status !== "signed" && (a.signature_status === "sent" || a.signature_status === "viewed")
+  })
+  var brouillons = amendments.filter(function (a) {
+    return a.status === "draft" && (a.signature_status === "unsent" || !a.signature_status)
+  })
+  var welcomeARegul = actifs.filter(function (e) { return e.welcome_pack_signed !== true })
+  var dossiersIncomplets = actifs.filter(function (e) { return !dossierState(e).ok })
+
+  var aTraiter = []
+  if (avenantsASigner.length > 0) {
+    aTraiter.push({
+      key: "avenants",
+      icon: "✍️",
+      text: avenantsASigner.length + " avenant" + (avenantsASigner.length > 1 ? "s" : "") + " en attente de signature",
+      go: "contrats"
+    })
+  }
+  if (brouillons.length > 0) {
+    aTraiter.push({
+      key: "brouillons",
+      icon: "📝",
+      text: brouillons.length + " brouillon" + (brouillons.length > 1 ? "s" : "") + " à finaliser",
+      go: "contrats"
+    })
+  }
+  if (welcomeARegul.length > 0) {
+    aTraiter.push({
+      key: "welcome",
+      icon: "📋",
+      text: welcomeARegul.length + " dossier" + (welcomeARegul.length > 1 ? "s" : "") + " de bienvenue à régulariser",
+      go: "conformite"
+    })
+  }
+  if (dossiersIncomplets.length > 0) {
+    aTraiter.push({
+      key: "dossiers",
+      icon: "⚠️",
+      text: dossiersIncomplets.length + " dossier" + (dossiersIncomplets.length > 1 ? "s" : "") + " incomplet" + (dossiersIncomplets.length > 1 ? "s" : ""),
+      go: "conformite"
+    })
+  }
+
+  // Badges sous-nav
+  var badgeContrats = avenantsASigner.length + brouillons.length
+  var badgeConformite = dossiersIncomplets.length + welcomeARegul.length
+
+  // Pipeline contrats (lecture seule)
+  var pipeBrouillon = amendments.filter(function (a) { return a.status === "draft" && (a.signature_status === "unsent" || !a.signature_status) }).length
+  var pipeASigner = amendments.filter(function (a) { return a.status !== "signed" && (a.signature_status === "sent" || a.signature_status === "viewed") }).length
+    + contracts.filter(function (c) { return c.status !== "signed" && c.status !== "archived" && (c.signature_status === "sent" || c.signature_status === "viewed") }).length
+  var pipeSigne = amendments.filter(function (a) { return a.status === "signed" || a.signature_status === "signed" }).length
+    + contracts.filter(function (c) { return c.status === "signed" || c.signature_status === "signed" }).length
+  var pipeArchive = contracts.filter(function (c) { return c.status === "archived" }).length
+
+  // Pills de navigation
+  var NAV = [
+    { key: "equipe", icon: "👥", label: "Équipe", badge: 0 },
+    { key: "contrats", icon: "📄", label: "Contrats & avenants", badge: badgeContrats },
+    { key: "coffre", icon: "🗄️", label: "Coffre docs", badge: 0 },
+    { key: "conformite", icon: "✅", label: "Conformité", badge: badgeConformite },
+    { key: "conges", icon: "🏖️", label: "Congés", badge: 0 }
+  ]
+
+  // ============================================================
   return (
     <div>
-      {/* === HEADER === */}
-      <div className="ph">
+      {/* === HEADER ROSE === */}
+      <div style={{
+        background: "var(--p, #FF82D7)",
+        border: "2.5px solid #191923",
+        borderRadius: 10,
+        boxShadow: "4px 4px 0 #191923",
+        padding: "14px 18px",
+        marginBottom: 14,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 12,
+        flexWrap: "wrap"
+      }}>
         <div>
-          <div className="pt">RESSOURCES HUMAINES</div>
-          <div className="ps">
-            {employees.length} salarié{employees.length > 1 ? "s" : ""}
-            {nbCdi > 0 ? (" · " + nbCdi + " CDI") : ""}
-            {nbExtras > 0 ? (" · " + nbExtras + " extra" + (nbExtras > 1 ? "s" : "") + " en cours") : ""}
-            {" · CCN Restauration Rapide (IDCC 1501)"}
+          <div className="yt" style={{ fontSize: 32, color: "#191923", lineHeight: 1 }}>Salut Edward&nbsp;!</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#191923", opacity: 0.75, marginTop: 4 }}>
+            {employees.length} salarié{employees.length > 1 ? "s" : ""} · {actifs.length} en poste · CCN Restauration Rapide (IDCC 1501)
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            className="btn"
-            onClick={function () { window.open("/api/hr/personnel-register", "_blank") }}
-            title="Imprimer le registre du personnel (Article L.1221-13)"
-          >📄 Registre du personnel</button>
-          <button
-            className="btn btn-y"
-            onClick={function () { setShowRetroImport(true) }}
-            title="Digitaliser les anciens contrats par photos ou PDF"
-          >📥 Importer historique</button>
-          <button
-            className="btn btn-p"
-            onClick={function () {
-              setEditingContract(null)
-              setWizardForEmployee(null)
-              setShowWizard(true)
-            }}
-          >+ Nouvelle embauche</button>
+        <button
+          className="btn btn-n"
+          style={{ fontSize: 12, padding: "10px 16px" }}
+          onClick={function () {
+            setEditingContract(null)
+            setWizardForEmployee(null)
+            setShowWizard(true)
+          }}
+        >+ Embaucher</button>
+      </div>
+
+      {/* === BARRE À TRAITER === */}
+      <div className="card-y" style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: aTraiter.length > 0 ? 10 : 0, flexWrap: "wrap" }}>
+          <span style={{ fontWeight: 900, fontSize: 12, textTransform: "uppercase", letterSpacing: 1 }}>
+            🔔 À traiter
+          </span>
+          {aTraiter.length === 0 ? (
+            <span style={{ fontWeight: 700, fontSize: 12, color: "#191923" }}>
+              &mdash; tout est à jour&nbsp;🎉
+            </span>
+          ) : (
+            <span style={{
+              background: "#191923", color: "var(--y, #FFEB5A)", fontWeight: 900, fontSize: 11,
+              padding: "2px 8px", borderRadius: 9, border: "1.5px solid #191923"
+            }}>{aTraiter.length}</span>
+          )}
         </div>
-      </div>
-      <div className="strip"></div>
-
-      {/* === Widget signatures en attente (compact, replié par défaut) === */}
-      <SignaturesPendingWidget />
-
-      {/* === ONGLETS ACTIFS / ANCIENS / TOUS === */}
-      <div style={{ display: "flex", gap: 0, marginBottom: 0, borderBottom: "2.5px solid #191923", flexWrap: "wrap" }}>
-        <button
-          onClick={function () { setActiveTab("actifs") }}
-          style={{
-            background: activeTab === "actifs" ? "#FFEB5A" : "#FFFFFF",
-            color: "#191923",
-            border: "2.5px solid #191923",
-            borderBottom: activeTab === "actifs" ? "2.5px solid #FFEB5A" : "2.5px solid #191923",
-            marginBottom: "-2.5px",
-            padding: "8px 18px",
-            fontFamily: "'Arial Narrow', Arial, sans-serif",
-            fontWeight: 900,
-            textTransform: "uppercase",
-            letterSpacing: 1,
-            fontSize: 11,
-            cursor: "pointer",
-            boxShadow: activeTab === "actifs" ? "3px 3px 0 #191923" : "none",
-            position: "relative",
-            zIndex: activeTab === "actifs" ? 2 : 1,
-          }}
-        >👥 Actifs ({nbActifsList})</button>
-        <button
-          onClick={function () { setActiveTab("anciens") }}
-          style={{
-            background: activeTab === "anciens" ? "#FF82D7" : "#FFFFFF",
-            color: "#191923",
-            border: "2.5px solid #191923",
-            borderBottom: activeTab === "anciens" ? "2.5px solid #FF82D7" : "2.5px solid #191923",
-            marginBottom: "-2.5px",
-            marginLeft: 6,
-            padding: "8px 18px",
-            fontFamily: "'Arial Narrow', Arial, sans-serif",
-            fontWeight: 900,
-            textTransform: "uppercase",
-            letterSpacing: 1,
-            fontSize: 11,
-            cursor: "pointer",
-            boxShadow: activeTab === "anciens" ? "3px 3px 0 #191923" : "none",
-            position: "relative",
-            zIndex: activeTab === "anciens" ? 2 : 1,
-          }}
-        >📤 Anciens ({nbAnciensList})</button>
-        <button
-          onClick={function () { setActiveTab("tous") }}
-          style={{
-            background: activeTab === "tous" ? "#191923" : "#FFFFFF",
-            color: activeTab === "tous" ? "#FFEB5A" : "#191923",
-            border: "2.5px solid #191923",
-            borderBottom: activeTab === "tous" ? "2.5px solid #191923" : "2.5px solid #191923",
-            marginBottom: "-2.5px",
-            marginLeft: 6,
-            padding: "8px 18px",
-            fontFamily: "'Arial Narrow', Arial, sans-serif",
-            fontWeight: 900,
-            textTransform: "uppercase",
-            letterSpacing: 1,
-            fontSize: 11,
-            cursor: "pointer",
-            boxShadow: activeTab === "tous" ? "3px 3px 0 #191923" : "none",
-            position: "relative",
-            zIndex: activeTab === "tous" ? 2 : 1,
-          }}
-        >Tous ({employees.length})</button>
-      </div>
-
-      {/* === RECHERCHE === */}
-      <div className="card" style={{ padding: 10 }}>
-        <input
-          className="inp"
-          value={search}
-          onChange={function (e) { setSearch(e.target.value) }}
-          placeholder="🔍 Rechercher un salarié par nom, email, téléphone..."
-          style={{ width: "100%", margin: 0 }}
-        />
-      </div>
-
-      {/* === LISTE DES SALARIÉS === */}
-      <div className="card">
-        {loading ? (
-          <div style={{ padding: 30, textAlign: "center", opacity: 0.5 }}>Chargement…</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: 40, textAlign: "center", opacity: 0.5 }}>
-            <div style={{ fontFamily: "Yellowtail, cursive", fontSize: 28, marginBottom: 6, color: "#FF82D7" }}>
-              {search ? "Aucun salarié trouvé"
-                : (activeTab === "actifs" ? "Aucun salarié en poste"
-                : (activeTab === "anciens" ? "Aucun ancien salarié"
-                : "Aucun salarié pour le moment"))}
-            </div>
-            <div style={{ fontSize: 12 }}>
-              {search ? "Essaie un autre mot-clé."
-                : (activeTab === "actifs" ? "Clique sur \"+ Nouvelle embauche\" pour ajouter."
-                : (activeTab === "anciens" ? "Aucun salarié n'est marqué comme parti."
-                : "Clique sur \"+ Nouvelle embauche\" pour commencer."))}
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {filtered.map(function (e) {
-              var nbContracts = contracts.filter(function (c) { return c._employee_id === e.id }).length
-              var nbDocs = docCounts[e.id] || 0
-              var nbCDocs = contractDocCounts[e.id] || 0
-              var totalDocs = nbDocs + nbCDocs
-              var mainC = getMainContract(e.id)
-              var meta = mainC ? getContractTypeMeta(mainC.type || "extra") : null
-
+        {aTraiter.length > 0 ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {aTraiter.map(function (it) {
               return (
-                <div
-                  key={e.id}
-                  onClick={function () { setViewingEmployeeId(e.id) }}
+                <button
+                  key={it.key}
+                  onClick={function () { setSection(it.go) }}
                   style={{
                     background: "#FFFFFF",
-                    border: e.needs_regularization ? "2.5px solid #FF82D7" : "2px solid #191923",
-                    borderRadius: 8,
-                    padding: 14,
+                    border: "2px solid #191923",
+                    borderRadius: 6,
+                    boxShadow: "2px 2px 0 #191923",
+                    padding: "8px 12px",
+                    fontFamily: "'Arial Narrow', Arial, sans-serif",
+                    fontWeight: 700,
+                    fontSize: 12,
                     cursor: "pointer",
-                    display: "grid",
-                    gridTemplateColumns: "auto 1fr auto",
-                    gap: 14,
+                    display: "flex",
                     alignItems: "center",
-                    transition: "background 0.15s",
-                    boxShadow: e.needs_regularization ? "3px 3px 0 #FF82D7" : "none",
+                    gap: 7
                   }}
-                  onMouseEnter={function (ev) { ev.currentTarget.style.background = "#FFF8E1" }}
-                  onMouseLeave={function (ev) { ev.currentTarget.style.background = "#FFFFFF" }}
                 >
-                  {/* Avatar */}
-                  <div style={{ fontSize: 38, lineHeight: 1 }}>👤</div>
-
-                  {/* Infos */}
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
-                      <span style={{ fontFamily: "Yellowtail, cursive", fontSize: 22, color: "#FF82D7", lineHeight: 1 }}>
-                        {e.prenom || "—"} {(e.nom || "").toUpperCase()}
-                      </span>
-                      {e.needs_regularization ? (
-                        <span style={{
-                          background: "#FF82D7",
-                          color: "#191923",
-                          padding: "3px 8px",
-                          borderRadius: 4,
-                          fontSize: 9,
-                          fontWeight: 900,
-                          textTransform: "uppercase",
-                          letterSpacing: ".5px",
-                          border: "1.5px solid #191923",
-                          boxShadow: "2px 2px 0 #191923",
-                        }}>
-                          ⚠ À RÉGULARISER
-                        </span>
-                      ) : null}
-                      {meta && (
-                        <span style={{
-                          background: meta.color,
-                          color: "#191923",
-                          padding: "3px 8px",
-                          borderRadius: 4,
-                          fontSize: 9,
-                          fontWeight: 900,
-                          textTransform: "uppercase",
-                          letterSpacing: ".5px",
-                          border: "1px solid #191923"
-                        }}>
-                          {meta.icon} {meta.label.replace("CDI ", "")}
-                        </span>
-                      )}
-                      {e.date_sortie ? (
-                        <span style={{
-                          background: "#191923",
-                          color: "#FFEB5A",
-                          padding: "3px 8px",
-                          borderRadius: 4,
-                          fontSize: 9,
-                          fontWeight: 900,
-                          textTransform: "uppercase",
-                          letterSpacing: ".5px",
-                        }}>
-                          PARTI {new Date(e.date_sortie).toLocaleDateString("fr-FR")}
-                        </span>
-                      ) : null}
-                    </div>
-                    {(mainC && (mainC.fonction || mainC.salaire_brut_mensuel || mainC.taux_horaire_brut)) ? (
-                      <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>
-                        {mainC.fonction ? mainC.fonction : ""}
-                        {mainC.fonction && (mainC.salaire_brut_mensuel || mainC.taux_horaire_brut) ? " · " : ""}
-                        {(mainC.type !== "extra" && mainC.salaire_brut_mensuel)
-                          ? (mainC.salaire_brut_mensuel + " €/mois")
-                          : (mainC.taux_horaire_brut ? (mainC.taux_horaire_brut + " €/h") : "")}
-                      </div>
-                    ) : null}
-                    <div style={{ fontSize: 11, opacity: 0.6, display: "flex", gap: 12, flexWrap: "wrap" }}>
-                      <span>📁 <b>{totalDocs}</b> doc{totalDocs > 1 ? "s" : ""}</span>
-                      <span>📄 <b>{nbContracts}</b> contrat{nbContracts > 1 ? "s" : ""}</span>
-                      {e.email ? <span>📧 {e.email}</span> : null}
-                      {e.telephone ? <span>📞 {e.telephone}</span> : null}
-                    </div>
-                  </div>
-
-                  {/* Bouton */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                    <button className="btn btn-y" style={{ pointerEvents: "none" }}>
-                      Ouvrir →
-                    </button>
-                    {!e.date_sortie ? (
-                      <button
-                        className="btn btn-sm"
-                        onClick={function (ev) {
-                          ev.stopPropagation()
-                          setOffboardingEmployee(e)
-                        }}
-                        title="Marquer ce salarié comme parti"
-                      >📤 Parti</button>
-                    ) : null}
-                  </div>
-                </div>
+                  <span style={{ fontSize: 15 }}>{it.icon}</span>
+                  <span>{it.text}</span>
+                  <span style={{ fontWeight: 900, color: "#FF82D7" }}>›</span>
+                </button>
               )
             })}
           </div>
-        )}
+        ) : null}
       </div>
 
-      {/* === RETRO UPLOAD WIZARD (import historique) === */}
+      {/* === KPIs + ROND PROGRESSION === */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "stretch", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flex: 1, minWidth: 260, flexWrap: "wrap" }}>
+          <KpiTile value={kpiEffectif} label="Effectif" onClick={function () { setSection("equipe"); setTeamFilter("actifs") }} />
+          <KpiTile value={kpiExtrasMois} label="Extras ce mois" />
+          <KpiTile value={kpiContrats} label="Contrats actifs" onClick={function () { setSection("contrats") }} />
+          <KpiTile value={kpiConges} label="Congés à venir" onClick={function () { setSection("conges") }} />
+        </div>
+        <div className="card" style={{
+          margin: 0, display: "flex", alignItems: "center", gap: 12, minWidth: 200, padding: 12
+        }}>
+          <ProgressRing done={dossiersOk} total={actifs.length} />
+          <div>
+            <div className="yt" style={{ fontSize: 17, color: "#FF82D7", lineHeight: 1 }}>Dossiers OK</div>
+            <div style={{ fontSize: 11, opacity: 0.65, marginTop: 3 }}>
+              {dossiersOk} dossier{dossiersOk > 1 ? "s" : ""} complet{dossiersOk > 1 ? "s" : ""} sur {actifs.length} actif{actifs.length > 1 ? "s" : ""}
+            </div>
+            {dossiersIncomplets.length > 0 ? (
+              <button
+                className="btn btn-sm"
+                style={{ marginTop: 7 }}
+                onClick={function () { setSection("conformite") }}
+              >Voir les manquants →</button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* === SOUS-NAV PILLS === */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        {NAV.map(function (n) {
+          var on = section === n.key
+          return (
+            <button
+              key={n.key}
+              className={"ann-tab" + (on ? " on" : "")}
+              onClick={function () { setSection(n.key) }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <span>{n.icon}</span>
+              <span>{n.label}</span>
+              {n.badge > 0 ? (
+                <span style={{
+                  background: on ? "var(--y, #FFEB5A)" : "#191923",
+                  color: on ? "#191923" : "var(--y, #FFEB5A)",
+                  fontWeight: 900, fontSize: 10, padding: "1px 6px", borderRadius: 9,
+                  border: "1.5px solid #191923"
+                }}>{n.badge}</span>
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ============================================================ */}
+      {/* SECTION : ÉQUIPE (hub)                                       */}
+      {/* ============================================================ */}
+      {section === "equipe" ? (
+        <div>
+          {/* Filtre actifs/anciens/tous + légende couleurs */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button className={"tag" + (teamFilter === "actifs" ? " on" : "")} onClick={function () { setTeamFilter("actifs") }}>Actifs ({actifs.length})</button>
+              <button className={"tag" + (teamFilter === "anciens" ? " on" : "")} onClick={function () { setTeamFilter("anciens") }}>Anciens ({anciens.length})</button>
+              <button className={"tag" + (teamFilter === "tous" ? " on" : "")} onClick={function () { setTeamFilter("tous") }}>Tous ({employees.length})</button>
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 10, fontWeight: 700, opacity: 0.7 }}>
+              {POSTE_LEGEND.map(function (lg) {
+                return (
+                  <span key={lg.label} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ width: 11, height: 11, borderRadius: "50%", background: lg.color, border: "1.5px solid #191923", display: "inline-block" }}></span>
+                    {lg.label}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Recherche */}
+          <div className="card" style={{ padding: 10 }}>
+            <input
+              className="inp"
+              value={search}
+              onChange={function (e) { setSearch(e.target.value) }}
+              placeholder="🔍 Rechercher un salarié par nom, email, téléphone..."
+              style={{ width: "100%", margin: 0 }}
+            />
+          </div>
+
+          {/* Grille de cartes */}
+          {loading ? (
+            <div className="card" style={{ padding: 30, textAlign: "center", opacity: 0.5 }}>Chargement…</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+              {teamList.map(function (e) {
+                var poste = posteForEmployee(e.id)
+                var st = statusForEmployee(e)
+                var mainC = getMainContract(e.id)
+                var meta = mainC ? getContractTypeMeta(mainC.type || "extra") : null
+                var nbContracts = contracts.filter(function (c) { return c._employee_id === e.id }).length
+                var totalDocs = (docCounts[e.id] || 0) + (contractDocCounts[e.id] || 0)
+                return (
+                  <div
+                    key={e.id}
+                    className="card card-click"
+                    style={{ margin: 0, padding: 14, display: "flex", gap: 12, alignItems: "flex-start" }}
+                    onClick={function () { setViewingEmployeeId(e.id) }}
+                  >
+                    <PosteAvatar
+                      meta={poste}
+                      initials={getInitials(e.prenom, e.nom)}
+                      statusColor={st.color}
+                      statusLabel={st.label}
+                      size={48}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="yt" style={{ fontSize: 21, color: "#FF82D7", lineHeight: 1.05 }}>
+                        {e.prenom || "—"} {(e.nom || "").toUpperCase()}
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.7, marginTop: 2 }}>
+                        {(mainC && mainC.fonction) ? mainC.fonction : poste.label}
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 7 }}>
+                        {meta ? (
+                          <span style={{
+                            background: meta.color, color: "#191923", padding: "2px 7px", borderRadius: 4,
+                            fontSize: 9, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".5px",
+                            border: "1.5px solid #191923"
+                          }}>{meta.icon} {meta.label.replace("CDI ", "")}</span>
+                        ) : null}
+                        {e.needs_regularization ? (
+                          <span style={{
+                            background: "#FF82D7", color: "#191923", padding: "2px 7px", borderRadius: 4,
+                            fontSize: 9, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".5px",
+                            border: "1.5px solid #191923"
+                          }}>⚠ À régulariser</span>
+                        ) : null}
+                        {e.date_sortie ? (
+                          <span style={{
+                            background: "#191923", color: "var(--y, #FFEB5A)", padding: "2px 7px", borderRadius: 4,
+                            fontSize: 9, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".5px"
+                          }}>Parti {new Date(e.date_sortie).toLocaleDateString("fr-FR")}</span>
+                        ) : null}
+                      </div>
+                      <div style={{ fontSize: 10, opacity: 0.55, display: "flex", gap: 10, flexWrap: "wrap", marginTop: 7 }}>
+                        <span>📁 <b>{totalDocs}</b> doc{totalDocs > 1 ? "s" : ""}</span>
+                        <span>📄 <b>{nbContracts}</b> contrat{nbContracts > 1 ? "s" : ""}</span>
+                      </div>
+                      {!e.date_sortie ? (
+                        <div style={{ marginTop: 8 }}>
+                          <button
+                            className="btn btn-sm"
+                            onClick={function (ev) { ev.stopPropagation(); setOffboardingEmployee(e) }}
+                            title="Marquer ce salarié comme parti"
+                          >📤 Parti</button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Carte Embaucher / extra (uniquement hors recherche, pour rester visible) */}
+              {!search.trim() ? (
+                <div
+                  onClick={function () {
+                    setEditingContract(null)
+                    setWizardForEmployee(null)
+                    setShowWizard(true)
+                  }}
+                  style={{
+                    border: "2.5px dashed #191923",
+                    borderRadius: 7,
+                    background: "rgba(255,255,255,0.45)",
+                    padding: 14,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    minHeight: 120
+                  }}
+                >
+                  <div style={{ fontSize: 30, lineHeight: 1 }}>＋</div>
+                  <div className="yt" style={{ fontSize: 19, color: "#FF82D7", marginTop: 4 }}>Embaucher / extra</div>
+                  <div style={{ fontSize: 10, opacity: 0.6, marginTop: 2 }}>CDI, agent de maîtrise, cadre ou contrat d&apos;extra</div>
+                </div>
+              ) : null}
+
+              {/* Vide */}
+              {teamList.length === 0 ? (
+                <div className="card" style={{ gridColumn: "1 / -1", padding: 36, textAlign: "center", opacity: 0.55, margin: 0 }}>
+                  <div className="yt" style={{ fontSize: 26, color: "#FF82D7", marginBottom: 4 }}>
+                    {search ? "Aucun salarié trouvé" : "Aucun salarié ici"}
+                  </div>
+                  <div style={{ fontSize: 12 }}>
+                    {search ? "Essaie un autre mot-clé." : "Clique sur « Embaucher » pour commencer."}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {/* ============================================================ */}
+      {/* SECTION : CONTRATS & AVENANTS                                */}
+      {/* ============================================================ */}
+      {section === "contrats" ? (
+        <div>
+          <SignaturesPendingWidget />
+
+          <div className="card">
+            <div className="yt" style={{ fontSize: 21, color: "#FF82D7", marginBottom: 4 }}>Pipeline contrats &amp; avenants</div>
+            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 12 }}>
+              Vue d&apos;ensemble du cycle de vie. La gestion détaillée se fait depuis la fiche de chaque salarié.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
+              {[
+                { label: "Brouillon", value: pipeBrouillon, bg: "#FFFFFF" },
+                { label: "À signer", value: pipeASigner, bg: "var(--y, #FFEB5A)" },
+                { label: "Signé", value: pipeSigne, bg: "#009D3A", fg: "#FFFFFF" },
+                { label: "Archivé", value: pipeArchive, bg: "#EBEBEB" }
+              ].map(function (p) {
+                return (
+                  <div key={p.label} style={{
+                    background: p.bg, color: p.fg || "#191923",
+                    border: "2px solid #191923", borderRadius: 6, boxShadow: "2px 2px 0 #191923",
+                    padding: "12px 10px", textAlign: "center"
+                  }}>
+                    <div style={{ fontWeight: 900, fontSize: 26, lineHeight: 1 }}>{p.value}</div>
+                    <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1, marginTop: 4 }}>{p.label}</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="card-p">
+            <div style={{ fontWeight: 700, fontSize: 12 }}>
+              💡 Pour créer un contrat, un avenant, ou suivre une signature&nbsp;: ouvre la fiche du salarié depuis l&apos;onglet <b>Équipe</b>.
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ============================================================ */}
+      {/* SECTION : COFFRE DOCUMENTS                                   */}
+      {/* ============================================================ */}
+      {section === "coffre" ? (
+        <div>
+          <div className="card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
+              <div className="yt" style={{ fontSize: 21, color: "#FF82D7" }}>Coffre documents</div>
+              <button className="btn btn-y" onClick={function () { setShowRetroImport(true) }}>📥 Importer un historique</button>
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 12 }}>
+              Tous les documents RH par salarié (pièces, contrats signés, bulletins). Clique pour ouvrir et gérer.
+            </div>
+            {loading ? (
+              <div style={{ padding: 20, textAlign: "center", opacity: 0.5 }}>Chargement…</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {employees.map(function (e) {
+                  var poste = posteForEmployee(e.id)
+                  var nbPerso = docCounts[e.id] || 0
+                  var nbContr = contractDocCounts[e.id] || 0
+                  var total = nbPerso + nbContr
+                  return (
+                    <div
+                      key={e.id}
+                      onClick={function () { setViewingEmployeeId(e.id) }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 12, padding: "8px 10px",
+                        border: "2px solid #191923", borderRadius: 6, background: "#FFFFFF",
+                        boxShadow: "2px 2px 0 #191923", cursor: "pointer"
+                      }}
+                    >
+                      <PosteAvatar meta={poste} initials={getInitials(e.prenom, e.nom)} size={36} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{e.prenom} {(e.nom || "").toUpperCase()}</div>
+                        <div style={{ fontSize: 10, opacity: 0.6 }}>{nbPerso} pièce{nbPerso > 1 ? "s" : ""} · {nbContr} doc{nbContr > 1 ? "s" : ""} contractuel{nbContr > 1 ? "s" : ""}</div>
+                      </div>
+                      <span style={{
+                        background: total > 0 ? "var(--y, #FFEB5A)" : "#EBEBEB",
+                        border: "1.5px solid #191923", borderRadius: 9, padding: "2px 9px",
+                        fontWeight: 900, fontSize: 12
+                      }}>📁 {total}</span>
+                      <span style={{ fontWeight: 900, color: "#FF82D7" }}>›</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* ============================================================ */}
+      {/* SECTION : CONFORMITÉ                                         */}
+      {/* ============================================================ */}
+      {section === "conformite" ? (
+        <div>
+          <div className="card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div className="yt" style={{ fontSize: 21, color: "#FF82D7" }}>Registre &amp; obligations</div>
+              <button
+                className="btn"
+                onClick={function () { window.open("/api/hr/personnel-register", "_blank") }}
+                title="Imprimer le registre du personnel (Article L.1221-13)"
+              >📄 Registre du personnel</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8, marginTop: 12 }}>
+              <div style={{ border: "2px solid #191923", borderRadius: 6, padding: 10, background: "#FFFFFF", boxShadow: "2px 2px 0 #191923" }}>
+                <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1, opacity: 0.6 }}>Médecine du travail</div>
+                <div style={{ fontWeight: 700, fontSize: 13, marginTop: 3 }}>{MESHUGA_LEGAL.medecine_travail.nom}</div>
+                <div style={{ fontSize: 11, opacity: 0.7 }}>{MESHUGA_LEGAL.medecine_travail.adresse}</div>
+                <div style={{ fontSize: 11, opacity: 0.7 }}>{MESHUGA_LEGAL.medecine_travail.telephone}</div>
+              </div>
+              <div style={{ border: "2px solid #191923", borderRadius: 6, padding: 10, background: "#FFFFFF", boxShadow: "2px 2px 0 #191923" }}>
+                <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1, opacity: 0.6 }}>Prévoyance · Retraite</div>
+                <div style={{ fontWeight: 700, fontSize: 13, marginTop: 3 }}>{MESHUGA_LEGAL.prevoyance.nom}</div>
+                <div style={{ fontSize: 11, opacity: 0.7 }}>{MESHUGA_LEGAL.retraite.nom}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Suivi des dossiers salariés actifs */}
+          <div className="card">
+            <div className="yt" style={{ fontSize: 19, color: "#FF82D7", marginBottom: 8 }}>Complétude des dossiers (actifs)</div>
+            {loading ? (
+              <div style={{ padding: 16, textAlign: "center", opacity: 0.5 }}>Chargement…</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {actifs.map(function (e) {
+                  var ds = dossierState(e)
+                  var poste = posteForEmployee(e.id)
+                  return (
+                    <div
+                      key={e.id}
+                      onClick={function () { setViewingEmployeeId(e.id) }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 12, padding: "8px 10px",
+                        border: ds.ok ? "2px solid #191923" : "2px solid #FF6B2B",
+                        borderRadius: 6, background: "#FFFFFF",
+                        boxShadow: ds.ok ? "2px 2px 0 #191923" : "2px 2px 0 #FF6B2B", cursor: "pointer"
+                      }}
+                    >
+                      <PosteAvatar meta={poste} initials={getInitials(e.prenom, e.nom)} size={36} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{e.prenom} {(e.nom || "").toUpperCase()}</div>
+                        <div style={{ fontSize: 10, opacity: 0.65 }}>
+                          {ds.ok ? "Dossier complet" : ("Manque : " + ds.missing.join(", "))}
+                        </div>
+                      </div>
+                      <span style={{
+                        background: ds.ok ? "#009D3A" : "#FF6B2B", color: "#FFFFFF",
+                        border: "1.5px solid #191923", borderRadius: 9, padding: "2px 9px",
+                        fontWeight: 900, fontSize: 12
+                      }}>{ds.done}/{ds.total}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <div style={{ fontSize: 10, opacity: 0.5, marginTop: 10 }}>
+              Note&nbsp;: la formation HACCP et le contact d&apos;urgence ne sont pas encore renseignés pour l&apos;équipe et seront ajoutés au suivi prochainement.
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* ============================================================ */}
+      {/* SECTION : CONGÉS & ABSENCES                                  */}
+      {/* ============================================================ */}
+      {section === "conges" ? (
+        <div className="card" style={{ padding: 36, textAlign: "center" }}>
+          <div style={{ fontSize: 40, lineHeight: 1 }}>🏖️</div>
+          <div className="yt" style={{ fontSize: 26, color: "#FF82D7", marginTop: 6 }}>Congés &amp; absences</div>
+          <div style={{ fontSize: 12, opacity: 0.65, marginTop: 6, maxWidth: 460, marginLeft: "auto", marginRight: "auto" }}>
+            Aucune demande de congés ni arrêt en cours. Le suivi des soldes, des demandes et des arrêts maladie
+            arrive dans la prochaine étape de la refonte (les arrêts existants restent gérés depuis la fiche salarié).
+          </div>
+        </div>
+      ) : null}
+
+      {/* ============================================================ */}
+      {/* MODALES & WIZARDS (inchangés)                                */}
+      {/* ============================================================ */}
       {showRetroImport && (
         <RetroUploadWizard
           onClose={function () { setShowRetroImport(false) }}
@@ -445,7 +895,6 @@ export default function RhTab() {
         />
       )}
 
-      {/* === OFFBOARDING WIZARD (marquer comme parti) === */}
       {offboardingEmployee && (
         <OffboardingWizard
           employee={offboardingEmployee}
@@ -458,7 +907,6 @@ export default function RhTab() {
         />
       )}
 
-      {/* === WIZARD === */}
       {showWizard && (
         <RhWizard
           existing={editingContract}
@@ -479,7 +927,6 @@ export default function RhTab() {
         />
       )}
 
-      {/* === EMPLOYEE DETAIL (vue déroulée sans onglets) === */}
       {viewingEmployeeId && (
         <EmployeeDetail
           employeeId={viewingEmployeeId}
@@ -507,7 +954,6 @@ export default function RhTab() {
         />
       )}
 
-      {/* === PREVIEW CONTRAT === */}
       {previewContract && (
         <ContractPreview
           contract={previewContract}
@@ -515,7 +961,6 @@ export default function RhTab() {
         />
       )}
 
-      {/* === PREVIEW DOSSIER DE BIENVENUE === */}
       {welcomePackEmpId && (
         <WelcomePackPreview
           employeeId={welcomePackEmpId}
@@ -523,7 +968,6 @@ export default function RhTab() {
         />
       )}
 
-      {/* === TOAST === */}
       {toast ? <div className="toast show">{toast}</div> : null}
     </div>
   )
