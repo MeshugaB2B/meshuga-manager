@@ -741,7 +741,8 @@ export default function AchatsTab(props) {
 
         // Mini sparkline component
         function Sparkline(p){
-          var data = p.data || []
+          var rawData = p.data || []
+          var data = rawData.filter(function(v){ return typeof v === 'number' && !isNaN(v) && isFinite(v) })
           if (data.length < 2) return null
           var mn = Math.min.apply(null, data); var mx = Math.max.apply(null, data)
           var range = mx - mn || 1
@@ -749,9 +750,11 @@ export default function AchatsTab(props) {
           var step = w / (data.length - 1)
           var pts = data.map(function(v, i){
             var x = i * step
-            var y = h - ((v - mn) / range) * h
+            var y = range > 0 ? h - ((v - mn) / range) * h : h / 2
+            if (!isFinite(x) || !isFinite(y)) return ''
             return x.toFixed(1) + ',' + y.toFixed(1)
-          }).join(' ')
+          }).filter(function(s){ return s.length > 0 }).join(' ')
+          if (!pts) return null
           var color = p.color || '#191923'
           var last = data[data.length - 1]; var first = data[0]
           var dotColor = last >= first ? '#CC0066' : '#009D3A'
@@ -992,7 +995,8 @@ export default function AchatsTab(props) {
 
         // Mini sparkline (réutilisable)
         function Sparkline(p){
-          var data = p.data || []
+          var rawData = p.data || []
+          var data = rawData.filter(function(v){ return typeof v === 'number' && !isNaN(v) && isFinite(v) })
           if (data.length < 2) return null
           var mn = Math.min.apply(null, data); var mx = Math.max.apply(null, data)
           var range = mx - mn || 1
@@ -1000,9 +1004,11 @@ export default function AchatsTab(props) {
           var step = w / (data.length - 1)
           var pts = data.map(function(v, i){
             var x = i * step
-            var y = h - ((v - mn) / range) * h
+            var y = range > 0 ? h - ((v - mn) / range) * h : h / 2
+            if (!isFinite(x) || !isFinite(y)) return ''
             return x.toFixed(1) + ',' + y.toFixed(1)
-          }).join(' ')
+          }).filter(function(s){ return s.length > 0 }).join(' ')
+          if (!pts) return null
           var color = p.color || '#191923'
           return <svg width={w} height={h} style={{flexShrink:0}}>
             <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1313,7 +1319,8 @@ export default function AchatsTab(props) {
 
         // Mini sparkline
         function Sparkline(p){
-          var data = p.data || []
+          var rawData = p.data || []
+          var data = rawData.filter(function(v){ return typeof v === 'number' && !isNaN(v) && isFinite(v) })
           if (data.length < 2) return null
           var mn = Math.min.apply(null, data); var mx = Math.max.apply(null, data)
           var range = mx - mn || 1
@@ -1321,9 +1328,11 @@ export default function AchatsTab(props) {
           var step = w / (data.length - 1)
           var pts = data.map(function(v, i){
             var x = i * step
-            var y = h - ((v - mn) / range) * h
+            var y = range > 0 ? h - ((v - mn) / range) * h : h / 2
+            if (!isFinite(x) || !isFinite(y)) return ''
             return x.toFixed(1) + ',' + y.toFixed(1)
-          }).join(' ')
+          }).filter(function(s){ return s.length > 0 }).join(' ')
+          if (!pts) return null
           var color = p.color || '#191923'
           return <svg width={w} height={h} style={{flexShrink:0,opacity:.7}}>
             <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
