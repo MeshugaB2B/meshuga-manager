@@ -49,36 +49,68 @@ async function detourerEtComposer(imageBlobOrUrl: any, outputSize: number) {
         var imageData = ctx.getImageData(0, 0, w, h)
         var data = imageData.data
 
-        // === PHASE 1 : critère STRICT pour détecter le fond clair principal ===
-        // (peu saturé ET clair, ou presque blanc pur)
-        function isBgStrict(i: number): boolean {
+        // === DÉTECTION FOND : auto-calibrée sur les 4 coins de l'image ===
+        // On échantillonne la couleur des 4 coins pour identifier le fond réel.
+        // Critère "fond" = pixel proche de la couleur médiane des coins ET peu saturé.
+        // Avantage : marche aussi bien sur fond blanc, gris clair, gris moyen,
+        // sans aspirer les zones blanches internes au sujet.
+        var cornerSamples: number[][] = []
+        var sampleRadius = 8  // échantillonne 8x8 px à chaque coin
+        function sampleCorner(cx: number, cy: number) {
+          for (var dy = 0; dy < sampleRadius; dy++) {
+            for (var dx = 0; dx < sampleRadius; dx++) {
+              var ix = (cy + dy) * w + (cx + dx)
+              if (ix < 0 || ix >= w * h) continue
+              var off = ix * 4
+              cornerSamples.push([data[off], data[off + 1], data[off + 2]])
+            }
+          }
+        }
+        sampleCorner(0, 0)
+        sampleCorner(w - sampleRadius, 0)
+        sampleCorner(0, h - sampleRadius)
+        sampleCorner(w - sampleRadius, h - sampleRadius)
+
+        // Médiane des 4 coins → couleur de référence du fond
+        function median(arr: number[]) { var s = arr.slice().sort(function(a,b){return a-b}); return s[Math.floor(s.length/2)] }
+        var refR = median(cornerSamples.map(function(c){return c[0]}))
+        var refG = median(cornerSamples.map(function(c){return c[1]}))
+        var refB = median(cornerSamples.map(function(c){return c[2]}))
+        var refMx = Math.max(refR, refG, refB)
+        var refSat = refMx - Math.min(refR, refG, refB)
+
+        // Si le fond de référence n'est pas peu saturé (sat > 40), c'est qu'on est
+        // sur une image lifestyle (table en bois, etc.) → on skip le détourage.
+        var bgIsClear = refSat < 40
+
+        // Critère "fond" : proche de la couleur de référence + peu saturé
+        // Tolérance : ±30 sur chaque canal (assez serré pour ne pas avaler le sujet
+        // mais assez large pour gérer les variations naturelles du fond)
+        function isBg(i: number): boolean {
+          if (!bgIsClear) return false
           var r = data[i], g = data[i+1], b = data[i+2]
           var mx = Math.max(r, g, b)
           var mn = Math.min(r, g, b)
           var sat = mx - mn
-          return (mx > 200 && sat < 30) || (r > 240 && g > 240 && b > 240)
+          // Doit être peu saturé (max 35 = pas de couleur franche)
+          if (sat > 35) return false
+          // Doit être proche de la couleur du fond de référence
+          if (Math.abs(r - refR) > 30) return false
+          if (Math.abs(g - refG) > 30) return false
+          if (Math.abs(b - refB) > 30) return false
+          return true
         }
 
-        // === PHASE 2 : critère RELAXED pour étendre aux ombres ===
-        // Tout pixel peu saturé (gris/blanc/noir) mais pas pur noir (pour éviter d'avaler
-        // des zones noires pures du sujet, comme un objet noir mat).
-        // Combiné au flood depuis le fond, seules les ombres CONNECTÉES au fond seront capturées.
-        function isBgRelaxed(i: number): boolean {
-          var r = data[i], g = data[i+1], b = data[i+2]
-          var mx = Math.max(r, g, b)
-          var mn = Math.min(r, g, b)
-          var sat = mx - mn
-          return sat < 55 && mx > 50
-        }
-
-        // Flood fill BFS depuis tous les bords (4-connexité) — Phase 1 strict
+        // Flood fill BFS depuis les bords (4-connexité)
+        // Stop dès qu'on rencontre un pixel non-fond (sujet, ombre, n'importe quoi de coloré)
+        // → Pas de phase 2 d'extension : les ombres et zones grises internes restent.
         var visited = new Uint8Array(w * h)
         var fond = new Uint8Array(w * h)
         var queue: number[] = []
         function trySeed(px: number) {
           var i = px * 4
           if (visited[px]) return
-          if (isBgStrict(i)) { queue.push(px); visited[px] = 1 }
+          if (isBg(i)) { queue.push(px); visited[px] = 1 }
         }
         for (var x = 0; x < w; x++) { trySeed(x); trySeed((h-1)*w + x) }
         for (var y = 0; y < h; y++) { trySeed(y*w); trySeed(y*w + (w-1)) }
@@ -98,38 +130,9 @@ async function detourerEtComposer(imageBlobOrUrl: any, outputSize: number) {
           for (var ni = 0; ni < 4; ni++) {
             var n = neighbors[ni]
             if (n < 0 || visited[n]) continue
-            if (isBgStrict(n * 4)) {
+            if (isBg(n * 4)) {
               visited[n] = 1
               queue.push(n)
-            }
-          }
-        }
-
-        // === Phase 2 : extension du fond aux OMBRES connectées ===
-        // On part des pixels déjà marqués fond, et on étend aux voisins peu saturés
-        // (sat < 55). Comme c'est une extension depuis le fond, on ne capture
-        // que les ombres en contact avec le fond, pas les zones sombres internes du sujet.
-        var phase2Queue: number[] = []
-        for (var pp = 0; pp < w*h; pp++) {
-          if (fond[pp]) phase2Queue.push(pp)
-        }
-        var head2 = 0
-        while (head2 < phase2Queue.length) {
-          var px2 = phase2Queue[head2++]
-          var py2 = Math.floor(px2 / w)
-          var pxx2 = px2 % w
-          var neighbors2 = [
-            py2 > 0 ? px2 - w : -1,
-            py2 < h-1 ? px2 + w : -1,
-            pxx2 > 0 ? px2 - 1 : -1,
-            pxx2 < w-1 ? px2 + 1 : -1
-          ]
-          for (var ni2 = 0; ni2 < 4; ni2++) {
-            var n2 = neighbors2[ni2]
-            if (n2 < 0 || fond[n2]) continue
-            if (isBgRelaxed(n2 * 4)) {
-              fond[n2] = 1
-              phase2Queue.push(n2)
             }
           }
         }
@@ -139,9 +142,12 @@ async function detourerEtComposer(imageBlobOrUrl: any, outputSize: number) {
         for (var p = 0; p < w*h; p++) if (fond[p]) fondCount++
         var fondRatio = fondCount / (w * h)
 
-        // Si trop peu de fond détecté (<10%), c'est probablement une image complexe :
-        // on bascule en mode "pas de détourage", on garde la photo telle quelle.
-        var skipDetour = fondRatio < 0.10
+        // Skip détourage si :
+        //  - fond extérieur pas identifiable (image lifestyle, table en bois) → bgIsClear false
+        //  - trop peu de fond détecté (<8%, image complexe sans bord clair)
+        //  - sujet aspiré (>92% fond → c'est sûrement un objet transparent type bouteille
+        //    dont l'intérieur a été détecté comme fond, on annule pour ne pas casser l'image)
+        var skipDetour = !bgIsClear || fondRatio < 0.08 || fondRatio > 0.92
 
         if (!skipDetour) {
           // === ANTI-ALIASING : masque alpha lissé pour transitions douces ===
