@@ -1472,284 +1472,196 @@ export default function EmployeeDetail(props) {
                         : ("Embauche : " + fmtDate(c.date_embauche || c.date_debut))}
                     </div>
 
-                    {/* === TIMELINE DOCUMENTS (du plus récent au plus ancien) === */}
+                    {/* === CHRONOLOGIE DU CONTRAT (dates de modification en clair) === */}
                     {(function () {
                       var docs = contractDocs[c.id] || []
-                      // TOUS les avenants signés (un salarié peut en avoir plusieurs au fil du temps)
-                      var avenantsSignes = docs.filter(function (d) { return d.doc_type === "avenant" })
-                      // 🔥 Sprint R : tri antéchronologique par DATE DU DOCUMENT (signature OCR),
-                      // fallback sur uploaded_at si document_date manque.
-                      avenantsSignes.sort(function (a, b) {
-                        var da = a.document_date || a.uploaded_at
-                        var db = b.document_date || b.uploaded_at
-                        return new Date(db).getTime() - new Date(da).getTime()
-                      })
-                      // L'avenant brouillon en cours (s'il existe)
-                      var avenantBrouillon = docs.filter(function (d) {
+                      var contratOriginel = docs.filter(function (d) { return d.doc_type === "contrat_signe" })[0]
+                      var avenantBrouillonDoc = docs.filter(function (d) {
                         return d.doc_type === "contrat_genere" && (d.label || "").toLowerCase().indexOf("avenant") >= 0
                       })[0]
-                      var contratOriginel = docs.filter(function (d) { return d.doc_type === "contrat_signe" })[0]
-                      var hasAnyDoc = avenantsSignes.length > 0 || !!avenantBrouillon || !!contratOriginel
+                      var signedAvenantDocs = docs.filter(function (d) { return d.doc_type === "avenant" }).sort(function (a, b) {
+                        return new Date(b.document_date || b.uploaded_at).getTime() - new Date(a.document_date || a.uploaded_at).getTime()
+                      })
+                      var amds = (contractAmendments || []).filter(function (a) { return a.contract_id === c.id })
+                      var draftAmendment = amds.filter(function (a) { return !a.signed_at && a.status !== "signed" })
+                        .sort(function (a, b) { return new Date(b.created_at).getTime() - new Date(a.created_at).getTime() })[0]
+                      var signedAmendments = amds.filter(function (a) { return a.signed_at || a.status === "signed" })
                       var isGenerating = generatingAmendmentFor === c.id
 
-                      if (!hasAnyDoc) return null
-
-                      // Label adaptatif du bouton "Générer" selon contexte
-                      var generateBtnLabel = avenantsSignes.length > 0
-                        ? "📝 Générer un nouvel avenant"
-                        : "📝 Générer un avenant"
-                      var generateBtnTitle = avenantsSignes.length > 0
-                        ? "Génère un nouvel avenant pour mettre à jour les clauses (HACCP, RGPD, etc.). L'ancien avenant signé reste archivé."
-                        : "Génère un avenant qui ajoute les clauses modernes (HACCP, RGPD, mobilité, déconnexion, etc.)"
-
-                      return (
-                        <div style={{
-                          background: "#FAFAFA",
-                          border: "1px solid #EBEBEB",
-                          borderRadius: 5,
-                          padding: 8,
-                          marginBottom: 8,
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 6
-                        }}>
-                          <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.5, color: "#888" }}>
-                            📁 Documents
-                          </div>
-
-                          {/* Tous les avenants signés (du plus récent au plus ancien) */}
-                          {avenantsSignes.map(function (av, idx) {
-                            var isMostRecent = idx === 0
-                            var label = avenantsSignes.length > 1
-                              ? ("✅ Avenant signé n°" + (avenantsSignes.length - idx))
-                              : "✅ Avenant signé"
-                            // 🔥 Sprint R : afficher la DATE DU DOCUMENT (OCR) en priorité
-                            var displayDate = av.document_date || av.uploaded_at
-                            var dateLabel = av.document_date ? "signé le " : "uploadé le "
-                            return (
-                              <div key={av.id} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: "1px dashed #DDD", opacity: isMostRecent ? 1 : 0.65 }}>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: isMostRecent ? "#16A34A" : "#666" }}>{label}</span>
-                                <span style={{ fontSize: 10, color: "#666" }}>· {dateLabel}{fmtDate(displayDate)}{!isMostRecent ? " (archivé)" : ""}</span>
-                                {av.document_description ? (
-                                  <span style={{ fontSize: 10, color: "#888", fontStyle: "italic", flexBasis: "100%", marginTop: 2 }}>↳ {av.document_description}</span>
-                                ) : null}
-                                <button
-                                  className="btn btn-sm btn-y"
-                                  style={{ marginLeft: "auto" }}
-                                  onClick={function () { openContractDoc(av) }}
-                                >📄 Ouvrir</button>
-                              </div>
-                            )
-                          })}
-
-                          {/* Avenant brouillon en cours (à signer) */}
-                          {avenantBrouillon ? (() => {
-                            // 🔥 Sprint C2B : retrouver l'amendment lié pour récup signature_status
-                            var pendingAmendment = (contractAmendments || []).filter(function (a) {
-                              return a.contract_id === c.id && !a.signed_at
-                            }).sort(function (a, b) {
-                              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-                            })[0]
-                            var sigStatus = pendingAmendment ? pendingAmendment.signature_status : "unsent"
-                            // Badge statut signature
-                            var statusBadge = null
-                            if (sigStatus === "sent") {
-                              statusBadge = <span style={{ fontSize: 10, fontWeight: 700, background: "#FFEB5A", color: "#191923", padding: "2px 6px", borderRadius: 3 }}>📧 Envoyé</span>
-                            } else if (sigStatus === "viewed") {
-                              statusBadge = <span style={{ fontSize: 10, fontWeight: 700, background: "#FFEB5A", color: "#191923", padding: "2px 6px", borderRadius: 3 }}>👁 Vu</span>
-                            } else if (sigStatus === "signed") {
-                              statusBadge = <span style={{ fontSize: 10, fontWeight: 700, background: "#16A34A", color: "#FFFFFF", padding: "2px 6px", borderRadius: 3 }}>✅ Signé</span>
-                            }
-                            // Le bouton "Envoyer pour signature" n'apparaît que si unsent (1er envoi)
-                            // En cas de sent/viewed, on l'enlève pour éviter les renvois accidentels (option : relance dans une prochaine itération)
-                            var canSend = pendingAmendment && (sigStatus === "unsent" || sigStatus === "expired" || sigStatus === "declined")
-                            // Libellé du document pour la modal
-                            var docLabel = "Avenant"
-                            if (pendingAmendment) {
-                              var typeLabels: any = {
-                                regularisation_welcome_pack: "Avenant d'actualisation contractuelle",
-                                augmentation_salaire: "Avenant — Modification de la rémunération",
-                                modification_horaires: "Avenant — Modification des horaires",
-                                changement_poste: "Avenant — Changement de poste",
-                                prolongation_duree: "Avenant — Prolongation de la durée",
-                                autre: "Avenant"
-                              }
-                              docLabel = typeLabels[pendingAmendment.amendment_type] || "Avenant"
-                            }
-                            return (
-                              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: "1px dashed #DDD" }}>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: "#FF82D7" }}>📝 Avenant en cours</span>
-                                {statusBadge ? statusBadge : <span style={{ fontSize: 10, color: "#666", fontStyle: "italic" }}>· à faire signer</span>}
-                                <div style={{ marginLeft: "auto", display: "flex", gap: 4, flexWrap: "wrap" }}>
-                                  <button
-                                    className="btn btn-sm btn-y"
-                                    onClick={function () { openContractDoc(avenantBrouillon) }}
-                                  >📄 Ouvrir</button>
-                                  {canSend ? (
-                                    <button
-                                      className="btn btn-sm"
-                                      style={{ background: "#FF82D7", color: "#FFFFFF", border: "1.5px solid #FF82D7", fontWeight: 700 }}
-                                      onClick={function () {
-                                        setSendSignaturePayload({
-                                          documentType: "amendment",
-                                          documentId: pendingAmendment.id,
-                                          documentLabel: docLabel,
-                                        })
-                                      }}
-                                      title="Envoyer cet avenant au salarié par email pour signature électronique"
-                                    >📧 Envoyer pour signature</button>
-                                  ) : null}
-                                  <button
-                                    className="btn btn-sm"
-                                    onClick={function () { triggerAvenantSignedUpload(c) }}
-                                    title="Uploader le PDF/scan de l'avenant signé par le salarié (signature papier)"
-                                  >📥 Uploader signé</button>
-                                  <button
-                                    className="btn btn-sm"
-                                    disabled={isGenerating}
-                                    onClick={function () { if (confirm("Régénérer l'avenant ? La version brouillon actuelle sera remplacée.")) generateAmendment(c) }}
-                                    title="Régénérer le brouillon (l'ancien sera remplacé, les avenants déjà signés ne sont pas touchés)"
-                                  >{isGenerating ? "⏳ Génération..." : "🔄 Régénérer"}</button>
-                                </div>
-                              </div>
-                            )
-                          })() : null}
-
-                          {/* Pas de brouillon en cours : toujours offrir la génération
-                              (qu'il y ait déjà un avenant signé obsolète ou rien du tout) */}
-                          {!avenantBrouillon ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0", borderBottom: contratOriginel ? "1px dashed #DDD" : "none" }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: "#888" }}>
-                                {avenantsSignes.length > 0 ? "📝 Mise à jour" : "📝 Aucun avenant"}
-                              </span>
-                              <span style={{ fontSize: 10, color: "#666", fontStyle: "italic" }}>
-                                {avenantsSignes.length > 0
-                                  ? "· l'avenant signé peut être obsolète"
-                                  : "· mise à jour des clauses modernes possible"}
-                              </span>
-                              <button
-                                className="btn btn-sm btn-y"
-                                style={{ marginLeft: "auto" }}
-                                disabled={isGenerating}
-                                onClick={function () { generateAmendment(c) }}
-                                title={generateBtnTitle}
-                              >{isGenerating ? "⏳ Génération..." : generateBtnLabel}</button>
-                            </div>
-                          ) : null}
-
-                          {/* Contrat originel (en bas = le plus ancien) */}
-                          {contratOriginel ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "4px 0" }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: "#191923" }}>📜 Contrat originel</span>
-                              <span style={{ fontSize: 10, color: "#666" }}>
-                                · signé le {fmtDate(contratOriginel.document_date || contratOriginel.uploaded_at)}
-                                {(c.date_embauche || c.date_debut) ? (" · effet " + fmtDate(c.date_embauche || c.date_debut)) : ""}
-                              </span>
-                              {contratOriginel.document_description ? (
-                                <span style={{ fontSize: 10, color: "#888", fontStyle: "italic", flexBasis: "100%", marginTop: 2 }}>↳ {contratOriginel.document_description}</span>
-                              ) : null}
-                              <button
-                                className="btn btn-sm btn-y"
-                                style={{ marginLeft: "auto" }}
-                                onClick={function () { openContractDoc(contratOriginel) }}
-                              >📄 Ouvrir</button>
-                            </div>
-                          ) : null}
-                        </div>
-                      )
-                    })()}
-
-                    {/* === AVENANTS RATTACHÉS À CE CONTRAT (frise imbriquée) === */}
-                    {(function () {
-                      var amds = (contractAmendments || [])
-                        .filter(function (a) { return a.contract_id === c.id })
-                        .slice()
-                        .sort(function (a, b) { return (b.amendment_number || 0) - (a.amendment_number || 0) })
-                      if (amds.length === 0) return null
                       var typeLabels = {
                         prolongation_duree: { icon: "📅", label: "Prolongation de durée" },
-                        augmentation_salaire: { icon: "💰", label: "Modification rémunération" },
-                        modification_horaires: { icon: "🕐", label: "Modification horaires" },
+                        augmentation_salaire: { icon: "💰", label: "Modification de la rémunération" },
+                        modification_horaires: { icon: "🕐", label: "Modification des horaires" },
                         changement_poste: { icon: "👔", label: "Changement de poste" },
                         regularisation_welcome_pack: { icon: "⚖", label: "Actualisation contractuelle" },
-                        autre: { icon: "📝", label: "Autre modification" }
+                        autre: { icon: "📝", label: "Modification du contrat" }
                       }
+                      var fmtChip = function (d) {
+                        if (!d) return "—"
+                        var dt = new Date(d)
+                        if (isNaN(dt.getTime())) return "—"
+                        return dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })
+                      }
+
+                      // === Construction des événements datés ===
+                      var events = []
+                      // 1) Avenant en cours (brouillon / non signé)
+                      if (draftAmendment || avenantBrouillonDoc) {
+                        var dts = draftAmendment ? (draftAmendment.effective_date || draftAmendment.created_at) : (avenantBrouillonDoc ? avenantBrouillonDoc.uploaded_at : null)
+                        var dlabel = draftAmendment ? ((typeLabels[draftAmendment.amendment_type] || typeLabels.autre).label) : "Avenant en cours"
+                        events.push({ ts: dts, kind: "draft", amendment: draftAmendment || null, brouillonDoc: avenantBrouillonDoc || null, title: dlabel, num: draftAmendment ? draftAmendment.amendment_number : null })
+                      }
+                      // 2) Avenants signés (enregistrements structurés)
+                      signedAmendments.forEach(function (a) {
+                        events.push({ ts: a.signature_date || a.effective_date || a.created_at, kind: "signed", amendment: a, title: (typeLabels[a.amendment_type] || typeLabels.autre).label, num: a.amendment_number })
+                      })
+                      // 3) Avenants signés "scan" sans contrepartie structurée (anciens imports papier)
+                      if (signedAmendments.length === 0) {
+                        signedAvenantDocs.forEach(function (d) {
+                          events.push({ ts: d.document_date || d.uploaded_at, kind: "scan", doc: d, title: "Avenant signé (document)" })
+                        })
+                      }
+                      // 4) Contrat fondateur (le plus ancien)
+                      events.push({ ts: (c.date_embauche || c.date_debut), kind: "contract", doc: contratOriginel || null, title: "Signature du contrat" })
+
+                      // Tri antéchronologique (le plus récent en haut)
+                      events.sort(function (a, b) {
+                        var ta = a.ts ? new Date(a.ts).getTime() : 0
+                        var tb = b.ts ? new Date(b.ts).getTime() : 0
+                        return tb - ta
+                      })
+
                       return (
-                        <div style={{ marginTop: 8, paddingLeft: 12, borderLeft: "3px solid #FFEB5A", display: "flex", flexDirection: "column", gap: 6 }}>
-                          <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.5, color: "#888" }}>
-                            📜 Avenants ({amds.length})
+                        <div style={{ background: "#FAFAFA", border: "1px solid #EBEBEB", borderRadius: 6, padding: 10, marginBottom: 8 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                            <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.5, color: "#888" }}>🗓 Chronologie du contrat</div>
+                            {(!draftAmendment && !avenantBrouillonDoc) ? (
+                              <button className="btn btn-sm btn-y" disabled={isGenerating}
+                                onClick={function () { generateAmendment(c) }}
+                                title="Générer un avenant de mise à jour (clauses HACCP, RGPD, etc.)"
+                              >{isGenerating ? "⏳..." : "📝 Générer un avenant"}</button>
+                            ) : null}
                           </div>
-                          {amds.map(function (a) {
-                            var am = typeLabels[a.amendment_type] || typeLabels.autre
-                            var sigStatus = a.signature_status || "unsent"
-                            var sigBadge = null
-                            if (sigStatus === "sent") sigBadge = { bg: "#FFEB5A", color: "#191923", text: "📧 Envoyé" }
-                            else if (sigStatus === "viewed") sigBadge = { bg: "#FFEB5A", color: "#191923", text: "👁 Vu" }
-                            else if (sigStatus === "signed") sigBadge = { bg: "#16A34A", color: "#FFFFFF", text: "✅ Signé" }
-                            var canSendForSignature = !a.signed_at && (sigStatus === "unsent" || sigStatus === "expired" || sigStatus === "declined")
-                            var amendmentDocLabel = "Avenant n°" + a.amendment_number + " — " + am.label
-                            return (
-                              <div key={a.id} style={{
-                                background: "#FAFAFA", border: "1.5px solid #DDD", borderRadius: 6,
-                                padding: "8px 10px", fontSize: 12, display: "flex", alignItems: "center",
-                                gap: 10, flexWrap: "wrap"
-                              }}>
-                                <span style={{ fontSize: 16 }}>{am.icon}</span>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontWeight: 900 }}>Avenant n°{a.amendment_number} — {am.label}</div>
-                                  <div style={{ fontSize: 11, color: "#666" }}>
-                                    Effet : {a.effective_date ? new Date(a.effective_date).toLocaleDateString("fr-FR") : "—"}
-                                    {a.motif ? (" · " + a.motif) : ""}
+                          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                            {events.map(function (ev, idx) {
+                              var isLast = idx === events.length - 1
+                              var dotColor = ev.kind === "draft" ? "#FF82D7" : (ev.kind === "contract" ? "#191923" : "#16A34A")
+                              // Statut signature de l'avenant en cours
+                              var sigStatus = (ev.amendment && ev.amendment.signature_status) ? ev.amendment.signature_status : "unsent"
+                              var canSend = !!(ev.amendment && !ev.amendment.signed_at && (sigStatus === "unsent" || sigStatus === "expired" || sigStatus === "declined"))
+                              var amdDocLabel = ev.amendment ? ("Avenant n°" + ev.amendment.amendment_number + " — " + ev.title) : "Avenant"
+                              var draftBadge = null
+                              if (ev.kind === "draft") {
+                                if (sigStatus === "sent") draftBadge = { bg: "#FFEB5A", color: "#191923", text: "📧 Envoyé" }
+                                else if (sigStatus === "viewed") draftBadge = { bg: "#FFEB5A", color: "#191923", text: "👁 Vu" }
+                                else draftBadge = { bg: "#FFF8E1", color: "#191923", text: "à signer" }
+                              }
+                              return (
+                                <div key={idx} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                                  {/* Date en clair */}
+                                  <div style={{ flexShrink: 0, width: 80, textAlign: "right", paddingTop: 1 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 900, color: "#191923" }}>{fmtChip(ev.ts)}</div>
                                   </div>
-                                  {a.changes ? (
-                                    <div style={{ fontSize: 10, color: "#888", marginTop: 4, fontFamily: "monospace" }}>
-                                      {Object.keys(a.changes).map(function (k) {
-                                        var ch = a.changes[k]
-                                        return k + " : " + (ch.before == null ? "—" : ch.before) + " → " + (ch.after == null ? "—" : ch.after)
-                                      }).join(" · ")}
-                                    </div>
-                                  ) : null}
+                                  {/* Rail */}
+                                  <div style={{ position: "relative", width: 14, flexShrink: 0, alignSelf: "stretch" }}>
+                                    <div style={{ position: "absolute", left: 5, top: 4, bottom: 0, width: 2, background: isLast ? "transparent" : "#DDD" }}></div>
+                                    <div style={{ position: "absolute", left: 0, top: 3, width: 12, height: 12, borderRadius: "50%", background: dotColor, border: "2px solid #191923" }}></div>
+                                  </div>
+                                  {/* Corps de l'événement */}
+                                  <div style={{ flex: 1, minWidth: 0, paddingBottom: isLast ? 0 : 12 }}>
+                                    {ev.kind === "draft" ? (
+                                      <div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                          <span style={{ fontSize: 12, fontWeight: 900, color: "#FF82D7" }}>
+                                            📝 {ev.num ? ("Avenant n°" + ev.num + " — ") : "Avenant — "}{ev.title}
+                                          </span>
+                                          {draftBadge ? (
+                                            <span style={{ fontSize: 10, fontWeight: 700, background: draftBadge.bg, color: draftBadge.color, padding: "2px 6px", borderRadius: 3 }}>{draftBadge.text}</span>
+                                          ) : null}
+                                        </div>
+                                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
+                                          {ev.brouillonDoc ? (
+                                            <button className="btn btn-sm btn-y" onClick={function () { openContractDoc(ev.brouillonDoc) }}>📄 Ouvrir</button>
+                                          ) : null}
+                                          {canSend ? (
+                                            <button className="btn btn-sm" style={{ background: "#FF82D7", color: "#FFFFFF", border: "1.5px solid #FF82D7", fontWeight: 700 }}
+                                              onClick={function () { setSendSignaturePayload({ documentType: "amendment", documentId: ev.amendment.id, documentLabel: amdDocLabel }) }}
+                                              title="Envoyer cet avenant au salarié pour signature électronique"
+                                            >📧 Envoyer pour signature</button>
+                                          ) : null}
+                                          <button className="btn btn-sm" onClick={function () { triggerAvenantSignedUpload(c) }}
+                                            title="Uploader le PDF/scan de l'avenant signé (signature papier)"
+                                          >📥 Uploader signé</button>
+                                          <button className="btn btn-sm" disabled={isGenerating}
+                                            onClick={function () { if (confirm("Régénérer l'avenant ? La version brouillon actuelle sera remplacée.")) generateAmendment(c) }}
+                                            title="Régénérer le brouillon (les avenants signés ne sont pas touchés)"
+                                          >{isGenerating ? "⏳..." : "🔄 Régénérer"}</button>
+                                          {(ev.amendment && !ev.amendment.signed_at) ? (
+                                            <button className="btn btn-sm btn-red" onClick={function () { deleteAmendmentWithRollback(ev.amendment) }}
+                                              title="Supprimer l'avenant et annuler la modification (rollback)"
+                                            >🗑️</button>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                    ) : null}
+
+                                    {ev.kind === "signed" ? (
+                                      <div>
+                                        <div style={{ fontSize: 12, fontWeight: 900, color: "#16A34A" }}>
+                                          ✅ {ev.num ? ("Avenant n°" + ev.num + " — ") : ""}{ev.title}
+                                        </div>
+                                        {(ev.amendment && ev.amendment.motif) ? (
+                                          <div style={{ fontSize: 10, color: "#888", marginTop: 1 }}>{ev.amendment.motif}</div>
+                                        ) : null}
+                                        {(ev.amendment && ev.amendment.changes) ? (
+                                          <div style={{ fontSize: 10, color: "#888", marginTop: 2, fontFamily: "monospace" }}>
+                                            {Object.keys(ev.amendment.changes).map(function (k) {
+                                              var ch = ev.amendment.changes[k]
+                                              return k + " : " + (ch.before == null ? "—" : ch.before) + " → " + (ch.after == null ? "—" : ch.after)
+                                            }).join(" · ")}
+                                          </div>
+                                        ) : null}
+                                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
+                                          <button className="btn btn-sm btn-y" onClick={function () { regenerateAmendmentContractuelPdf(ev.amendment) }}
+                                            title="Régénérer le PDF de l'avenant et l'ouvrir"
+                                          >🖨️ PDF</button>
+                                        </div>
+                                      </div>
+                                    ) : null}
+
+                                    {ev.kind === "scan" ? (
+                                      <div>
+                                        <div style={{ fontSize: 12, fontWeight: 900, color: "#16A34A" }}>✅ {ev.title}</div>
+                                        {ev.doc.document_description ? (
+                                          <div style={{ fontSize: 10, color: "#888", marginTop: 1 }}>{ev.doc.document_description}</div>
+                                        ) : null}
+                                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
+                                          <button className="btn btn-sm btn-y" onClick={function () { openContractDoc(ev.doc) }}>📄 Ouvrir</button>
+                                        </div>
+                                      </div>
+                                    ) : null}
+
+                                    {ev.kind === "contract" ? (
+                                      <div>
+                                        <div style={{ fontSize: 12, fontWeight: 900, color: "#191923" }}>📜 {ev.title}</div>
+                                        <div style={{ fontSize: 10, color: "#888", marginTop: 1 }}>
+                                          {c.fonction ? c.fonction : ""}
+                                          {(c.type !== "extra" && c.salaire_brut_mensuel) ? (" · " + c.salaire_brut_mensuel + " €/mois") : (c.taux_horaire_brut ? (" · " + c.taux_horaire_brut + " €/h") : "")}
+                                        </div>
+                                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
+                                          {ev.doc ? (
+                                            <button className="btn btn-sm btn-y" onClick={function () { openContractDoc(ev.doc) }}>📄 Ouvrir l&apos;original</button>
+                                          ) : (
+                                            <button className="btn btn-sm btn-y" onClick={function () { if (props.onContractPreview) props.onContractPreview(c) }}>👁 Voir / Imprimer</button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </div>
                                 </div>
-                                {sigBadge ? (
-                                  <span style={{ padding: "2px 8px", background: sigBadge.bg, color: sigBadge.color, borderRadius: 10, fontSize: 10, fontWeight: 900 }}>{sigBadge.text}</span>
-                                ) : (
-                                  <span style={{
-                                    padding: "2px 8px",
-                                    background: a.status === "signed" ? "#16A34A" : a.status === "finalized" ? "#FFA500" : "#999",
-                                    color: "white", borderRadius: 10, fontSize: 10, fontWeight: 900
-                                  }}>{a.status === "signed" ? "SIGNÉ" : a.status === "finalized" ? "FINALISÉ" : "BROUILLON"}</span>
-                                )}
-                                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                                  <button
-                                    className="btn btn-sm btn-y"
-                                    onClick={function () { regenerateAmendmentContractuelPdf(a) }}
-                                    title="Régénérer le PDF de l'avenant et l'ouvrir pour impression"
-                                  >🖨️ PDF</button>
-                                  {canSendForSignature ? (
-                                    <button
-                                      className="btn btn-sm"
-                                      style={{ background: "#FF82D7", color: "#FFFFFF", border: "1.5px solid #FF82D7", fontWeight: 700 }}
-                                      onClick={function () {
-                                        setSendSignaturePayload({
-                                          documentType: "amendment",
-                                          documentId: a.id,
-                                          documentLabel: amendmentDocLabel,
-                                        })
-                                      }}
-                                      title="Envoyer cet avenant au salarié par email pour signature électronique"
-                                    >📧 Envoyer pour signature</button>
-                                  ) : null}
-                                  {(a.status !== "signed" && !a.signed_at) ? (
-                                    <button
-                                      className="btn btn-sm btn-red"
-                                      onClick={function () { deleteAmendmentWithRollback(a) }}
-                                      title="Supprimer l'avenant et annuler la modification (rollback)"
-                                    >🗑️</button>
-                                  ) : null}
-                                </div>
-                              </div>
-                            )
-                          })}
+                              )
+                            })}
+                          </div>
                         </div>
                       )
                     })()}
@@ -1923,70 +1835,28 @@ export default function EmployeeDetail(props) {
         </div>
 
         {/* === BLOC DOSSIER DE BIENVENUE === */}
-        <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
-          <div className="ct">📋 Dossier de bienvenue</div>
-          {welcomePackDocs.length > 0 ? (
-            <div style={{ background: "#FFFFFF", border: "2px solid #FF82D7", borderRadius: 6, padding: 12, marginBottom: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <span style={{ background: "#FF82D7", color: "#FFFFFF", padding: "3px 8px", borderRadius: 4, fontSize: 9, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".5px" }}>
-                  ✓ Signé
-                </span>
-                <span style={{ fontSize: 12, fontWeight: 700 }}>
-                  Dossier signé téléversé le {fmtDate(welcomePackDocs[0].uploaded_at)}
-                </span>
-              </div>
-              <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 8 }}>
-                {welcomePackDocs.length} fichier{welcomePackDocs.length > 1 ? "s" : ""} archivé{welcomePackDocs.length > 1 ? "s" : ""} · catégorie « dossier_bienvenue_signe »
-              </div>
-              {/* Bouton "Voir le signé" : ouvre le viewer inline avec toolbar PDF.
-                  Trouve le dernier avenant signé qui incluait le welcomepack. */}
-              {(function() {
-                var signedAmendments = contractAmendments.filter(function(a: any) {
-                  return a.signed_at && a.signature_includes_welcome_pack === true
-                })
-                if (signedAmendments.length === 0) return null
-                var lastSigned = signedAmendments[signedAmendments.length - 1]
-                var wpViewerUrl = buildSignedDocViewUrl({ entityKind: "amendment", entityId: lastSigned.id, docKind: "welcomepack", mode: "print" })
-                return (
-                  <a
-                    href={wpViewerUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: "inline-block",
-                      padding: "6px 12px",
-                      background: "#FFEB5A",
-                      border: "2px solid #191923",
-                      borderRadius: 4,
-                      fontSize: 11,
-                      fontWeight: 900,
-                      color: "#191923",
-                      textDecoration: "none",
-                      boxShadow: "1px 1px 0 #191923"
-                    }}
-                  >🖨️ Télécharger le dossier signé en PDF</a>
-                )
-              })()}
-            </div>
-          ) : (
+        {/* Affiché uniquement tant qu'il n'est pas signé. Une fois signé, le dossier
+            apparaît dans le bloc « Documents » en bas (catégorie dossier_bienvenue_signe). */}
+        {welcomePackDocs.length === 0 ? (
+          <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
+            <div className="ct">📋 Dossier de bienvenue</div>
             <div style={{ background: "#FAFAFA", border: "1px dashed #BBBBBB", borderRadius: 6, padding: 12, marginBottom: 10, fontSize: 11.5, color: "#666" }}>
-              ✗ Aucun dossier signé n&apos;a encore été téléversé pour ce salarié.
+              ✗ Pas encore signé. Génère le dossier, fais-le signer, puis téléverse-le &mdash; il sera ensuite classé dans les Documents ci-dessous.
             </div>
-          )}
-
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            <button
-              className="btn btn-y btn-sm"
-              onClick={previewWelcomePack}
-            >👁 Générer / Voir le dossier</button>
-            <button
-              className="btn btn-sm"
-              onClick={triggerWelcomePackUpload}
-              disabled={uploadingWelcomePack}
-              title="Uploader le PDF signé « Lu et approuvé »"
-            >{uploadingWelcomePack ? "Upload..." : "📎 Uploader le signé"}</button>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button
+                className="btn btn-y btn-sm"
+                onClick={previewWelcomePack}
+              >👁 Générer / Voir le dossier</button>
+              <button
+                className="btn btn-sm"
+                onClick={triggerWelcomePackUpload}
+                disabled={uploadingWelcomePack}
+                title="Uploader le PDF signé « Lu et approuvé »"
+              >{uploadingWelcomePack ? "Upload..." : "📎 Uploader le signé"}</button>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {/* === BLOC DOCUMENTS (perso + contractuels fusionnés) === */}
         <div className="mb">
