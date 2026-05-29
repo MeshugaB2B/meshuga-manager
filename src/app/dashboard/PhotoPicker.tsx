@@ -230,7 +230,7 @@ export default function PhotoPicker(props: any) {
   }
 
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(25,25,35,.65)',zIndex:500,display:'flex',alignItems:'center',justifyContent:'center',padding:14}} onClick={onClose}>
+    <div style={{position:'fixed',inset:0,background:'rgba(25,25,35,.65)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:14}} onClick={onClose}>
       <div style={{background:'#FFFFFF',borderRadius:18,width:'100%',maxWidth:560,maxHeight:'92vh',display:'flex',flexDirection:'column',border:'2px solid #191923',boxShadow:'5px 5px 0 #191923',overflow:'hidden'}} onClick={function(e){e.stopPropagation()}}>
 
         {/* Header */}
