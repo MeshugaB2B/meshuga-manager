@@ -646,6 +646,21 @@ export default function AchatsTab(props) {
             )
           }) : <div style={{fontSize:13,color:'#888'}}>Aucune facture importée pour ce produit.</div>}
         </div>
+
+        {/* ========== PHOTO PICKER MODAL (dans la vue détail) ========== */}
+        {photoPickerOpen && (
+          <PhotoPicker
+            productId={prod.id}
+            productName={prod.name}
+            toast={toast}
+            onClose={function(){setPhotoPickerOpen(false)}}
+            onUploaded={function(url){
+              setPhotoPickerOpen(false)
+              loadData()
+              setSelectedProduct(Object.assign({}, prod, {photo_url:url}))
+            }}
+          />
+        )}
       </div>
     )
   }
