@@ -46,6 +46,74 @@ function getInitialsFromName(prenom: string, nom: string): string {
   return (p || "?") + "." + (n || "?") + "."
 }
 
+// Initiales compactes "PN" pour l'avatar (sans points)
+function avatarInitials(prenom, nom) {
+  var p = (prenom || "").trim()
+  var n = (nom || "").trim()
+  var res = ((p ? p.charAt(0) : "") + (n ? n.charAt(0) : "")).toUpperCase()
+  return res || "?"
+}
+
+// Code couleur par poste — aligné sur le hub RhTab
+//   Cuisine #CC0066 | Caisse/accueil #005FFF | Salle/équipier #009D3A |
+//   Commercial B2B #FF82D7 | Direction/admin #191923 (initiale jaune)
+function getPosteMeta(fonction, type) {
+  var f = (fonction || "").toLowerCase()
+  var t = (type || "").toLowerCase()
+  if (f.indexOf("directeur") >= 0 || f.indexOf("directrice") >= 0 || f.indexOf("direction") >= 0
+      || f.indexOf("gérant") >= 0 || f.indexOf("gerant") >= 0 || f.indexOf("président") >= 0
+      || f.indexOf("president") >= 0 || f.indexOf("administr") >= 0) {
+    return { key: "direction", label: "Direction / admin", color: "#191923", textColor: "#FFEB5A" }
+  }
+  if (f.indexOf("commercial") >= 0 || f.indexOf("b2b") >= 0 || f.indexOf("business") >= 0
+      || f.indexOf("développement") >= 0 || f.indexOf("developpement") >= 0 || f.indexOf("vente") >= 0
+      || t === "cdi_agent_maitrise" || t === "cdi_cadre") {
+    return { key: "commercial", label: "Commercial B2B", color: "#FF82D7", textColor: "#191923" }
+  }
+  if (f.indexOf("cuisin") >= 0 || f.indexOf("chef") >= 0 || f.indexOf("plonge") >= 0
+      || t === "cdi_cuisinier") {
+    return { key: "cuisine", label: "Cuisine", color: "#CC0066", textColor: "#FFFFFF" }
+  }
+  if (f.indexOf("caiss") >= 0 || f.indexOf("vendeu") >= 0 || f.indexOf("accueil") >= 0
+      || f.indexOf("comptoir") >= 0 || t === "cdi_caissier") {
+    return { key: "caisse", label: "Caisse / accueil", color: "#005FFF", textColor: "#FFFFFF" }
+  }
+  if (f.indexOf("serveu") >= 0 || f.indexOf("salle") >= 0 || f.indexOf("équipier") >= 0
+      || f.indexOf("equipier") >= 0 || f.indexOf("runner") >= 0) {
+    return { key: "salle", label: "Salle / équipier", color: "#009D3A", textColor: "#FFFFFF" }
+  }
+  return { key: "autre", label: "Équipe", color: "#191923", textColor: "#FFEB5A" }
+}
+
+// Masque une valeur sensible en conservant un soupçon de format
+function maskSensitive(val) {
+  var s = String(val || "")
+  if (!s) return "—"
+  return "•••• •••• " + s.replace(/\s+/g, "").slice(-2)
+}
+
+// Ancienneté à partir de la date d'embauche la plus ancienne des contrats
+function computeAnciennete(contractsList) {
+  var dates = (contractsList || [])
+    .map(function (c) { return c.date_debut })
+    .filter(function (d) { return !!d })
+    .map(function (d) { return new Date(d).getTime() })
+    .filter(function (t) { return !isNaN(t) })
+  if (dates.length === 0) return { since: null, label: "—" }
+  var first = new Date(Math.min.apply(null, dates))
+  var now = new Date()
+  var months = (now.getFullYear() - first.getFullYear()) * 12 + (now.getMonth() - first.getMonth())
+  if (now.getDate() < first.getDate()) months -= 1
+  if (months < 0) months = 0
+  var y = Math.floor(months / 12)
+  var m = months % 12
+  var parts = []
+  if (y > 0) parts.push(y + " an" + (y > 1 ? "s" : ""))
+  if (m > 0) parts.push(m + " mois")
+  if (parts.length === 0) parts.push("moins d'un mois")
+  return { since: first, label: parts.join(" ") }
+}
+
 // === PdfPreviewModal : modal d'aperçu de document avec actions Fermer/Imprimer ===
 // Affiche un iframe sur l'URL passée (HTML signé via /api/signatures/view OU PDF
 // via signed URL Supabase). Le bouton "Imprimer" essaie d'abord d'utiliser
@@ -218,6 +286,7 @@ export default function EmployeeDetail(props) {
   // payload : { documentType: 'contract'|'amendment', documentId, documentLabel, amendmentData? }
   var [sendSignaturePayload, setSendSignaturePayload] = useState(null)
   var [contractAmendments, setContractAmendments] = useState([])
+  var [revealSensitive, setRevealSensitive] = useState(false)
   var signedFileInputRef = useRef(null)
   var avenantSignedInputRef = useRef(null)
   var welcomePackFileInputRef = useRef(null)
@@ -981,6 +1050,21 @@ export default function EmployeeDetail(props) {
     archived: { bg: "#EDEDED", color: "#666" }
   }
 
+  // === Synthèse poste / type / ancienneté pour l'en-tête ===
+  var sortedForMain = contracts.slice().sort(function (a, b) {
+    var aCdi = a.type !== "extra" ? 1 : 0
+    var bCdi = b.type !== "extra" ? 1 : 0
+    if (aCdi !== bCdi) return bCdi - aCdi
+    var aCur = a.is_current === true ? 1 : 0
+    var bCur = b.is_current === true ? 1 : 0
+    if (aCur !== bCur) return bCur - aCur
+    return (b.created_at || "").localeCompare(a.created_at || "")
+  })
+  var mainC = sortedForMain[0] || null
+  var poste = getPosteMeta(mainC ? mainC.fonction : "", mainC ? mainC.type : "")
+  var typeMeta = mainC ? getContractTypeMeta(mainC.type || "extra") : null
+  var anciennete = computeAnciennete(contracts)
+
   return (
     <div className="overlay" onClick={function (e) { if (e.target === e.currentTarget) props.onClose() }}>
       <div className="modal modal-xl" style={{ maxWidth: 880, maxHeight: "92vh", overflowY: "auto" }}>
@@ -1023,16 +1107,46 @@ export default function EmployeeDetail(props) {
         {/* === HEADER === */}
         <div className="mh" style={{ position: "sticky", top: 0, zIndex: 10, background: "#FFFFFF" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
-            <div className="mt" style={{ fontFamily: "Yellowtail, cursive", fontSize: 28, color: "#FF82D7", lineHeight: 1.1 }}>
-              👤 {emp.prenom} {(emp.nom || "").toUpperCase()}
-              {emp.date_sortie ? (
-                <span className="badge" style={{
-                  marginLeft: 10, background: "#191923", color: "#FFEB5A", fontFamily: "'Arial Narrow', Arial",
-                  fontSize: 10, padding: "3px 8px", verticalAlign: "middle",
-                }}>
-                  PARTI {fmtDate(emp.date_sortie)}
-                </span>
-              ) : null}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+              {/* Avatar couleur poste */}
+              <div style={{
+                width: 54, height: 54, borderRadius: "50%", flexShrink: 0,
+                background: poste.color, color: poste.textColor,
+                border: "2.5px solid #191923", boxShadow: "3px 3px 0 #191923",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 900, fontSize: 20, letterSpacing: ".5px",
+                fontFamily: "'Arial Narrow', Arial, sans-serif"
+              }}>{avatarInitials(emp.prenom, emp.nom)}</div>
+              <div style={{ minWidth: 0 }}>
+                <div className="mt" style={{ fontFamily: "Yellowtail, cursive", fontSize: 28, color: "#FF82D7", lineHeight: 1.05 }}>
+                  {emp.prenom} {(emp.nom || "").toUpperCase()}
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 4 }}>
+                  <span style={{
+                    background: poste.color, color: poste.textColor, fontSize: 9, fontWeight: 900,
+                    textTransform: "uppercase", letterSpacing: ".5px", padding: "2px 8px",
+                    borderRadius: 4, border: "1.5px solid #191923"
+                  }}>{(mainC && mainC.fonction) ? mainC.fonction : poste.label}</span>
+                  {typeMeta ? (
+                    <span style={{
+                      background: typeMeta.color, color: "#191923", fontSize: 9, fontWeight: 900,
+                      textTransform: "uppercase", letterSpacing: ".5px", padding: "2px 8px",
+                      borderRadius: 4, border: "1.5px solid #191923"
+                    }}>{typeMeta.icon} {typeMeta.label.replace("CDI ", "")}</span>
+                  ) : null}
+                  {anciennete.since ? (
+                    <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.65 }}>
+                      🗓 {anciennete.label} d&apos;ancienneté
+                    </span>
+                  ) : null}
+                  {emp.date_sortie ? (
+                    <span style={{
+                      background: "#191923", color: "#FFEB5A", fontFamily: "'Arial Narrow', Arial",
+                      fontSize: 9, fontWeight: 900, padding: "2px 8px", borderRadius: 4
+                    }}>PARTI {fmtDate(emp.date_sortie)}</span>
+                  ) : null}
+                </div>
+              </div>
             </div>
             <button className="btn" onClick={props.onClose}>Fermer ×</button>
           </div>
@@ -1124,6 +1238,8 @@ export default function EmployeeDetail(props) {
 
           {!editing ? (
             <div>
+              {/* Coordonnées */}
+              <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1, opacity: 0.5, marginBottom: 6 }}>Coordonnées</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", fontSize: 13 }}>
                 <div><b>Civilité :</b> {emp.civilite || "—"}</div>
                 <div><b>Nationalité :</b> {emp.nationalite ? capitalize(emp.nationalite) : "—"}</div>
@@ -1133,8 +1249,6 @@ export default function EmployeeDetail(props) {
                   <b>Adresse :</b> {emp.adresse || "—"}
                   {(emp.code_postal || emp.ville) ? (<span> · {emp.code_postal || ""} {emp.ville || ""}</span>) : null}
                 </div>
-                <div><b>N° Sécu sociale :</b> {emp.num_secu || "—"}</div>
-                <div></div>
                 <div>
                   <b>Email :</b> {emp.email
                     ? <a href={"mailto:" + emp.email} style={{ color: "#FF82D7" }}>{emp.email}</a>
@@ -1142,10 +1256,32 @@ export default function EmployeeDetail(props) {
                 </div>
                 <div>
                   <b>Téléphone :</b> {emp.telephone
-                    ? <a href={"tel:" + emp.telephone} style={{ color: "#FF82D7" }}>{emp.telephone}</a>
+                    ? (revealSensitive
+                        ? <a href={"tel:" + emp.telephone} style={{ color: "#FF82D7" }}>{emp.telephone}</a>
+                        : <span style={{ letterSpacing: 1 }}>{maskSensitive(emp.telephone)}</span>)
                     : "—"}
                 </div>
               </div>
+
+              {/* Administratif (sensible — masqué par défaut) */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 0 6px" }}>
+                <span style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1, opacity: 0.5 }}>Administratif</span>
+                <button
+                  className="btn btn-sm"
+                  onClick={function () { setRevealSensitive(!revealSensitive) }}
+                  title="Afficher / masquer les données sensibles"
+                >{revealSensitive ? "🙈 Masquer" : "👁 Afficher"}</button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 16px", fontSize: 13 }}>
+                <div>
+                  <b>N° Sécu sociale :</b>{" "}
+                  {emp.num_secu
+                    ? (revealSensitive ? emp.num_secu : <span style={{ letterSpacing: 1 }}>{maskSensitive(emp.num_secu)}</span>)
+                    : "—"}
+                </div>
+                <div></div>
+              </div>
+
               {emp.notes ? (
                 <div style={{ marginTop: 12, padding: 10, background: "#FFF8E1", borderLeft: "3px solid #FF82D7", borderRadius: 4 }}>
                   <div style={{ fontSize: 11, fontWeight: 900, marginBottom: 4 }}>📝 Notes :</div>
