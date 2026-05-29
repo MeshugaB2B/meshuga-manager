@@ -516,7 +516,10 @@ export default function AchatsTab(props) {
 
     return (
       <div>
-        <div onClick={function(){setSelectedProduct(null)}} style={{cursor:'pointer',fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginBottom:12}}>← Retour</div>
+        <button onClick={function(){setSelectedProduct(null)}} style={{display:'inline-flex',alignItems:'center',gap:8,padding:'9px 16px',background:'#FFFFFF',color:'#191923',border:'2px solid #191923',borderRadius:20,fontWeight:900,fontSize:12,cursor:'pointer',marginBottom:14,boxShadow:'2px 2px 0 #191923'}} onMouseEnter={function(e){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='2px 2px 0 #191923'}}>
+          <span style={{fontSize:16,lineHeight:1}}>←</span>
+          <span>Retour au catalogue</span>
+        </button>
 
         {/* PHOTO PRODUIT */}
         <div style={{marginBottom:14}}>
@@ -571,19 +574,23 @@ export default function AchatsTab(props) {
             </div>
           </div>
 
-          {siblingProducts.length > 1 && <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Fournisseurs</div>}
+          {siblingProducts.length > 1 && <div style={{fontFamily:'Yellowtail',fontSize:18,color:'#FF82D7',marginTop:20,marginBottom:8}}>Fournisseurs</div>}
           {siblingProducts.length > 1 && siblingProducts.map(function(sp) {
             var spSup = suppliers.filter(function(ss) { return ss.id === sp.supplier_id })[0]
             var diff = activeProduct.id !== sp.id && Number(activeProduct.current_price) > 0 ? ((Number(sp.current_price) - Number(activeProduct.current_price)) / Number(activeProduct.current_price) * 100).toFixed(1) : null
             return (
-              <div key={sp.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',borderRadius:8,marginBottom:4,background:sp.is_active ? '#FFF9D0' : 'transparent',border:sp.is_active ? '2px solid #FFEB5A' : '1px solid #EEE'}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                  {sp.is_active && <span style={{fontSize:14}}>★</span>}
-                  <span style={{fontWeight:900,fontSize:14}}>{spSup ? spSup.name : '?'}</span>
-                  <span style={{fontSize:10,color:'#888'}}>{sp.name}</span>
-                  {sp.is_active && <span style={{fontSize:10,fontWeight:900,color:'#8A6D00',background:'#FFEB5A',padding:'2px 8px',borderRadius:10}}>ACTIF</span>}
+              <div key={sp.id} style={{display:'grid',gridTemplateColumns:'1fr auto auto',alignItems:'center',gap:12,padding:'10px 12px',borderRadius:10,marginBottom:6,background:sp.is_active?'#FFF9D0':'#FAFAFA',border:sp.is_active?'2px solid #FFEB5A':'1.5px solid #EEE'}}>
+                {/* COL 1 : étoile + nom fournisseur + variante + ACTIF */}
+                <div style={{display:'flex',alignItems:'center',gap:8,minWidth:0}}>
+                  {sp.is_active && <span style={{fontSize:14,flexShrink:0}}>★</span>}
+                  <div style={{minWidth:0}}>
+                    <div style={{fontWeight:900,fontSize:13,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{spSup?spSup.name:'?'}</div>
+                    <div style={{fontSize:10,color:'#888',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{sp.name}</div>
+                  </div>
+                  {sp.is_active && <span style={{fontSize:9,fontWeight:900,color:'#8A6D00',background:'#FFEB5A',padding:'2px 7px',borderRadius:10,flexShrink:0}}>ACTIF</span>}
                 </div>
-                <div style={{display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+                {/* COL 2 : prix + édition + variation */}
+                <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0,justifyContent:'flex-end'}}>
                   {editingPriceId === sp.id ? (
                     <div style={{display:'flex',alignItems:'center',gap:4}}>
                       <input type="text" inputMode="decimal" autoFocus value={editingPriceVal} onChange={function(e){setEditingPriceVal(e.target.value)}} onKeyDown={function(e){if(e.key==='Enter'){savePrice(sp.id, editingPriceVal)}if(e.key==='Escape'){setEditingPriceId(null);setEditingPriceVal('')}}} style={{width:70,padding:'4px 6px',fontSize:13,fontWeight:900,border:'2px solid #FF82D7',borderRadius:4,textAlign:'right'}} />
@@ -592,10 +599,15 @@ export default function AchatsTab(props) {
                       <button onClick={function(){setEditingPriceId(null);setEditingPriceVal('')}} style={{padding:'3px 6px',background:'#fff',color:'#888',border:'1px solid #DDD',borderRadius:4,cursor:'pointer',fontSize:10}}>✕</button>
                     </div>
                   ) : (
-                    <span onClick={function(){setEditingPriceId(sp.id);setEditingPriceVal(Number(sp.current_price).toFixed(2))}} style={{fontWeight:900,fontSize:14,cursor:'pointer',padding:'2px 6px',borderRadius:4}} title="Cliquer pour modifier">{Number(sp.current_price).toFixed(2)} €/{sp.unit} <span style={{fontSize:10,opacity:.5}}>✏️</span></span>
+                    <span onClick={function(){setEditingPriceId(sp.id);setEditingPriceVal(Number(sp.current_price).toFixed(2))}} style={{fontWeight:900,fontSize:14,cursor:'pointer',whiteSpace:'nowrap'}} title="Cliquer pour modifier">{Number(sp.current_price).toFixed(2)}€/{sp.unit} <span style={{fontSize:10,opacity:.45}}>✏️</span></span>
                   )}
-                  {diff !== null && editingPriceId !== sp.id && <span style={{fontSize:11,fontWeight:900,color:Number(diff) > 0 ? '#CC0066' : '#009D3A'}}>{Number(diff) > 0 ? '+' : ''}{diff}%</span>}
-                  {!sp.is_active && editingPriceId !== sp.id && <button onClick={function(){toggleActive(sp.id, articleId)}} style={{padding:'3px 10px',fontSize:10,fontWeight:900,borderRadius:20,border:'2px solid #191923',background:'#fff',cursor:'pointer'}}>ACTIVER</button>}
+                  {diff !== null && editingPriceId !== sp.id && (
+                    <span style={{fontSize:11,fontWeight:900,color:Number(diff)>0?'#CC0066':'#009D3A',background:Number(diff)>0?'#FFE5F0':'#E8FFE8',padding:'2px 7px',borderRadius:10,minWidth:42,textAlign:'center',whiteSpace:'nowrap'}}>{Number(diff)>0?'+':''}{diff}%</span>
+                  )}
+                </div>
+                {/* COL 3 : bouton ACTIVER si inactif */}
+                <div style={{flexShrink:0,minWidth:0}}>
+                  {!sp.is_active && editingPriceId !== sp.id && <button onClick={function(){toggleActive(sp.id, articleId)}} style={{padding:'4px 10px',fontSize:10,fontWeight:900,borderRadius:14,border:'2px solid #191923',background:'#fff',cursor:'pointer',whiteSpace:'nowrap'}}>ACTIVER</button>}
                 </div>
               </div>
             )
@@ -614,37 +626,41 @@ export default function AchatsTab(props) {
           <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Évolution du prix</div>
           {allPricesForArticle.length >= 2 ? renderPriceChart(allProductIds, prices, supplierMapForChart) : <div style={{fontSize:13,color:'#888'}}>Pas encore d&apos;historique. Importe une facture pour commencer le suivi.</div>}
 
-          <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#FF82D7',marginTop:20,marginBottom:8}}>Historique factures</div>
-          {allPricesForArticle.length > 0 ? allPricesForArticle.slice().reverse().map(function(ph) {
-            var phSup = supplierMapForChart[ph.product_id] || '?'
-            var hasInvoice = !!ph.invoice_path
-            return (
-              <div
-                key={ph.id}
-                onClick={hasInvoice ? function(){ openInvoice(ph.invoice_path) } : undefined}
-                style={{
-                  display:'flex',justifyContent:'space-between',fontSize:12,padding:'6px 8px',
-                  borderBottom:'1px solid #F5F5F5',alignItems:'center',gap:6,flexWrap:'wrap',
-                  cursor:hasInvoice?'pointer':'default',
-                  borderRadius:4,
-                  transition:'background .12s'
-                }}
-                onMouseOver={hasInvoice ? function(e){ e.currentTarget.style.background = '#FFF5FB' } : undefined}
-                onMouseOut={hasInvoice ? function(e){ e.currentTarget.style.background = 'transparent' } : undefined}
-                title={hasInvoice ? 'Cliquer pour ouvrir la facture' : ''}
-              >
-                <span style={{fontWeight:700,minWidth:80}}>{new Date(ph.invoice_date).toLocaleDateString('fr-FR')}</span>
-                <span style={{fontSize:11,color:'#888'}}>{phSup}</span>
-                {ph.pack_label && <span style={{fontSize:10,color:'#666'}}>{ph.pack_label}</span>}
-                <span style={{fontWeight:900}}>{Number(ph.master_unit_price).toFixed(2)} €/{prod.unit}</span>
-                {ph.invoice_filename && (
-                  <span style={{fontSize:10,color:hasInvoice?'#FF82D7':'#888',fontWeight:hasInvoice?900:400}}>
-                    {hasInvoice ? '📄 ' : ''}{ph.invoice_filename}
-                  </span>
-                )}
+          <div style={{fontFamily:'Yellowtail',fontSize:18,color:'#FF82D7',marginTop:24,marginBottom:8}}>Historique factures</div>
+          {allPricesForArticle.length > 0 ? (
+            <div style={{border:'1.5px solid #EEE',borderRadius:10,overflow:'hidden'}}>
+              {/* Header tableau */}
+              <div style={{display:'grid',gridTemplateColumns:'90px 1fr 100px 110px 70px',gap:10,padding:'8px 12px',background:'#FAFAFA',borderBottom:'1.5px solid #EEE',fontSize:9,fontWeight:900,textTransform:'uppercase',letterSpacing:.5,opacity:.55}}>
+                <span>Date</span>
+                <span>Fournisseur</span>
+                <span style={{textAlign:'center'}}>Conditt</span>
+                <span style={{textAlign:'right'}}>Prix unitaire</span>
+                <span style={{textAlign:'center'}}>Facture</span>
               </div>
-            )
-          }) : <div style={{fontSize:13,color:'#888'}}>Aucune facture importée pour ce produit.</div>}
+              {/* Lignes */}
+              {allPricesForArticle.slice().reverse().map(function(ph) {
+                var phSup = supplierMapForChart[ph.product_id] || '?'
+                var hasInvoice = !!ph.invoice_path
+                return (
+                  <div key={ph.id} style={{display:'grid',gridTemplateColumns:'90px 1fr 100px 110px 70px',gap:10,padding:'9px 12px',borderBottom:'1px solid #F5F5F5',alignItems:'center',fontSize:12,background:'#FFFFFF'}}>
+                    <span style={{fontWeight:700,whiteSpace:'nowrap'}}>{new Date(ph.invoice_date).toLocaleDateString('fr-FR')}</span>
+                    <span style={{fontSize:12,color:'#191923',fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{phSup}</span>
+                    <span style={{fontSize:10,color:'#666',textAlign:'center',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{ph.pack_label || '—'}</span>
+                    <span style={{fontWeight:900,textAlign:'right',whiteSpace:'nowrap'}}>{Number(ph.master_unit_price).toFixed(2)}€/{prod.unit}</span>
+                    <div style={{display:'flex',justifyContent:'center'}}>
+                      {hasInvoice ? (
+                        <button onClick={function(){openInvoice(ph.invoice_path)}} title={'Ouvrir '+(ph.invoice_filename||'facture')} style={{padding:'4px 10px',background:'var(--y)',color:'#191923',border:'1.5px solid #191923',borderRadius:14,fontSize:11,fontWeight:900,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:4,whiteSpace:'nowrap'}} onMouseEnter={function(e){e.currentTarget.style.background='#FFD93D'}} onMouseLeave={function(e){e.currentTarget.style.background='var(--y)'}}>
+                          📄 Voir
+                        </button>
+                      ) : (
+                        <span style={{fontSize:10,opacity:.4}}>—</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : <div style={{fontSize:13,color:'#888'}}>Aucune facture importée pour ce produit.</div>}
         </div>
 
         {/* ========== PHOTO PICKER MODAL (dans la vue détail) ========== */}
