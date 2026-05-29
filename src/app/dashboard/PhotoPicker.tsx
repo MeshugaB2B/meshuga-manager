@@ -49,25 +49,36 @@ async function detourerEtComposer(imageBlobOrUrl: any, outputSize: number) {
         var imageData = ctx.getImageData(0, 0, w, h)
         var data = imageData.data
 
-        // Critère "fond candidat" : pixel peu saturé (sat < 35) ET clair (mx > 200)
-        // OU très sombre uniformément (mn > 240 = blanc pur)
-        function isBgCandidate(i: number): boolean {
+        // === PHASE 1 : critère STRICT pour détecter le fond clair principal ===
+        // (peu saturé ET clair, ou presque blanc pur)
+        function isBgStrict(i: number): boolean {
           var r = data[i], g = data[i+1], b = data[i+2]
           var mx = Math.max(r, g, b)
           var mn = Math.min(r, g, b)
           var sat = mx - mn
-          return (mx > 200 && sat < 35) || (r > 240 && g > 240 && b > 240)
+          return (mx > 200 && sat < 30) || (r > 240 && g > 240 && b > 240)
         }
 
-        // Flood fill BFS depuis tous les bords (4-connexité)
+        // === PHASE 2 : critère RELAXED pour étendre aux ombres ===
+        // Tout pixel peu saturé (gris/blanc/noir) mais pas pur noir (pour éviter d'avaler
+        // des zones noires pures du sujet, comme un objet noir mat).
+        // Combiné au flood depuis le fond, seules les ombres CONNECTÉES au fond seront capturées.
+        function isBgRelaxed(i: number): boolean {
+          var r = data[i], g = data[i+1], b = data[i+2]
+          var mx = Math.max(r, g, b)
+          var mn = Math.min(r, g, b)
+          var sat = mx - mn
+          return sat < 55 && mx > 50
+        }
+
+        // Flood fill BFS depuis tous les bords (4-connexité) — Phase 1 strict
         var visited = new Uint8Array(w * h)
         var fond = new Uint8Array(w * h)
         var queue: number[] = []
-        // Seed : bords
         function trySeed(px: number) {
           var i = px * 4
           if (visited[px]) return
-          if (isBgCandidate(i)) { queue.push(px); visited[px] = 1 }
+          if (isBgStrict(i)) { queue.push(px); visited[px] = 1 }
         }
         for (var x = 0; x < w; x++) { trySeed(x); trySeed((h-1)*w + x) }
         for (var y = 0; y < h; y++) { trySeed(y*w); trySeed(y*w + (w-1)) }
@@ -87,9 +98,38 @@ async function detourerEtComposer(imageBlobOrUrl: any, outputSize: number) {
           for (var ni = 0; ni < 4; ni++) {
             var n = neighbors[ni]
             if (n < 0 || visited[n]) continue
-            if (isBgCandidate(n * 4)) {
+            if (isBgStrict(n * 4)) {
               visited[n] = 1
               queue.push(n)
+            }
+          }
+        }
+
+        // === Phase 2 : extension du fond aux OMBRES connectées ===
+        // On part des pixels déjà marqués fond, et on étend aux voisins peu saturés
+        // (sat < 55). Comme c'est une extension depuis le fond, on ne capture
+        // que les ombres en contact avec le fond, pas les zones sombres internes du sujet.
+        var phase2Queue: number[] = []
+        for (var pp = 0; pp < w*h; pp++) {
+          if (fond[pp]) phase2Queue.push(pp)
+        }
+        var head2 = 0
+        while (head2 < phase2Queue.length) {
+          var px2 = phase2Queue[head2++]
+          var py2 = Math.floor(px2 / w)
+          var pxx2 = px2 % w
+          var neighbors2 = [
+            py2 > 0 ? px2 - w : -1,
+            py2 < h-1 ? px2 + w : -1,
+            pxx2 > 0 ? px2 - 1 : -1,
+            pxx2 < w-1 ? px2 + 1 : -1
+          ]
+          for (var ni2 = 0; ni2 < 4; ni2++) {
+            var n2 = neighbors2[ni2]
+            if (n2 < 0 || fond[n2]) continue
+            if (isBgRelaxed(n2 * 4)) {
+              fond[n2] = 1
+              phase2Queue.push(n2)
             }
           }
         }
@@ -104,13 +144,40 @@ async function detourerEtComposer(imageBlobOrUrl: any, outputSize: number) {
         var skipDetour = fondRatio < 0.10
 
         if (!skipDetour) {
-          // Composer : pour chaque pixel fond → jaune Meshuga
-          var ly = MESHUGA_YELLOW
-          for (var p2 = 0; p2 < w*h; p2++) {
-            if (fond[p2]) {
-              var i2 = p2 * 4
-              data[i2] = ly.r; data[i2+1] = ly.g; data[i2+2] = ly.b
+          // === ANTI-ALIASING : masque alpha lissé pour transitions douces ===
+          // Au lieu d'un masque binaire, on calcule un alpha 0-255 par pixel
+          // en moyennant le masque sur un voisinage 3x3 (lissage 1 pass).
+          var alpha = new Uint8Array(w * h)
+          for (var pa = 0; pa < w*h; pa++) {
+            alpha[pa] = fond[pa] ? 0 : 255  // 0 = fond pur, 255 = sujet pur
+          }
+          var alphaSmooth = new Uint8Array(w * h)
+          for (var py3 = 0; py3 < h; py3++) {
+            for (var pxx3 = 0; pxx3 < w; pxx3++) {
+              var px3 = py3 * w + pxx3
+              var sum = alpha[px3]
+              var cnt = 1
+              if (py3 > 0) { sum += alpha[px3 - w]; cnt++ }
+              if (py3 < h-1) { sum += alpha[px3 + w]; cnt++ }
+              if (pxx3 > 0) { sum += alpha[px3 - 1]; cnt++ }
+              if (pxx3 < w-1) { sum += alpha[px3 + 1]; cnt++ }
+              if (py3 > 0 && pxx3 > 0) { sum += alpha[px3 - w - 1]; cnt++ }
+              if (py3 > 0 && pxx3 < w-1) { sum += alpha[px3 - w + 1]; cnt++ }
+              if (py3 < h-1 && pxx3 > 0) { sum += alpha[px3 + w - 1]; cnt++ }
+              if (py3 < h-1 && pxx3 < w-1) { sum += alpha[px3 + w + 1]; cnt++ }
+              alphaSmooth[px3] = Math.round(sum / cnt)
             }
+          }
+
+          // Composer : blend chaque pixel avec le jaune Meshuga selon son alpha lissé
+          // out = sujet * (alpha/255) + jaune * (1 - alpha/255)
+          var ly = MESHUGA_YELLOW
+          for (var p4 = 0; p4 < w*h; p4++) {
+            var i4 = p4 * 4
+            var a = alphaSmooth[p4] / 255
+            data[i4]   = Math.round(data[i4]   * a + ly.r * (1 - a))
+            data[i4+1] = Math.round(data[i4+1] * a + ly.g * (1 - a))
+            data[i4+2] = Math.round(data[i4+2] * a + ly.b * (1 - a))
           }
           ctx.putImageData(imageData, 0, 0)
         }
