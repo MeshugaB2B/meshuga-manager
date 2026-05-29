@@ -1393,23 +1393,44 @@ export default function EmployeeDetail(props) {
 
         {/* === BLOC CONTRATS === */}
         <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
-          <div className="ct">📄 Contrats ({contracts.length})</div>
+          <div className="ct">📄 Parcours contractuel ({contracts.length})</div>
           {contracts.length === 0 ? (
             <div style={{ padding: 16, background: "#FAFAFA", borderRadius: 6, textAlign: "center", color: "#999", fontStyle: "italic", fontSize: 12 }}>
               Aucun contrat. Clique sur "+ Nouveau contrat" pour en créer un.
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {contracts.map(function (c) {
+            <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 14, marginTop: 6 }}>
+              {contracts.slice().sort(function (a, b) {
+                var aCur = a.is_current === true ? 1 : 0
+                var bCur = b.is_current === true ? 1 : 0
+                if (aCur !== bCur) return bCur - aCur
+                var da = new Date(a.date_debut || a.date_embauche || a.created_at || 0).getTime()
+                var db = new Date(b.date_debut || b.date_embauche || b.created_at || 0).getTime()
+                return db - da
+              }).map(function (c) {
                 var meta = getContractTypeMeta(c.type || "extra")
                 var sc = statusColors[c.status] || statusColors.draft
+                var isCurrent = c.is_current === true
+                var railColor = isCurrent ? "#FF82D7" : (c.status === "archived" ? "#BBBBBB" : "#191923")
                 return (
-                  <div key={c.id} style={{
-                    background: "#FFFFFF",
-                    border: "1px solid #DDD",
-                    borderRadius: 6,
-                    padding: 10
-                  }}>
+                  <div key={c.id} style={{ display: "flex", gap: 12, alignItems: "stretch" }}>
+                    {/* Rail de la frise */}
+                    <div style={{ position: "relative", width: 18, flexShrink: 0 }}>
+                      <div style={{ position: "absolute", left: 7, top: 6, bottom: -14, width: 3, background: "#EBEBEB" }}></div>
+                      <div style={{ position: "absolute", left: 1, top: 6, width: 15, height: 15, borderRadius: "50%", background: railColor, border: "2.5px solid #191923", boxShadow: "1px 1px 0 #191923" }}></div>
+                    </div>
+                    {/* Encart contrat */}
+                    <div style={{
+                      flex: 1, minWidth: 0,
+                      background: "#FFFFFF",
+                      border: isCurrent ? "2.5px solid #FF82D7" : "2px solid #191923",
+                      borderRadius: 8,
+                      padding: 12,
+                      boxShadow: isCurrent ? "3px 3px 0 #FF82D7" : "3px 3px 0 #191923"
+                    }}>
+                      {isCurrent ? (
+                        <div style={{ display: "inline-block", background: "#FF82D7", color: "#191923", fontSize: 9, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".5px", padding: "2px 8px", borderRadius: 4, border: "1.5px solid #191923", marginBottom: 8 }}>● Contrat en cours</div>
+                      ) : null}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <span style={{
@@ -1638,6 +1659,101 @@ export default function EmployeeDetail(props) {
                       )
                     })()}
 
+                    {/* === AVENANTS RATTACHÉS À CE CONTRAT (frise imbriquée) === */}
+                    {(function () {
+                      var amds = (contractAmendments || [])
+                        .filter(function (a) { return a.contract_id === c.id })
+                        .slice()
+                        .sort(function (a, b) { return (b.amendment_number || 0) - (a.amendment_number || 0) })
+                      if (amds.length === 0) return null
+                      var typeLabels = {
+                        prolongation_duree: { icon: "📅", label: "Prolongation de durée" },
+                        augmentation_salaire: { icon: "💰", label: "Modification rémunération" },
+                        modification_horaires: { icon: "🕐", label: "Modification horaires" },
+                        changement_poste: { icon: "👔", label: "Changement de poste" },
+                        regularisation_welcome_pack: { icon: "⚖", label: "Actualisation contractuelle" },
+                        autre: { icon: "📝", label: "Autre modification" }
+                      }
+                      return (
+                        <div style={{ marginTop: 8, paddingLeft: 12, borderLeft: "3px solid #FFEB5A", display: "flex", flexDirection: "column", gap: 6 }}>
+                          <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.5, color: "#888" }}>
+                            📜 Avenants ({amds.length})
+                          </div>
+                          {amds.map(function (a) {
+                            var am = typeLabels[a.amendment_type] || typeLabels.autre
+                            var sigStatus = a.signature_status || "unsent"
+                            var sigBadge = null
+                            if (sigStatus === "sent") sigBadge = { bg: "#FFEB5A", color: "#191923", text: "📧 Envoyé" }
+                            else if (sigStatus === "viewed") sigBadge = { bg: "#FFEB5A", color: "#191923", text: "👁 Vu" }
+                            else if (sigStatus === "signed") sigBadge = { bg: "#16A34A", color: "#FFFFFF", text: "✅ Signé" }
+                            var canSendForSignature = !a.signed_at && (sigStatus === "unsent" || sigStatus === "expired" || sigStatus === "declined")
+                            var amendmentDocLabel = "Avenant n°" + a.amendment_number + " — " + am.label
+                            return (
+                              <div key={a.id} style={{
+                                background: "#FAFAFA", border: "1.5px solid #DDD", borderRadius: 6,
+                                padding: "8px 10px", fontSize: 12, display: "flex", alignItems: "center",
+                                gap: 10, flexWrap: "wrap"
+                              }}>
+                                <span style={{ fontSize: 16 }}>{am.icon}</span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontWeight: 900 }}>Avenant n°{a.amendment_number} — {am.label}</div>
+                                  <div style={{ fontSize: 11, color: "#666" }}>
+                                    Effet : {a.effective_date ? new Date(a.effective_date).toLocaleDateString("fr-FR") : "—"}
+                                    {a.motif ? (" · " + a.motif) : ""}
+                                  </div>
+                                  {a.changes ? (
+                                    <div style={{ fontSize: 10, color: "#888", marginTop: 4, fontFamily: "monospace" }}>
+                                      {Object.keys(a.changes).map(function (k) {
+                                        var ch = a.changes[k]
+                                        return k + " : " + (ch.before == null ? "—" : ch.before) + " → " + (ch.after == null ? "—" : ch.after)
+                                      }).join(" · ")}
+                                    </div>
+                                  ) : null}
+                                </div>
+                                {sigBadge ? (
+                                  <span style={{ padding: "2px 8px", background: sigBadge.bg, color: sigBadge.color, borderRadius: 10, fontSize: 10, fontWeight: 900 }}>{sigBadge.text}</span>
+                                ) : (
+                                  <span style={{
+                                    padding: "2px 8px",
+                                    background: a.status === "signed" ? "#16A34A" : a.status === "finalized" ? "#FFA500" : "#999",
+                                    color: "white", borderRadius: 10, fontSize: 10, fontWeight: 900
+                                  }}>{a.status === "signed" ? "SIGNÉ" : a.status === "finalized" ? "FINALISÉ" : "BROUILLON"}</span>
+                                )}
+                                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                  <button
+                                    className="btn btn-sm btn-y"
+                                    onClick={function () { regenerateAmendmentContractuelPdf(a) }}
+                                    title="Régénérer le PDF de l'avenant et l'ouvrir pour impression"
+                                  >🖨️ PDF</button>
+                                  {canSendForSignature ? (
+                                    <button
+                                      className="btn btn-sm"
+                                      style={{ background: "#FF82D7", color: "#FFFFFF", border: "1.5px solid #FF82D7", fontWeight: 700 }}
+                                      onClick={function () {
+                                        setSendSignaturePayload({
+                                          documentType: "amendment",
+                                          documentId: a.id,
+                                          documentLabel: amendmentDocLabel,
+                                        })
+                                      }}
+                                      title="Envoyer cet avenant au salarié par email pour signature électronique"
+                                    >📧 Envoyer pour signature</button>
+                                  ) : null}
+                                  {(a.status !== "signed" && !a.signed_at) ? (
+                                    <button
+                                      className="btn btn-sm btn-red"
+                                      onClick={function () { deleteAmendmentWithRollback(a) }}
+                                      title="Supprimer l'avenant et annuler la modification (rollback)"
+                                    >🗑️</button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })()}
+
                     {/* === BOUTONS D'ACTION CONTEXTUELS === */}
                     {(function () {
                       var docs = contractDocs[c.id] || []
@@ -1686,6 +1802,7 @@ export default function EmployeeDetail(props) {
                         </div>
                       )
                     })()}
+                    </div>
                   </div>
                 )
               })}
@@ -1693,152 +1810,33 @@ export default function EmployeeDetail(props) {
           )}
         </div>
 
-        {/* 🔥 === BLOC HISTORIQUE DES AVENANTS (modifications contractuelles) === */}
-        {contractAmendments.length > 0 ? (
-          <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
-            <div className="ct">📜 Historique des avenants ({contractAmendments.length})</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {contractAmendments.map(function(a) {
-                var typeLabels: any = {
-                  prolongation_duree: { icon: "📅", label: "Prolongation de durée" },
-                  augmentation_salaire: { icon: "💰", label: "Modification rémunération" },
-                  modification_horaires: { icon: "🕐", label: "Modification horaires" },
-                  changement_poste: { icon: "👔", label: "Changement de poste" },
-                  regularisation_welcome_pack: { icon: "⚖", label: "Actualisation contractuelle" },
-                  autre: { icon: "📝", label: "Autre modification" }
-                }
-                var meta = typeLabels[a.amendment_type] || typeLabels.autre
-                var contractRef = contracts.filter(function(c: any){ return c.id === a.contract_id })[0]
-                var contractLabel = contractRef ? (
-                  contractRef.type === "extra" ? "CDD Extra" : (contractRef.type || "").replace("cdi_", "CDI ").replace("agent_maitrise", "Agent de maîtrise")
-                ) : ""
-                // 🔥 Sprint C2B : badge signature_status + bouton Envoyer pour signature
-                var sigStatus = a.signature_status || "unsent"
-                var sigBadge: any = null
-                if (sigStatus === "sent") sigBadge = { bg: "#FFEB5A", color: "#191923", text: "📧 Envoyé" }
-                else if (sigStatus === "viewed") sigBadge = { bg: "#FFEB5A", color: "#191923", text: "👁 Vu" }
-                else if (sigStatus === "signed") sigBadge = { bg: "#16A34A", color: "#FFFFFF", text: "✅ Signé" }
-                // Conditions pour afficher le bouton d'envoi
-                var canSendForSignature = !a.signed_at && (sigStatus === "unsent" || sigStatus === "expired" || sigStatus === "declined")
-                // Libellé pour la modal
-                var amendmentDocLabel = "Avenant n°" + a.amendment_number + " — " + meta.label
-                return (
-                  <div key={a.id} style={{
-                    background: "#FAFAFA",
-                    border: "1px solid #DDD",
-                    borderRadius: 6,
-                    padding: "8px 12px",
-                    fontSize: 12,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    flexWrap: "wrap"
-                  }}>
-                    <span style={{ fontSize: 16 }}>{meta.icon}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 900 }}>
-                        Avenant n°{a.amendment_number} — {meta.label}
-                        {contractLabel && (
-                          <span style={{ fontWeight: 400, color: "#888", marginLeft: 6 }}>· {contractLabel}</span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 11, color: "#666" }}>
-                        Effet : {a.effective_date ? new Date(a.effective_date).toLocaleDateString("fr-FR") : "—"}
-                        {a.motif ? (" · " + a.motif) : ""}
-                      </div>
-                      {a.changes ? (
-                        <div style={{ fontSize: 10, color: "#888", marginTop: 4, fontFamily: "monospace" }}>
-                          {Object.keys(a.changes).map(function(k) {
-                            var ch = a.changes[k]
-                            return k + " : " + (ch.before == null ? "—" : ch.before) + " → " + (ch.after == null ? "—" : ch.after)
-                          }).join(" · ")}
-                        </div>
-                      ) : null}
-                    </div>
-                    {/* Badge statut signature ou état avenant */}
-                    {sigBadge ? (
-                      <span style={{
-                        padding: "2px 8px",
-                        background: sigBadge.bg,
-                        color: sigBadge.color,
-                        borderRadius: 10,
-                        fontSize: 10,
-                        fontWeight: 900
-                      }}>{sigBadge.text}</span>
-                    ) : (
-                      <span style={{
-                        padding: "2px 8px",
-                        background: a.status === "signed" ? "#16A34A" : a.status === "finalized" ? "#FFA500" : "#999",
-                        color: "white",
-                        borderRadius: 10,
-                        fontSize: 10,
-                        fontWeight: 900
-                      }}>
-                        {a.status === "signed" ? "SIGNÉ" : a.status === "finalized" ? "FINALISÉ" : "BROUILLON"}
-                      </span>
-                    )}
-                    {/* 🔥 Boutons d'action sur chaque avenant */}
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                      <button
-                        onClick={function() { regenerateAmendmentContractuelPdf(a) }}
-                        title="Régénérer le PDF de l'avenant et l'ouvrir pour impression"
-                        style={{
-                          padding: "5px 10px",
-                          background: "#FFEB5A",
-                          border: "2px solid #191923",
-                          borderRadius: 4,
-                          fontSize: 11,
-                          fontWeight: 900,
-                          cursor: "pointer",
-                          color: "#191923",
-                          boxShadow: "1px 1px 0 #191923"
-                        }}>🖨️ PDF</button>
-                      {/* 🔥 Sprint C2B : envoi pour signature électronique */}
-                      {canSendForSignature && (
-                        <button
-                          onClick={function() {
-                            setSendSignaturePayload({
-                              documentType: "amendment",
-                              documentId: a.id,
-                              documentLabel: amendmentDocLabel,
-                            })
-                          }}
-                          title="Envoyer cet avenant au salarié par email pour signature électronique"
-                          style={{
-                            padding: "5px 10px",
-                            background: "#FF82D7",
-                            border: "2px solid #191923",
-                            borderRadius: 4,
-                            fontSize: 11,
-                            fontWeight: 900,
-                            cursor: "pointer",
-                            color: "#FFFFFF",
-                            boxShadow: "1px 1px 0 #191923"
-                          }}>📧 Envoyer pour signature</button>
-                      )}
-                      {a.status !== "signed" && !a.signed_at && (
-                        <button
-                          onClick={function() { deleteAmendmentWithRollback(a) }}
-                          title="Supprimer l'avenant et annuler la modification (rollback)"
-                          style={{
-                            padding: "5px 10px",
-                            background: "#CC0066",
-                            border: "2px solid #191923",
-                            borderRadius: 4,
-                            fontSize: 11,
-                            fontWeight: 900,
-                            cursor: "pointer",
-                            color: "white",
-                            boxShadow: "1px 1px 0 #191923"
-                          }}>🗑️</button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+
+        {/* === BLOC CONFORMITÉ === */}
+        <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
+          <div className="ct">✅ Conformité</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
+            <div style={{
+              border: emp.haccp_done ? "2px solid #009D3A" : "2px solid #FF6B2B",
+              borderRadius: 6, padding: 10, background: "#FFFFFF",
+              boxShadow: emp.haccp_done ? "2px 2px 0 #009D3A" : "2px 2px 0 #FF6B2B"
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1, opacity: 0.55 }}>Formation HACCP</div>
+              <div style={{ fontWeight: 700, fontSize: 13, marginTop: 3 }}>
+                {emp.haccp_done ? ("✅ Formé(e)" + (emp.haccp_date ? " · " + fmtDate(emp.haccp_date) : "")) : "⚠ À programmer"}
+              </div>
+            </div>
+            <div style={{ border: "2px solid #191923", borderRadius: 6, padding: 10, background: "#FFFFFF", boxShadow: "2px 2px 0 #191923" }}>
+              <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1, opacity: 0.55 }}>Visite médicale</div>
+              <div style={{ fontWeight: 700, fontSize: 13, marginTop: 3 }}>À suivre</div>
+              <div style={{ fontSize: 10, opacity: 0.6 }}>EFFICIENCE — médecine du travail</div>
+            </div>
+            <div style={{ border: "2px solid #191923", borderRadius: 6, padding: 10, background: "#FFFFFF", boxShadow: "2px 2px 0 #191923" }}>
+              <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1, opacity: 0.55 }}>Solde congés</div>
+              <div style={{ fontWeight: 700, fontSize: 13, marginTop: 3 }}>—</div>
+              <div style={{ fontSize: 10, opacity: 0.6 }}>Suivi des congés à venir</div>
             </div>
           </div>
-        ) : null}
+        </div>
 
         {/* === BLOC ARRÊTS DE TRAVAIL === */}
         <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
