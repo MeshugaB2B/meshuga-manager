@@ -39,6 +39,7 @@ export default function AchatsTab(props) {
   var [pdfViewer, setPdfViewer] = useState(null) // { filename, fournisseur, date, productName }
   // 🔥 Modal de comparaison côte-à-côte des factures
   var [compareModal, setCompareModal] = useState(null) // { article, products: [{filename, date, ...}, ...] }
+  var [achatsView, setAchatsView] = useState('pilotage')
 
   useEffect(function() { loadData() }, [])
 
@@ -618,12 +619,257 @@ export default function AchatsTab(props) {
   // =========================================================================
   return (
     <div>
-      <div style={{marginBottom:14}}>
-        <div style={{fontSize:13,opacity:.6}}>
-          Catalogue dynamique — {products.length} produits · {activeSuppliers.length} fournisseurs · {recipes.length} recettes actives
+      {/* ============ HEADER PILOTAGE ============ */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14,gap:10,flexWrap:'wrap'}}>
+        <div>
+          <div style={{fontFamily:"'Yellowtail',cursive",fontSize:32,color:'var(--p)',lineHeight:1}}>Achats</div>
+          <div style={{fontSize:11,opacity:.55,fontWeight:700,marginTop:2}}>{products.filter(function(p){return p.is_active}).length} produits actifs · {activeSuppliers.length} fournisseurs</div>
         </div>
+        <input type="text" placeholder="🔍 Chercher un produit, un fournisseur…" value={searchQ} onChange={function(e){setSearchQ(e.target.value)}} style={{flex:1,minWidth:220,maxWidth:380,padding:'10px 14px',fontSize:13,border:'2px solid #191923',borderRadius:20,background:'#fff',fontWeight:700,boxShadow:'2px 2px 0 #191923'}} />
       </div>
 
+      {/* ============ ONGLETS PILOTAGE / CATALOGUE ============ */}
+      <div style={{display:'flex',gap:6,marginBottom:18}}>
+        {[{id:'pilotage',label:'Pilotage',emoji:'📊'},{id:'catalogue',label:'Catalogue',emoji:'📦'}].map(function(t){
+          var active = achatsView === t.id
+          return <button key={t.id} onClick={function(){setAchatsView(t.id)}} style={{padding:'8px 18px',background:active?'var(--p)':'#FFFFFF',color:active?'#FFFFFF':'#191923',border:'2px solid #191923',borderRadius:20,fontWeight:900,fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',gap:6,boxShadow:active?'2px 2px 0 #191923':'none'}}>
+            <span style={{fontSize:14}}>{t.emoji}</span>{t.label}
+          </button>
+        })}
+      </div>
+
+      {/* ============ VUE PILOTAGE (Sprint 1) ============ */}
+      {achatsView === 'pilotage' && (function(){
+        // 1. Variations récentes (30 derniers jours, |%| >= 5)
+        // On reconstruit depuis l'historique côté front
+        var byProduct = {}
+        prices.forEach(function(pr){
+          if (!byProduct[pr.product_id]) byProduct[pr.product_id] = []
+          byProduct[pr.product_id].push(pr)
+        })
+        var thirtyDaysAgo = Date.now() - 30 * 24 * 3600 * 1000
+        var variations = []
+        Object.keys(byProduct).forEach(function(pid){
+          var arr = byProduct[pid].slice().sort(function(a,b){ return new Date(a.invoice_date).getTime() - new Date(b.invoice_date).getTime() })
+          if (arr.length < 2) return
+          // Dernier prix vs précédent
+          var last = arr[arr.length - 1]
+          var prev = arr[arr.length - 2]
+          var lastDate = new Date(last.invoice_date).getTime()
+          if (lastDate < thirtyDaysAgo) return
+          var lp = Number(last.unit_price_ht); var pp = Number(prev.unit_price_ht)
+          if (!lp || !pp || pp === 0) return
+          var pct = (lp - pp) / pp * 100
+          if (Math.abs(pct) < 5) return
+          var product = products.filter(function(x){ return x.id === pid })[0]
+          if (!product) return
+          var sup = suppliers.filter(function(s){ return s.id === product.supplier_id })[0]
+          // Sparkline data : 6 derniers points
+          var spark = arr.slice(-6).map(function(p){ return Number(p.unit_price_ht) })
+          variations.push({
+            product: product, supplier: sup, last: lp, prev: pp, pct: pct, lastDate: last.invoice_date,
+            invoiceFile: last.invoice_filename, spark: spark
+          })
+        })
+        // Hausses d'abord, par |%| décroissant
+        var hausses = variations.filter(function(v){ return v.pct > 0 }).sort(function(a,b){ return b.pct - a.pct })
+        var baisses = variations.filter(function(v){ return v.pct < 0 }).sort(function(a,b){ return a.pct - b.pct })
+
+        // 2. Économies possibles : top 5 du comparateur (déjà calculé en `comparisons`)
+        var topEconomies = comparisons.filter(function(c){ return c.sameUnit && Number(c.saving) >= 10 }).slice(0, 5)
+
+        // 3. KPIs santé
+        var nbProducts = products.filter(function(p){ return p.is_active }).length
+        var nbHausses = hausses.length
+        var nbBaisses = baisses.length
+        var totalSavings = 0
+        topEconomies.forEach(function(c){
+          // Économie possible = différence prix * qté annuelle ? On n'a pas le volume.
+          // À défaut, on affiche juste le % moyen.
+          totalSavings += Number(c.saving)
+        })
+        var avgSavingPct = topEconomies.length > 0 ? (totalSavings / topEconomies.length).toFixed(0) : 0
+        var nbAlertesActives = comparisons.filter(function(c){ return c.sameUnit && Number(c.saving) >= 10 }).length
+
+        // Fournisseur le plus actif (par nb produits)
+        var supplierCounts = {}
+        products.forEach(function(p){
+          if (!p.is_active) return
+          supplierCounts[p.supplier_id] = (supplierCounts[p.supplier_id] || 0) + 1
+        })
+        var topSupId = null; var topSupCount = 0
+        Object.keys(supplierCounts).forEach(function(sid){
+          if (supplierCounts[sid] > topSupCount) { topSupId = sid; topSupCount = supplierCounts[sid] }
+        })
+        var topSup = suppliers.filter(function(s){ return s.id === topSupId })[0]
+
+        // Mini sparkline component
+        function Sparkline(p){
+          var data = p.data || []
+          if (data.length < 2) return null
+          var mn = Math.min.apply(null, data); var mx = Math.max.apply(null, data)
+          var range = mx - mn || 1
+          var w = 60; var h = 22
+          var step = w / (data.length - 1)
+          var pts = data.map(function(v, i){
+            var x = i * step
+            var y = h - ((v - mn) / range) * h
+            return x.toFixed(1) + ',' + y.toFixed(1)
+          }).join(' ')
+          var color = p.color || '#191923'
+          var last = data[data.length - 1]; var first = data[0]
+          var dotColor = last >= first ? '#CC0066' : '#009D3A'
+          var lastX = (data.length - 1) * step
+          var lastY = h - ((last - mn) / range) * h
+          return <svg width={w} height={h} style={{flexShrink:0}}>
+            <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx={lastX.toFixed(1)} cy={lastY.toFixed(1)} r="2.5" fill={dotColor} />
+          </svg>
+        }
+
+        return (
+          <div>
+            {/* 4 TUILES KPI */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,marginBottom:18}}>
+              <div style={{background:'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Produits actifs</div>
+                <div style={{fontSize:30,fontWeight:900,lineHeight:1.1,marginTop:4}}>{nbProducts}</div>
+                <div style={{fontSize:9,opacity:.55,marginTop:2,fontWeight:700}}>chez {activeSuppliers.length} fournisseurs</div>
+              </div>
+              <div onClick={function(){if(hausses.length>0){var el=document.getElementById('block-hausses');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})}}} style={{background:'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',cursor:hausses.length>0?'pointer':'default',transition:'transform .12s'}} onMouseEnter={function(e){if(hausses.length>0){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='4px 4px 0 #191923'}}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <span style={{width:9,height:9,borderRadius:'50%',background:nbHausses>0?'var(--p)':'#009D3A',flexShrink:0}}></span>
+                  <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>Hausses 30j</div>
+                </div>
+                <div style={{display:'flex',alignItems:'baseline',gap:6}}>
+                  <div style={{fontSize:30,fontWeight:900,color:nbHausses>0?'var(--p)':'#009D3A',lineHeight:1.1,marginTop:4}}>{nbHausses}</div>
+                  {nbHausses>0 && <span style={{fontSize:10,color:'var(--p)',fontWeight:900}}>voir ↓</span>}
+                </div>
+                <div style={{fontSize:9,opacity:.55,marginTop:2,fontWeight:700}}>{nbHausses>0?'≥ 5% sur 30 jours':'Aucune hausse 🎉'}</div>
+              </div>
+              <div onClick={function(){if(topEconomies.length>0){var el=document.getElementById('block-economies');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})}}} style={{background:'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',cursor:topEconomies.length>0?'pointer':'default',transition:'transform .12s'}} onMouseEnter={function(e){if(topEconomies.length>0){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='4px 4px 0 #191923'}}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <span style={{fontSize:11,lineHeight:1}}>💰</span>
+                  <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>Économies possibles</div>
+                </div>
+                <div style={{display:'flex',alignItems:'baseline',gap:6}}>
+                  <div style={{fontSize:30,fontWeight:900,color:'#009D3A',lineHeight:1.1,marginTop:4}}>{topEconomies.length}</div>
+                  {topEconomies.length>0 && <span style={{fontSize:10,color:'#009D3A',fontWeight:900}}>voir ↓</span>}
+                </div>
+                <div style={{fontSize:9,opacity:.55,marginTop:2,fontWeight:700}}>{topEconomies.length>0?'jusqu\'à -'+avgSavingPct+'% en moy.':'Tout est optimisé'}</div>
+              </div>
+              {topSup && (
+                <div style={{background:'#FFFFFF',borderRadius:14,padding:'14px 16px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <span style={{fontSize:11,lineHeight:1}}>🏆</span>
+                    <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',opacity:.55,letterSpacing:.5}}>Top fournisseur</div>
+                  </div>
+                  <div style={{fontSize:14,fontWeight:900,lineHeight:1.15,marginTop:4,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{topSup.name}</div>
+                  <div style={{fontSize:11,marginTop:2,fontWeight:700,color:'#191923'}}>{topSupCount} produits actifs</div>
+                </div>
+              )}
+            </div>
+
+            {/* BLOC HAUSSES RÉCENTES */}
+            {hausses.length > 0 && (
+              <div id="block-hausses" style={{background:'#FFFFFF',borderRadius:14,padding:16,marginBottom:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,gap:8,flexWrap:'wrap'}}>
+                  <div>
+                    <div style={{fontFamily:"'Yellowtail',cursive",fontSize:24,color:'var(--p)',lineHeight:1}}>Hausses récentes</div>
+                    <div style={{fontSize:10,fontWeight:700,opacity:.55,marginTop:2}}>{hausses.length} variation{hausses.length>1?'s':''} ≥ +5% sur les 30 derniers jours</div>
+                  </div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {hausses.slice(0, 8).map(function(v, i){
+                    var dateStr = new Date(v.lastDate).toLocaleDateString('fr-FR', {day:'2-digit',month:'short'})
+                    return (
+                      <div key={i} onClick={function(){setSelectedProduct(v.product)}} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'#FFFFFF',border:'2px solid #191923',borderRadius:10,cursor:'pointer',boxShadow:'2px 2px 0 #191923',transition:'transform .12s'}} onMouseEnter={function(e){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='2px 2px 0 #191923'}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:900,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{v.product.name}</div>
+                          <div style={{fontSize:10,opacity:.55,fontWeight:700,marginTop:2}}>{v.supplier ? v.supplier.name : '?'} · {dateStr} · {v.prev.toFixed(2)}€ → {v.last.toFixed(2)}€/{v.product.unit}</div>
+                        </div>
+                        <Sparkline data={v.spark} color="#191923" />
+                        <div style={{minWidth:60,textAlign:'right'}}>
+                          <div style={{fontSize:18,fontWeight:900,color:'var(--p)',lineHeight:1}}>+{v.pct.toFixed(0)}%</div>
+                        </div>
+                        <div style={{fontSize:14,opacity:.55,fontWeight:900}}>›</div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {hausses.length > 8 && <div style={{fontSize:10,fontWeight:700,opacity:.5,marginTop:8,textAlign:'center'}}>+ {hausses.length - 8} autres dans le catalogue ↓</div>}
+              </div>
+            )}
+
+            {/* BLOC ÉCONOMIES POSSIBLES */}
+            {topEconomies.length > 0 && (
+              <div id="block-economies" style={{background:'#FFFFFF',borderRadius:14,padding:16,marginBottom:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,gap:8,flexWrap:'wrap'}}>
+                  <div>
+                    <div style={{fontFamily:"'Yellowtail',cursive",fontSize:24,color:'var(--p)',lineHeight:1}}>💰 Économies possibles</div>
+                    <div style={{fontSize:10,fontWeight:700,opacity:.55,marginTop:2}}>Mêmes articles disponibles ailleurs · {topEconomies.length} opportunités ≥ 10%</div>
+                  </div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {topEconomies.map(function(c, i){
+                    var cheapest = c.products[0]
+                    var current = c.products.filter(function(p){return p.is_active})[0] || c.products[c.products.length-1]
+                    return (
+                      <div key={i} style={{padding:'10px 12px',background:'#FFFFFF',border:'2px solid #191923',borderRadius:10,boxShadow:'2px 2px 0 #191923'}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:13,fontWeight:900}}>{c.article}</div>
+                            <div style={{fontSize:10,opacity:.7,fontWeight:700,marginTop:3}}>
+                              <span>Actuel : <strong>{current.supplier}</strong> {current.price.toFixed(2)}€/{current.unit}</span>
+                              <span style={{margin:'0 6px',opacity:.4}}>→</span>
+                              <span>Moins cher : <strong style={{color:'#009D3A'}}>{cheapest.supplier}</strong> {cheapest.price.toFixed(2)}€/{cheapest.unit}</span>
+                            </div>
+                          </div>
+                          <div style={{background:'#E8F8EE',color:'#009D3A',padding:'4px 12px',borderRadius:14,fontSize:13,fontWeight:900,border:'1.5px solid #009D3A',flexShrink:0}}>
+                            -{c.saving}%
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* BLOC BAISSES (bonus, plus discret) */}
+            {baisses.length > 0 && (
+              <div style={{background:'#FFFFFF',borderRadius:14,padding:16,marginBottom:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,gap:8,flexWrap:'wrap'}}>
+                  <div>
+                    <div style={{fontFamily:"'Yellowtail',cursive",fontSize:22,color:'#009D3A',lineHeight:1}}>🎉 Bonnes nouvelles</div>
+                    <div style={{fontSize:10,fontWeight:700,opacity:.55,marginTop:2}}>{baisses.length} baisse{baisses.length>1?'s':''} de prix ce mois</div>
+                  </div>
+                </div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                  {baisses.slice(0, 6).map(function(v, i){
+                    return (
+                      <div key={i} onClick={function(){setSelectedProduct(v.product)}} style={{padding:'6px 10px',background:'#E8F8EE',border:'1.5px solid #009D3A',borderRadius:10,cursor:'pointer',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',gap:6}}>
+                        <span style={{color:'#191923'}}>{v.product.name}</span>
+                        <span style={{color:'#009D3A',fontWeight:900}}>{v.pct.toFixed(0)}%</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {variations.length === 0 && topEconomies.length === 0 && (
+              <div style={{padding:40,textAlign:'center',opacity:.5,fontSize:13,background:'#FFFFFF',borderRadius:14,border:'2px dashed #DDD',fontWeight:700}}>
+                Aucune variation ni économie détectée. Tes prix sont stables et bien négociés. 👌
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* ============ VUE CATALOGUE (ancien rendu) ============ */}
+      {achatsView === 'catalogue' && (
+      <>
       {/* Filtres catégorie + recherche */}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:14}}>
         <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
@@ -837,6 +1083,8 @@ export default function AchatsTab(props) {
         <div style={{padding:32,textAlign:'center',opacity:.5,fontSize:13}}>
           Aucun fournisseur dans cette catégorie.
         </div>
+      )}
+      </>
       )}
 
       {/* ============ MODAL AFFECTATION À UNE RECETTE ============ */}
