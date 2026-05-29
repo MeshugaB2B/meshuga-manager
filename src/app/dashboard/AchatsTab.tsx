@@ -1284,7 +1284,7 @@ export default function AchatsTab(props) {
           if (pr && pr.article_id) usedArticleIds[pr.article_id] = 1
         })
 
-        // Filtrer + chercher
+        // Filtrer + chercher (NOTE : on travaille toujours sur products, on groupera par article ENSUITE)
         var list = products.slice()
         // Toggle inactifs
         if (!showInactiveProducts) {
@@ -1304,6 +1304,9 @@ export default function AchatsTab(props) {
             if ((p.name || '').toLowerCase().indexOf(q) > -1) return true
             var s = suppliers.filter(function(ss){ return ss.id === p.supplier_id })[0]
             if (s && (s.name || '').toLowerCase().indexOf(q) > -1) return true
+            // Aussi chercher dans le nom de l'article parent
+            var art = articles.filter(function(a){ return a.id === p.article_id })[0]
+            if (art && (art.name || '').toLowerCase().indexOf(q) > -1) return true
             return false
           })
         }
@@ -1314,25 +1317,66 @@ export default function AchatsTab(props) {
             return usedArticleIds[p.article_id]
           })
         }
-        // Tri
-        var trends = {}
-        list.forEach(function(p){ trends[p.id] = getTrend(p.id) })
+
+        // === GROUPEMENT PAR ARTICLE ===
+        // Pour chaque article on garde le product actif comme "représentant" (sinon le 1er)
+        // Et on calcule : prix actif, fournisseur actif, nb alts, photo, tendance
+        var byArt: any = {}
+        var orphansNoArticle: any[] = []  // products sans article_id (rares) → restent isolés
+        list.forEach(function(p) {
+          if (!p.article_id) { orphansNoArticle.push(p); return }
+          if (!byArt[p.article_id]) {
+            byArt[p.article_id] = { products: [], representant: null }
+          }
+          byArt[p.article_id].products.push(p)
+        })
+        // Choisir le représentant par article
+        // Priorité : le product actif (= ton fournisseur courant ★) — son prix sera affiché
+        // Sa photo est utilisée, sinon on prend la photo d'un autre product du groupe
+        Object.keys(byArt).forEach(function(aid) {
+          var grp = byArt[aid]
+          var actifs = grp.products.filter(function(p: any){ return p.is_active })
+          var rep = actifs[0] || grp.products[0]
+          // Si le représentant n'a pas de photo, hériter de la photo d'un autre product du même article
+          if (!rep.photo_url) {
+            var withPhoto = grp.products.filter(function(p: any){ return p.photo_url })[0]
+            if (withPhoto) rep = Object.assign({}, rep, { photo_url: withPhoto.photo_url })
+          }
+          grp.representant = rep
+        })
+
+        // Construire la liste finale d'items (représentants articles + orphans sans article)
+        var groupedList: any[] = Object.values(byArt).map(function(grp: any) {
+          var rep = grp.representant
+          var article = articles.filter(function(a: any){ return a.id === rep.article_id })[0]
+          return { product: rep, article: article, group: grp.products, isGrouped: true }
+        }).concat(orphansNoArticle.map(function(p: any) {
+          return { product: p, article: null, group: [p], isGrouped: false }
+        }))
+
+        // Tri sur les items groupés
+        var trends: any = {}
+        groupedList.forEach(function(it: any){ trends[it.product.id] = getTrend(it.product.id) })
         if (catalogSort === 'name_asc') {
-          list.sort(function(a,b){ return (a.name||'').localeCompare(b.name||'') })
+          groupedList.sort(function(a: any,b: any){
+            var na = a.article ? a.article.name : a.product.name
+            var nb = b.article ? b.article.name : b.product.name
+            return (na||'').localeCompare(nb||'')
+          })
         } else if (catalogSort === 'price_asc') {
-          list.sort(function(a,b){ return Number(a.current_price)-Number(b.current_price) })
+          groupedList.sort(function(a: any,b: any){ return Number(a.product.current_price)-Number(b.product.current_price) })
         } else if (catalogSort === 'price_desc') {
-          list.sort(function(a,b){ return Number(b.current_price)-Number(a.current_price) })
+          groupedList.sort(function(a: any,b: any){ return Number(b.product.current_price)-Number(a.product.current_price) })
         } else if (catalogSort === 'variation_desc') {
-          list.sort(function(a,b){ return Math.abs(trends[b.id].pct) - Math.abs(trends[a.id].pct) })
+          groupedList.sort(function(a: any,b: any){ return Math.abs(trends[b.product.id].pct) - Math.abs(trends[a.product.id].pct) })
         } else if (catalogSort === 'recent') {
-          // Basé sur la date du dernier prix
-          list.sort(function(a,b){
-            var ta = byProduct[a.id] ? new Date(byProduct[a.id][byProduct[a.id].length-1].invoice_date).getTime() : 0
-            var tb = byProduct[b.id] ? new Date(byProduct[b.id][byProduct[b.id].length-1].invoice_date).getTime() : 0
+          groupedList.sort(function(a: any,b: any){
+            var ta = byProduct[a.product.id] ? new Date(byProduct[a.product.id][byProduct[a.product.id].length-1].invoice_date).getTime() : 0
+            var tb = byProduct[b.product.id] ? new Date(byProduct[b.product.id][byProduct[b.product.id].length-1].invoice_date).getTime() : 0
             return tb - ta
           })
         }
+
 
         // Couleurs catégorie (gradient placeholder)
         function catGradient(supplierCat){
@@ -1420,35 +1464,42 @@ export default function AchatsTab(props) {
             </div>
 
             {/* Galerie de cartes */}
-            {list.length === 0 && (
+            {groupedList.length === 0 && (
               <div style={{padding:40,textAlign:'center',opacity:.5,fontWeight:700,fontSize:13,background:'#FFFFFF',borderRadius:14,border:'2px dashed #DDD'}}>Aucun produit ne correspond à la recherche</div>
             )}
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:12}}>
-              {list.map(function(p){
-                var sup = suppliers.filter(function(ss){ return ss.id === p.supplier_id })[0]
+              {groupedList.map(function(it: any){
+                var p = it.product
+                var article = it.article
+                var group = it.group
+                var displayName = article ? article.name : p.name
+                var sup = suppliers.filter(function(ss: any){ return ss.id === p.supplier_id })[0]
                 var supCat = sup ? sup.category : 'ingredient'
                 var tr = trends[p.id] || { pct: 0, spark: [], last: null }
-                var nbFournisseursAlt = p.article_id ? (artFournisseursCount[p.article_id] || 1) : 1
+                // Nombre de fournisseurs actifs dans le groupe
+                var actifs = group.filter(function(pp: any){ return pp.is_active })
+                var nbFournisseursAlt = actifs.length
+                // Prix min/max dans le groupe (parmi actifs)
+                var prices_grp = actifs.map(function(pp: any){ return Number(pp.current_price) }).filter(function(v: number){ return v > 0 })
+                var priceMin = prices_grp.length > 0 ? Math.min.apply(null, prices_grp) : Number(p.current_price)
+                var priceMax = prices_grp.length > 0 ? Math.max.apply(null, prices_grp) : Number(p.current_price)
+                var hasPriceRange = priceMin < priceMax * 0.99 // tolerance 1%
                 var isOrphan = p.article_id ? !usedArticleIds[p.article_id] : !usedProductIds[p.id]
                 var trendColor = '#191923'
                 var trendArrow = '→'
                 if (tr.pct >= 5) { trendColor = '#CC0066'; trendArrow = '↗' }
                 else if (tr.pct <= -5) { trendColor = '#009D3A'; trendArrow = '↘' }
                 return (
-                  <div key={p.id} onClick={function(){setSelectedProduct(p)}} style={{background:'#FFFFFF',borderRadius:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',overflow:'hidden',cursor:'pointer',display:'flex',flexDirection:'column',transition:'transform .12s',opacity:p.is_active?1:0.6}} onMouseEnter={function(e){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='4px 4px 0 #191923'}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}}>
+                  <div key={p.id} onClick={function(){setSelectedProduct(p)}} style={{background:'#FFFFFF',borderRadius:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',overflow:'hidden',cursor:'pointer',display:'flex',flexDirection:'column',transition:'transform .12s',opacity:p.is_active?1:0.6}} onMouseEnter={function(e: any){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='4px 4px 0 #191923'}} onMouseLeave={function(e: any){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}}>
                     {/* Photo / placeholder */}
                     <div style={{height:90,background:p.photo_url ? '#F5F5F5' : catGradient(supCat),display:'flex',alignItems:'center',justifyContent:'center',fontSize:42,position:'relative',borderBottom:'2px solid #191923',overflow:'hidden'}}>
                       {p.photo_url ? (
-                        <img src={p.photo_url} alt={p.name} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
+                        <img src={p.photo_url} alt={displayName} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} />
                       ) : catEmoji(supCat)}
-                      {/* Badge fournisseur */}
-                      {sup && (
-                        <div style={{position:'absolute',top:6,left:6,background:'rgba(255,255,255,.95)',color:'#191923',fontSize:9,fontWeight:900,padding:'3px 8px',borderRadius:6,border:'1.5px solid #191923',letterSpacing:.3,maxWidth:'70%',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{sup.name}</div>
-                      )}
                       {/* Badges droite : ALT / ORPHELIN / INACTIF */}
                       <div style={{position:'absolute',top:6,right:6,display:'flex',gap:4}}>
                         {nbFournisseursAlt > 1 && (
-                          <div title={nbFournisseursAlt+' fournisseurs proposent cet article'} style={{background:'var(--p)',color:'#FFF',fontSize:9,fontWeight:900,padding:'3px 7px',borderRadius:6,letterSpacing:.3}}>ALT ×{nbFournisseursAlt}</div>
+                          <div title={nbFournisseursAlt+' fournisseurs proposent cet article'} style={{background:'var(--p)',color:'#FFF',fontSize:9,fontWeight:900,padding:'3px 7px',borderRadius:6,letterSpacing:.3}}>×{nbFournisseursAlt} FOURN.</div>
                         )}
                         {isOrphan && p.is_active && (
                           <div title="Pas utilisé en recette" style={{background:'#DDD',color:'#555',fontSize:9,fontWeight:900,padding:'3px 7px',borderRadius:6,letterSpacing:.3}}>ORPHELIN</div>
@@ -1460,12 +1511,20 @@ export default function AchatsTab(props) {
                     </div>
                     {/* Contenu */}
                     <div style={{padding:'10px 12px',flex:1,display:'flex',flexDirection:'column',gap:6}}>
-                      <div style={{fontWeight:900,fontSize:13,lineHeight:1.2}}>{p.name}</div>
+                      <div style={{fontWeight:900,fontSize:13,lineHeight:1.2}}>{displayName}</div>
+                      {/* Fournisseur actif (sous le nom) */}
+                      {sup && (
+                        <div style={{fontSize:10,opacity:.55,fontWeight:700,marginTop:-3}}>{sup.name}{nbFournisseursAlt > 1 ? ' · meilleur prix' : ''}</div>
+                      )}
                       {/* Prix actuel + tendance */}
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginTop:'auto',paddingTop:6,gap:6}}>
                         <div>
-                          <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase'}}>Prix actuel</div>
-                          <div style={{fontSize:20,fontWeight:900,color:'#191923',lineHeight:1}}>{Number(p.current_price).toFixed(2)}<span style={{fontSize:11,opacity:.6}}>€/{p.unit}</span></div>
+                          <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase'}}>{hasPriceRange ? 'Prix' : 'Prix actif'}</div>
+                          {hasPriceRange ? (
+                            <div style={{fontSize:16,fontWeight:900,color:'#191923',lineHeight:1}}>{priceMin.toFixed(2)}<span style={{fontSize:10,opacity:.5}}>→</span>{priceMax.toFixed(2)}<span style={{fontSize:11,opacity:.6}}>€/{p.unit}</span></div>
+                          ) : (
+                            <div style={{fontSize:20,fontWeight:900,color:'#191923',lineHeight:1}}>{Number(p.current_price).toFixed(2)}<span style={{fontSize:11,opacity:.6}}>€/{p.unit}</span></div>
+                          )}
                         </div>
                         <div style={{textAlign:'right',display:'flex',alignItems:'center',gap:6}}>
                           {tr.spark.length > 1 && <Sparkline data={tr.spark} color={trendColor} />}
