@@ -40,6 +40,9 @@ export default function AchatsTab(props) {
   // 🔥 Modal de comparaison côte-à-côte des factures
   var [compareModal, setCompareModal] = useState(null) // { article, products: [{filename, date, ...}, ...] }
   var [achatsView, setAchatsView] = useState('pilotage')
+  var [showInactiveProducts, setShowInactiveProducts] = useState(false)
+  var [showOrphansToggle, setShowOrphansToggle] = useState(true)
+  var [catalogSort, setCatalogSort] = useState('recent')
 
   useEffect(function() { loadData() }, [])
 
@@ -867,225 +870,238 @@ export default function AchatsTab(props) {
         )
       })()}
 
-      {/* ============ VUE CATALOGUE (ancien rendu) ============ */}
-      {achatsView === 'catalogue' && (
-      <>
-      {/* Filtres catégorie + recherche */}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:14}}>
-        <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-          <span style={{fontFamily:'Yellowtail',fontSize:13,color:'#191923'}}>Filtrer :</span>
-          {[
-            {v:'all',l:'TOUS'},
-            {v:'ingredient',l:'INGRÉDIENTS'},
-            {v:'boisson',l:'BOISSONS'},
-            {v:'packaging',l:'PACKAGING'},
-            {v:'consommable',l:'CONSOMMABLES'}
-          ].map(function(c) {
-            return <button key={c.v} onClick={function(){setCatFilter(c.v)}} style={{
-              padding:'5px 14px',fontSize:11,fontWeight:900,borderRadius:20,
-              border:'2px solid #191923',
-              background:catFilter===c.v?'#FFEB5A':'transparent',
-              color:'#191923',cursor:'pointer',textTransform:'uppercase',
-              fontFamily:'Arial Narrow, Arial, sans-serif'
-            }}>{c.l}</button>
-          })}
-        </div>
-        <input
-          type="text"
-          placeholder="🔍 Rechercher…"
-          value={searchQ}
-          onChange={function(e){setSearchQ(e.target.value)}}
-          style={{padding:'6px 12px',fontSize:12,border:'2px solid #191923',borderRadius:20,background:'#fff',minWidth:200,fontWeight:700}}
-        />
-      </div>
+      {/* ============ VUE CATALOGUE V2 (Sprint 2) ============ */}
+      {achatsView === 'catalogue' && (function(){
+        // États de filtrage avancé via state (déjà déclarés en haut)
+        // Calcul tendance prix sur 30j par produit (réutilise byProduct)
+        var byProduct = {}
+        prices.forEach(function(pr){
+          if (!byProduct[pr.product_id]) byProduct[pr.product_id] = []
+          byProduct[pr.product_id].push(pr)
+        })
+        // Pour chaque produit actif : last_price, prev_price, variation%, sparkline
+        function getTrend(productId) {
+          var arr = byProduct[productId] || []
+          if (arr.length < 2) return { pct: 0, spark: [], last: null }
+          arr = arr.slice().sort(function(a,b){ return new Date(a.invoice_date).getTime() - new Date(b.invoice_date).getTime() })
+          var last = Number(arr[arr.length-1].unit_price_ht)
+          var prev = Number(arr[arr.length-2].unit_price_ht)
+          var pct = prev > 0 ? (last - prev) / prev * 100 : 0
+          var spark = arr.slice(-6).map(function(p){ return Number(p.unit_price_ht) })
+          return { pct: pct, spark: spark, last: last }
+        }
 
-      {/* COMPARATEUR PRIX FOURNISSEURS */}
-      {comparisons.length > 0 && showCompare && (
-        <div style={{background:'#fff',border:'2px solid #FF82D7',borderRadius:12,padding:16,marginBottom:14}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-            <div style={{fontFamily:'Yellowtail',fontSize:18,color:'#191923'}}>💰 Comparateur prix fournisseurs</div>
-            <button onClick={function(){setShowCompare(false)}} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:18,opacity:.4}}>✕</button>
-          </div>
-          <div style={{fontSize:11,color:'#888',marginBottom:8}}>{comparisons.length} ingrédient{comparisons.length>1?'s':''} disponible{comparisons.length>1?'s':''} chez plusieurs fournisseurs · triés par économie potentielle</div>
-          {comparisons.slice(0, 10).map(function(c, i) {
-            // Compter combien de produits ont une facture cliquable
-            var withFile = c.products.filter(function(p){ return p.last_invoice_filename })
-            return (
-              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderBottom:'1px solid #F0F0F0',fontSize:13,gap:8,flexWrap:'wrap'}}>
-                <span style={{fontWeight:900,minWidth:120}}>{c.article}</span>
-                <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                  {c.products.map(function(p, pi) {
-                    var dateLabel = p.last_invoice_date ? new Date(p.last_invoice_date).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'2-digit'}) : 'Jamais facturé'
-                    var hasFile = !!p.last_invoice_filename
-                    return (
-                      <span 
-                        key={pi}
-                        title={'Dernière facture : ' + dateLabel + (hasFile ? ' · Cliquer pour ouvrir' : '')}
-                        onClick={function(){
-                          if (hasFile) {
-                            setPdfViewer({
-                              filename: p.last_invoice_filename,
-                              fournisseur: p.supplier,
-                              date: p.last_invoice_date,
-                              productName: c.article,
-                              price: p.price,
-                              unit: p.unit
-                            })
-                          }
-                        }}
-                        style={{
-                          fontSize:12,
-                          fontWeight:p.is_active?900:400,
-                          color:pi===0?'#009D3A':'#191923',
-                          cursor: hasFile ? 'pointer' : 'help',
-                          textDecoration: hasFile ? 'underline dotted' : 'none',
-                          textDecorationColor: '#bbb'
-                        }}>
-                        {p.supplier}: {p.price.toFixed(2)}€/{p.unit}{p.is_active ? ' ★' : ''}
-                      </span>
-                    )
-                  })}
-                  {c.sameUnit ? (
-                    <span style={{fontSize:11,fontWeight:900,color:'#009D3A',background:'#E8FFE8',padding:'2px 8px',borderRadius:10}}>-{c.saving}%</span>
-                  ) : (
-                    <span style={{fontSize:10,fontWeight:700,color:'#A05A00',background:'#FFF6E5',padding:'2px 8px',borderRadius:10}}>⚠️ unités ≠</span>
-                  )}
-                  {/* 🔥 Bouton "Comparer les factures" si au moins 2 products ont un filename */}
-                  {withFile.length >= 2 && (
-                    <button 
-                      onClick={function(){ setCompareModal({ article: c.article, products: c.products.filter(function(p){return p.last_invoice_filename}) }) }}
-                      title="Comparer les factures côte-à-côte"
-                      style={{
-                        background:'#FFEB5A',
-                        border:'1.5px solid #191923',
-                        color:'#191923',
-                        padding:'2px 8px',
-                        borderRadius:10,
-                        fontSize:10,
-                        fontWeight:900,
-                        cursor:'pointer'
-                      }}>
-                      📑 Comparer
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-      {!showCompare && comparisons.length > 0 && (
-        <button onClick={function(){setShowCompare(true)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #FF82D7',background:'#fff',color:'#FF82D7',cursor:'pointer',marginBottom:10}}>💰 Afficher le comparateur ({comparisons.length})</button>
-      )}
+        // Article ID → nb de fournisseurs alternatifs disponibles
+        var artFournisseursCount = {}
+        products.forEach(function(p){
+          if (!p.is_active || !p.article_id) return
+          artFournisseursCount[p.article_id] = (artFournisseursCount[p.article_id] || 0) + 1
+        })
 
-      {/* INGRÉDIENTS NON UTILISÉS EN RECETTE */}
-      {orphanProducts.length > 0 && showOrphans && (
-        <div style={{background:'#fff',border:'2px solid #CC0066',borderRadius:12,padding:16,marginBottom:14}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-            <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#CC0066'}}>🚫 Ingrédients non utilisés en recette ({orphanProducts.length})</div>
-            <button onClick={function(){setShowOrphans(false)}} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:16,opacity:.4}}>✕</button>
-          </div>
-          <div style={{fontSize:12,color:'#888',marginBottom:8}}>Ces ingrédients ont été achetés mais n&apos;apparaissent dans aucune recette. Pour les alternatives multi-fournisseurs (ex: Cheddar HPS vs Foodflow), seuls les ingrédients dont AUCUN fournisseur n&apos;est utilisé apparaissent ici. Cliquez pour voir le détail.</div>
-          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {orphanProducts.map(function(op) {
-              var sup = suppliers.filter(function(s) { return s.id === op.supplier_id })[0]
-              return <span key={op.id} onClick={function(){setSelectedProduct(op)}} style={{display:'inline-block',padding:'4px 10px',borderRadius:20,fontSize:11,fontWeight:900,background:'#FFE0E0',color:'#CC0066',border:'1px solid #CC0066',cursor:'pointer'}}>{op.name} <span style={{fontWeight:400,opacity:.7}}>({sup ? sup.name : '?'} · {Number(op.current_price).toFixed(2)}€/{op.unit})</span></span>
-            })}
-          </div>
-        </div>
-      )}
-      {!showOrphans && orphanProducts.length > 0 && (
-        <button onClick={function(){setShowOrphans(true)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #CC0066',background:'#fff',color:'#CC0066',cursor:'pointer',marginBottom:10}}>🚫 Afficher les ingrédients non utilisés ({orphanProducts.length})</button>
-      )}
+        // Set des product_id utilisés en recettes
+        var usedProductIds = {}; var usedArticleIds = {}
+        recipeIngs.forEach(function(ri){
+          if (!ri.product_id) return
+          usedProductIds[ri.product_id] = 1
+          var pr = products.filter(function(x){ return x.id === ri.product_id })[0]
+          if (pr && pr.article_id) usedArticleIds[pr.article_id] = 1
+        })
 
-      {/* LIGNES TEXTE LIBRE NON LIÉES */}
-      {freeTextArr.length > 0 && showFreeText && (
-        <div style={{background:'#fff',border:'2px solid #FFEB5A',borderRadius:12,padding:16,marginBottom:14}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-            <div style={{fontFamily:'Yellowtail',fontSize:16,color:'#8A6D00'}}>🔗 À reconnecter au catalogue ({freeTextArr.length})</div>
-            <button onClick={function(){setShowFreeText(false)}} style={{background:'transparent',border:'none',cursor:'pointer',fontSize:16,opacity:.4}}>✕</button>
-          </div>
-          <div style={{fontSize:12,color:'#888',marginBottom:8}}>Ces lignes recettes utilisent un texte libre sans lien catalogue. Liez-les pour propagation auto des prix lors du prochain import facture.</div>
-          <div style={{display:'flex',flexDirection:'column',gap:4}}>
-            {freeTextArr.slice(0, 20).map(function(ft, i) {
-              return (
-                <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 8px',background:'#FFF9D0',borderRadius:6,fontSize:12,gap:6,flexWrap:'wrap'}}>
-                  <span><strong>{ft.article}</strong> <span style={{opacity:.6,marginLeft:6,fontSize:10}}>({ft.fournisseur} · {ft.unite})</span></span>
-                  <span style={{fontWeight:900}}>{ft.prix_avg.toFixed(2)} €/{ft.unite} <span style={{opacity:.6,fontWeight:400,fontSize:10,marginLeft:4}}>· {ft.nb_recettes} recette{ft.nb_recettes>1?'s':''}</span></span>
-                </div>
-              )
-            })}
-            {freeTextArr.length > 20 && <div style={{fontSize:10,opacity:.6,marginTop:6,textAlign:'center'}}>+ {freeTextArr.length - 20} autres lignes…</div>}
-          </div>
-        </div>
-      )}
-      {!showFreeText && freeTextArr.length > 0 && (
-        <button onClick={function(){setShowFreeText(true)}} style={{padding:'4px 12px',fontSize:11,fontWeight:900,borderRadius:20,border:'1px solid #8A6D00',background:'#fff',color:'#8A6D00',cursor:'pointer',marginBottom:10}}>🔗 Afficher les non liés ({freeTextArr.length})</button>
-      )}
+        // Filtrer + chercher
+        var list = products.slice()
+        // Toggle inactifs
+        if (!showInactiveProducts) {
+          list = list.filter(function(p){ return p.is_active })
+        }
+        // Catégorie
+        if (catFilter !== 'all') {
+          list = list.filter(function(p){
+            var s = suppliers.filter(function(ss){ return ss.id === p.supplier_id })[0]
+            return s && s.category === catFilter
+          })
+        }
+        // Recherche texte (nom produit ou fournisseur)
+        if (searchQ && searchQ.trim().length > 0) {
+          var q = searchQ.toLowerCase().trim()
+          list = list.filter(function(p){
+            if ((p.name || '').toLowerCase().indexOf(q) > -1) return true
+            var s = suppliers.filter(function(ss){ return ss.id === p.supplier_id })[0]
+            if (s && (s.name || '').toLowerCase().indexOf(q) > -1) return true
+            return false
+          })
+        }
+        // Orphelins
+        if (!showOrphansToggle) {
+          list = list.filter(function(p){
+            if (!p.article_id) return usedProductIds[p.id]
+            return usedArticleIds[p.article_id]
+          })
+        }
+        // Tri
+        var trends = {}
+        list.forEach(function(p){ trends[p.id] = getTrend(p.id) })
+        if (catalogSort === 'name_asc') {
+          list.sort(function(a,b){ return (a.name||'').localeCompare(b.name||'') })
+        } else if (catalogSort === 'price_asc') {
+          list.sort(function(a,b){ return Number(a.current_price)-Number(b.current_price) })
+        } else if (catalogSort === 'price_desc') {
+          list.sort(function(a,b){ return Number(b.current_price)-Number(a.current_price) })
+        } else if (catalogSort === 'variation_desc') {
+          list.sort(function(a,b){ return Math.abs(trends[b.id].pct) - Math.abs(trends[a.id].pct) })
+        } else if (catalogSort === 'recent') {
+          // Basé sur la date du dernier prix
+          list.sort(function(a,b){
+            var ta = byProduct[a.id] ? new Date(byProduct[a.id][byProduct[a.id].length-1].invoice_date).getTime() : 0
+            var tb = byProduct[b.id] ? new Date(byProduct[b.id][byProduct[b.id].length-1].invoice_date).getTime() : 0
+            return tb - ta
+          })
+        }
 
-      {/* SECTIONS PAR FOURNISSEUR */}
-      {filteredSuppliers.map(function(s) {
-        var supProducts = products.filter(function(p) { return p.supplier_id === s.id && productMatchesSearch(p) })
-        if (supProducts.length === 0 && searchQ) return null
-        var catBadge = s.category === 'ingredient'
-          ? {bg:'#FFEB5A',color:'#191923',label:'Ingrédients'}
-          : s.category === 'boisson'
-            ? {bg:'#E0F0FF',color:'#005FFF',label:'Boissons'}
-            : s.category === 'packaging'
-              ? {bg:'#FF82D7',color:'#FFF',label:'Packaging'}
-              : {bg:'#E8E8E8',color:'#555',label:'Consommable'}
+        // Couleurs catégorie (gradient placeholder)
+        function catGradient(supplierCat){
+          if (supplierCat === 'boisson') return 'linear-gradient(135deg, #FFE5F5 0%, #FFE5E5 100%)'
+          if (supplierCat === 'packaging') return 'linear-gradient(135deg, #F0F4FF 0%, #DCE7FF 100%)'
+          if (supplierCat === 'consommable') return 'linear-gradient(135deg, #F0FFF4 0%, #DCF7E3 100%)'
+          return 'linear-gradient(135deg, var(--y) 0%, #FFF5C2 100%)' // ingrédient = jaune par défaut
+        }
+        function catEmoji(supplierCat){
+          if (supplierCat === 'boisson') return '🥤'
+          if (supplierCat === 'packaging') return '📦'
+          if (supplierCat === 'consommable') return '🧽'
+          return '🥬'
+        }
+
+        // Mini sparkline
+        function Sparkline(p){
+          var data = p.data || []
+          if (data.length < 2) return null
+          var mn = Math.min.apply(null, data); var mx = Math.max.apply(null, data)
+          var range = mx - mn || 1
+          var w = 56; var h = 18
+          var step = w / (data.length - 1)
+          var pts = data.map(function(v, i){
+            var x = i * step
+            var y = h - ((v - mn) / range) * h
+            return x.toFixed(1) + ',' + y.toFixed(1)
+          }).join(' ')
+          var color = p.color || '#191923'
+          return <svg width={w} height={h} style={{flexShrink:0,opacity:.7}}>
+            <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        }
+
+        // CATS pour les chips
+        var CATS = [
+          {id:'all', label:'Tous', emoji:'☰'},
+          {id:'ingredient', label:'Ingrédients', emoji:'🥬'},
+          {id:'boisson', label:'Boissons', emoji:'🥤'},
+          {id:'packaging', label:'Packaging', emoji:'📦'},
+          {id:'consommable', label:'Consommables', emoji:'🧽'}
+        ]
+
         return (
-          <div key={s.id} style={{background:'#fff',border:'2px solid #191923',borderRadius:12,padding:16,marginBottom:14}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingBottom:10,borderBottom:'2px solid #FFEB5A',marginBottom:8,flexWrap:'wrap',gap:6}}>
-              <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                <span style={{fontWeight:900,fontSize:16,textTransform:'uppercase'}}>{s.name}</span>
-                <span style={{display:'inline-block',padding:'3px 10px',borderRadius:20,fontSize:10,fontWeight:900,background:catBadge.bg,color:catBadge.color,textTransform:'uppercase'}}>{catBadge.label}</span>
-              </div>
-              <span style={{fontFamily:'Yellowtail',fontSize:12,color:'#888'}}>{supProducts.length} produit{supProducts.length>1?'s':''}</span>
+          <div>
+            {/* Chips catégories scrollables */}
+            <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:8,marginBottom:14,scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}}>
+              {CATS.map(function(c){
+                var active = catFilter === c.id
+                return (
+                  <button key={c.id} onClick={function(){setCatFilter(c.id)}} style={{flexShrink:0,padding:'8px 14px',background:active?'var(--p)':'#FFFFFF',color:active?'#FFFFFF':'#191923',border:'2px solid #191923',borderRadius:20,fontWeight:900,fontSize:12,cursor:'pointer',whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}>
+                    <span style={{fontSize:14}}>{c.emoji}</span>
+                    {c.label}
+                  </button>
+                )
+              })}
             </div>
-            {supProducts.length === 0 && <div style={{fontSize:13,color:'#888',padding:'8px 0'}}>Aucun produit — importez une facture pour alimenter</div>}
-            {supProducts.map(function(p) {
-              var prodRecipes = getRecipesForProduct(p.id)
-              var sibCount = p.article_id ? products.filter(function(pp) { return pp.article_id === p.article_id }).length : 1
-              return (
-                <div key={p.id} onClick={function(){setSelectedProduct(p)}} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 8px',borderBottom:'1px solid #F0F0F0',cursor:'pointer',borderRadius:6,gap:8,flexWrap:'wrap'}}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                      <span style={{fontWeight:900,fontSize:14}}>{p.name}</span>
-                      {p.is_active && sibCount > 1 && <span style={{fontSize:9,fontWeight:900,color:'#8A6D00',background:'#FFEB5A',padding:'1px 6px',borderRadius:8}}>★ ACTIF</span>}
-                      {sibCount > 1 && <span style={{fontSize:9,color:'#888'}}>{sibCount} fourn.</span>}
-                    </div>
-                    <div style={{marginTop:3}}>
-                      {prodRecipes.length > 0 ? prodRecipes.slice(0, 6).map(function(r) {
-                        return <span key={r.id} style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,margin:2,background:'#FFF3B0',color:'#8A6D00',border:'1px solid #EED980',textTransform:'uppercase'}}>{r.full_name}</span>
-                      }) : p.category === 'boisson' ? (
-                        <span style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,background:'#E0F0FF',color:'#005FFF',border:'1px solid #B0D0FF',textTransform:'uppercase'}}>Boisson revente</span>
-                      ) : p.category === 'packaging' ? (
-                        <span style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,background:'#FFE0F0',color:'#CC0066',border:'1px solid #FFB0D7',textTransform:'uppercase'}}>Packaging</span>
-                      ) : (
-                        <span style={{display:'inline-block',padding:'2px 8px',borderRadius:10,fontSize:9,fontWeight:900,background:'#E8E8E8',color:'#555',border:'1px solid #CCC',textTransform:'uppercase'}}>Hors recettes</span>
+
+            {/* Filtres avancés compacts */}
+            <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center',fontSize:11,fontWeight:700,opacity:.85}}>
+              <span style={{opacity:.6}}>Trier :</span>
+              {[
+                {v:'recent', l:'Récent'},
+                {v:'name_asc', l:'Nom A-Z'},
+                {v:'price_desc', l:'Prix ↓'},
+                {v:'price_asc', l:'Prix ↑'},
+                {v:'variation_desc', l:'Variation'}
+              ].map(function(s){
+                var active = catalogSort === s.v
+                return (
+                  <button key={s.v} onClick={function(){setCatalogSort(s.v)}} style={{padding:'4px 10px',fontSize:11,fontWeight:900,border:'1.5px solid '+(active?'var(--p)':'#DDD'),background:active?'#FFE5F5':'#FFF',color:active?'var(--p)':'#555',borderRadius:14,cursor:'pointer'}}>{s.l}</button>
+                )
+              })}
+              <span style={{marginLeft:8,opacity:.4}}>·</span>
+              <label style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer'}}>
+                <input type="checkbox" checked={showInactiveProducts} onChange={function(e){setShowInactiveProducts(e.target.checked)}} /> Inactifs
+              </label>
+              <label style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer'}}>
+                <input type="checkbox" checked={showOrphansToggle} onChange={function(e){setShowOrphansToggle(e.target.checked)}} /> Orphelins
+              </label>
+              <span style={{marginLeft:'auto',opacity:.55,fontSize:11}}>{list.length} produit{list.length>1?'s':''}</span>
+            </div>
+
+            {/* Galerie de cartes */}
+            {list.length === 0 && (
+              <div style={{padding:40,textAlign:'center',opacity:.5,fontWeight:700,fontSize:13,background:'#FFFFFF',borderRadius:14,border:'2px dashed #DDD'}}>Aucun produit ne correspond à la recherche</div>
+            )}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:12}}>
+              {list.map(function(p){
+                var sup = suppliers.filter(function(ss){ return ss.id === p.supplier_id })[0]
+                var supCat = sup ? sup.category : 'ingredient'
+                var tr = trends[p.id] || { pct: 0, spark: [], last: null }
+                var nbFournisseursAlt = p.article_id ? (artFournisseursCount[p.article_id] || 1) : 1
+                var isOrphan = p.article_id ? !usedArticleIds[p.article_id] : !usedProductIds[p.id]
+                var trendColor = '#191923'
+                var trendArrow = '→'
+                if (tr.pct >= 5) { trendColor = '#CC0066'; trendArrow = '↗' }
+                else if (tr.pct <= -5) { trendColor = '#009D3A'; trendArrow = '↘' }
+                return (
+                  <div key={p.id} onClick={function(){setSelectedProduct(p)}} style={{background:'#FFFFFF',borderRadius:14,border:'2px solid #191923',boxShadow:'3px 3px 0 #191923',overflow:'hidden',cursor:'pointer',display:'flex',flexDirection:'column',transition:'transform .12s',opacity:p.is_active?1:0.6}} onMouseEnter={function(e){e.currentTarget.style.transform='translate(-1px,-1px)';e.currentTarget.style.boxShadow='4px 4px 0 #191923'}} onMouseLeave={function(e){e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='3px 3px 0 #191923'}}>
+                    {/* Placeholder photo */}
+                    <div style={{height:90,background:catGradient(supCat),display:'flex',alignItems:'center',justifyContent:'center',fontSize:42,position:'relative',borderBottom:'2px solid #191923'}}>
+                      {catEmoji(supCat)}
+                      {/* Badge fournisseur */}
+                      {sup && (
+                        <div style={{position:'absolute',top:6,left:6,background:'rgba(255,255,255,.95)',color:'#191923',fontSize:9,fontWeight:900,padding:'3px 8px',borderRadius:6,border:'1.5px solid #191923',letterSpacing:.3,maxWidth:'70%',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{sup.name}</div>
                       )}
-                      {prodRecipes.length > 6 && <span style={{fontSize:9,color:'#888',marginLeft:4}}>+{prodRecipes.length-6}</span>}
+                      {/* Badges droite : ALT / ORPHELIN / INACTIF */}
+                      <div style={{position:'absolute',top:6,right:6,display:'flex',gap:4}}>
+                        {nbFournisseursAlt > 1 && (
+                          <div title={nbFournisseursAlt+' fournisseurs proposent cet article'} style={{background:'var(--p)',color:'#FFF',fontSize:9,fontWeight:900,padding:'3px 7px',borderRadius:6,letterSpacing:.3}}>ALT ×{nbFournisseursAlt}</div>
+                        )}
+                        {isOrphan && p.is_active && (
+                          <div title="Pas utilisé en recette" style={{background:'#DDD',color:'#555',fontSize:9,fontWeight:900,padding:'3px 7px',borderRadius:6,letterSpacing:.3}}>ORPHELIN</div>
+                        )}
+                        {!p.is_active && (
+                          <div style={{background:'#888',color:'#FFF',fontSize:9,fontWeight:900,padding:'3px 7px',borderRadius:6,letterSpacing:.3}}>INACTIF</div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Contenu */}
+                    <div style={{padding:'10px 12px',flex:1,display:'flex',flexDirection:'column',gap:6}}>
+                      <div style={{fontWeight:900,fontSize:13,lineHeight:1.2}}>{p.name}</div>
+                      {/* Prix actuel + tendance */}
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginTop:'auto',paddingTop:6,gap:6}}>
+                        <div>
+                          <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase'}}>Prix actuel</div>
+                          <div style={{fontSize:20,fontWeight:900,color:'#191923',lineHeight:1}}>{Number(p.current_price).toFixed(2)}<span style={{fontSize:11,opacity:.6}}>€/{p.unit}</span></div>
+                        </div>
+                        <div style={{textAlign:'right',display:'flex',alignItems:'center',gap:6}}>
+                          {tr.spark.length > 1 && <Sparkline data={tr.spark} color={trendColor} />}
+                          {tr.pct !== 0 && (
+                            <div style={{fontSize:13,fontWeight:900,color:trendColor,whiteSpace:'nowrap'}}>
+                              <span style={{fontSize:14}}>{trendArrow}</span> {tr.pct > 0 ? '+' : ''}{tr.pct.toFixed(0)}%
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div style={{textAlign:'right',flexShrink:0}}>
-                    <span style={{fontSize:16,fontWeight:900}}>{Number(p.current_price).toFixed(2)} €</span>
-                    <span style={{fontSize:11,color:'#888',marginLeft:2}}>/{p.unit}</span>
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
         )
-      })}
-
-      {filteredSuppliers.length === 0 && (
-        <div style={{padding:32,textAlign:'center',opacity:.5,fontSize:13}}>
-          Aucun fournisseur dans cette catégorie.
-        </div>
-      )}
-      </>
-      )}
+      })()}
 
       {/* ============ MODAL AFFECTATION À UNE RECETTE ============ */}
       {assignModal && (
