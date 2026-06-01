@@ -206,6 +206,9 @@ export default function RhTab() {
   var [previewContract, setPreviewContract] = useState(null)
   var [welcomePackEmpId, setWelcomePackEmpId] = useState(null)
   var [search, setSearch] = useState("")
+  var [contractsTab, setContractsTab] = useState("a_signer") // a_signer | brouillon | signe | archive | tous
+  var [contractsType, setContractsType] = useState("tous") // tous | contrats | avenants
+  var [contractsSearch, setContractsSearch] = useState("")
   var [toast, setToast] = useState("")
 
   function showToast(msg) {
@@ -395,12 +398,103 @@ export default function RhTab() {
   var badgeConformite = dossiersIncomplets.length + welcomeARegul.length
 
   // Pipeline contrats (lecture seule)
-  var pipeBrouillon = amendments.filter(function (a) { return a.status === "draft" && (a.signature_status === "unsent" || !a.signature_status) }).length
-  var pipeASigner = amendments.filter(function (a) { return a.status !== "signed" && (a.signature_status === "sent" || a.signature_status === "viewed") }).length
-    + contracts.filter(function (c) { return c.status !== "signed" && c.status !== "archived" && (c.signature_status === "sent" || c.signature_status === "viewed") }).length
-  var pipeSigne = amendments.filter(function (a) { return a.status === "signed" || a.signature_status === "signed" }).length
-    + contracts.filter(function (c) { return c.status === "signed" || c.signature_status === "signed" }).length
-  var pipeArchive = contracts.filter(function (c) { return c.status === "archived" }).length
+
+  // ============================================================
+  // VUE PILOTAGE CONTRATS & AVENANTS — items unifiés + classification
+  // ============================================================
+  function empName(empId) {
+    var e = employees.filter(function (x) { return x.id === empId })[0]
+    if (!e) return "Salarié inconnu"
+    return (e.prenom || "") + " " + (e.nom || "").toUpperCase()
+  }
+  function normStatus(status, sig) {
+    var s = status || ""
+    var g = sig || ""
+    if (s === "archived") return "archive"
+    if (s === "signed" || g === "signed") return "signe"
+    if (g === "sent" || g === "viewed") return "a_signer"
+    if (s === "finalized" || s === "draft" || g === "unsent" || !g) return "brouillon"
+    return "brouillon"
+  }
+  var STATUS_META = {
+    a_signer: { label: "À signer", color: "#FFEB5A", fg: "#191923", icon: "✍️" },
+    brouillon: { label: "Brouillon", color: "#FFFFFF", fg: "#191923", icon: "📝" },
+    signe: { label: "Signé", color: "#009D3A", fg: "#FFFFFF", icon: "✅" },
+    archive: { label: "Archivé", color: "#EBEBEB", fg: "#666", icon: "🗄️" }
+  }
+  var AMD_TYPE_LABELS = {
+    prolongation_duree: "Prolongation de durée",
+    augmentation_salaire: "Modification de rémunération",
+    modification_horaires: "Modification des horaires",
+    changement_poste: "Changement de poste",
+    regularisation_welcome_pack: "Actualisation contractuelle",
+    autre: "Avenant"
+  }
+
+  var contractItems = []
+  contracts.forEach(function (c) {
+    var st = normStatus(c.status, c.signature_status)
+    var meta = getContractTypeMeta(c.type || "extra")
+    contractItems.push({
+      kind: "contract",
+      id: c.id,
+      empId: c._employee_id,
+      title: (meta ? meta.label : "Contrat"),
+      sub: c.fonction || "",
+      type: c.type,
+      status: st,
+      sig: c.signature_status || "unsent",
+      isCurrent: c.is_current === true,
+      ts: c.created_at || c.date_debut || null,
+      dateLabel: c.date_debut ? new Date(c.date_debut).toLocaleDateString("fr-FR") : null,
+      raw: c
+    })
+  })
+  amendments.forEach(function (a) {
+    var st = normStatus(a.status, a.signature_status)
+    var label = AMD_TYPE_LABELS[a.amendment_type] || a.objet || "Avenant"
+    contractItems.push({
+      kind: "amendment",
+      id: a.id,
+      empId: a._employee_id,
+      title: (a.amendment_number ? ("Avenant n°" + a.amendment_number) : "Avenant") + " — " + label,
+      sub: a.objet || "",
+      type: "avenant",
+      status: st,
+      sig: a.signature_status || "unsent",
+      isCurrent: false,
+      ts: a.created_at || a.signature_date || null,
+      dateLabel: a.signature_date ? new Date(a.signature_date).toLocaleDateString("fr-FR") : (a.created_at ? new Date(a.created_at).toLocaleDateString("fr-FR") : null),
+      raw: a
+    })
+  })
+
+  var countByStatus = { a_signer: 0, brouillon: 0, signe: 0, archive: 0, tous: contractItems.length }
+  contractItems.forEach(function (it) { countByStatus[it.status] = (countByStatus[it.status] || 0) + 1 })
+
+  var contractItemsFiltered = contractItems.filter(function (it) {
+    if (contractsTab !== "tous" && it.status !== contractsTab) return false
+    if (contractsType === "contrats" && it.kind !== "contract") return false
+    if (contractsType === "avenants" && it.kind !== "amendment") return false
+    if (contractsSearch.trim()) {
+      var q = contractsSearch.toLowerCase()
+      var hay = (it.title + " " + it.sub + " " + empName(it.empId)).toLowerCase()
+      if (hay.indexOf(q) < 0) return false
+    }
+    return true
+  }).sort(function (a, b) {
+    var ta = a.ts ? new Date(a.ts).getTime() : 0
+    var tb = b.ts ? new Date(b.ts).getTime() : 0
+    return tb - ta
+  })
+
+  var CONTRACT_TABS = [
+    { key: "a_signer", label: "À signer" },
+    { key: "brouillon", label: "Brouillons" },
+    { key: "signe", label: "Signés" },
+    { key: "archive", label: "Archivés" },
+    { key: "tous", label: "Tous" }
+  ]
 
   // Pills de navigation
   var NAV = [
@@ -707,35 +801,134 @@ export default function RhTab() {
         <div>
           <SignaturesPendingWidget />
 
+          {/* En-tête + filtres type + recherche */}
           <div className="card">
-            <div className="yt" style={{ fontSize: 21, color: "#FF82D7", marginBottom: 4 }}>Pipeline contrats &amp; avenants</div>
-            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 12 }}>
-              Vue d&apos;ensemble du cycle de vie. La gestion détaillée se fait depuis la fiche de chaque salarié.
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+              <div className="yt" style={{ fontSize: 21, color: "#FF82D7" }}>Contrats &amp; avenants</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button className={"tag" + (contractsType === "tous" ? " on" : "")} onClick={function () { setContractsType("tous") }}>Tout</button>
+                <button className={"tag" + (contractsType === "contrats" ? " on" : "")} onClick={function () { setContractsType("contrats") }}>Contrats</button>
+                <button className={"tag" + (contractsType === "avenants" ? " on" : "")} onClick={function () { setContractsType("avenants") }}>Avenants</button>
+              </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
-              {[
-                { label: "Brouillon", value: pipeBrouillon, bg: "#FFFFFF" },
-                { label: "À signer", value: pipeASigner, bg: "var(--y, #FFEB5A)" },
-                { label: "Signé", value: pipeSigne, bg: "#009D3A", fg: "#FFFFFF" },
-                { label: "Archivé", value: pipeArchive, bg: "#EBEBEB" }
-              ].map(function (p) {
+
+            {/* Onglets de statut avec compteurs */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+              {CONTRACT_TABS.map(function (t) {
+                var on = contractsTab === t.key
+                var n = countByStatus[t.key] || 0
                 return (
-                  <div key={p.label} style={{
-                    background: p.bg, color: p.fg || "#191923",
-                    border: "2px solid #191923", borderRadius: 6, boxShadow: "2px 2px 0 #191923",
-                    padding: "12px 10px", textAlign: "center"
-                  }}>
-                    <div style={{ fontWeight: 900, fontSize: 26, lineHeight: 1 }}>{p.value}</div>
-                    <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1, marginTop: 4 }}>{p.label}</div>
+                  <button
+                    key={t.key}
+                    className={"ann-tab" + (on ? " on" : "")}
+                    onClick={function () { setContractsTab(t.key) }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    <span>{t.label}</span>
+                    <span style={{
+                      background: on ? "var(--y, #FFEB5A)" : "#191923",
+                      color: on ? "#191923" : "var(--y, #FFEB5A)",
+                      fontWeight: 900, fontSize: 10, padding: "1px 6px", borderRadius: 9, border: "1.5px solid #191923"
+                    }}>{n}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Recherche */}
+            <input
+              className="inp"
+              value={contractsSearch}
+              onChange={function (e) { setContractsSearch(e.target.value) }}
+              placeholder="🔍 Rechercher par salarié, fonction, type de document..."
+              style={{ width: "100%", margin: 0 }}
+            />
+          </div>
+
+          {/* Liste actionnable */}
+          {loading ? (
+            <div className="card" style={{ padding: 24, textAlign: "center", opacity: 0.5 }}>Chargement…</div>
+          ) : contractItemsFiltered.length === 0 ? (
+            <div className="card" style={{ padding: 30, textAlign: "center", opacity: 0.6 }}>
+              <div className="yt" style={{ fontSize: 22, color: "#FF82D7", marginBottom: 4 }}>Rien ici</div>
+              <div style={{ fontSize: 12 }}>Aucun document ne correspond à ce filtre.</div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {contractItemsFiltered.map(function (it) {
+                var sm = STATUS_META[it.status] || STATUS_META.brouillon
+                var poste = posteForEmployee(it.empId)
+                var canRelance = it.status === "a_signer" || (it.status === "brouillon" && it.kind === "amendment")
+                return (
+                  <div
+                    key={it.kind + "_" + it.id}
+                    className="card-click"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
+                      border: it.status === "a_signer" ? "2px solid #FF82D7" : "2px solid #191923",
+                      borderRadius: 8, background: "#FFFFFF",
+                      boxShadow: it.status === "a_signer" ? "3px 3px 0 #FF82D7" : "3px 3px 0 #191923",
+                      margin: 0
+                    }}
+                    onClick={function () { if (it.empId) setViewingEmployeeId(it.empId) }}
+                  >
+                    {/* Avatar couleur poste */}
+                    <div style={{
+                      width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
+                      background: poste.color, color: poste.textColor,
+                      border: "2px solid #191923", boxShadow: "2px 2px 0 #191923",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontWeight: 900, fontSize: 15, fontFamily: "'Arial Narrow', Arial, sans-serif"
+                    }}>{(function () {
+                      var e = employees.filter(function (x) { return x.id === it.empId })[0]
+                      return e ? getInitials(e.prenom, e.nom) : "?"
+                    })()}</div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 900, fontSize: 13 }}>{empName(it.empId)}</span>
+                        {it.kind === "amendment" ? (
+                          <span style={{ fontSize: 9, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".5px", background: "#FFEB5A", color: "#191923", padding: "1px 6px", borderRadius: 3, border: "1.5px solid #191923" }}>Avenant</span>
+                        ) : null}
+                        {it.isCurrent ? (
+                          <span style={{ fontSize: 9, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".5px", background: "#FF82D7", color: "#191923", padding: "1px 6px", borderRadius: 3, border: "1.5px solid #191923" }}>● En cours</span>
+                        ) : null}
+                      </div>
+                      <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>
+                        {it.title}{it.sub && it.sub !== it.title ? (" · " + it.sub) : ""}
+                      </div>
+                      {it.dateLabel ? (
+                        <div style={{ fontSize: 10, opacity: 0.5, marginTop: 1 }}>🗓 {it.dateLabel}</div>
+                      ) : null}
+                    </div>
+
+                    {/* Badge statut */}
+                    <span style={{
+                      background: sm.color, color: sm.fg, border: "1.5px solid #191923",
+                      borderRadius: 9, padding: "3px 9px", fontWeight: 900, fontSize: 10,
+                      textTransform: "uppercase", letterSpacing: ".5px", whiteSpace: "nowrap"
+                    }}>{sm.icon} {sm.label}</span>
+
+                    {/* Action directe */}
+                    {canRelance ? (
+                      <button
+                        className="btn btn-sm"
+                        style={{ background: "#FF82D7", color: "#FFFFFF", border: "1.5px solid #FF82D7", fontWeight: 700, whiteSpace: "nowrap" }}
+                        onClick={function (ev) { ev.stopPropagation(); if (it.empId) setViewingEmployeeId(it.empId) }}
+                        title="Ouvrir la fiche pour gérer la signature"
+                      >📧 Signature</button>
+                    ) : (
+                      <span style={{ fontWeight: 900, color: "#FF82D7" }}>›</span>
+                    )}
                   </div>
                 )
               })}
             </div>
-          </div>
+          )}
 
           <div className="card-p">
             <div style={{ fontWeight: 700, fontSize: 12 }}>
-              💡 Pour créer un contrat, un avenant, ou suivre une signature&nbsp;: ouvre la fiche du salarié depuis l&apos;onglet <b>Équipe</b>.
+              💡 Clique sur une ligne pour ouvrir la fiche du salarié&nbsp;: création, édition, envoi en signature et suivi s&apos;y font.
             </div>
           </div>
         </div>
