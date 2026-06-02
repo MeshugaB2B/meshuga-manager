@@ -481,7 +481,13 @@ export function buildAvenant(amendment: any, contract: any, emp: any, vacs: any[
   // - headerText : "AVENANT  ·  EMY SOULABAILLE" (bandeau haut de chaque page)
   var employerInitials = (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : "E.T."
   var salarieInitials = "en attente"
-  if (contract && (contract.signature_signed_at || contract.signed_at)) {
+  // 🔧 Fix paraphes : pour un avenant, l'événement de signature salarié est porté
+  // par l'AVENANT (amendment), pas par le contrat initial. On gate donc sur
+  // amendment.signature_signed_at / signed_at / signature_status === 'signed'.
+  // (Avant : on lisait contract.* -> restait "en attente" car le contrat n'est pas
+  // forcément signé via ce flux.)
+  var amendmentSigned = !!(amendment && (amendment.signature_signed_at || amendment.signed_at || amendment.signature_status === "signed"))
+  if (amendmentSigned) {
     var empFull = ((emp && emp.prenom) || '') + ' ' + ((emp && emp.nom) || '')
     salarieInitials = getInitials(empFull) || "en attente"
   }
