@@ -454,6 +454,18 @@ export async function POST(
     })
   }
 
+  // 🔧 Fix paraphes (v14) : refléter en mémoire la signature salarié EN COURS avant
+  // de générer le HTML. Les builders dérivent les initiales du paraphe de ces champs ;
+  // or l'UPDATE DB (signature_signed_at) n'a lieu qu'APRÈS la génération. Sans cette
+  // mutation, le HTML archivé fige "en attente". Idempotent : on ne réécrit pas une
+  // valeur déjà posée (utile aussi pour le backfill, où les rows ont déjà ces champs).
+  var signedIso = signedAt.toISOString()
+  amendment.signature_signed_at = amendment.signature_signed_at || signedIso
+  amendment.signed_at = amendment.signed_at || signedIso
+  amendment.signature_status = "signed"
+  contract.signature_signed_at = contract.signature_signed_at || signedIso
+  contract.signed_at = contract.signed_at || signedIso
+
   // Génération HTML du document brut selon le type d'entité
   var avenantHtml = ""
   if (entityKind === "amendment") {
@@ -516,13 +528,14 @@ export async function POST(
   var employerInitials = (employerSig && employerSig.full_name) ? getInitials(employerSig.full_name) : "—"
   var employeeInitials = getInitials(signedFullName)
 
+  // 🔧 v14 : les paraphes sont désormais gravés dans le CSS @page @bottom-right par les
+  // builders (avec les bonnes initiales grâce à la mutation in-memory ci-dessus). On ne
+  // patche donc plus le HTML a posteriori : injectEmployeeParaphes est mort (shim => "").
   var signedAvenantHtml = injectEmployeeSignature(avenantHtml, employeeSignedBlock, signedDateLabel)
-  signedAvenantHtml = injectEmployeeParaphes(signedAvenantHtml, employerInitials, employeeInitials)
 
   var signedWelcomePackHtml = ""
   if (includeWp) {
     signedWelcomePackHtml = injectEmployeeSignature(welcomePackHtml, employeeSignedBlock, signedDateLabel)
-    signedWelcomePackHtml = injectEmployeeParaphes(signedWelcomePackHtml, employerInitials, employeeInitials)
   }
 
   // === 9. Audit JSON pour la DB ===
