@@ -1,6 +1,6 @@
 // ============================================================
 // FILE PATH dans le repo :
-//   src/app/api/hr/document/[id]/route.ts
+//   src/app/api/hr/document/[docId]/route.ts
 // ============================================================
 // Route de service des documents RH — logique « PDF-FIRST ».
 //
@@ -33,6 +33,32 @@ export var dynamic = "force-dynamic"
 
 var HR_BUCKET_CONTRACT = "hr-contract-docs"
 var HR_BUCKET_EMPLOYEE = "hr-employee-docs"
+var HR_BUCKET_SIGN = "hr-signatures"
+
+// Teste si un objet existe dans un bucket (createSignedUrl court, jeté ensuite).
+async function bucketHas(admin, bucket, path) {
+  try {
+    var r = await admin.storage.from(bucket).createSignedUrl(path, 60)
+    return !!(r && !r.error && r.data && r.data.signedUrl)
+  } catch (e) {
+    return false
+  }
+}
+
+// Résout le bucket réel d'un document : certains documents signés anciens ont été
+// archivés dans hr-signatures alors que leur file_path est référencé tel quel dans
+// hr_contract_documents. On retombe donc sur hr-signatures si l'objet n'est pas dans
+// le bucket primaire. Retourne le 1er bucket candidat qui contient le path.
+async function resolveBucket(admin, candidates, path) {
+  if (!path) return candidates[0]
+  var i = 0
+  while (i < candidates.length) {
+    var ok = await bucketHas(admin, candidates[i], path)
+    if (ok) return candidates[i]
+    i++
+  }
+  return candidates[0]
+}
 
 function getAdmin() {
   var url = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
@@ -117,6 +143,13 @@ export async function GET(req, ctx) {
   }
   var doc = sel.data
   var label = doc.label || doc.doc_type || "Document"
+
+  // Résolution du bucket réel (repli hr-signatures pour les anciens docs signés).
+  var candidateBuckets = source === "employee"
+    ? [HR_BUCKET_EMPLOYEE, HR_BUCKET_SIGN]
+    : [HR_BUCKET_CONTRACT, HR_BUCKET_SIGN]
+  var probePath = doc.assembled_pdf_path || doc.file_path || null
+  bucket = await resolveBucket(admin, candidateBuckets, probePath)
 
   try {
     // 1) PDF assemblé figé (contrats/avenants signés, solde tout compte...)
