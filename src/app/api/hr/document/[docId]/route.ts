@@ -83,12 +83,28 @@ function buildImagePagesHtml(title, urls) {
 export async function GET(req, ctx) {
   var admin = getAdmin()
 
-  var id = ctx && ctx.params ? ctx.params.id : null
+  var url = new URL(req.url)
+
+  // Récupération robuste de l'id : params Next, sinon parsing du pathname.
+  // (selon la version / le contexte, ctx.params peut ne pas être renseigné)
+  var id = null
+  if (ctx && ctx.params && ctx.params.id) {
+    id = ctx.params.id
+  }
+  if (!id) {
+    var parts = url.pathname.split("/").filter(function (s) { return s && s.length > 0 })
+    var docIdx = parts.lastIndexOf("document")
+    if (docIdx >= 0 && parts.length > docIdx + 1) {
+      id = decodeURIComponent(parts[docIdx + 1])
+    } else if (parts.length > 0) {
+      id = decodeURIComponent(parts[parts.length - 1])
+    }
+  }
+  if (id === "undefined" || id === "null" || id === "") id = null
   if (!id) {
     return NextResponse.json({ error: "id manquant" }, { status: 400 })
   }
 
-  var url = new URL(req.url)
   var source = url.searchParams.get("source") === "employee" ? "employee" : "contract"
   var forceDownload = url.searchParams.get("dl") === "1"
 
