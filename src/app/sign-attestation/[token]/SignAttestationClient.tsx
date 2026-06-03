@@ -37,14 +37,37 @@ export default function SignAttestationClient(props: Props) {
   var hasName = (fullName || "").trim().length >= 3
   var canSubmit = hasName && consentDocument && !submitting
 
+  var fetchClientGeo = async function () {
+    try {
+      var ctrl = new AbortController()
+      var to = setTimeout(function () { ctrl.abort() }, 4000)
+      var r = await fetch("https://ipwho.is/", { signal: ctrl.signal })
+      clearTimeout(to)
+      if (!r.ok) return null
+      var j = await r.json()
+      if (j && j.success !== false) {
+        return {
+          ip: j.ip || "",
+          city: j.city || "",
+          region: j.region || "",
+          country: j.country || "",
+          country_code: j.country_code || "",
+        }
+      }
+    } catch (e) {}
+    return null
+  }
+
   var doSubmit = async function () {
     setSubmitting(true)
     setErrorMsg("")
+    // Géoloc côté navigateur (IP résidentielle -> non bloquée par les fournisseurs)
+    var clientGeo = await fetchClientGeo()
     try {
       var res = await fetch("/api/sign-attestation/" + props.token + "/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName: fullName.trim(), consentDocument: consentDocument }),
+        body: JSON.stringify({ fullName: fullName.trim(), consentDocument: consentDocument, clientGeo: clientGeo }),
       })
       var data = await res.json()
       if (!res.ok || !data.ok) {
