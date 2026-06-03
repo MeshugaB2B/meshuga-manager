@@ -147,32 +147,41 @@ export function buildHygieneGuide(emp, options) {
     "<path d='M36 44 l3 3 l5 -6' fill='none' stroke='#191923' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/>" +
     "</svg>"
 
-  // --- gestes de lavage des mains (glyphes ronds, 6 étapes) ---
+  // --- gestes de lavage des mains (mains stylisées, 6 étapes) ---
+  // Main "paume ouverte" en coords locales (centre ~ 12,22) : 4 doigts + paume + pouce.
+  var HAND_INNER =
+    "<rect x='6.5' y='4' width='3.6' height='19' rx='1.8'/>" +
+    "<rect x='11.2' y='2' width='3.6' height='21' rx='1.8'/>" +
+    "<rect x='15.9' y='2' width='3.6' height='21' rx='1.8'/>" +
+    "<rect x='20.6' y='4.5' width='3.6' height='18.5' rx='1.8'/>" +
+    "<path d='M4.5 20 h22 v9 a11 11 0 0 1 -11 11 a11 11 0 0 1 -11 -11 Z'/>" +
+    "<rect x='-1.5' y='22' width='3.8' height='13' rx='1.9' transform='rotate(40 0.4 28.5)'/>"
+  var hand = function (tf) {
+    return "<g transform='" + tf + "' fill='#FFD9EC' stroke='#191923' stroke-width='2.2' stroke-linejoin='round' stroke-linecap='round'>" + HAND_INNER + "</g>"
+  }
   var hwGlyph = function (n) {
     var s = "<svg viewBox='0 0 72 72' width='100%' height='100%' " + SVG + ">"
-    var k = "stroke='#191923' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'"
+    // une main claire, identique partout (lisible), centrée
+    s += hand("translate(18,11) scale(1.25)")
+    var P = "fill='none' stroke='#D14F9E' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'"
     if (n === 1) {
-      s += "<path d='M26 50 V36 a3 3 0 0 1 6 0 v-3 a3 3 0 0 1 6 0 v2 a3 3 0 0 1 6 0 v3 a3 3 0 0 1 6 0 v9 a10 10 0 0 1 -10 10 h-4 a10 10 0 0 1 -10 -10 Z' fill='#FFE9F4' " + k + "/>"
-      s += "<g fill='#FF82D7'><circle cx='22' cy='20' r='3'/><circle cx='32' cy='15' r='3.4'/><circle cx='42' cy='21' r='2.6'/></g>"
+      // savon qui mousse
+      s += "<g fill='#fff' stroke='#FF82D7' stroke-width='1.8'><circle cx='17' cy='22' r='5.5'/><circle cx='12' cy='30' r='4'/><circle cx='20' cy='33' r='3.2'/></g>"
     } else if (n === 2) {
-      s += "<path d='M30 22 v26 a6 6 0 0 0 6 6' fill='#FFE9F4' " + k + "/>"
-      s += "<path d='M42 22 v26 a6 6 0 0 1 -6 6' fill='#FFE9F4' " + k + "/>"
-      s += "<g stroke='#FF82D7' stroke-width='3' stroke-linecap='round'><line x1='30' y1='24' x2='30' y2='40'/><line x1='42' y1='24' x2='42' y2='40'/></g>"
+      // frottement paume contre paume : double flèche
+      s += "<g " + P + "><path d='M24 50 h22'/><path d='M24 50 l5 -4 M24 50 l5 4'/><path d='M46 50 l-5 -4 M46 50 l-5 4'/></g>"
     } else if (n === 3) {
-      s += "<rect x='20' y='34' width='32' height='16' rx='8' fill='#FFE9F4' " + k + "/>"
-      s += "<g stroke='#FF82D7' stroke-width='3' stroke-linecap='round'><line x1='26' y1='34' x2='26' y2='22'/><line x1='33' y1='34' x2='33' y2='20'/><line x1='40' y1='34' x2='40' y2='20'/><line x1='47' y1='34' x2='47' y2='22'/></g>"
+      // dos de la main : flèche qui balaie
+      s += "<g " + P + "><path d='M22 38 q13 -9 26 0'/><path d='M48 38 l-1 -6 M48 38 l-6 0'/></g>"
     } else if (n === 4) {
-      s += "<g " + k + "><path d='M24 48 V30'/><path d='M31 48 V26'/><path d='M38 48 V26'/><path d='M45 48 V30'/></g>"
-      s += "<g stroke='#FF82D7' stroke-width='3' stroke-linecap='round'><path d='M27 30 V44'/><path d='M34 26 V44'/><path d='M41 26 V44'/></g>"
-      s += "<rect x='20' y='46' width='32' height='8' rx='4' fill='#FFE9F4' " + k + "/>"
+      // entre les doigts : traits roses entre les doigts
+      s += "<g stroke='#D14F9E' stroke-width='3' stroke-linecap='round'><line x1='31' y1='18' x2='31' y2='27'/><line x1='37.5' y1='16' x2='37.5' y2='27'/><line x1='44' y1='18' x2='44' y2='27'/></g>"
     } else if (n === 5) {
-      s += "<rect x='24' y='30' width='24' height='22' rx='9' fill='#FFE9F4' " + k + "/>"
-      s += "<path d='M44 34 a8 8 0 0 1 8 8' stroke='#FF82D7' stroke-width='3' fill='none' stroke-linecap='round'/>"
-      s += "<path d='M30 30 q6 -10 12 0' stroke='#FF82D7' stroke-width='3' fill='none' stroke-linecap='round'/>"
+      // pouce mis en évidence
+      s += "<circle cx='20' cy='47' r='8.5' " + P + "/>"
     } else {
-      s += "<path d='M22 46 a14 14 0 0 0 28 0' fill='#FFE9F4' " + k + "/>"
-      s += "<g fill='#FF82D7'><circle cx='28' cy='34' r='3'/><circle cx='36' cy='31' r='3'/><circle cx='44' cy='34' r='3'/></g>"
-      s += "<path d='M30 24 q6 6 12 0' " + k + "/>"
+      // ongles : petits arcs aux bouts des doigts
+      s += "<g " + P + " stroke-width='2.4'><path d='M28 17 a3 3 0 0 1 6 0'/><path d='M35 15 a3 3 0 0 1 6 0'/><path d='M42 17 a3 3 0 0 1 6 0'/></g>"
     }
     s += "</svg>"
     return s
@@ -324,13 +333,14 @@ export function buildHygieneGuide(emp, options) {
     ".rx .it .h{font-family:'BILD Condensed','Arial Narrow',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--pd);font-size:10pt;margin-bottom:1.5mm;display:flex;align-items:center;gap:2mm}" +
     ".rx .it p{margin:0;font-size:10pt;line-height:1.45}" +
     ".rx .dot{width:7mm;height:7mm;flex-shrink:0}" +
-    ".alg{display:grid;grid-template-columns:repeat(2,1fr);gap:2.5mm 5mm;margin:3mm 0}" +
-    ".alg .a{display:flex;gap:3mm;align-items:flex-start;background:#fff;border:1px solid #F2D8EC;border-radius:12px;padding:2.6mm 3.5mm;break-inside:avoid}" +
+    ".alg{display:grid;grid-template-columns:repeat(3,1fr);gap:1.8mm 3mm;margin:2.5mm 0}" +
+    ".alg .a{display:flex;gap:2.5mm;align-items:center;background:#fff;border:1px solid #F2D8EC;border-radius:12px;padding:2mm 3mm;break-inside:avoid}" +
     ".alg .n{flex-shrink:0;width:6mm;height:6mm;border-radius:50%;background:var(--y);border:1.5px solid var(--p);color:var(--ink);font-family:'BILD Condensed','Arial Narrow',sans-serif;font-weight:800;font-size:8.5pt;display:flex;align-items:center;justify-content:center}" +
     ".alg .a b{font-size:10pt}.alg .a span{display:block;font-size:8.8pt;color:var(--muted)}" +
-    ".sundae{display:flex;gap:5mm;align-items:center;background:linear-gradient(180deg,#FFFDFB,#FFF6FC);border:1px solid #F2D8EC;border-radius:18px;padding:5mm;margin:4mm 0;break-inside:avoid}" +
-    ".sundae .ill{width:62mm;flex-shrink:0}" +
-    ".reco{page:signature;page-break-before:always;break-before:page}" +
+    ".sundae{display:flex;gap:4mm;align-items:center;background:linear-gradient(180deg,#FFFDFB,#FFF6FC);border:1px solid #F2D8EC;border-radius:18px;padding:4mm;margin:3mm 0;break-inside:avoid}" +
+    ".sundae .ill{width:40mm;flex-shrink:0}" +
+    ".pbreak{page-break-before:always;break-before:page}" +
+    ".reco{page:signature;page-break-before:always;break-before:page;break-inside:avoid;page-break-inside:avoid}" +
     ".sig{border-radius:20px;overflow:hidden;border:1px solid #F2D8EC;box-shadow:0 10px 26px rgba(255,130,215,.18);margin-top:5mm;break-inside:avoid}" +
     ".sig .head{background:linear-gradient(135deg,#FF82D7,#FF6FC2);color:#fff;padding:4mm 6mm;font-family:'BILD Condensed','Arial Narrow',sans-serif;text-transform:uppercase;letter-spacing:1.5px;font-weight:900;font-size:13pt;text-align:center}" +
     ".sig .id{background:var(--ys);padding:3.5mm 6mm;text-align:center;font-size:12pt}" +
@@ -383,7 +393,7 @@ export function buildHygieneGuide(emp, options) {
 
   // 2 — Cadre réglementaire (détaillé, en cartes)
   var c2 =
-    "<section class='chapter'>" +
+    "<section class='chapter pbreak'>" +
       "<div class='copen'>" +
         chead("2", "Le cadre réglementaire") +
         "<p>Quelques textes structurent tout ce qui suit. Pas besoin de les connaître par cœur : voici, en clair, ce que chacun implique pour nous au quotidien.</p>" +
@@ -416,7 +426,7 @@ export function buildHygieneGuide(emp, options) {
   hwGrid += "</div>"
 
   var c3 =
-    "<section class='chapter'>" +
+    "<section class='chapter pbreak'>" +
       "<div class='copen'>" +
         chead("3", "L’hygiène, ça commence par toi") +
         "<p>Nos mains et notre tenue sont au contact direct des aliments : c’est la première barrière contre les microbes. On y consacre le plus de soin.</p>" +
@@ -431,8 +441,7 @@ export function buildHygieneGuide(emp, options) {
       "<div class='card keep'>" +
         li([
           "<strong>Casquette Meshuga obligatoire</strong> en zone de manipulation : elle retient les cheveux, première source de contamination. Cheveux longs attachés, barbe soignée.",
-          "<strong>Tenue propre réservée au service</strong> : on n’arrive pas et on ne repart pas en tenue de travail. T-shirt/tablier propres changés dès qu’ils sont souillés.",
-          "<strong>Tablier</strong> propre par-dessus, retiré pour aller aux toilettes ou sortir.",
+          "<strong>Tenue propre réservée au service</strong> : on n’arrive pas et on ne repart pas en tenue de travail. T-shirt propre changé dès qu’il est souillé.",
           "<strong>Chaussures fermées</strong>, antidérapantes, propres, réservées au poste.",
           "<strong>Mains &amp; ongles</strong> : ongles courts, propres, sans vernis ni faux ongles.",
           "<strong>Bijoux interdits</strong> aux mains et avant-bras (bagues, montre, bracelets) : ils retiennent les microbes et peuvent tomber dans un plat. Boucles d’oreilles discrètes tolérées.",
@@ -443,7 +452,7 @@ export function buildHygieneGuide(emp, options) {
       "<h3 class='bc'>Santé &amp; éviction</h3>" +
       "<div class='card keep'>" +
         "<p>Un soignant malade contamine sans le vouloir. Si tu présentes <strong>diarrhée, vomissements, fièvre, angine, plaie infectée, infection de la peau, des yeux, du nez ou de la gorge</strong> : <strong>préviens Edward avant ta prise de poste</strong>. Tu ne manipules pas de denrées tant que les symptômes durent (Règl. 852/2004, annexe II, chap. VIII).</p>" +
-        "<p style='margin-bottom:0'><strong>Coupure ou blessure aux mains :</strong> on nettoie, on protège avec un <strong>pansement bleu détectable</strong> (visible s’il tombe dans un plat) et on enfile un <strong>gant</strong> par-dessus. On signale toute plaie à Edward.</p>" +
+        "<p style='margin-bottom:0'><strong>Coupure ou blessure aux mains :</strong> on nettoie, on protège avec un <strong>pansement bleu détectable</strong> (visible s’il tombe dans un plat) et on enfile un <strong>gant</strong> par-dessus. On signale toute plaie à Edward. <strong>Des pansements bleus détectables sont disponibles en libre-service dans le restaurant.</strong></p>" +
       "</div>" +
 
       "<h3 class='bc'>Interdit en zone de production… et pourquoi</h3>" +
@@ -460,7 +469,7 @@ export function buildHygieneGuide(emp, options) {
 
   // 4 — Marche en avant
   var c4 =
-    "<section class='chapter'>" +
+    "<section class='chapter pbreak'>" +
       "<div class='copen'>" +
         chead("4", "La marche en avant", icArrow) +
         "<p>Le principe : un produit avance toujours du « sale » vers le « propre », sans jamais revenir en arrière. Sur nos 27 m², on ne peut pas tout séparer dans l’<strong>espace</strong> — alors on sépare dans le <strong>temps</strong>.</p>" +
@@ -481,7 +490,7 @@ export function buildHygieneGuide(emp, options) {
 
   // 5 — Réception
   var c5 =
-    "<section class='chapter'>" +
+    "<section class='chapter pbreak'>" +
       "<div class='copen'>" +
         chead("5", "Réceptionner une livraison", icThermo) +
         "<p>La réception est un point de contrôle clé : un produit non conforme refusé ici, c’est un risque évité en cuisine. À chaque livraison (Norbert, Rouquette, Foodflow, Marina Sea Food, Monarque, Jacquier, Episaveurs…), on prend deux minutes pour vérifier.</p>" +
@@ -503,7 +512,7 @@ export function buildHygieneGuide(emp, options) {
 
   // 6 — Températures (titre + 1er tableau groupés)
   var c6 =
-    "<section class='chapter'>" +
+    "<section class='chapter pbreak'>" +
       "<div class='copen'>" +
         chead("6", "Les températures", icSnow) +
         "<p>Référence : arrêté du 21 décembre 2009 + Règlement (CE) 853/2004. Il s’agit de la température <strong>maximale</strong> de la denrée.</p>" +
@@ -560,7 +569,7 @@ export function buildHygieneGuide(emp, options) {
 
   // 8 — Préparations maison
   var c8 =
-    "<section class='chapter'>" +
+    "<section class='chapter pbreak'>" +
       "<div class='copen'>" +
         chead("8", "Nos préparations maison") +
         "<p>Plusieurs recettes Meshuga utilisent des matières dites « sensibles ». Bonne nouvelle : on les maîtrise à la source par le choix des ingrédients.</p>" +
@@ -578,7 +587,7 @@ export function buildHygieneGuide(emp, options) {
 
   // 9 — DLC
   var c9 =
-    "<section class='chapter'>" +
+    "<section class='chapter pbreak'>" +
       "<div class='copen'>" +
         chead("9", "Durées de conservation (DLC)") +
         "<p>Voici nos durées recommandées comme point de départ raisonnable. <strong>Toute durée plus longue doit être validée par une analyse microbiologique</strong> (test de vieillissement) : sans analyse, on reste sur ces valeurs courtes.</p>" +
@@ -628,7 +637,7 @@ export function buildHygieneGuide(emp, options) {
   }
   algGrid += "</div>"
   var c10 =
-    "<section class='chapter'>" +
+    "<section class='chapter pbreak'>" +
       "<div class='copen'>" +
         chead("10", "Les allergènes", icAllerg) +
         "<p>C’est un point <strong>vital</strong> : pour une personne allergique, une trace invisible peut déclencher une réaction grave, parfois mortelle. La loi (Règl. UE 1169/2011, annexe II) impose d’informer le client sur <strong>14 allergènes</strong>, sur place <strong>et en ligne</strong> (Deliveroo / Uber Eats).</p>" +
@@ -638,21 +647,20 @@ export function buildHygieneGuide(emp, options) {
       "<div class='card keep'>" +
         "<h3 class='bc' style='margin-top:0'>Nos réflexes Meshuga</h3>" +
         li([
-          "<strong>On connaît la composition</strong> de chaque produit : en cas de doute, on se réfère à la <strong>fiche allergènes</strong> — jamais « je crois ».",
+          "<strong>On connaît la composition</strong> de chaque produit. Dans le doute, <strong>on ne devine jamais</strong> : on se réfère à la <strong>fiche allergènes</strong> (jamais « je crois ») ou on oriente le client vers une option sûre.",
           "<strong>Contamination croisée :</strong> pour un plat « sans », on utilise un ustensile et un plan <strong>propres et dédiés</strong>. Une trace suffit.",
-          "<strong>Question d’un client allergique :</strong> on prend l’information au sérieux, on vérifie la fiche, on répond précisément. Si on n’est pas certain, on le dit honnêtement.",
+          "<strong>Question d’un client allergique :</strong> on prend l’information au sérieux, on vérifie la fiche, on répond précisément.",
           "<strong>En ligne :</strong> les allergènes doivent rester accessibles et à jour sur les plateformes de livraison."
         ]) +
       "</div>" +
-      hero("Face à un doute sur un allergène : <b>on ne devine jamais.</b> On vérifie la fiche, ou on oriente le client vers une option dont on est sûr.") +
     "</section>"
 
   // 11 — Nettoyage & désinfection
   var c11 =
-    "<section class='chapter'>" +
+    "<section class='chapter pbreak'>" +
       "<div class='copen'>" +
         chead("11", "Nettoyage &amp; désinfection", icSpray) +
-        "<p><strong>Nettoyer</strong> = enlever les salissures visibles. <strong>Désinfecter</strong> = détruire les microbes invisibles. On <strong>nettoie d’abord</strong>, on désinfecte ensuite, et on respecte toujours la <strong>dose</strong> et le <strong>temps de contact</strong> indiqués.</p>" +
+        "<p><strong>Nettoyer</strong> = enlever les salissures visibles. <strong>Désinfecter</strong> = détruire les microbes invisibles. On <strong>nettoie d’abord</strong>, on désinfecte ensuite, en respectant la <strong>dose</strong> et le <strong>temps de contact</strong>.</p>" +
       "</div>" +
       "<div class='tbl keep'><table><thead><tr><th>Usage</th><th>Type de produit</th><th style='width:34mm'>Normes</th></tr></thead><tbody>" +
         "<tr><td>Surfaces, plans, planches, machine sundae, armoires froides</td><td>Détergent-désinfectant apte au <strong>contact alimentaire</strong></td><td class='val'>EN 1276 · EN 13697</td></tr>" +
@@ -662,7 +670,7 @@ export function buildHygieneGuide(emp, options) {
         "<tr><td>Sols</td><td>Détergent sol</td><td>Pro</td></tr>" +
         "<tr><td>Sanitaires</td><td>Désinfectant sanitaires</td><td>WC/sanitaires</td></tr>" +
       "</tbody></table></div>" +
-      note("<b>Consommables :</b> gants nitrile, essuie-tout à usage unique — <b>jamais de torchon réutilisé</b> pour les surfaces. On conserve les fiches techniques et fiches de données de sécurité (FDS), et on consigne chaque opération sur la <b>feuille de nettoyage</b> du PMS.") +
+      note("<b>Consommables :</b> gants nitrile, essuie-tout à usage unique (<b>jamais de torchon réutilisé</b>). On conserve les fiches techniques (FDS) et on consigne chaque opération sur la <b>feuille de nettoyage</b> du PMS.") +
 
       "<h3 class='bc'>Protocole machine à sundae — chaque jour</h3>" +
       "<div class='sundae keep'>" +
