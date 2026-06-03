@@ -118,14 +118,25 @@ async function fetchJsonWithTimeout(url: string, ms: number): Promise<any> {
 async function getIpGeo(ip: string): Promise<{ city: string; region: string; country: string; country_code: string } | null> {
   if (!ip || ip === "unknown" || ip === "127.0.0.1" || ip === "::1") return null
   if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|fc00:|fd00:)/.test(ip)) return null
-  var d1 = await fetchJsonWithTimeout("https://ipapi.co/" + encodeURIComponent(ip) + "/json/", 3000)
-  if (d1 && !d1.error && (d1.country_name || d1.country)) {
-    return { city: d1.city || "", region: d1.region || "", country: d1.country_name || "", country_code: d1.country || "" }
+
+  // 1) ipwho.is — HTTPS, gratuit sans clé, fiable
+  var d1 = await fetchJsonWithTimeout("https://ipwho.is/" + encodeURIComponent(ip), 4500)
+  if (d1 && d1.success !== false && (d1.country || d1.country_code)) {
+    return { city: d1.city || "", region: d1.region || "", country: d1.country || "", country_code: d1.country_code || "" }
   }
-  var d2 = await fetchJsonWithTimeout("https://ipwho.is/" + encodeURIComponent(ip), 3000)
-  if (d2 && d2.success !== false && (d2.country || d2.country_code)) {
-    return { city: d2.city || "", region: d2.region || "", country: d2.country || "", country_code: d2.country_code || "" }
+
+  // 2) ip-api.com — repli (HTTP gratuit sans clé)
+  var d2 = await fetchJsonWithTimeout("http://ip-api.com/json/" + encodeURIComponent(ip) + "?fields=status,country,countryCode,regionName,city", 4500)
+  if (d2 && d2.status === "success" && (d2.country || d2.countryCode)) {
+    return { city: d2.city || "", region: d2.regionName || "", country: d2.country || "", country_code: d2.countryCode || "" }
   }
+
+  // 3) ipapi.co — dernier repli (souvent payant désormais, peut échouer)
+  var d3 = await fetchJsonWithTimeout("https://ipapi.co/" + encodeURIComponent(ip) + "/json/", 4500)
+  if (d3 && !d3.error && (d3.country_name || d3.country)) {
+    return { city: d3.city || "", region: d3.region || "", country: d3.country_name || "", country_code: d3.country || "" }
+  }
+
   return null
 }
 
