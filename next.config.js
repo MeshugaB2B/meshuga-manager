@@ -13,6 +13,7 @@ const nextConfig = {
       "/api/hr/backfill-pdf": ["./node_modules/@sparticuz/chromium/**"],
       "/api/sign/[token]/submit": ["./node_modules/@sparticuz/chromium/**"],
       "/api/hr/hygiene-guide/preview": ["./node_modules/@sparticuz/chromium/**"],
+      "/api/sign-attestation/[token]/submit": ["./node_modules/@sparticuz/chromium/**"],
     },
   },
 }
