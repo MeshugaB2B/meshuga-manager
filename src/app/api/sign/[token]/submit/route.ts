@@ -30,6 +30,7 @@ import { loadEmployerSignature } from "@/app/dashboard/rh/employerSignature"
 import { markEmployeeWelcomePackSigned } from "@/app/dashboard/rh/employeeWelcomePack"
 import { getInitials, buildParaphFooter, buildContract } from "@/app/dashboard/rh/contractBuilders"
 import { LOGO_PINK } from "@/app/dashboard/logos"
+import { launchBrowser, renderPdf, injectMeshugaFonts } from "@/lib/hr/pdf-render"
 import { sendBrevoEmail, buildEdwardSignatureNotifEmail } from "@/lib/brevo"
 import { sendTwilioSms, buildEdwardSignatureNotifSms, normalizePhoneFR } from "@/lib/twilio"
 import { createHash } from "crypto"
@@ -635,6 +636,49 @@ export async function POST(
     var archivePath = (entityKind === "amendment" ? "amendments/" : "contracts/") +
       contract.id + "/" + timestamp + (entityKind === "amendment" ? "_avenant_signe.html" : "_contrat_signe.html")
     var blobSize = new Blob([signedAvenantHtml]).size
+
+    // === Rendu PDF figé (Chrome headless), non bloquant ===
+    // On rend le document signé en PDF et on renseigne assembled_pdf_path sur la row
+    // hr_contract_documents : la route d'affichage sert alors le PDF figé (PDF-first),
+    // plus jamais de HTML "vivant". Si le rendu echoue, assembled_pdf_path reste null
+    // (fallback HTML) et la signature n'est pas impactee.
+    var avenantPdfPath = null
+    var wpPdfPath = null
+    var pdfBrowser = null
+    try {
+      pdfBrowser = await launchBrowser()
+      // Avenant/contrat : le HTML signe a deja les bons paraphes (mutation in-memory
+      // des timestamps signes en amont). On embarque les polices pour un rendu fidele.
+      var avHtmlForPdf = injectMeshugaFonts(signedAvenantHtml)
+      var avPdf = await renderPdf(pdfBrowser, avHtmlForPdf)
+      var avPdfStoragePath = (entityKind === "amendment" ? "amendments/" : "contracts/") +
+        contract.id + "/" + timestamp + (entityKind === "amendment" ? "_avenant_signe.pdf" : "_contrat_signe.pdf")
+      var avUp = await sb.storage.from("hr-contract-docs").upload(
+        avPdfStoragePath,
+        avPdf,
+        { contentType: "application/pdf", upsert: true }
+      )
+      if (!avUp.error) avenantPdfPath = avPdfStoragePath
+      else console.error("[sign/submit] Upload PDF avenant:", avUp.error.message)
+
+      // Dossier de bienvenue : polices deja embarquees, paraphes deja OK -> rendu tel quel.
+      if (includeWp && signedWelcomePackHtml) {
+        var wpPdf = await renderPdf(pdfBrowser, signedWelcomePackHtml)
+        var wpPdfStoragePath = contract.id + "/dossier_bienvenue/" + timestamp + "_dossier_bienvenue_signe.pdf"
+        var wpUp = await sb.storage.from("hr-contract-docs").upload(
+          wpPdfStoragePath,
+          wpPdf,
+          { contentType: "application/pdf", upsert: true }
+        )
+        if (!wpUp.error) wpPdfPath = wpPdfStoragePath
+        else console.error("[sign/submit] Upload PDF dossier bienvenue:", wpUp.error.message)
+      }
+    } catch (ePdf: any) {
+      console.error("[sign/submit] Rendu PDF fige non bloquant:", (ePdf && ePdf.message) || ePdf)
+    } finally {
+      try { if (pdfBrowser) await pdfBrowser.close() } catch (e) {}
+    }
+
     var copyRes = await sb.storage.from("hr-contract-docs").upload(
       archivePath,
       new Blob([signedAvenantHtml], { type: "text/html; charset=utf-8" }),
@@ -650,6 +694,7 @@ export async function POST(
         file_path: archivePath,
         mime_type: "text/html; charset=utf-8",
         size_bytes: blobSize,
+        assembled_pdf_path: avenantPdfPath,
         document_date: signedAt.toISOString().substring(0, 10),
         validated_by_user: true,
       })
@@ -679,6 +724,7 @@ export async function POST(
           file_path: archiveWpPath,
           mime_type: "text/html; charset=utf-8",
           size_bytes: wpBlobSize,
+          assembled_pdf_path: wpPdfPath,
           document_date: signedAt.toISOString().substring(0, 10),
           validated_by_user: true,
         })
