@@ -65,7 +65,10 @@ export default function AttestationsCard(props) {
       })
       var data = await res.json()
       if (!res.ok || !data.ok) throw new Error(data.error || "Échec de l'envoi")
-      setMsg(data.email ? "Guide envoyé par email ✓" : "Lien de signature créé ✓")
+      var canaux = []
+      if (data.email) canaux.push("email")
+      if (data.sms) canaux.push("SMS")
+      setMsg(canaux.length ? "Guide envoyé par " + canaux.join(" + ") + " ✓" : "Lien de signature créé ✓")
       await load()
     } catch (e: any) {
       setErr(e.message || String(e))
