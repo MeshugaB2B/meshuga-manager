@@ -120,58 +120,81 @@ function parseUserAgent(ua: string): { os: string; browser: string; device: stri
   }
   else if (/Linux/.test(ua)) os = "Linux"
 
-  // === Browser ===
-  if (/Edg\/(\d+)/.test(ua)) {
-    var edgM = ua.match(/Edg\/(\d+)/)
-    browser = "Microsoft Edge" + (edgM ? " " + edgM[1] : "")
-  }
-  else if (/OPR\/(\d+)|Opera/.test(ua)) {
-    var oprM = ua.match(/OPR\/(\d+)/)
-    browser = "Opera" + (oprM ? " " + oprM[1] : "")
-  }
-  else if (/Chrome\/(\d+)/.test(ua) && !/Edg|OPR/.test(ua)) {
-    var chrM = ua.match(/Chrome\/(\d+)/)
-    browser = "Google Chrome" + (chrM ? " " + chrM[1] : "")
-  }
-  else if (/Firefox\/(\d+)/.test(ua)) {
-    var ffM = ua.match(/Firefox\/(\d+)/)
-    browser = "Mozilla Firefox" + (ffM ? " " + ffM[1] : "")
-  }
-  else if (/Version\/(\d+).*Safari/.test(ua)) {
-    var safM = ua.match(/Version\/(\d+)/)
-    browser = "Safari" + (safM ? " " + safM[1] : "")
-  }
+  // === Browser (inclut variantes iOS : CriOS/FxiOS/EdgiOS + navigateurs in-app) ===
+  var bm = null
+  if (/CriOS\/(\d+)/.test(ua)) { bm = ua.match(/CriOS\/(\d+)/); browser = "Google Chrome (iOS)" + (bm ? " " + bm[1] : "") }
+  else if (/FxiOS\/(\d+)/.test(ua)) { bm = ua.match(/FxiOS\/(\d+)/); browser = "Mozilla Firefox (iOS)" + (bm ? " " + bm[1] : "") }
+  else if (/EdgiOS\/(\d+)/.test(ua)) { bm = ua.match(/EdgiOS\/(\d+)/); browser = "Microsoft Edge (iOS)" + (bm ? " " + bm[1] : "") }
+  else if (/Edg\/(\d+)/.test(ua)) { bm = ua.match(/Edg\/(\d+)/); browser = "Microsoft Edge" + (bm ? " " + bm[1] : "") }
+  else if (/OPR\/(\d+)|Opera/.test(ua)) { bm = ua.match(/OPR\/(\d+)/); browser = "Opera" + (bm ? " " + bm[1] : "") }
+  else if (/Chrome\/(\d+)/.test(ua) && !/Edg|OPR/.test(ua)) { bm = ua.match(/Chrome\/(\d+)/); browser = "Google Chrome" + (bm ? " " + bm[1] : "") }
+  else if (/Firefox\/(\d+)/.test(ua)) { bm = ua.match(/Firefox\/(\d+)/); browser = "Mozilla Firefox" + (bm ? " " + bm[1] : "") }
+  else if (/Version\/(\d+).*Safari/.test(ua)) { bm = ua.match(/Version\/(\d+)/); browser = "Safari" + (bm ? " " + bm[1] : "") }
+  // Navigateurs in-app (lien ouvert depuis une app)
+  else if (/FBAN|FBAV|FB_IAB/.test(ua)) browser = "Facebook (navigateur in-app)"
+  else if (/Instagram/.test(ua)) browser = "Instagram (navigateur in-app)"
+  else if (/Line\//.test(ua)) browser = "LINE (navigateur in-app)"
+  else if (/WhatsApp/.test(ua)) browser = "WhatsApp (navigateur in-app)"
+  else if (/GSA\//.test(ua)) browser = "Google App (navigateur in-app)"
+  // Safari / WebView iOS sans jeton "Version/" (cas in-app fréquent)
+  else if (/AppleWebKit/.test(ua) && /Mobile/.test(ua)) browser = "Safari / WebView (iOS)"
+  else if (/AppleWebKit/.test(ua)) browser = "Navigateur WebKit"
 
   // === Device ===
-  if (/iPhone|Android.*Mobile|Mobile.*Safari/.test(ua)) device = "Smartphone"
+  if (/iPhone|iPod|Android.*Mobile|Mobile.*Safari/.test(ua)) device = "Smartphone"
   else if (/iPad|Tablet|Android(?!.*Mobile)/.test(ua)) device = "Tablette"
   else device = "Ordinateur"
+
+  // Repli : ne jamais laisser "Inconnu" sans information probante -> extrait d'UA brut.
+  if (browser === "Inconnu" && ua) browser = "Non identifié (" + ua.slice(0, 60) + ")"
+  if (os === "Inconnu" && ua) os = "Non identifié"
 
   return { os: os, browser: browser, device: device }
 }
 
-// Geo-IP via ipapi.co (gratuit, sans clé, ~500 req/jour)
+// Geo-IP avec repli sur 2 fournisseurs gratuits sans clé (ipapi.co puis ipwho.is).
+async function fetchJsonWithTimeout(url: string, ms: number): Promise<any> {
+  var ctrl = new AbortController()
+  var to = setTimeout(function () { ctrl.abort() }, ms)
+  try {
+    var res = await fetch(url, { signal: ctrl.signal })
+    clearTimeout(to)
+    if (!res.ok) return null
+    return await res.json()
+  } catch (e) {
+    clearTimeout(to)
+    return null
+  }
+}
+
 async function getIpGeo(ip: string): Promise<{ city: string; region: string; country: string; country_code: string } | null> {
   if (!ip || ip === "unknown" || ip === "127.0.0.1" || ip === "::1") return null
   // IPs privées : pas de geo
   if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|fc00:|fd00:)/.test(ip)) return null
-  try {
-    var ctrl = new AbortController()
-    var to = setTimeout(function () { ctrl.abort() }, 3000)
-    var res = await fetch("https://ipapi.co/" + encodeURIComponent(ip) + "/json/", { signal: ctrl.signal })
-    clearTimeout(to)
-    if (!res.ok) return null
-    var data: any = await res.json()
-    if (data.error) return null
+
+  // Fournisseur 1 : ipapi.co
+  var d1 = await fetchJsonWithTimeout("https://ipapi.co/" + encodeURIComponent(ip) + "/json/", 3000)
+  if (d1 && !d1.error && (d1.country_name || d1.country)) {
     return {
-      city: data.city || "",
-      region: data.region || "",
-      country: data.country_name || "",
-      country_code: data.country || "",
+      city: d1.city || "",
+      region: d1.region || "",
+      country: d1.country_name || "",
+      country_code: d1.country || "",
     }
-  } catch (e) {
-    return null
   }
+
+  // Fournisseur 2 (repli) : ipwho.is
+  var d2 = await fetchJsonWithTimeout("https://ipwho.is/" + encodeURIComponent(ip), 3000)
+  if (d2 && d2.success !== false && (d2.country || d2.country_code)) {
+    return {
+      city: d2.city || "",
+      region: d2.region || "",
+      country: d2.country || "",
+      country_code: d2.country_code || "",
+    }
+  }
+
+  return null
 }
 
 // ============================================================
@@ -498,7 +521,7 @@ export async function POST(
 
   var docNoun = entityKind === "amendment" ? "l'avenant" : "le contrat de travail"
   var consentText = includeWp
-    ? "Lu et approuvé l'intégralité de " + docNoun + " et du Dossier de bienvenue Meshuga (13 pages)"
+    ? "Lu et approuvé l'intégralité de " + docNoun + " et du Dossier de bienvenue Meshuga"
     : "Lu et approuvé l'intégralité du document"
 
   var recipientEmail = amendment.signature_recipient_email || emp.email || ""
@@ -900,7 +923,7 @@ export async function POST(
     var cher = isFemale ? "Chère" : "Cher"
 
     var subject = "✓ Signature confirmée — " + docLabel
-    var bundleText = includeWp ? " ainsi que le Dossier de bienvenue Meshuga (13 pages)" : ""
+    var bundleText = includeWp ? " ainsi que le Dossier de bienvenue Meshuga" : ""
 
     var htmlContent = ''
       + '<!DOCTYPE html>'
