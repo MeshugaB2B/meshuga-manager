@@ -60,11 +60,16 @@ export async function POST(req: Request) {
     var emp: any = empRes.data
 
     var recipientEmail = String(body.recipientEmail || emp.email || "").trim()
-    if (!recipientEmail || !recipientEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      return NextResponse.json({ ok: false, error: "Email du salarié manquant ou invalide" }, { status: 400 })
-    }
+    var emailValid = !!(recipientEmail && recipientEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/))
+    if (!emailValid) recipientEmail = ""
+
     var recipientPhoneRaw = String(body.recipientPhone || emp.telephone || "").trim()
     var recipientPhone = normalizePhoneFR(recipientPhoneRaw)
+
+    // Au moins un canal de contact est requis (email OU téléphone).
+    if (!emailValid && !recipientPhone) {
+      return NextResponse.json({ ok: false, error: "Ce salarié n'a ni email valide ni téléphone : renseigne au moins un moyen de contact dans sa fiche." }, { status: 400 })
+    }
 
     var token = randomUUID().replace(/-/g, "")
     var nowIso = new Date().toISOString()
@@ -81,7 +86,7 @@ export async function POST(req: Request) {
         signature_token: token,
         signature_status: "sent",
         signature_sent_at: nowIso,
-        signature_recipient_email: recipientEmail,
+        signature_recipient_email: recipientEmail || null,
         signature_recipient_phone: recipientPhone || recipientPhoneRaw || null,
       })
       .select("id")
@@ -92,35 +97,37 @@ export async function POST(req: Request) {
 
     var signatureUrl = appUrl() + "/sign-attestation/" + token
 
-    // === Email Brevo (même template que les avenants) ===
+    // === Email Brevo (même template que les avenants) — si email valide ===
     var emailOk = false
-    try {
-      var emailContent = buildSignatureRequestEmail({
-        recipientFirstName: emp.prenom || "",
-        recipientLastName: emp.nom || "",
-        recipientCivilite: emp.civilite || null,
-        documentTypeLabel: DOC_LABEL,
-        signatureUrl: signatureUrl,
-        includeWelcomePack: false,
-        senderName: "Edward Touret",
-        expiresInDays: 30,
-      })
-      var emailRes = await sendBrevoEmail({
-        to: [{ email: recipientEmail, name: ((emp.prenom || "") + " " + (emp.nom || "")).trim() }],
-        bcc: [{ email: "edward@meshuga.fr", name: "Edward Touret" }],
-        subject: emailContent.subject,
-        htmlContent: emailContent.htmlContent,
-        textContent: emailContent.textContent,
-        replyTo: { email: "edward@meshuga.fr", name: "Edward Touret" },
-        tags: ["signature-request", "attestation-hygiene"],
-      })
-      emailOk = !!(emailRes && emailRes.ok)
-    } catch (eMail) {
-      console.error("[attestations/send] email:", (eMail && (eMail as any).message) || eMail)
+    if (emailValid) {
+      try {
+        var emailContent = buildSignatureRequestEmail({
+          recipientFirstName: emp.prenom || "",
+          recipientLastName: emp.nom || "",
+          recipientCivilite: emp.civilite || null,
+          documentTypeLabel: DOC_LABEL,
+          signatureUrl: signatureUrl,
+          includeWelcomePack: false,
+          senderName: "Edward Touret",
+          expiresInDays: 30,
+        })
+        var emailRes = await sendBrevoEmail({
+          to: [{ email: recipientEmail, name: ((emp.prenom || "") + " " + (emp.nom || "")).trim() }],
+          bcc: [{ email: "edward@meshuga.fr", name: "Edward Touret" }],
+          subject: emailContent.subject,
+          htmlContent: emailContent.htmlContent,
+          textContent: emailContent.textContent,
+          replyTo: { email: "edward@meshuga.fr", name: "Edward Touret" },
+          tags: ["signature-request", "attestation-hygiene"],
+        })
+        emailOk = !!(emailRes && emailRes.ok)
+      } catch (eMail) {
+        console.error("[attestations/send] email:", (eMail && (eMail as any).message) || eMail)
+      }
     }
 
-    // === SMS optionnel (Twilio) ===
-    var smsOk: boolean | null = null
+    // === SMS Twilio (même token que l'email) — si téléphone valide ===
+    var smsOk = false
     if (recipientPhone) {
       try {
         var smsBody = buildSignatureSmsBody({ prenom: emp.prenom || "", signatureUrl: signatureUrl })
@@ -137,6 +144,8 @@ export async function POST(req: Request) {
       signatureUrl: signatureUrl,
       email: emailOk,
       sms: smsOk,
+      sentEmail: emailValid,
+      sentSms: !!recipientPhone,
     })
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e && (e as any).message) || "Erreur serveur" }, { status: 500 })
