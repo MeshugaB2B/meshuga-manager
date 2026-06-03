@@ -1727,16 +1727,6 @@ export default function EmployeeDetail(props) {
         <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
           <div className="ct">✅ Conformité</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
-            <div style={{
-              border: emp.haccp_done ? "2px solid #009D3A" : "2px solid #FF6B2B",
-              borderRadius: 6, padding: 10, background: "#FFFFFF",
-              boxShadow: emp.haccp_done ? "2px 2px 0 #009D3A" : "2px 2px 0 #FF6B2B"
-            }}>
-              <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1, opacity: 0.55 }}>Formation HACCP</div>
-              <div style={{ fontWeight: 700, fontSize: 13, marginTop: 3 }}>
-                {emp.haccp_done ? ("✅ Formé(e)" + (emp.haccp_date ? " · " + fmtDate(emp.haccp_date) : "")) : "⚠ À programmer"}
-              </div>
-            </div>
             <div style={{ border: "2px solid #191923", borderRadius: 6, padding: 10, background: "#FFFFFF", boxShadow: "2px 2px 0 #191923" }}>
               <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1, opacity: 0.55 }}>Visite médicale</div>
               <div style={{ fontWeight: 700, fontSize: 13, marginTop: 3 }}>À suivre</div>
