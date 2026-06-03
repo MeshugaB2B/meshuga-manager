@@ -317,7 +317,7 @@ export async function POST(req: Request, ctx: { params: { token: string } }) {
       console.error("[sign-attestation/submit] notif non bloquant:", (eNotif && (eNotif as any).message) || eNotif)
     }
 
-    return NextResponse.json({ ok: true, signedAt: signedIso })
+    return NextResponse.json({ ok: true, signedAt: signedIso, hash: hash })
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e && (e as any).message) || "Erreur serveur" }, { status: 500 })
   }
