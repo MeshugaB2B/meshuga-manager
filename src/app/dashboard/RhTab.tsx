@@ -1054,7 +1054,7 @@ export default function RhTab() {
               </div>
             )}
             <div style={{ fontSize: 10, opacity: 0.5, marginTop: 10 }}>
-              Note&nbsp;: la formation HACCP et le contact d&apos;urgence ne sont pas encore renseignés pour l&apos;équipe et seront ajoutés au suivi prochainement.
+              Note&nbsp;: le contact d&apos;urgence n&apos;est pas encore renseigné pour l&apos;équipe et sera ajouté au suivi prochainement.
             </div>
           </div>
         </div>
