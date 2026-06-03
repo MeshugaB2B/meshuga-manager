@@ -47,6 +47,54 @@ export function buildHygieneGuide(emp, options) {
     return ini
   }
 
+  // ---------- rendu signature électronique (mode signé, identique aux avenants) ----------
+  var fmtDT = function (iso) {
+    if (!iso) return ""
+    var d = new Date(iso)
+    var p2 = function (n) { var x = String(n); return x.length < 2 ? "0" + x : x }
+    return p2(d.getDate()) + "/" + p2(d.getMonth() + 1) + "/" + d.getFullYear() + " à " + p2(d.getHours()) + ":" + p2(d.getMinutes())
+  }
+  var buildSig = function (s) {
+    var geoStr = "Non déterminée"
+    if (s.geo) {
+      var gp = []
+      if (s.geo.city) gp.push(s.geo.city)
+      if (s.geo.country) gp.push(s.geo.country)
+      if (gp.length) geoStr = gp.join(", ")
+    }
+    var hashShort = s.hash ? String(s.hash).slice(0, 32) : "—"
+    var sec = function (t) { return "<div style='font-weight:900;color:#FF82D7;font-size:7.5px;text-transform:uppercase;letter-spacing:.6px;margin:3px 0 2px;padding-bottom:1px;border-bottom:.5px solid #FFEB5A'>" + t + "</div>" }
+    var row = function (k, v) { return "<div><strong style='color:#2c2c2c;font-weight:700'>" + k + " :</strong> " + v + "</div>" }
+    var zone =
+      "<div style='text-align:center;padding:4mm 3mm 3mm;border-bottom:1px dotted #DDD;margin-bottom:3mm'>" +
+        "<div style='font-family:Arial,sans-serif;font-size:8px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px'>Signature électronique " + g("du salarié", "de la salariée", "du/de la salarié(e)") + "</div>" +
+        "<div style='font-family:Yellowtail,cursive;font-size:34px;color:#FF82D7;line-height:1;padding:4px 0'>" + esc(s.fullName) + "</div>" +
+        "<div style='font-family:Arial,sans-serif;font-size:10px;color:#191923;font-weight:700;margin-top:3px'>&laquo; Lu et approuvé &raquo;</div>" +
+        "<div style='font-family:Arial,sans-serif;font-size:9px;color:#555;font-style:italic;margin-top:2px'>Le " + esc(fmtDT(s.signedAtIso)) + " (heure de Paris)</div>" +
+      "</div>"
+    var audit =
+      "<div style='font-family:Arial,sans-serif;font-size:8px;line-height:1.55;color:#555'>" +
+        sec("Identité du signataire") +
+        row("Nom", esc(s.fullName)) +
+        row("Email", esc(s.recipientEmail || "—")) +
+        row("Identifiant", "<span style='font-family:monospace;font-size:7px'>" + esc(s.signatureId) + "</span>") +
+        sec("Chaîne de délivrance") +
+        (s.sentAtIso ? row("Envoyé le", esc(fmtDT(s.sentAtIso))) : "") +
+        (s.viewedAtIso ? row("Ouvert le", esc(fmtDT(s.viewedAtIso))) : "") +
+        row("Signé le", esc(fmtDT(s.signedAtIso))) +
+        sec("Traçabilité technique") +
+        row("IP", "<span style='font-family:monospace;font-size:7px'>" + esc(s.ip || "—") + "</span> (" + esc(geoStr) + ")") +
+        row("Système", esc((s.ua && s.ua.os) || "—") + " · " + esc((s.ua && s.ua.browser) || "—")) +
+        row("Appareil", esc((s.ua && s.ua.device) || "—")) +
+        sec("Intégrité du document") +
+        row("Hash SHA-256", "<span style='font-family:monospace;font-size:7px;word-break:break-all'>" + esc(hashShort) + "…</span>") +
+        row("Consentement", esc(s.consentText || "Lu et approuvé")) +
+        "<div style='margin-top:4px;padding-top:3px;border-top:1px dotted #DDD;font-size:7.5px;font-style:italic;color:#666'>Force probante équivalente à signature manuscrite (art. 1366-1367 C. civ. + eIDAS UE 910/2014).</div>" +
+      "</div>"
+    return zone + audit
+  }
+  var signature = o.signature || null
+
   var version = o.version || "v5"
   var dateStr = o.date || todayFr()
 
@@ -70,7 +118,7 @@ export function buildHygieneGuide(emp, options) {
     : "[Civilité Prénom NOM]"
 
   var employeeInitials = nomComplet ? getInitials(nomComplet) : ""
-  var paraphText = "E.T.   /   " + (employeeInitials || "en attente")
+  var paraphText = "E.T.   /   " + (signature && employeeInitials ? employeeInitials : "en attente")
 
   // =====================================================================
   // PICTOS / ILLUSTRATIONS (style pop : aplats rose/jaune, contours souples)
@@ -823,11 +871,16 @@ export function buildHygieneGuide(emp, options) {
         "<div class='head'>Reconnaissance de formation hygiène</div>" +
         "<div class='id'>" + esc(nomLigne) + "</div>" +
         "<div class='body'>" +
-          "<p class='faitline'>Fait à <strong>Paris</strong>, le <strong>" + esc(dateStr) + "</strong>.</p>" +
-          "<div class='lines'>" +
-            "<div class='sline'>" + g("Le salarié", "La salariée", "Le/la salarié(e)") + " (lu et approuvé)</div>" +
-            "<div class='sline'>Pour SAS AEGIA FOOD — Edward Touret</div>" +
-          "</div>" +
+          (signature
+            ? ("<p class='faitline'>Fait à <strong>Paris</strong>, le <strong>" + esc(dateStr) + "</strong>.</p>" +
+               buildSig(signature) +
+               "<div class='lines' style='margin-top:3mm'><div class='sline'>Formateur référent — Edward Touret, pour SAS AEGIA FOOD</div></div>")
+            : ("<p class='faitline'>Fait à <strong>Paris</strong>, le <strong>" + esc(dateStr) + "</strong>.</p>" +
+               "<div class='lines'>" +
+                 "<div class='sline'>" + g("Le salarié", "La salariée", "Le/la salarié(e)") + " (lu et approuvé)</div>" +
+                 "<div class='sline'>Pour SAS AEGIA FOOD — Edward Touret</div>" +
+               "</div>")
+          ) +
         "</div>" +
       "</div>" +
       "<p style='font-size:9.5pt;color:#6B6B76;margin-top:5mm'>Signature électronique " + g("du salarié", "de la salariée", "du/de la salarié(e)") + " (+ paraphe sur chaque page), horodatage et traçabilité conservés (art. 1366-1367 C. civ. + eIDAS UE 910/2014). Document interne SAS AEGIA FOOD — conservé au dossier RH et intégré au PMS.</p>" +
