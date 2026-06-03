@@ -8,9 +8,10 @@ const nextConfig = {
     // doivent rester telles quelles dans node_modules côté fonction serverless.
     serverComponentsExternalPackages: ["@sparticuz/chromium", "puppeteer-core"],
     // Force l'inclusion des fichiers brotli de Chromium (dossier bin/*.br) dans
-    // le bundle de la/les fonction(s) PDF. Sans ça : "input directory .../bin does not exist".
+    // le bundle de CHAQUE fonction qui rend du PDF. Sans ça : "input directory .../bin does not exist".
     outputFileTracingIncludes: {
       "/api/hr/pdf-selftest": ["./node_modules/@sparticuz/chromium/**"],
+      "/api/hr/backfill-pdf": ["./node_modules/@sparticuz/chromium/**"],
     },
   },
 }
