@@ -176,10 +176,24 @@ export async function POST(req: Request, ctx: { params: { token: string } }) {
     var signedAt = new Date()
     var signedIso = signedAt.toISOString()
     var signatureId = randomUUID()
+    var clientGeo: any = body.clientGeo && typeof body.clientGeo === "object" ? body.clientGeo : null
     var ip = getClientIp(req)
+    if ((!ip || ip === "unknown") && clientGeo && clientGeo.ip) ip = String(clientGeo.ip)
     var uaRaw = req.headers.get("user-agent") || ""
     var ua = parseUserAgent(uaRaw)
-    var geo = await getIpGeo(ip)
+    // Géoloc : priorité au navigateur du salarié (IP résidentielle, non bloquée).
+    // Repli serveur (getIpGeo) seulement si le client n'a rien renvoyé.
+    var geo: any = null
+    if (clientGeo && (clientGeo.country || clientGeo.country_code)) {
+      geo = {
+        city: clientGeo.city || "",
+        region: clientGeo.region || "",
+        country: clientGeo.country || "",
+        country_code: clientGeo.country_code || "",
+      }
+    } else {
+      geo = await getIpGeo(ip)
+    }
 
     var empForBuilder = { civilite: emp.civilite, prenom: emp.prenom, nom: emp.nom, email: emp.email }
 
