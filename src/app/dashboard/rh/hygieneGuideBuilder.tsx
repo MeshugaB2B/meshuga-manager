@@ -285,7 +285,7 @@ export function buildHygieneGuide(emp, options) {
     "h2.yt{font-family:'Yellowtail',cursive;color:var(--p);font-weight:400;font-size:33pt;line-height:1;margin:0;flex:1}" +
     ".chip{width:18mm;height:18mm;border-radius:50%;overflow:hidden;flex-shrink:0;box-shadow:0 6px 16px rgba(25,25,35,.12)}" +
     ".chip svg{display:block}" +
-    "h3.bc{font-family:'BILD Condensed','Arial Narrow',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--pd);font-size:13pt;margin:7mm 0 2.5mm;display:flex;align-items:center;gap:2.5mm;break-after:avoid;page-break-after:avoid}" +
+    "h3.bc{font-family:'BILD Condensed','Arial Narrow',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--p);font-size:13pt;margin:7mm 0 2.5mm;display:flex;align-items:center;gap:2.5mm;break-after:avoid;page-break-after:avoid}" +
     "h3.bc::before{content:'';width:4mm;height:4mm;border-radius:50%;background:var(--y);border:2px solid var(--p);flex-shrink:0}" +
     "ul.tidy{list-style:none;padding:0;margin:3mm 0}" +
     "ul.tidy li{position:relative;padding:1.6mm 0 1.6mm 8mm;break-inside:avoid}" +
@@ -299,7 +299,7 @@ export function buildHygieneGuide(emp, options) {
     ".note b{color:var(--pd)}" +
     ".reg{display:grid;grid-template-columns:1fr;gap:3mm;margin:3mm 0}" +
     ".reg .row{display:flex;gap:4mm;align-items:flex-start;background:#fff;border:1px solid #F2D8EC;border-radius:14px;padding:3.5mm 4.5mm;break-inside:avoid}" +
-    ".reg .tag{flex-shrink:0;background:var(--ps);color:var(--pd);font-family:'BILD Condensed','Arial Narrow',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.5px;font-size:8.5pt;padding:1.5mm 3mm;border-radius:999px;white-space:nowrap;margin-top:.5mm}" +
+    ".reg .tag{flex-shrink:0;background:var(--p);color:#fff;font-family:'BILD Condensed','Arial Narrow',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.5px;font-size:8.5pt;padding:1.5mm 3mm;border-radius:999px;white-space:nowrap;margin-top:.5mm}" +
     ".reg .row p{margin:0}" +
     ".tbl{border-radius:16px;overflow:hidden;border:1px solid #F2D8EC;margin:4mm 0;box-shadow:0 8px 20px rgba(255,130,215,.10)}" +
     "table{width:100%;border-collapse:collapse;font-size:10.5pt}" +
@@ -330,12 +330,12 @@ export function buildHygieneGuide(emp, options) {
     ".ma-arrow{display:flex;align-items:center;justify-content:center;flex:0 0 auto}" +
     ".rx{display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin:4mm 0}" +
     ".rx .it{background:#fff;border:1px solid #F2D8EC;border-left:5px solid var(--p);border-radius:14px;padding:4mm 5mm;break-inside:avoid;box-shadow:0 6px 16px rgba(255,130,215,.10)}" +
-    ".rx .it .h{font-family:'BILD Condensed','Arial Narrow',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--pd);font-size:10pt;margin-bottom:1.5mm;display:flex;align-items:center;gap:2mm}" +
+    ".rx .it .h{font-family:'BILD Condensed','Arial Narrow',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--p);font-size:10pt;margin-bottom:1.5mm;display:flex;align-items:center;gap:2mm}" +
     ".rx .it p{margin:0;font-size:10pt;line-height:1.45}" +
     ".rx .dot{width:7mm;height:7mm;flex-shrink:0}" +
     ".alg{display:grid;grid-template-columns:repeat(3,1fr);gap:1.8mm 3mm;margin:2.5mm 0}" +
     ".alg .a{display:flex;gap:2.5mm;align-items:center;background:#fff;border:1px solid #F2D8EC;border-radius:12px;padding:2mm 3mm;break-inside:avoid}" +
-    ".alg .n{flex-shrink:0;width:6mm;height:6mm;border-radius:50%;background:var(--y);border:1.5px solid var(--p);color:var(--ink);font-family:'BILD Condensed','Arial Narrow',sans-serif;font-weight:800;font-size:8.5pt;display:flex;align-items:center;justify-content:center}" +
+    ".alg .n{flex-shrink:0;width:6mm;height:6mm;border-radius:50%;background:var(--y);border:1.5px solid var(--p);color:var(--ink);font-family:'BILD Condensed','Arial Narrow',sans-serif;font-weight:800;font-size:9pt;line-height:1;display:flex;align-items:center;justify-content:center;text-align:center}" +
     ".alg .a b{font-size:10pt}.alg .a span{display:block;font-size:8.8pt;color:var(--muted)}" +
     ".sundae{display:flex;gap:4mm;align-items:center;background:linear-gradient(180deg,#FFFDFB,#FFF6FC);border:1px solid #F2D8EC;border-radius:18px;padding:4mm;margin:3mm 0;break-inside:avoid}" +
     ".sundae .ill{width:40mm;flex-shrink:0}" +
@@ -387,6 +387,15 @@ export function buildHygieneGuide(emp, options) {
       "<div class='card soft keep'>" +
         "<h3 class='bc' style='margin-top:0'>Ton formateur référent</h3>" +
         "<p style='margin-bottom:0'><strong>Edward Touret</strong> a suivi la <strong>formation spécifique en hygiène alimentaire de 14 heures</strong> (organisme <strong>CNFSE</strong>, décembre 2020 – janvier 2021). Cette qualification remplit l’obligation légale « au moins une personne formée par établissement » (art. L.233-4 du Code rural) et lui permet d’assurer ta formation interne : ce document <strong>complète les consignes orales et la démonstration pratique</strong> reçues directement sur place.</p>" +
+      "</div>" +
+      "<div class='card keep'>" +
+        "<h3 class='bc' style='margin-top:0'>Comment utiliser ce guide</h3>" +
+        li([
+          "<strong>Lis-le en entier</strong> à ton arrivée, puis garde-le comme référence : en cas de doute sur une température, une durée ou un geste, la réponse est ici.",
+          "<strong>Il complète la pratique :</strong> rien ne remplace la démonstration sur le terrain et les consignes orales d’Edward. Le guide fixe la règle, le poste t’apprend le geste.",
+          "<strong>Il évolue :</strong> recettes, fournisseurs ou matériel peuvent changer. La version qui fait foi est toujours la dernière signée — on te préviendra des mises à jour.",
+          "<strong>Une question, un doute ? On demande.</strong> En hygiène, mieux vaut une question de trop qu’un risque pris : on n’invente jamais une réponse."
+        ]) +
       "</div>" +
       hero("La sécurité de ce que nous servons est l’affaire de tous. Un geste oublié peut rendre un client malade : c’est pour ça que ces règles existent — et qu’on les applique <b>à chaque service</b>.") +
     "</section>"
@@ -463,6 +472,15 @@ export function buildHygieneGuide(emp, options) {
           "<strong>Tousser ou éternuer au-dessus des aliments :</strong> on se détourne, on se couvre, puis on se lave les mains.",
           "<strong>Cracher</strong> : évident, mais interdit partout dans l’espace de travail.",
           "<strong>Téléphone en main :</strong> c’est un nid à microbes. On le range ; si on doit l’utiliser, on se relave les mains juste après."
+        ]) +
+      "</div>" +
+      note("Aucune de ces règles n’est là pour embêter : chacune empêche un microbe d’atteindre l’assiette du client. En cas de doute sur un geste, on se réfère à ce guide ou on demande à Edward.") +
+      "<div class='card soft keep'>" +
+        "<h3 class='bc' style='margin-top:0'>Visiteurs, livreurs &amp; intervenants</h3>" +
+        li([
+          "<strong>La zone de production reste réservée</strong> au personnel : livreurs, commerciaux et visiteurs n’y entrent pas. On réceptionne au comptoir ou à l’entrée.",
+          "<strong>Toute personne autorisée à entrer</strong> en cuisine (technicien, agent de contrôle) respecte les mêmes règles — pas de bijoux, mains propres — et on l’accompagne.",
+          "<strong>Animaux strictement interdits</strong> en zone alimentaire (seuls les chiens guides sont admis en salle, dans le respect de la réglementation)."
         ]) +
       "</div>" +
     "</section>"
@@ -572,14 +590,22 @@ export function buildHygieneGuide(emp, options) {
     "<section class='chapter pbreak'>" +
       "<div class='copen'>" +
         chead("8", "Nos préparations maison") +
-        "<p>Plusieurs recettes Meshuga utilisent des matières dites « sensibles ». Bonne nouvelle : on les maîtrise à la source par le choix des ingrédients.</p>" +
+        "<p>Plusieurs recettes Meshuga utilisent des matières dites « sensibles » (œuf, lait). Bonne nouvelle : on les maîtrise <strong>à la source</strong>, par le choix d’<strong>ingrédients pasteurisés et de cuissons complètes</strong> — un vrai atout sécurité, qu’on complète toujours par le froid, l’étiquetage et une DLC courte.</p>" +
       "</div>" +
-      hero("Chez Meshuga, on a fait le choix d’<b>ingrédients pasteurisés et de cuissons complètes</b> sur nos préparations sensibles. C’est un vrai atout sécurité — qu’on complète toujours par le froid, l’étiquetage et une DLC courte.") +
       "<div class='card keep'>" +
         li([
           "<strong>Sauces maison</strong> (mayonnaises, Caesar, russe…) : faites au <strong>jaune d’œuf pasteurisé</strong>, jamais à l’œuf coquille cru — le risque <em>Salmonella</em> est maîtrisé dès l’ingrédient. On applique malgré tout froid + étiquetage + DLC courte.",
           "<strong>Machine à sundae</strong> : <strong>lait pasteurisé</strong>. Ici la maîtrise repose surtout sur l’hygiène irréprochable de la machine (voir chapitre Nettoyage).",
           "<strong>Egg sandwich</strong> : <strong>œuf cuit</strong> (cuisson complète), jamais d’œuf cru ni de jaune coulant."
+        ]) +
+      "</div>" +
+      "<div class='card keep'>" +
+        "<h3 class='bc' style='margin-top:0'>Quand on fabrique, les bons gestes</h3>" +
+        li([
+          "<strong>On travaille vite et froid :</strong> une préparation sensible ne traîne pas à température ambiante. On sort les quantités utiles, le reste reste au froid.",
+          "<strong>Refroidissement rapide :</strong> une préparation chaude destinée au froid passe de +63 °C à +10 °C en <strong>moins de deux heures</strong> avant d’être filmée et stockée.",
+          "<strong>On ne prépare pas trop à l’avance :</strong> les quantités sont calées sur la rotation réelle, pour tenir la DLC courte sans gâcher.",
+          "<strong>Matériel propre et dédié :</strong> planches, contenants et ustensiles sont nettoyés-désinfectés <strong>avant</strong> de commencer une préparation prête-à-consommer."
         ]) +
       "</div>" +
       note("<b>Règle générale maison :</b> froid (+4 °C max) + étiquetage + DLC secondaire + rotation FIFO sur toutes les préparations. On goûte avec une cuillère à usage unique — jamais les doigts, jamais en replongeant la même cuillère.") +
@@ -644,7 +670,7 @@ export function buildHygieneGuide(emp, options) {
       "</div>" +
       "<h3 class='bc'>Les 14 allergènes à déclaration</h3>" +
       algGrid +
-      "<div class='card keep'>" +
+      "<div class='card keep' style='margin-top:6mm'>" +
         "<h3 class='bc' style='margin-top:0'>Nos réflexes Meshuga</h3>" +
         li([
           "<strong>On connaît la composition</strong> de chaque produit. Dans le doute, <strong>on ne devine jamais</strong> : on se réfère à la <strong>fiche allergènes</strong> (jamais « je crois ») ou on oriente le client vers une option sûre.",
@@ -671,6 +697,16 @@ export function buildHygieneGuide(emp, options) {
         "<tr><td>Sanitaires</td><td>Désinfectant sanitaires</td><td>WC/sanitaires</td></tr>" +
       "</tbody></table></div>" +
       note("<b>Consommables :</b> gants nitrile, essuie-tout à usage unique (<b>jamais de torchon réutilisé</b>). On conserve les fiches techniques (FDS) et on consigne chaque opération sur la <b>feuille de nettoyage</b> du PMS.") +
+
+      "<div class='card keep'>" +
+        "<h3 class='bc' style='margin-top:0'>Les 4 leviers d’un nettoyage efficace (T.A.C.T.)</h3>" +
+        li([
+          "<strong>Température :</strong> une eau tiède ou chaude dissout bien mieux les graisses qu’une eau froide.",
+          "<strong>Action mécanique :</strong> on frotte — le produit seul ne décolle pas les salissures incrustées.",
+          "<strong>Concentration :</strong> on respecte la <strong>dose</strong> de la fiche technique : trop peu n’agit pas, trop laisse des résidus.",
+          "<strong>Temps de contact :</strong> on laisse au désinfectant le temps d’agir <strong>avant</strong> de rincer (durée indiquée sur le produit)."
+        ]) +
+      "</div>" +
 
       "<h3 class='bc'>Protocole machine à sundae — chaque jour</h3>" +
       "<div class='sundae keep'>" +
@@ -752,6 +788,16 @@ export function buildHygieneGuide(emp, options) {
           "<strong>Traçabilité</strong> (art.18 Règl. 178/2002) : on conserve bons de livraison, étiquettes et n° de lot — on sait toujours « un pas en amont » d’où vient un produit.",
           "<strong>Autocontrôles :</strong> relevés de température, étiquetage, feuilles de nettoyage, bons huiles, rapports nuisibles — tout est consigné au PMS.",
           "<strong>Retrait / rappel</strong> (art.19) : un produit dangereux est retiré, Edward et les autorités sont informés."
+        ]) +
+      "</div>" +
+      "<div class='card soft keep'>" +
+        "<h3 class='bc' style='margin-top:0'>Notre Plan de Maîtrise Sanitaire (PMS)</h3>" +
+        "<p>Le PMS rassemble nos documents d’hygiène au même endroit : il prouve, en cas de contrôle, que la maîtrise est réelle et quotidienne. On y consigne :</p>" +
+        li([
+          "<strong>Relevés de températures</strong> (armoires froides, réception) et actions correctives en cas d’écart.",
+          "<strong>Bons de livraison, étiquettes et numéros de lot</strong>, conservés pour la traçabilité.",
+          "<strong>Feuilles de nettoyage</strong>, bons d’enlèvement des huiles (Quatra) et rapports de l’entreprise de lutte contre les nuisibles.",
+          "<strong>Plats témoins</strong> des prestations B2B, conservés 5 jours à 0 / +3 °C."
         ]) +
       "</div>" +
       note("<b>Affichages obligatoires :</b> information allergènes (sur place + en ligne) · origine des viandes · interdiction de fumer/vapoter · mention « Fait maison » lorsqu’elle s’applique.") +
