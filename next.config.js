@@ -10,7 +10,6 @@ const nextConfig = {
     // Force l'inclusion des fichiers brotli de Chromium (dossier bin/*.br) dans
     // le bundle de CHAQUE fonction qui rend du PDF.
     outputFileTracingIncludes: {
-      "/api/hr/pdf-selftest": ["./node_modules/@sparticuz/chromium/**"],
       "/api/hr/backfill-pdf": ["./node_modules/@sparticuz/chromium/**"],
       "/api/sign/[token]/submit": ["./node_modules/@sparticuz/chromium/**"],
     },
