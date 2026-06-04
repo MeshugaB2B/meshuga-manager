@@ -175,6 +175,19 @@ export default function PayslipsImportWizard(props) {
     return empId
   }
 
+  var updateField = function (pageIndex, fieldName, raw) {
+    var v = (raw === "" || raw === null || raw === undefined) ? null : parseFloat(String(raw).replace(",", "."))
+    if (v !== null && isNaN(v)) v = null
+    var next = items.map(function (it) {
+      if (it.index !== pageIndex) return it
+      var nf = Object.assign({}, it.fields)
+      nf[fieldName] = v
+      return Object.assign({}, it, { fields: nf })
+    })
+    setItems(next)
+  }
+  var cellInput = { width: 72, padding: "4px 6px", border: "1.5px solid #CBD5E1", borderRadius: 5, fontSize: 12, textAlign: "right", fontFamily: "inherit" }
+
   // ============ RENDU ============
   var box = { background: "#FFFFFF", border: "3px solid " + INK, borderRadius: 14, boxShadow: "6px 6px 0 " + INK, padding: 22, maxWidth: 820, width: "100%" }
   var overlay = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", zIndex: 1000, overflowY: "auto" }
@@ -279,16 +292,22 @@ export default function PayslipsImportWizard(props) {
                         <td style={{ padding: 6 }}>{g.nb}</td>
                         <td style={{ padding: 6 }}>{g.last.periode_label}</td>
                         <td style={{ padding: 6, textAlign: "right" }}>{fmt(f.brut)}</td>
-                        <td style={{ padding: 6, textAlign: "right" }}>{fmt(f.net_paye)}</td>
-                        <td style={{ padding: 6, textAlign: "right" }}>{fmt(f.cp_n1_solde)}</td>
-                        <td style={{ padding: 6, textAlign: "right" }}>{fmt(f.cp_n_solde)}</td>
+                        <td style={{ padding: 6, textAlign: "right" }}>
+                          <input value={f.net_paye === null || f.net_paye === undefined ? "" : f.net_paye} onChange={function (e) { updateField(g.last.index, "net_paye", e.target.value) }} style={cellInput} />
+                        </td>
+                        <td style={{ padding: 6, textAlign: "right" }}>
+                          <input value={f.cp_n1_solde === null || f.cp_n1_solde === undefined ? "" : f.cp_n1_solde} onChange={function (e) { updateField(g.last.index, "cp_n1_solde", e.target.value) }} style={cellInput} />
+                        </td>
+                        <td style={{ padding: 6, textAlign: "right" }}>
+                          <input value={f.cp_n_solde === null || f.cp_n_solde === undefined ? "" : f.cp_n_solde} onChange={function (e) { updateField(g.last.index, "cp_n_solde", e.target.value) }} style={cellInput} />
+                        </td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
             </div>
-            <div style={{ fontSize: 11, color: "#666", marginBottom: 10 }}>⚠ = bulletins où un montant n&apos;a pas été lu (rare). Tu pourras les revoir ensuite ; ça ne bloque pas l&apos;archivage.</div>
+            <div style={{ fontSize: 11, color: "#666", marginBottom: 10 }}>Les colonnes <strong>Net payé</strong>, <strong>CP N-1</strong> et <strong>CP N</strong> sont modifiables : corrige ici les rares valeurs non lues (⚠) avant d&apos;enregistrer. Tu corriges le <strong>dernier mois</strong> (celui qui fixe le solde de congés).</div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <button onClick={function () { setStep(2) }} style={btnG}>← Mapping</button>
               <button onClick={doCommit} style={btnP}>✓ Enregistrer {items.length + (data ? data.annexPages.length : 0)} documents</button>
