@@ -27,6 +27,7 @@ import RhWizard from "./rh/RhWizard"
 import EmployeeDetail from "./rh/EmployeeDetail"
 import SignaturesPendingWidget from "./rh/SignaturesPendingWidget"
 import RetroUploadWizard from "./rh/RetroUploadWizard"
+import PayslipsImportWizard from "./rh/PayslipsImportWizard"
 import OffboardingWizard from "./rh/OffboardingWizard"
 import { buildContract } from "./rh/contractBuilders"
 import { buildWelcomePack } from "./rh/welcomePackBuilder"
@@ -198,6 +199,7 @@ export default function RhTab() {
   var [section, setSection] = useState("equipe") // equipe | contrats | coffre | conformite | conges
   var [showWizard, setShowWizard] = useState(false)
   var [showRetroImport, setShowRetroImport] = useState(false)
+  var [showPayslipsImport, setShowPayslipsImport] = useState(false)
   var [offboardingEmployee, setOffboardingEmployee] = useState(null)
   var [teamFilter, setTeamFilter] = useState("actifs") // actifs | anciens | tous
   var [editingContract, setEditingContract] = useState(null)
@@ -943,6 +945,7 @@ export default function RhTab() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
               <div className="yt" style={{ fontSize: 21, color: "#FF82D7" }}>Coffre documents</div>
               <button className="btn btn-y" onClick={function () { setShowRetroImport(true) }}>📥 Importer un historique</button>
+              <button className="btn btn-y" onClick={function () { setShowPayslipsImport(true) }}>📄 Importer des bulletins</button>
             </div>
             <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 12 }}>
               Tous les documents RH par salarié (pièces, contrats signés, bulletins). Clique pour ouvrir et gérer.
@@ -1083,6 +1086,16 @@ export default function RhTab() {
           onSaved={function () {
             setShowRetroImport(false)
             showToast("Historique importé")
+            loadAll()
+          }}
+        />
+      )}
+
+      {showPayslipsImport && (
+        <PayslipsImportWizard
+          onClose={function () { setShowPayslipsImport(false) }}
+          onDone={function () {
+            showToast("Bulletins importés")
             loadAll()
           }}
         />
