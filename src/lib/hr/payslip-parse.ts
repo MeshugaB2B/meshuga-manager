@@ -2,26 +2,25 @@
 // FILE PATH dans le repo :
 //   src/lib/hr/payslip-parse.ts
 // ============================================================
-// Briques de parsing des bulletins de paie Silae.
-//   - parseHeader(text)  : lit l'en-tête machine-readable "dossier##TYPE##MM-AAAA##matricule##NOM##Prenom##siret"
-//                          présent en haut de CHAQUE page (déterministe, gratuit).
-//   - extractFieldsWithClaude(text) : extrait montants + compteurs de congés
-//                          via Claude Haiku (le texte unpdf est aplati, donc
-//                          le parsing positionnel des congés n'est pas fiable).
+// Parsing déterministe des bulletins Silae (aucune dépendance externe).
+//   - parseHeader(text)                : en-tête machine-readable "##".
+//   - extractFields(fluxText, layout)  : montants depuis le texte "flux"
+//       (libellés inline fiables) + compteurs de congés depuis les LIGNES
+//       reconstruites par coordonnées (grille Acquis/Pris/Solde alignée).
+//   - layoutLinesFromItems(items)      : reconstruit les lignes alignées.
+// Le wizard permet de corriger à la main les rares valeurs non lues.
 // ============================================================
-
-import Anthropic from "@anthropic-ai/sdk"
 
 var HDR_RE = /(\d+)##([A-Z]+)##(\d{2}-\d{4})##(\d+)##([^#\n]+)##([^#\n]+)##(\d+)/
 
 export interface PayslipHeader {
   dossier: string
-  doc_type: string          // BULLETIN | SOLDECPT | CERTIFTRA | ...
-  periode_code: string      // "05-2026"
-  periode_iso: string       // "2026-05-01"
-  periode_label: string     // "Mai 2026"
+  doc_type: string
+  periode_code: string
+  periode_iso: string
+  periode_label: string
   matricule: string
-  nom: string               // tel qu'écrit dans l'en-tête (NOM de famille)
+  nom: string
   prenom: string
   siret: string
 }
@@ -60,79 +59,87 @@ export interface PayslipFields {
   statut: string | null
 }
 
-var EMPTY_FIELDS: PayslipFields = {
-  brut: null, net_imposable: null, net_paye: null,
-  cp_n1_acquis: null, cp_n1_pris: null, cp_n1_solde: null,
-  cp_n_acquis: null, cp_n_pris: null, cp_n_solde: null,
-  emploi: null, statut: null,
-}
-
-function toNum(v: any): number | null {
-  if (v === null || v === undefined || v === "") return null
-  if (typeof v === "number") return isFinite(v) ? v : null
-  var s = String(v).replace(/\s/g, "").replace(",", ".").replace(/[^\d.\-]/g, "")
-  if (s === "" || s === "-" || s === ".") return null
-  var n = parseFloat(s)
+function toNum(s: any): number | null {
+  if (s === null || s === undefined) return null
+  var v = String(s).replace(/\s/g, "").replace(",", ".")
+  if (!/-?\d/.test(v)) return null
+  var n = parseFloat(v)
   return isFinite(n) ? n : null
 }
 
-var PROMPT = [
-  "Tu reçois le TEXTE BRUT d'un bulletin de paie français (logiciel Silae), extrait d'un PDF SANS mise en page : les colonnes sont aplaties et les valeurs chiffrées peuvent être regroupées en fin de texte. Lis attentivement.",
-  "",
-  "Extrais UNIQUEMENT les informations suivantes et renvoie un objet JSON STRICT, sans aucun texte autour, sans backticks :",
-  "{",
-  '  "brut": number|null,            // "Salaire brut" du mois (rémunération brute totale)',
-  '  "net_imposable": number|null,   // Net imposable du mois (souvent la base du "Prélèvement à la source - PAS")',
-  '  "net_paye": number|null,        // "Net payé" / "Net à payer" du mois (montant viré au salarié)',
-  '  "cp_n1_acquis": number|null,    // Congés N-1 : jours Acquis',
-  '  "cp_n1_pris": number|null,      // Congés N-1 : jours Pris',
-  '  "cp_n1_solde": number|null,     // Congés N-1 : Solde',
-  '  "cp_n_acquis": number|null,     // Congés N : jours Acquis',
-  '  "cp_n_pris": number|null,       // Congés N : jours Pris',
-  '  "cp_n_solde": number|null,      // Congés N : Solde',
-  '  "emploi": string|null,          // libellé de l\'emploi (ex "Cuisinier")',
-  '  "statut": string|null           // statut professionnel (ex "Employé")',
-  "}",
-  "",
-  "Règles : nombres au format décimal avec un point (jamais d'espace ni de virgule, pas de symbole €). Si une valeur est absente ou la case vide, mets null. Le bloc congés est présenté en deux colonnes \"Congés N-1\" et \"Congés N\", chacune avec les lignes Acquis / Pris / Solde ; une case vide = null (n'invente jamais). Ne confonds pas les cumuls annuels avec les valeurs du mois : prends les valeurs MENSUELLES.",
-].join("\n")
+function firstMatch(text: string, re: RegExp): number | null {
+  var m = String(text || "").match(re)
+  return m ? toNum(m[1]) : null
+}
 
-export async function extractFieldsWithClaude(text: string): Promise<PayslipFields> {
-  var apiKey = process.env.ANTHROPIC_API_KEY || ""
-  if (!apiKey) return Object.assign({}, EMPTY_FIELDS)
-  var anthropic = new Anthropic({ apiKey: apiKey })
+function numsIn(s: string): number[] {
+  var m = String(s || "").match(/\d{1,3}(?: \d{3})*(?:\.\d+)?|\d+\.\d+/g)
+  if (!m) return []
+  var out: number[] = []
+  for (var i = 0; i < m.length; i++) { var n = toNum(m[i]); if (n !== null) out.push(n) }
+  return out
+}
 
-  var clipped = String(text || "").slice(0, 8000)
-  var resp = await anthropic.messages.create({
-    model: process.env.HR_PAYSLIP_MODEL || "claude-haiku-4-5",
-    max_tokens: 600,
-    messages: [{ role: "user", content: PROMPT + "\n\n=== TEXTE DU BULLETIN ===\n" + clipped }],
-  })
-
-  var raw = ""
-  for (var i = 0; i < resp.content.length; i++) {
-    var blk: any = resp.content[i]
-    if (blk && blk.type === "text") raw += blk.text
+function congeRow(layout: string[], label: string): [number | null, number | null] {
+  var start = 0
+  for (var i = 0; i < layout.length; i++) {
+    var L = layout[i]
+    if (L.indexOf("Cong") >= 0 && L.indexOf("N-1") >= 0) { start = i; break }
   }
-  raw = raw.replace(/```json/gi, "").replace(/```/g, "").trim()
-  var jstart = raw.indexOf("{")
-  var jend = raw.lastIndexOf("}")
-  if (jstart >= 0 && jend > jstart) raw = raw.slice(jstart, jend + 1)
+  for (var j = start; j < layout.length; j++) {
+    var t = layout[j].trim()
+    if (t.indexOf(label) === 0) {
+      var ns = numsIn(t.slice(label.length))
+      return [ns.length >= 1 ? ns[0] : null, ns.length >= 2 ? ns[1] : null]
+    }
+  }
+  return [null, null]
+}
 
-  var parsed: any = {}
-  try { parsed = JSON.parse(raw) } catch (e) { parsed = {} }
+export function extractFields(fluxText: string, layout: string[]): PayslipFields {
+  var f = fluxText || ""
+  var lay = Array.isArray(layout) ? layout : []
+
+  var brut = firstMatch(f, /Salaire brut\s+([\d ]+[.,]\d{2})/)
+  var net_paye = firstMatch(f, /Net pay[ée]\s*:\s*([\d ]+[.,]\d{2})\s*euros/i)
+  if (net_paye === null) net_paye = firstMatch(f, /Net pay[ée]\s+([\d ]+[.,]\d{2})/i)
+  if (net_paye === null) net_paye = firstMatch(f, /Net à payer[^\d]*([\d ]+[.,]\d{2})/i)
+  var net_imposable = firstMatch(f, /-\s*PAS\s+([\d ]+[.,]\d{2})/)
+  if (net_imposable === null) net_imposable = firstMatch(f, /source\s*-\s*PAS\s+([\d ]+[.,]\d{2})/)
+
+  var acq = congeRow(lay, "Acquis")
+  var pri = congeRow(lay, "Pris")
+  var sol = congeRow(lay, "Solde")
+
+  var emploi: string | null = null
+  var me = f.match(/Emploi\s*:?\s*\n?\s*([A-Za-zÀ-ÿ' \-]{3,40})/)
+  if (me) emploi = me[1].trim().split("\n")[0].slice(0, 60)
 
   return {
-    brut: toNum(parsed.brut),
-    net_imposable: toNum(parsed.net_imposable),
-    net_paye: toNum(parsed.net_paye),
-    cp_n1_acquis: toNum(parsed.cp_n1_acquis),
-    cp_n1_pris: toNum(parsed.cp_n1_pris),
-    cp_n1_solde: toNum(parsed.cp_n1_solde),
-    cp_n_acquis: toNum(parsed.cp_n_acquis),
-    cp_n_pris: toNum(parsed.cp_n_pris),
-    cp_n_solde: toNum(parsed.cp_n_solde),
-    emploi: parsed.emploi ? String(parsed.emploi).slice(0, 80) : null,
-    statut: parsed.statut ? String(parsed.statut).slice(0, 80) : null,
+    brut: brut,
+    net_imposable: net_imposable,
+    net_paye: net_paye,
+    cp_n1_acquis: acq[0], cp_n1_pris: pri[0], cp_n1_solde: sol[0],
+    cp_n_acquis: acq[1], cp_n_pris: pri[1], cp_n_solde: sol[1],
+    emploi: emploi,
+    statut: null,
   }
+}
+
+export function layoutLinesFromItems(items: any[]): string[] {
+  var rows: any = {}
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i]
+    if (!it || !it.str || !String(it.str).trim()) continue
+    var y = Math.round(it.transform[5])
+    if (!rows[y]) rows[y] = []
+    rows[y].push({ x: it.transform[4], s: it.str })
+  }
+  var ys = Object.keys(rows).map(Number).sort(function (a, b) { return b - a })
+  var lines: string[] = []
+  for (var k = 0; k < ys.length; k++) {
+    var arr = rows[ys[k]].sort(function (a: any, b: any) { return a.x - b.x })
+    lines.push(arr.map(function (o: any) { return o.s }).join("  "))
+  }
+  return lines
 }
