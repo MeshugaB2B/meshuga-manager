@@ -2,16 +2,16 @@
 // FILE PATH dans le repo :
 //   src/app/api/hr/payslips/parse-batch/route.ts
 // ============================================================
-// Étape 2 du wizard : extrait les montants + compteurs de congés pour un
-// LOT de pages bulletins (appelée en boucle par le wizard, avec barre de
-// progression). Relit le PDF temporaire, isole les pages demandées, et
-// passe chacune à Claude Haiku.
+// Étape 2 du wizard : extrait montants + congés pour un LOT de pages.
+// 100% déterministe (aucun appel externe) : montants depuis le texte "flux",
+// congés depuis les lignes reconstruites par coordonnées (colonnes préservées).
+// Instantané, gratuit, sans risque de timeout.
 // ============================================================
 
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { extractText, getDocumentProxy } from "unpdf"
-import { parseHeader, extractFieldsWithClaude } from "@/lib/hr/payslip-parse"
+import { getDocumentProxy, extractText } from "unpdf"
+import { parseHeader, extractFields, layoutLinesFromItems } from "@/lib/hr/payslip-parse"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -44,35 +44,32 @@ export async function POST(req: Request) {
     var buffer = Buffer.from(ab)
 
     var pdf = await getDocumentProxy(new Uint8Array(buffer))
-    var res = await extractText(pdf, { mergePages: false })
-    var pages: string[] = res.text || []
+    var fluxRes = await extractText(pdf, { mergePages: false })
+    var flux: string[] = fluxRes.text || []
 
-    // Extraction Claude en parallèle (concurrence limitée)
     var items: any[] = []
-    var CONC = 5
-    var queue = indices.slice()
-    async function worker() {
-      while (queue.length) {
-        var idx = queue.shift()
-        if (idx === undefined || idx < 0 || idx >= pages.length) continue
-        var txt = pages[idx]
-        var h = parseHeader(txt)
-        var fields = { brut: null, net_imposable: null, net_paye: null, cp_n1_acquis: null, cp_n1_pris: null, cp_n1_solde: null, cp_n_acquis: null, cp_n_pris: null, cp_n_solde: null, emploi: null, statut: null }
-        try { fields = await extractFieldsWithClaude(txt) } catch (e) { /* garde vide */ }
-        items.push({
-          index: idx,
-          matricule: h ? h.matricule : null,
-          periode_iso: h ? h.periode_iso : null,
-          periode_label: h ? h.periode_label : null,
-          periode_code: h ? h.periode_code : null,
-          doc_type: h ? h.doc_type : null,
-          fields: fields,
-        })
-      }
+    for (var n = 0; n < indices.length; n++) {
+      var idx = indices[n]
+      if (idx === undefined || idx < 0 || idx >= flux.length) continue
+      var fluxText = flux[idx]
+      var h = parseHeader(fluxText)
+      var layout: string[] = []
+      try {
+        var page = await pdf.getPage(idx + 1)
+        var tc = await page.getTextContent()
+        layout = layoutLinesFromItems(tc.items)
+      } catch (e) { layout = [] }
+      var fields = extractFields(fluxText, layout)
+      items.push({
+        index: idx,
+        matricule: h ? h.matricule : null,
+        periode_iso: h ? h.periode_iso : null,
+        periode_label: h ? h.periode_label : null,
+        periode_code: h ? h.periode_code : null,
+        doc_type: h ? h.doc_type : null,
+        fields: fields,
+      })
     }
-    var workers = []
-    for (var w = 0; w < CONC; w++) workers.push(worker())
-    await Promise.all(workers)
 
     items.sort(function (a, b) { return a.index - b.index })
     return NextResponse.json({ ok: true, items: items })
