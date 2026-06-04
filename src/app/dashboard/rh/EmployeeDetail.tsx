@@ -1734,11 +1734,6 @@ export default function EmployeeDetail(props) {
               <div style={{ fontWeight: 700, fontSize: 13, marginTop: 3 }}>À suivre</div>
               <div style={{ fontSize: 10, opacity: 0.6 }}>EFFICIENCE — médecine du travail</div>
             </div>
-            <div style={{ border: "2px solid #191923", borderRadius: 6, padding: 10, background: "#FFFFFF", boxShadow: "2px 2px 0 #191923" }}>
-              <div style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1, opacity: 0.55 }}>Solde congés</div>
-              <div style={{ fontWeight: 700, fontSize: 13, marginTop: 3 }}>—</div>
-              <div style={{ fontSize: 10, opacity: 0.6 }}>Suivi des congés à venir</div>
-            </div>
           </div>
         </div>
 
