@@ -29,6 +29,7 @@ import HistoricalDocumentUploadModal from "./HistoricalDocumentUploadModal"
 import SendSignatureModal from "./SendSignatureModal"
 import AttestationsCard from "./AttestationsCard"
 import PayslipsCard from "./PayslipsCard"
+import EmployeeSummary from "./EmployeeSummary"
 import {
   NATIONALITES,
   getContractTypeMeta,
@@ -1227,6 +1228,9 @@ export default function EmployeeDetail(props) {
           </div>
         ) : null}
 
+        {/* === BLOC SYNTHÈSE RH (indicateurs unifiés, reliés) === */}
+        {emp ? <EmployeeSummary employeeId={emp.id} /> : null}
+
         {/* === BLOC INFOS PERSONNELLES === */}
         <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -1725,6 +1729,9 @@ export default function EmployeeDetail(props) {
         </div>
 
 
+        {/* === BLOC PAIE & CONGÉS (bulletins importés de Silae) === */}
+        {emp ? <PayslipsCard employeeId={emp.id} /> : null}
+
         {/* === BLOC CONFORMITÉ === */}
         <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
           <div className="ct">✅ Conformité</div>
@@ -1736,6 +1743,9 @@ export default function EmployeeDetail(props) {
             </div>
           </div>
         </div>
+
+        {/* === BLOC ATTESTATION HYGIÈNE (signature électronique du guide) === */}
+        {emp ? <AttestationsCard employeeId={emp.id} /> : null}
 
         {/* === BLOC ARRÊTS DE TRAVAIL === */}
         <div className="mb" style={{ borderBottom: "2px solid #EDEDED", paddingBottom: 16 }}>
@@ -1844,12 +1854,6 @@ export default function EmployeeDetail(props) {
             </div>
           </div>
         ) : null}
-
-        {/* === BLOC ATTESTATION HYGIÈNE (signature électronique du guide) === */}
-        {emp ? <AttestationsCard employeeId={emp.id} /> : null}
-
-        {/* === BLOC PAIE & CONGÉS (bulletins importés de Silae) === */}
-        {emp ? <PayslipsCard employeeId={emp.id} /> : null}
 
         {/* === BLOC DOCUMENTS (perso + contractuels fusionnés) === */}
         <div className="mb">
