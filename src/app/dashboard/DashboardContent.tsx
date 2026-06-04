@@ -23,6 +23,7 @@ import Sidebar from './Sidebar'
 import FloatingChat from './FloatingChat'
 import TasksTab from './TasksTab'
 import CrmTab from './CrmTab'
+import AnnuaireTab from './AnnuaireTab'
 import ProspectionTab from './ProspectionTab'
 import { G } from './styles'
 import { LOGO_PINK, LOGO_YELLOW, STAMP_YELLOW, STAMP_PINK } from './logos'
@@ -1018,79 +1019,15 @@ function DashboardImpl() {
           )}
 
           {page === 'annuaire' && (
-            <div>
-              <div className="ph">
-                <div><div className="pt">Annuaire</div><div className="ps">{contacts.length} contacts</div></div>
-                <div style={{display:'flex',gap:6}}>
-                  <button className="btn btn-y btn-sm" onClick={function(){openModal('contact',{category:'food',vip:false})}}>+ Contact</button>
-                  <button className="btn btn-sm" style={{background:'#FFEB5A',border:'2px solid #191923'}} onClick={function(){document.getElementById('csv-imp').click()}}>📥 Import CSV</button>
-                  <input id="csv-imp" type="file" accept=".csv" style={{display:'none'}} onChange={function(e){
-                    var f=e.target&&e.target.files&&e.target.files[0]
-                    if(!f)return
-                    var r=new FileReader()
-                    r.onload=function(ev){
-                      var raw=ev.target?String(ev.target.result):''
-                      var rows=raw.split('\n').filter(function(l){return l.trim()})
-                      var added=rows.slice(1).map(function(row){
-                        var cols=row.split(',').map(function(x){return x.replace(/"/g,'').trim()})
-                        return {id:Date.now()+Math.random(),cat:'prestataire',name:cols[0]||'',phone:cols[1]||'',email:cols[2]||'',notes:cols[3]||'',vip:false}
-                      }).filter(function(c){return c.name})
-                      if(added.length>0){
-                      var inserts = added.map(function(c){return {full_name:c.name||'',phone:c.phone||'',email:c.email||'',notes:c.notes||'',category:'prestataire',is_vip:false}})
-                      sb().from('contacts').insert(inserts).then(function(){loadContacts();toast(added.length+' contacts importés !')})
-                    }
-                    }
-                    r.readAsText(f)
-                    e.target.value=''
-                  }} />
-                </div>
-              </div>
-
-              {/* FILTRES CATÉGORIES */}
-              {(function(){
-                var cats = ['all','food','prestataire','photographe','comptabilite','client','presse','banque','team','autre']
-                var catLabels = {all:'Tous',food:'Fournisseurs',prestataire:'Prestataires',photographe:'Photographe',comptabilite:'Comptabilité',client:'Clients B2B',presse:'Presse',banque:'Banque',team:'Team Meshuga',autre:'Autre'}
-                var catColors = {food:'#009D3A',prestataire:'#005FFF',photographe:'#7B3FBE',comptabilite:'#2D7A5A',client:'#FF82D7',presse:'#FF6B2B',banque:'#1A1A6E',team:'#FFEB5A',autre:'#888'}
-                var filtered = contacts
-                  .filter(function(c){ return annCat==='all' || (c.category||c.cat)===annCat })
-                  .slice().sort(function(a,b){ return (function(){var an=a.nom||(a.full_name||'').split(' ').pop()||'';var bn=b.nom||(b.full_name||'').split(' ').pop()||'';return an.localeCompare(bn,'fr')})() })
-                return(
-                  <div>
-                    <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap'}}>
-                      {cats.map(function(cat){
-                        var count = cat==='all' ? contacts.length : contacts.filter(function(c){return (c.category||c.cat)===cat}).length
-                        return(
-                          <button key={cat} style={{fontSize:10,padding:'4px 10px',borderRadius:4,border:'2px solid '+(annCat===cat?catColors[cat]||'#191923':'#DDD'),background:annCat===cat?catColors[cat]||'#191923':'#fff',color:annCat===cat?(cat==='team'||cat==='banque'?'#191923':'#fff'):'#555',fontWeight:annCat===cat?900:400,cursor:'pointer'}} onClick={function(){setAnnCat(cat)}}>
-                            {catLabels[cat]} <span style={{opacity:.5,fontSize:9}}>({count})</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:12}}>
-                      {filtered.map(function(c){
-                        var catColor = catColors[c.category||c.cat]||'#888'
-                        return(
-                          <div key={c.id} className="card" style={{cursor:'pointer',borderTop:'3px solid '+catColor}} onClick={function(){openModal('contact',Object.assign({},c))}}>
-                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
-                              <div style={{fontSize:9,fontWeight:900,textTransform:'uppercase',padding:'2px 7px',background:catColor,color:'#fff',borderRadius:3,display:'inline-block',letterSpacing:.5}}>{catLabels[c.category||c.cat]||c.category||c.cat}</div>
-                              {(c.is_vip||c.vip)&&<span style={{fontSize:10}}>⭐ VIP</span>}
-                            </div>
-                            <div style={{fontWeight:900,fontSize:15}}>{c.full_name || (c.nom ? (c.prenom ? c.prenom+' '+c.nom : c.nom) : c.name) || ''}</div>
-                            {(c.company_name||c.societe)&&<div style={{fontSize:12,color:'#555',marginTop:1,fontStyle:'italic'}}>{c.company_name||c.societe}</div>}
-                            {c.phone&&c.phone!=='—'&&<a href={'tel:'+c.phone.replace(/\s/g,'')} style={{display:'block',fontSize:12,marginTop:6,color:'inherit',textDecoration:'none'}} onClick={function(e){e.stopPropagation()}}>📞 {c.phone}</a>}
-                            {c.phone2&&<a href={'tel:'+c.phone2.replace(/\s/g,'')} style={{display:'block',fontSize:11,color:'#888',textDecoration:'none'}} onClick={function(e){e.stopPropagation()}}>📞 {c.phone2}</a>}
-                            {c.email&&<a href={'mailto:'+c.email} style={{display:'block',fontSize:12,marginTop:2,color:'inherit',textDecoration:'none'}} onClick={function(e){e.stopPropagation()}}>✉️ {c.email}</a>}
-                            {c.email2&&<a href={'mailto:'+c.email2} style={{display:'block',fontSize:11,color:'#888',textDecoration:'none'}} onClick={function(e){e.stopPropagation()}}>✉️ {c.email2}</a>}
-                            {c.website&&<div style={{fontSize:11,marginTop:2}}><a href={c.website.startsWith('http')?c.website:'https://'+c.website} target="_blank" rel="noopener noreferrer" style={{color:'#005FFF',textDecoration:'none'}} onClick={function(e){e.stopPropagation()}}>🌐 {c.website.replace(/^https?:\/\//,'')}</a></div>}
-                            {c.notes&&<div style={{fontSize:10,opacity:.5,marginTop:6,lineHeight:1.4}}>{c.notes}</div>}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
+            <AnnuaireTab
+              contacts={contacts}
+              annCat={annCat}
+              setAnnCat={setAnnCat}
+              openModal={openModal}
+              loadContacts={loadContacts}
+              toast={toast}
+              sb={sb}
+            />
           )}
 
           {page === 'tasks' && (
