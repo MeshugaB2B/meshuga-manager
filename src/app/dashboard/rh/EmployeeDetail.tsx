@@ -28,6 +28,7 @@ import AmendmentModal from "./AmendmentModal"
 import HistoricalDocumentUploadModal from "./HistoricalDocumentUploadModal"
 import SendSignatureModal from "./SendSignatureModal"
 import AttestationsCard from "./AttestationsCard"
+import PayslipsCard from "./PayslipsCard"
 import {
   NATIONALITES,
   getContractTypeMeta,
@@ -1851,6 +1852,9 @@ export default function EmployeeDetail(props) {
 
         {/* === BLOC ATTESTATION HYGIÈNE (signature électronique du guide) === */}
         {emp ? <AttestationsCard employeeId={emp.id} /> : null}
+
+        {/* === BLOC PAIE & CONGÉS (bulletins importés de Silae) === */}
+        {emp ? <PayslipsCard employeeId={emp.id} /> : null}
 
         {/* === BLOC DOCUMENTS (perso + contractuels fusionnés) === */}
         <div className="mb">
