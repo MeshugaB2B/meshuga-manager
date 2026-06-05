@@ -296,7 +296,7 @@ export function buildEmailHtml(m, synth) {
   }).join('')
 
   var anomaliesBlock = m.anomalies.length
-    ? '<div style="background:#FFFFFF;border:2px solid #191923;border-left:6px solid #FF82D7;border-radius:6px;padding:12px;margin-bottom:18px;"><div style="font-weight:900;font-size:13px;color:#191923;margin-bottom:4px;">⚠️ Anomalies Z (' + m.anomalies.length + ')</div><div style="font-size:12px;color:#555;">' + m.anomalies.map(function (a) { return esc(a.jour) }).join(', ') + '</div></div>'
+    ? '<div style="background:#FFFFFF;border:2px solid #191923;border-left:6px solid #FF82D7;border-radius:6px;padding:12px;margin-bottom:18px;"><div style="font-weight:900;font-size:13px;color:#191923;margin-bottom:6px;">⚠️ Anomalies Z (' + m.anomalies.length + ')</div>' + m.anomalies.map(function (a) { var reason = (a.reasons && a.reasons.length) ? a.reasons.join(' ; ') : 'Écart signalé sur le Z de caisse.'; return '<div style="font-size:12px;color:#191923;margin-bottom:4px;line-height:1.5;"><b>' + esc(a.jour) + '</b> — ' + esc(reason) + '</div>' }).join('') + '<div style="font-size:11px;color:#888;margin-top:2px;">À vérifier dans Zelty : règlements vs commandes du jour.</div></div>'
     : ''
 
   var commercialLine = 'Activité B2B : ' + m.commercial.devisCreated + ' devis créé' + (m.commercial.devisCreated > 1 ? 's' : '') + ' &middot; ' + m.commercial.rdvPlanned + ' RDV planifié' + (m.commercial.rdvPlanned > 1 ? 's' : '')
