@@ -19,7 +19,7 @@
 // =============================================================================
 
 import { MESHUGA_LOGO_PINK_DATA_URI } from '@/lib/meshugaLogo'
-import { Resend } from 'resend'
+import { sendBrevoEmail } from '@/lib/brevo'
 import { sendTwilioSms, normalizePhoneFR } from '@/lib/twilio'
 
 var CLAUDE_MODEL = process.env.HR_OCR_MODEL || 'claude-haiku-4-5-20251001'
@@ -419,17 +419,17 @@ export async function runWeeklyReport(sb, week, doSend) {
   result.recipients = rcpt.emails
 
   try {
-    if (process.env.RESEND_API_KEY && rcpt.emails.length) {
-      var resend = new Resend(process.env.RESEND_API_KEY)
-      var fromHeader = 'Meshuga Reporting <' + (process.env.RESEND_FROM_EMAIL || 'events@meshuga.fr') + '>'
-      var er = await resend.emails.send({
-        from: fromHeader,
-        to: rcpt.emails,
+    if (rcpt.emails.length) {
+      var toList = rcpt.emails.map(function (e) { return { email: e } })
+      var er = await sendBrevoEmail({
+        to: toList,
         subject: '\uD83D\uDCCA Bilan Meshuga — ' + metrics.weekLabel,
-        html: buildEmailHtml(metrics, synth)
+        htmlContent: buildEmailHtml(metrics, synth),
+        sender: { email: 'hello@meshuga.fr', name: 'Meshuga Reporting' }
       })
-      if (er && er.error) { result.errors.push('email: ' + (er.error.message || JSON.stringify(er.error))) } else { result.emailSent = true; result.emailId = (er && er.data && er.data.id) || null }
-    } else { result.errors.push('email: RESEND_API_KEY manquante ou aucun destinataire') }
+      if (er && er.ok) { result.emailSent = true; result.emailId = er.messageId || null }
+      else { result.errors.push('email: ' + ((er && er.error) || 'echec Brevo')) }
+    } else { result.errors.push('email: aucun destinataire') }
   } catch (e) { result.errors.push('email: ' + String((e && e.message) || e)) }
 
   try {
