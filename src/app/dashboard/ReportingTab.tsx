@@ -62,6 +62,7 @@ export default function ReportingTab(ctx) {
   var [loading, setLoading] = useState(true)
   var [err, setErr] = useState('')
   var [sending, setSending] = useState(false)
+  var [lastSend, setLastSend] = useState(null)
 
   var load = function (mon) {
     setLoading(true)
@@ -95,13 +96,15 @@ export default function ReportingTab(ctx) {
       .then(function (r) { return r.json() })
       .then(function (j) {
         setSending(false)
+        setLastSend(j || { ok: false })
         if (j && j.ok) {
-          var bits = []
-          if (j.emailSent) bits.push('email ✓')
-          if (j.smsSent) bits.push('SMS ✓')
           if (j.note) { toast(j.note) }
-          else if (bits.length) { toast('Bilan envoyé : ' + bits.join(' · ')) }
-          else { toast('Traité, mais rien envoyé (voir config)') }
+          else {
+            var parts = []
+            parts.push(j.emailSent ? 'email ✓' : 'email ✗')
+            parts.push(j.smsSent ? 'SMS ✓' : 'SMS ✗')
+            toast('Envoi : ' + parts.join(' · '))
+          }
           if (j.errors && j.errors.length) { console.warn('weekly-report errors', j.errors) }
         } else {
           toast('Échec : ' + ((j && j.error) || 'inconnu'))
@@ -136,6 +139,16 @@ export default function ReportingTab(ctx) {
           <button className="btn btn-sm" style={{ background: ROSE, color: '#fff', opacity: sending ? 0.6 : 1 }} onClick={sendNow} disabled={sending}>{sending ? '⏳ Envoi…' : '📤 Envoyer (email + SMS)'}</button>
         </div>
       </div>
+
+      {lastSend ? (
+        <div className="card" style={{ marginBottom: 12, borderLeft: '6px solid ' + ((lastSend.emailSent && (lastSend.smsSent || !lastSend.recipients)) ? '#009D3A' : ROSE) }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: NOIR }}>
+            {lastSend.note ? lastSend.note : ('Email ' + (lastSend.emailSent ? '✓ envoyé' : '✗ échec') + '  ·  SMS ' + (lastSend.smsSent ? '✓ envoyé' : '✗ échec'))}
+          </div>
+          {(lastSend.recipients && lastSend.recipients.length) ? <div style={{ fontSize: 12, color: '#666', marginTop: 3 }}>Destinataires email : {lastSend.recipients.join(', ')}</div> : null}
+          {(lastSend.errors && lastSend.errors.length) ? <div style={{ fontSize: 12, color: '#B00', marginTop: 3 }}>{lastSend.errors.join(' — ')}</div> : null}
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="card" style={{ textAlign: 'center', padding: 36 }}>
