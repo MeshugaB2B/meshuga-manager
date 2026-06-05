@@ -1796,13 +1796,13 @@ function DashboardImpl() {
           <div className={page === "dash" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("dash"); setMenuOpen(false) }}><div className="mms-tile-ico">{"⚡"}</div><div className="mms-tile-lbl">Dashboard</div></div>
           <div className={page === "pilotage" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("pilotage"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📈"}</div><div className="mms-tile-lbl">Analytics</div></div>
           <div className={page === "tasks" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("tasks"); setMenuOpen(false) }}><div className="mms-tile-ico">{"✅"}</div><div className="mms-tile-lbl">Tâches</div></div>
+          {!isEmy && <div className={page === "reporting" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("reporting"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📊"}</div><div className="mms-tile-lbl">Bilan hebdo</div></div>}
         </div>
         <div className="mms-sec">Commercial B2B</div>
         <div className="mms-grid">
           <div className={page === "crm" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("crm"); setMenuOpen(false) }}><div className="mms-tile-ico">{"◎"}</div><div className="mms-tile-lbl">CRM</div></div>
           <div className={page === "chasse" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("chasse"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔍"}</div><div className="mms-tile-lbl">Prospection</div></div>
           <div className={page === "devis" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("devis"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📄"}</div><div className="mms-tile-lbl">Devis</div></div>
-          {!isEmy && <div className={page === "reporting" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("reporting"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📋"}</div><div className="mms-tile-lbl">Bilan hebdo</div></div>}
         </div>
         <div className="mms-sec">Cuisine & Achats</div>
         <div className="mms-grid">
