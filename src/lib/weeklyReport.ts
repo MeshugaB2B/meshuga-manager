@@ -18,9 +18,9 @@
 // Côté serveur uniquement (utilise SUPABASE_SERVICE_ROLE_KEY / ANTHROPIC_API_KEY).
 // =============================================================================
 
-import { MESHUGA_LOGO_PINK_DATA_URI } from './meshugaLogo'
+import { MESHUGA_LOGO_PINK_DATA_URI } from '@/lib/meshugaLogo'
 import { Resend } from 'resend'
-import { sendTwilioSms, normalizePhoneFR } from './twilio'
+import { sendTwilioSms, normalizePhoneFR } from '@/lib/twilio'
 
 var CLAUDE_MODEL = process.env.HR_OCR_MODEL || 'claude-haiku-4-5-20251001'
 
@@ -145,6 +145,21 @@ export async function buildWeeklyMetrics(sb, week) {
   var rdvRes = await sb.from('cal_events').select('id').gte('start_date', week.startStr).lte('start_date', week.endStr).eq('type', 'rdv')
   var eventsRes = await sb.from('cal_events').select('id,title,type,start_date').gte('start_date', week.startStr).lte('start_date', week.endStr).neq('source', 'ai_suggestion')
 
+  // Tâches : accomplies la semaine écoulée + prévues la semaine suivante
+  var nextStart = ymd(addDays(parseYmd(week.endStr), 1))
+  var nextEnd = ymd(addDays(parseYmd(week.endStr), 7))
+  var soonEnd = ymd(addDays(parseYmd(week.endStr), 21))
+  var doneRes = await sb.from('tasks').select('title,updated_at').eq('status', 'done').gte('updated_at', week.startStr + 'T00:00:00').lte('updated_at', week.endStr + 'T23:59:59')
+  var plannedRes = await sb.from('tasks').select('title,deadline,priority').neq('status', 'done').gte('deadline', nextStart).lte('deadline', nextEnd)
+  var backlogRes = await sb.from('tasks').select('title,deadline,priority').neq('status', 'done').order('deadline', { ascending: true, nullsFirst: false })
+  // Agenda à venir (RDV / events internes des 3 prochaines semaines)
+  var upcomingRes = await sb.from('cal_events').select('title,type,start_date').gt('start_date', week.endStr).lte('start_date', soonEnd).neq('source', 'ai_suggestion').order('start_date', { ascending: true })
+
+  var doneTasks = (doneRes.data || []).map(function (t) { return t.title }).filter(function (x) { return !!x })
+  var plannedTasks = (plannedRes.data || []).map(function (t) { return { title: t.title, deadline: t.deadline, priority: t.priority } })
+  var backlogTasks = (backlogRes.data || []).map(function (t) { return { title: t.title, deadline: t.deadline, priority: t.priority } })
+  var upcomingEvents = (upcomingRes.data || []).slice(0, 8).map(function (e) { return { title: e.title, type: e.type, date: e.start_date } })
+
   return {
     weekLabel: week.label,
     weekStart: week.startStr,
@@ -164,7 +179,14 @@ export async function buildWeeklyMetrics(sb, week) {
       devisCreated: (devisRes.data || []).length,
       rdvPlanned: (rdvRes.data || []).length,
       events: (eventsRes.data || []).length
-    }
+    },
+    tasks: {
+      done: doneTasks,
+      planned: plannedTasks,
+      backlog: backlogTasks,
+      openTotal: backlogTasks.length
+    },
+    upcomingEvents: upcomingEvents
   }
 }
 
@@ -184,8 +206,13 @@ export async function synthesizeWeek(m) {
   var chTop = topEntries(m.channels, 5).map(function (e) { return (CHANNEL_LABELS[e.k] || e.k) + ' ' + euro(e.v) }).join(', ')
   var payTop = topEntries(m.payments, 5).map(function (e) { return (PAYMENT_LABELS[e.k] || e.k) + ' ' + euro(e.v) }).join(', ')
   var daysTxt = m.byDay.map(function (d) { return d.jour + ' ' + euro(d.ca) + ' (' + d.tickets + ' tk)' }).join(' | ')
+  var t = m.tasks || { done: [], planned: [], backlog: [], openTotal: 0 }
+  var doneTxt = t.done.length ? t.done.join(' ; ') : 'aucune tâche marquée terminée'
+  var plannedTxt = t.planned.length ? t.planned.map(function (x) { return x.title + (x.deadline ? ' (échéance ' + x.deadline + ')' : '') }).join(' ; ') : 'aucune tâche planifiée'
+  var backlogTxt = (t.backlog && t.backlog.length) ? t.backlog.slice(0, 5).map(function (x) { return x.title }).join(' ; ') : 'backlog vide'
+  var evTxt = (m.upcomingEvents && m.upcomingEvents.length) ? m.upcomingEvents.map(function (e) { return e.title + ' (' + (e.type || 'event') + ', ' + e.date + ')' }).join(' ; ') : 'aucun événement à l\'agenda'
 
-  var prompt = 'Tu es l\'analyste de gestion du restaurant street-food Meshuga (Paris 6e). '
+  var prompt = 'Tu es l\'analyste de gestion du restaurant street-food Meshuga (Paris 6e, 3 rue Vavin). '
     + 'Voici les données réelles de la ' + m.weekLabel + ' :\n'
     + '- CA TTC : ' + euro2(m.ca.ttc) + (m.ca.deltaPct != null ? ' (' + pct(m.ca.deltaPct) + ' vs S-1: ' + euro2(m.ca.prev) + ')' : '') + '\n'
     + '- Tickets : ' + m.tickets.total + (m.tickets.deltaPct != null ? ' (' + pct(m.tickets.deltaPct) + ' vs S-1)' : '') + ', panier moyen ' + euro2(m.ticketMoyen) + '\n'
@@ -194,9 +221,17 @@ export async function synthesizeWeek(m) {
     + '- Par paiement : ' + payTop + '\n'
     + '- Meilleur jour : ' + (m.bestDay ? m.bestDay.jour + ' (' + euro(m.bestDay.ca) + ')' : 'n/a') + ', plus faible : ' + (m.worstDay ? m.worstDay.jour + ' (' + euro(m.worstDay.ca) + ')' : 'n/a') + '\n'
     + '- Anomalies Z signalées : ' + (m.anomalies.length || 'aucune') + '\n'
-    + '- Activité B2B de la semaine : ' + m.commercial.devisCreated + ' devis créés, ' + m.commercial.rdvPlanned + ' RDV planifiés.\n\n'
+    + '- Activité B2B de la semaine : ' + m.commercial.devisCreated + ' devis créés, ' + m.commercial.rdvPlanned + ' RDV planifiés.\n'
+    + '- Tâches terminées cette semaine : ' + doneTxt + '\n'
+    + '- Tâches déjà planifiées la semaine prochaine : ' + plannedTxt + '\n'
+    + '- Backlog en cours (' + t.openTotal + ') : ' + backlogTxt + '\n'
+    + '- Agenda des 3 prochaines semaines : ' + evTxt + '\n\n'
+    + 'Consignes pour les priorités :\n'
+    + '1) Si des événements sont à l\'agenda, transforme-les en actions concrètes (préparer, confirmer, relancer).\n'
+    + '2) Reprends les tâches déjà planifiées la semaine prochaine si pertinentes.\n'
+    + '3) S\'il n\'y a NI tâche planifiée NI événement, PROPOSE 3 actions concrètes et utiles pour un street-food à Paris 6e (ex : pousser le canal le plus faible de la semaine, action B2B vers les bureaux/écoles du quartier, optimisation food cost, animation réseaux). Reste réaliste et actionnable.\n\n'
     + 'Réponds UNIQUEMENT en JSON valide, sans markdown ni backticks, au format : '
-    + '{"analyse":"2 à 3 phrases d\'analyse concrète et actionnable basées sur ces chiffres réels (tendance CA, canaux, jours forts/faibles)","priorites":["priorité 1 concrète pour la semaine prochaine","priorité 2","priorité 3"]}. '
+    + '{"analyse":"2 à 3 phrases d\'analyse concrète basées sur les chiffres réels (tendance CA, canaux, jours forts/faibles, et un mot sur les tâches accomplies s\'il y en a)","priorites":["priorité 1 concrète","priorité 2","priorité 3"]}. '
     + 'Sois direct, factuel, sans flatterie. En français.'
 
   try {
@@ -266,6 +301,15 @@ export function buildEmailHtml(m, synth) {
 
   var commercialLine = 'Activité B2B : ' + m.commercial.devisCreated + ' devis créé' + (m.commercial.devisCreated > 1 ? 's' : '') + ' &middot; ' + m.commercial.rdvPlanned + ' RDV planifié' + (m.commercial.rdvPlanned > 1 ? 's' : '')
 
+  var liList = function (arr) { return arr.map(function (x) { return '<li style="margin-bottom:3px;">' + esc(x) + '</li>' }).join('') }
+  var tk = m.tasks || { done: [], planned: [] }
+  var doneBlock = (tk.done && tk.done.length) ? '<div style="margin-bottom:10px;"><div style="font-size:12px;font-weight:900;color:#191923;">✅ Tâches accomplies</div><ul style="margin:4px 0 0;padding-left:18px;font-size:13px;color:#191923;">' + liList(tk.done) + '</ul></div>' : ''
+  var plannedBlock = (tk.planned && tk.planned.length) ? '<div style="margin-bottom:10px;"><div style="font-size:12px;font-weight:900;color:#191923;">🗒️ Prévues la semaine prochaine</div><ul style="margin:4px 0 0;padding-left:18px;font-size:13px;color:#191923;">' + liList(tk.planned.map(function (x) { return x.title + (x.deadline ? ' — ' + x.deadline : '') })) + '</ul></div>' : ''
+  var evBlock = (m.upcomingEvents && m.upcomingEvents.length) ? '<div><div style="font-size:12px;font-weight:900;color:#191923;">📅 Agenda à venir</div><ul style="margin:4px 0 0;padding-left:18px;font-size:13px;color:#191923;">' + liList(m.upcomingEvents.map(function (e) { return e.title + ' (' + e.date + ')' })) + '</ul></div>' : ''
+  var tasksAgendaBlock = (doneBlock || plannedBlock || evBlock)
+    ? '<div style="background:#FFFFFF;border:2px solid #191923;border-radius:8px;padding:16px;box-shadow:3px 3px 0 #191923;margin-bottom:18px;"><div style="font-weight:900;font-size:15px;color:#191923;margin-bottom:8px;">📋 Tâches &amp; agenda</div>' + doneBlock + plannedBlock + evBlock + '</div>'
+    : '<div style="background:#FFFFFF;border:2px dashed #191923;border-radius:8px;padding:14px;margin-bottom:18px;font-size:13px;color:#555;">Aucune tâche ni événement enregistré — vois les priorités proposées ci-dessus.</div>'
+
   return '' +
 '<div style="background:#FFFFFF;padding:0;margin:0;font-family:Arial,Helvetica,sans-serif;color:#191923;">' +
 '<div style="max-width:640px;margin:0 auto;padding:24px;">' +
@@ -309,6 +353,8 @@ export function buildEmailHtml(m, synth) {
     '<div style="font-weight:900;font-size:15px;color:#191923;margin-bottom:8px;">🎯 Priorités semaine prochaine</div>' +
     '<ol style="margin:0;padding-left:20px;">' + prioItems + '</ol>' +
   '</div>' +
+
+  tasksAgendaBlock +
 
   '<div style="font-size:12px;color:#777;border-top:1.5px solid #EBEBEB;padding-top:12px;">' + commercialLine + '</div>' +
   '<div style="font-size:11px;color:#AAA;margin-top:14px;text-align:center;">Bilan généré automatiquement par Meshuga Manager.</div>' +
