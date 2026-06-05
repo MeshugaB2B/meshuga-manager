@@ -936,7 +936,7 @@ function DashboardImpl() {
     {id: 'recipes', label: 'Recettes', icon: '🥪'},
     {id: 'purchases', label: 'Achats', icon: '🛒'},
     {id: 'rh', label: 'Ressources Humaines', icon: '👥'},
-    {id: 'legal', label: 'Légal & Conformité', icon: '⚖️'},
+    {id: 'legal', label: 'Légal & Docs', icon: '🗂️'},
     {id: 'messagerie', label: 'Messagerie', icon: '💬'}, // legacy — remplacé par FloatingChat (présent partout)
   ]
   
@@ -1813,7 +1813,7 @@ function DashboardImpl() {
         <div className="mms-sec">Équipe & Admin</div>
         <div className="mms-grid">
           <div className={page === "rh" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("rh"); setMenuOpen(false) }}><div className="mms-tile-ico">{"👥"}</div><div className="mms-tile-lbl">RH</div></div>
-          <div className={page === "legal" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("legal"); setMenuOpen(false) }}><div className="mms-tile-ico">{"⚖️"}</div><div className="mms-tile-lbl">Légal</div></div>
+          <div className={page === "legal" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("legal"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🗂️"}</div><div className="mms-tile-lbl">Légal</div></div>
           {!isEmy && <div className={page === "journal" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("journal"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📓"}</div><div className="mms-tile-lbl">Journal</div></div>}
         </div>
         <div className="mms-sec">Marketing</div>
