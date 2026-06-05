@@ -73,6 +73,9 @@ var nameOf = function (c) {
   return c.name || ''
 }
 var companyOf = function (c) { return c.company_name || c.societe || '' }
+// Catégories où l'on cherche d'abord la SOCIÉTÉ (fournisseurs) → société en titre
+var ORG_FIRST_CATS = ['food']
+var isOrgFirst = function (cat) { return ORG_FIRST_CATS.indexOf(cat) !== -1 }
 var personOf = function (c) {
   var p = c.contact || ''
   if (!p || p === '—') return ''
@@ -154,6 +157,7 @@ export default function AnnuaireTab(ctx) {
     var nm = nameOf(c)
     var comp = companyOf(c)
     var person = personOf(c)
+    var orgFirst = isOrgFirst(cat) && !!comp
     var phone = c.phone && c.phone !== '—' ? c.phone : ''
     return (
       <div
@@ -167,9 +171,19 @@ export default function AnnuaireTab(ctx) {
           {isVip(c) ? <span style={{ fontSize: 11, fontWeight: 900, color: '#B8920A', whiteSpace: 'nowrap' }}>⭐ VIP</span> : null}
         </div>
 
-        <div style={{ fontWeight: 900, fontSize: 15, lineHeight: 1.15, color: NOIR }}>{nm || 'Sans nom'}</div>
-        {comp ? <div style={{ fontSize: 12, color: '#555', fontStyle: 'italic', marginTop: 1 }}>{comp}</div> : null}
-        {person ? <div style={{ fontSize: 11.5, color: '#444', marginTop: 4 }}>👤 {person}</div> : null}
+        {orgFirst ? (
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 17, lineHeight: 1.15, color: NOIR }}>{comp}</div>
+            {nm && nm !== comp ? <div style={{ fontSize: 12.5, color: '#444', marginTop: 3 }}>👤 {nm}</div> : null}
+            {person && person !== nm && person !== comp ? <div style={{ fontSize: 11.5, color: '#666', marginTop: 2 }}>👤 {person}</div> : null}
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 15, lineHeight: 1.15, color: NOIR }}>{nm || 'Sans nom'}</div>
+            {comp ? <div style={{ fontSize: 12, color: '#555', fontStyle: 'italic', marginTop: 1 }}>{comp}</div> : null}
+            {person ? <div style={{ fontSize: 11.5, color: '#444', marginTop: 4 }}>👤 {person}</div> : null}
+          </div>
+        )}
 
         <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {phone ? <a href={'tel:' + phone.replace(/\s/g, '')} style={{ fontSize: 12.5, color: NOIR, textDecoration: 'none', fontWeight: 700 }} onClick={function (e) { e.stopPropagation() }}>📞 {phone}</a> : null}
