@@ -24,6 +24,7 @@ import FloatingChat from './FloatingChat'
 import TasksTab from './TasksTab'
 import CrmTab from './CrmTab'
 import AnnuaireTab from './AnnuaireTab'
+import ReportingTab from './ReportingTab'
 import ProspectionTab from './ProspectionTab'
 import { G } from './styles'
 import { LOGO_PINK, LOGO_YELLOW, STAMP_YELLOW, STAMP_PINK } from './logos'
@@ -926,7 +927,7 @@ function DashboardImpl() {
     {id: 'devis', label: 'Devis', icon: '📄'},
     {id: 'annuaire', label: 'Annuaire', icon: '📒'},
     {id: 'calendrier', label: 'Calendrier', icon: '📅'},
-    {id: 'reporting', label: 'Reporting', icon: '📋'},
+    {id: 'reporting', label: 'Bilan hebdo', icon: '📊'},
     {id: 'vault', label: 'Coffre-fort', icon: '🔐'},
     {id: 'gmb', label: 'Google My Biz.', icon: '⭐'},
     {id: 'instagram', label: 'Instagram', icon: '📸'},
@@ -1226,57 +1227,7 @@ function DashboardImpl() {
           )}
 
           {page === 'reporting' && (
-            <div>
-              <div className="ph">
-                <div><div className="pt">Reporting</div><div className="ps">Compte-rendus hebdo</div></div>
-                {isEmy && <button className="btn btn-n btn-sm" onClick={function() { openModal('cr', {}) }}>+ Nouveau CR</button>}
-              </div>
-              {!isEmy && (
-                <div className="card-y" style={{marginBottom:12}}>
-                  <div className="ct">📝 Formulaire CR Emy</div>
-                  <div style={{fontSize:12,opacity:.7,marginBottom:8}}>Ce qu&apos;Emy remplit chaque semaine :</div>
-                  <div style={{fontSize:11,opacity:.6,lineHeight:1.8}}>Semaine du · Prospects contactés · RDV effectués · Commandes · Victoires · Challenges · Priorités S+1 · Note pour Edward</div>
-                </div>
-              )}
-              {reports.length === 0 && (
-                <div className="card" style={{textAlign:'center',padding:40}}>
-                  <div style={{fontSize:40,marginBottom:10}}>📋</div>
-                  <div style={{fontWeight:900,textTransform:'uppercase'}}>Aucun CR pour l&apos;instant</div>
-                  {isEmy && <button className="btn btn-y" style={{marginTop:14}} onClick={function() { openModal('cr', {}) }}>Creer le premier CR</button>}
-                </div>
-              )}
-              {reports.map(function(r, i) {
-                return (
-                  <div key={r.id} className="card-y" style={{border:'2px solid #191923',borderRadius:7,boxShadow:'3px 3px 0 #191923',marginBottom:12}}>
-                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}>
-                      <div style={{fontWeight:900,fontSize:16,textTransform:'uppercase'}}>{r.week}</div>
-                      <span style={{fontSize:10,opacity:.5}}>{r.date}</span>
-                    </div>
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
-                      <div style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{r.prospects}</div><div className="yt" style={{fontSize:11,opacity:.5}}>Prospects</div></div>
-                      <div style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{r.rdv}</div><div className="yt" style={{fontSize:11,opacity:.5}}>RDV</div></div>
-                      <div style={{background:'#fff',border:'1.5px solid #191923',borderRadius:4,padding:'8px',textAlign:'center'}}><div style={{fontWeight:900,fontSize:20}}>{r.cmds}</div><div className="yt" style={{fontSize:11,opacity:.5}}>Commandes</div></div>
-                    </div>
-                    {r.wins && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>✅ Victoires</div><div style={{fontSize:12}}>{r.wins}</div></div>}
-                    {r.challenges && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>⚡ Challenges</div><div style={{fontSize:12}}>{r.challenges}</div></div>}
-                    {r.next && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>🎯 Priorites S+1</div><div style={{fontSize:12}}>{r.next}</div></div>}
-                    {r.notes && <div style={{background:'#fff',border:'2px solid #191923',borderRadius:5,padding:10,marginBottom:8}}><div className="yt" style={{fontSize:14,color:'#FF82D7',marginBottom:4}}>💬 Note d&apos;Emy</div><div style={{fontSize:12}}>{r.notes}</div></div>}
-                    {r.feedback && <div style={{background:'#FF82D7',border:'2px solid #191923',borderRadius:5,padding:10}}><div className="yt" style={{fontSize:14,marginBottom:4}}>Retour d&apos;Edward</div><div style={{fontSize:12}}>{r.feedback}</div></div>}
-                    {!isEmy && !r.feedback && (
-                      <div style={{marginTop:10}}>
-                        <div className="lbl">Ton retour a Emy</div>
-                        <textarea className="inp" placeholder="Bravo, recadrages..." id={'fb-'+r.id} style={{minHeight:60}} />
-                        <button className="btn btn-y btn-sm" style={{marginTop:6}} onClick={function() {
-                          var el = document.getElementById('fb-'+r.id)
-                          var v = el ? el.value : ''
-                          if (v) { setReports(function(prev) { return prev.map(function(x, j) { return j===i ? Object.assign({},x,{feedback:v,status:'read'}) : x }) }); toast('Retour envoye ✓') }
-                        }}>Envoyer</button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+            <ReportingTab toast={toast} isEmy={isEmy} />
           )}
 
           {page === 'vault' && (
@@ -1851,7 +1802,7 @@ function DashboardImpl() {
           <div className={page === "crm" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("crm"); setMenuOpen(false) }}><div className="mms-tile-ico">{"◎"}</div><div className="mms-tile-lbl">CRM</div></div>
           <div className={page === "chasse" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("chasse"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🔍"}</div><div className="mms-tile-lbl">Prospection</div></div>
           <div className={page === "devis" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("devis"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📄"}</div><div className="mms-tile-lbl">Devis</div></div>
-          {!isEmy && <div className={page === "reporting" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("reporting"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📋"}</div><div className="mms-tile-lbl">Reporting</div></div>}
+          {!isEmy && <div className={page === "reporting" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("reporting"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📋"}</div><div className="mms-tile-lbl">Bilan hebdo</div></div>}
         </div>
         <div className="mms-sec">Cuisine & Achats</div>
         <div className="mms-grid">
