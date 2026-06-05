@@ -252,17 +252,63 @@ export default function LegalTab() {
     setUploading(false)
   }
 
-  // ====== Télécharger une archive ======
-  async function downloadArchive(a) {
+  // ====== Ouverture fiable d'un fichier stocké (iOS Safari) ======
+  // On ouvre l'onglet AU MOMENT du tap, puis on le navigue une fois le lien prêt
+  function openStored(bucket, path) {
+    var win = window.open("", "_blank")
+    supabase.storage.from(bucket).createSignedUrl(path, 3600).then(function(res) {
+      if (res.error || !res.data) {
+        if (win) win.close()
+        setToast("Erreur ouverture du document")
+        setTimeout(function() { setToast("") }, 3000)
+        return
+      }
+      if (win) { win.location.href = res.data.signedUrl } else { window.location.href = res.data.signedUrl }
+    }).catch(function() {
+      if (win) win.close()
+      setToast("Erreur ouverture du document")
+      setTimeout(function() { setToast("") }, 3000)
+    })
+  }
+
+  // ====== Partage natif (iOS/Android) avec le FICHIER en pièce jointe ======
+  async function shareStored(bucket, path, displayName) {
     try {
-      var res = await supabase.storage.from("legal-archives").createSignedUrl(a.file_path, 3600)
-      if (res.error) throw res.error
-      window.open(res.data.signedUrl, "_blank")
+      var res = await supabase.storage.from(bucket).createSignedUrl(path, 3600)
+      if (res.error || !res.data) throw new Error("signed url")
+      var url = res.data.signedUrl
+      var ext = (path.split(".").pop() || "pdf").toLowerCase()
+      var safeName = (displayName || "document").replace(/[^a-z0-9-_ ]+/gi, "_").trim() + "." + ext
+      // 1) Partage du fichier lui-même (Web Share API niveau 2)
+      try {
+        var resp = await fetch(url)
+        var blob = await resp.blob()
+        var file = new File([blob], safeName, {type: blob.type || "application/pdf"})
+        if (typeof navigator !== "undefined" && navigator.canShare && navigator.canShare({files: [file]})) {
+          await navigator.share({files: [file], title: displayName || "Document Meshuga"})
+          return
+        }
+      } catch (eFile) {
+        // on bascule sur le partage de lien
+      }
+      // 2) Partage du lien (si le fichier n'est pas partageable)
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({title: displayName || "Document Meshuga", url: url})
+        return
+      }
+      // 3) Dernier recours : ouverture
+      window.open(url, "_blank")
     } catch (e) {
+      if (e && e.name === "AbortError") return
       console.error(e)
-      setToast("Erreur téléchargement")
+      setToast("Partage indisponible sur cet appareil")
       setTimeout(function() { setToast("") }, 3000)
     }
+  }
+
+  // ====== Ouvrir une archive ======
+  function downloadArchive(a) {
+    openStored("legal-archives", a.file_path)
   }
 
   // ====== Supprimer une archive ======
@@ -294,13 +340,14 @@ export default function LegalTab() {
       var existing = legalDocs.filter(function(d) { return d.notes === "ref:" + item.key })[0]
       if (existing) {
         await supabase.storage.from("legal-documents").remove([existing.file_path])
-        await supabase.from("legal_documents").update({
+        var upd = await supabase.from("legal_documents").update({
           file_path: path,
           edited_at: new Date().toISOString().slice(0, 10),
           updated_at: new Date().toISOString()
         }).eq("id", existing.id)
+        if (upd.error) throw upd.error
       } else {
-        await supabase.from("legal_documents").insert([{
+        var ins = await supabase.from("legal_documents").insert([{
           category: category,
           name: item.name,
           description: item.description,
@@ -308,6 +355,7 @@ export default function LegalTab() {
           edited_at: new Date().toISOString().slice(0, 10),
           notes: "ref:" + item.key
         }])
+        if (ins.error) throw ins.error
       }
 
       setToast("✓ Document mis à jour : " + item.name)
@@ -315,20 +363,14 @@ export default function LegalTab() {
       loadLegalDocs()
     } catch (e) {
       console.error(e)
-      setToast("Erreur upload")
-      setTimeout(function() { setToast("") }, 3000)
+      setToast("Erreur : " + (e.message || "enregistrement échoué"))
+      setTimeout(function() { setToast("") }, 4000)
     }
     setLoadingDocs(false)
   }
 
-  async function downloadReference(doc) {
-    try {
-      var res = await supabase.storage.from("legal-documents").createSignedUrl(doc.file_path, 3600)
-      if (res.error) throw res.error
-      window.open(res.data.signedUrl, "_blank")
-    } catch (e) {
-      console.error(e)
-    }
+  function downloadReference(doc) {
+    openStored("legal-documents", doc.file_path)
   }
 
   var getReferenceDocBy = function(key) {
@@ -440,8 +482,13 @@ export default function LegalTab() {
                         )}
                         <div style={{display:"flex",gap:6}}>
                           {hasFile && (
-                            <button className="btn btn-p btn-sm" onClick={function() { downloadReference(doc) }} style={{flex:3,fontSize:12,fontWeight:900,justifyContent:"center"}}>
+                            <button className="btn btn-p btn-sm" onClick={function() { downloadReference(doc) }} style={{flex:2,fontSize:12,fontWeight:900,justifyContent:"center"}}>
                               📂 Ouvrir
+                            </button>
+                          )}
+                          {hasFile && (
+                            <button className="btn btn-sm" onClick={function() { shareStored("legal-documents", doc.file_path, item.name) }} style={{flex:1,fontSize:12,justifyContent:"center"}} title="Partager (mail, SMS, WhatsApp)">
+                              📤
                             </button>
                           )}
                           <label className={hasFile ? "btn btn-sm" : "btn btn-p btn-sm"} style={{flex:hasFile?1:"auto",width:hasFile?"auto":"100%",fontSize:hasFile?10:12,cursor:"pointer",textAlign:"center",justifyContent:"center"}} title={hasFile ? "Remplacer le fichier" : "Charger le fichier"}>
@@ -583,8 +630,9 @@ export default function LegalTab() {
                         </td>
                         <td style={{padding:"8px 10px",textAlign:"right",fontSize:10,color:"#999"}}>{fmtDate(a.uploaded_at)}</td>
                         <td style={{padding:"8px 10px",textAlign:"center",whiteSpace:"nowrap"}}>
-                          <button className="btn btn-sm" onClick={function() { downloadArchive(a) }} style={{fontSize:10,marginRight:4}}>⬇</button>
-                          <button className="btn btn-sm" onClick={function() { deleteArchive(a) }} style={{fontSize:10,background:"#FFE0E0",color:"#C8166A"}}>🗑</button>
+                          <button className="btn btn-sm" onClick={function() { downloadArchive(a) }} style={{fontSize:10,marginRight:4}} title="Ouvrir">📂</button>
+                          <button className="btn btn-sm" onClick={function() { shareStored("legal-archives", a.file_path, a.file_name) }} style={{fontSize:10,marginRight:4}} title="Partager">📤</button>
+                          <button className="btn btn-sm" onClick={function() { deleteArchive(a) }} style={{fontSize:10,background:"#FFE0E0",color:"#C8166A"}} title="Supprimer">🗑</button>
                         </td>
                       </tr>
                     )
