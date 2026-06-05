@@ -18,9 +18,9 @@
 // Côté serveur uniquement (utilise SUPABASE_SERVICE_ROLE_KEY / ANTHROPIC_API_KEY).
 // =============================================================================
 
-import { MESHUGA_LOGO_PINK_DATA_URI } from './meshugaLogo'
+import { MESHUGA_LOGO_PINK_DATA_URI } from '@/lib/meshugaLogo'
 import { Resend } from 'resend'
-import { sendTwilioSms, normalizePhoneFR } from './twilio'
+import { sendTwilioSms, normalizePhoneFR } from '@/lib/twilio'
 
 var CLAUDE_MODEL = process.env.HR_OCR_MODEL || 'claude-haiku-4-5-20251001'
 
