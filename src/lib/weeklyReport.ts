@@ -21,6 +21,23 @@
 import { MESHUGA_LOGO_PINK_DATA_URI } from '@/lib/meshugaLogo'
 import { sendBrevoEmail } from '@/lib/brevo'
 import { sendTwilioSms, normalizePhoneFR } from '@/lib/twilio'
+import { createHmac } from 'crypto'
+
+// --- Lien sécurisé vers la page rapport (token HMAC, sans stockage) ----------
+function viewSecret() {
+  return process.env.WEEKLY_VIEW_SECRET || process.env.CRON_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || 'meshuga-weekly'
+}
+export function signWeek(weekStart) {
+  return createHmac('sha256', viewSecret()).update('wr:' + weekStart).digest('hex').slice(0, 24)
+}
+export function verifyWeek(weekStart, token) {
+  if (!weekStart || !token) return false
+  return token === signWeek(weekStart)
+}
+export function reportUrl(weekStart) {
+  var base = process.env.NEXT_PUBLIC_APP_URL || 'https://meshuga-manager.vercel.app'
+  return base + '/api/weekly-report/view?week=' + weekStart + '&t=' + signWeek(weekStart)
+}
 
 var CLAUDE_MODEL = process.env.HR_OCR_MODEL || 'claude-haiku-4-5-20251001'
 
@@ -362,10 +379,28 @@ export function buildEmailHtml(m, synth) {
 }
 
 // ---- Rendu SMS --------------------------------------------------------------
-export function buildSmsBody(m) {
+export function buildSmsBody(m, url) {
   var d = m.ca.deltaPct == null ? '' : ' (' + pct(m.ca.deltaPct) + ' vs S-1)'
-  var best = m.bestDay ? ' Meilleur jour ' + m.bestDay.jourCourt + ' ' + euro(m.bestDay.ca) + '.' : ''
-  return 'Meshuga - ' + m.weekLabel + ' : CA ' + euro(m.ca.ttc) + d + ', ' + m.tickets.total + ' tickets, panier ' + euro2(m.ticketMoyen) + '.' + best + ' Detail par email.'
+  var sd = m.weekStart ? (m.weekStart.slice(8, 10) + '/' + m.weekStart.slice(5, 7)) : ''
+  var ed = m.weekEnd ? (m.weekEnd.slice(8, 10) + '/' + m.weekEnd.slice(5, 7)) : ''
+  var base = 'Meshuga S.' + sd + '-' + ed + ' : CA ' + euro(m.ca.ttc) + d + ', ' + m.tickets.total + ' tickets, panier ' + euro2(m.ticketMoyen) + '.'
+  if (url) base += ' Rapport : ' + url
+  return base
+}
+
+// ---- Page web du rapport (lien SMS) — même rendu que l'email + bouton PDF ----
+export function buildReportPage(m, synth) {
+  var inner = buildEmailHtml(m, synth)
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8" />'
+    + '<meta name="viewport" content="width=device-width, initial-scale=1" />'
+    + '<title>Bilan Meshuga — ' + esc(m.weekLabel) + '</title>'
+    + '<style>body{margin:0;background:#FFEB5A;} @media print{.no-print{display:none !important;} body{background:#FFFFFF;}}</style>'
+    + '</head><body>'
+    + '<div class="no-print" style="position:sticky;top:0;background:#191923;padding:10px 16px;text-align:right;z-index:10;">'
+    + '<button onclick="window.print()" style="background:#FF82D7;color:#FFFFFF;border:2px solid #FFFFFF;border-radius:6px;padding:8px 16px;font-weight:900;font-size:14px;cursor:pointer;">📄 Télécharger / Imprimer en PDF</button>'
+    + '</div>'
+    + inner
+    + '</body></html>'
 }
 
 // ---- Destinataires ----------------------------------------------------------
@@ -432,13 +467,27 @@ export async function runWeeklyReport(sb, week, doSend) {
     } else { result.errors.push('email: aucun destinataire') }
   } catch (e) { result.errors.push('email: ' + String((e && e.message) || e)) }
 
-  try {
-    var phone = normalizePhoneFR(rcpt.edwardPhone)
-    if (phone) {
-      var sr = await sendTwilioSms({ to: phone, body: buildSmsBody(metrics) })
-      if (sr && sr.ok) { result.smsSent = true } else { result.errors.push('sms: ' + ((sr && sr.error) || 'echec')) }
-    } else { result.errors.push('sms: EDWARD_NOTIFICATION_PHONE manquant ou invalide') }
-  } catch (e) { result.errors.push('sms: ' + String((e && e.message) || e)) }
+  var link = reportUrl(metrics.weekStart)
+  result.reportUrl = link
+  var smsBody = buildSmsBody(metrics, link)
+  var phones = []
+  var pe = normalizePhoneFR(rcpt.edwardPhone)
+  if (pe) phones.push(pe)
+  var pm = normalizePhoneFR(rcpt.emyPhone)
+  if (pm && phones.indexOf(pm) === -1) phones.push(pm)
+  if (phones.length) {
+    var sent = 0
+    for (var i = 0; i < phones.length; i++) {
+      try {
+        var sr = await sendTwilioSms({ to: phones[i], body: smsBody })
+        if (sr && sr.ok) { sent++ } else { result.errors.push('sms ' + phones[i] + ': ' + ((sr && sr.error) || 'echec')) }
+      } catch (e) { result.errors.push('sms ' + phones[i] + ': ' + String((e && e.message) || e)) }
+    }
+    result.smsSent = sent > 0
+    result.smsCount = sent
+  } else {
+    result.errors.push('sms: aucun numéro valide (EDWARD_NOTIFICATION_PHONE)')
+  }
 
   return result
 }
