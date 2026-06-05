@@ -243,6 +243,32 @@ export default function ReportingTab(ctx) {
             </div>
           ) : null}
 
+          {/* Tâches & agenda */}
+          <div className="card" style={{ marginBottom: 10 }}>
+            <div className="ct" style={{ marginBottom: 8 }}>📋 Tâches &amp; agenda</div>
+            {(m.tasks && m.tasks.done && m.tasks.done.length) ? (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: NOIR, marginBottom: 2 }}>✅ Accomplies</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>{m.tasks.done.map(function (x, i) { return <li key={i} style={{ fontSize: 13, color: NOIR }}>{x}</li> })}</ul>
+              </div>
+            ) : null}
+            {(m.tasks && m.tasks.planned && m.tasks.planned.length) ? (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: NOIR, marginBottom: 2 }}>🗒️ Prévues la semaine prochaine</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>{m.tasks.planned.map(function (x, i) { return <li key={i} style={{ fontSize: 13, color: NOIR }}>{x.title}{x.deadline ? ' — ' + x.deadline : ''}</li> })}</ul>
+              </div>
+            ) : null}
+            {(m.upcomingEvents && m.upcomingEvents.length) ? (
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 900, color: NOIR, marginBottom: 2 }}>📅 Agenda à venir</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>{m.upcomingEvents.map(function (e, i) { return <li key={i} style={{ fontSize: 13, color: NOIR }}>{e.title} ({e.date})</li> })}</ul>
+              </div>
+            ) : null}
+            {(!(m.tasks && m.tasks.done && m.tasks.done.length) && !(m.tasks && m.tasks.planned && m.tasks.planned.length) && !(m.upcomingEvents && m.upcomingEvents.length)) ? (
+              <div style={{ fontSize: 12, color: '#777' }}>Aucune tâche ni événement enregistré — vois les priorités proposées ci-dessus.</div>
+            ) : null}
+          </div>
+
           {/* Activité commerciale (honnête) */}
           <div style={{ fontSize: 12, color: '#777', borderTop: '1.5px solid #EBEBEB', paddingTop: 10 }}>
             Activité B2B : {m.commercial.devisCreated} devis créé{m.commercial.devisCreated > 1 ? 's' : ''} &middot; {m.commercial.rdvPlanned} RDV planifié{m.commercial.rdvPlanned > 1 ? 's' : ''} cette semaine
