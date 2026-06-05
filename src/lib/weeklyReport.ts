@@ -371,13 +371,15 @@ export function buildSmsBody(m) {
 // ---- Destinataires ----------------------------------------------------------
 export async function resolveRecipients(sb) {
   var emails = []
+  var add = function (e) { if (e && emails.indexOf(e) === -1) emails.push(e) }
   try {
     var res = await sb.from('profiles').select('email,role').not('email', 'is', null)
-    ;(res.data || []).forEach(function (p) { if (p.email && emails.indexOf(p.email) === -1) emails.push(p.email) })
+    ;(res.data || []).forEach(function (p) { add(p.email) })
   } catch (e) { console.error('[weeklyReport] profiles introuvables:', e) }
-  if (process.env.EDWARD_NOTIFICATION_EMAIL && emails.indexOf(process.env.EDWARD_NOTIFICATION_EMAIL) === -1) emails.push(process.env.EDWARD_NOTIFICATION_EMAIL)
-  if (emails.indexOf('emy@meshuga.fr') === -1) emails.push('emy@meshuga.fr')
-  return { emails: emails, edwardPhone: process.env.EDWARD_NOTIFICATION_PHONE || '' }
+  // Destinataires garantis (Edward + Emy)
+  add(process.env.EDWARD_NOTIFICATION_EMAIL || 'edward@meshuga.fr')
+  add('emy@meshuga.fr')
+  return { emails: emails, edwardPhone: process.env.EDWARD_NOTIFICATION_PHONE || '', emyPhone: '+33624677866' }
 }
 
 // ---- Orchestration : calcul + IA + archivage + envoi -----------------------
@@ -417,16 +419,17 @@ export async function runWeeklyReport(sb, week, doSend) {
   result.recipients = rcpt.emails
 
   try {
-    if (process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL && rcpt.emails.length) {
+    if (process.env.RESEND_API_KEY && rcpt.emails.length) {
       var resend = new Resend(process.env.RESEND_API_KEY)
+      var fromHeader = 'Meshuga Reporting <' + (process.env.RESEND_FROM_EMAIL || 'events@meshuga.fr') + '>'
       var er = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL,
+        from: fromHeader,
         to: rcpt.emails,
         subject: '\uD83D\uDCCA Bilan Meshuga — ' + metrics.weekLabel,
         html: buildEmailHtml(metrics, synth)
       })
-      if (er && er.error) { result.errors.push('email: ' + JSON.stringify(er.error)) } else { result.emailSent = true }
-    } else { result.errors.push('email: config Resend ou destinataires manquants') }
+      if (er && er.error) { result.errors.push('email: ' + (er.error.message || JSON.stringify(er.error))) } else { result.emailSent = true; result.emailId = (er && er.data && er.data.id) || null }
+    } else { result.errors.push('email: RESEND_API_KEY manquante ou aucun destinataire') }
   } catch (e) { result.errors.push('email: ' + String((e && e.message) || e)) }
 
   try {
