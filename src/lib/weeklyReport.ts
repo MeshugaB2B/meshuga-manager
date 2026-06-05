@@ -336,9 +336,9 @@ export function buildEmailHtml(m, synth) {
   '</div>' +
 
   '<div style="background:#FF82D7;border:2px solid #191923;border-radius:8px;padding:18px;text-align:center;box-shadow:4px 4px 0 #191923;margin-bottom:8px;">' +
-    '<div style="font-size:13px;color:#191923;font-weight:700;margin-bottom:4px;">' + esc(m.weekLabel) + '</div>' +
-    '<div style="font-size:40px;font-weight:900;color:#191923;line-height:1;">' + esc(euro(m.ca.ttc)) + '</div>' +
-    '<div style="font-size:11px;color:#191923;opacity:.7;margin:4px 0 8px;">CA TTC encaissé</div>' +
+    '<div style="font-size:13px;color:#FFFFFF;font-weight:700;margin-bottom:4px;">' + esc(m.weekLabel) + '</div>' +
+    '<div style="font-size:40px;font-weight:900;color:#FFFFFF;line-height:1;">' + esc(euro(m.ca.ttc)) + '</div>' +
+    '<div style="font-size:11px;color:#FFFFFF;opacity:.9;margin:4px 0 8px;">CA TTC encaissé</div>' +
     deltaBadge +
   '</div>' +
 
@@ -348,7 +348,7 @@ export function buildEmailHtml(m, synth) {
     kpiTile(m.daysWithZ + '/7', 'Jours encaissés') +
   '</tr></table>' +
 
-  '<div style="background:#FFEB5A;border:2px solid #191923;border-radius:8px;padding:16px;box-shadow:3px 3px 0 #191923;margin-bottom:18px;">' +
+  '<div style="background:#FFFFFF;border:2px solid #191923;border-left:6px solid #FF82D7;border-radius:8px;padding:16px;box-shadow:3px 3px 0 #191923;margin-bottom:18px;">' +
     '<div style="font-weight:900;font-size:15px;color:#191923;margin-bottom:6px;">🧠 Analyse de la semaine</div>' +
     '<div style="font-size:14px;line-height:1.6;color:#191923;">' + esc(synth.analyse) + '</div>' +
   '</div>' +
@@ -394,7 +394,7 @@ export function buildReportPage(m, synth) {
   return '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8" />'
     + '<meta name="viewport" content="width=device-width, initial-scale=1" />'
     + '<title>Bilan Meshuga — ' + esc(m.weekLabel) + '</title>'
-    + '<style>body{margin:0;background:#FFEB5A;} @media print{.no-print{display:none !important;} body{background:#FFFFFF;}}</style>'
+    + '<style>body{margin:0;background:#FFFFFF;} @media print{.no-print{display:none !important;}}</style>'
     + '</head><body>'
     + '<div class="no-print" style="position:sticky;top:0;background:#191923;padding:10px 16px;text-align:right;z-index:10;">'
     + '<button onclick="window.print()" style="background:#FF82D7;color:#FFFFFF;border:2px solid #FFFFFF;border-radius:6px;padding:8px 16px;font-weight:900;font-size:14px;cursor:pointer;">📄 Télécharger / Imprimer en PDF</button>'
