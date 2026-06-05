@@ -126,37 +126,16 @@ function getDefaultWeekPeriod() {
   }
 }
 
-// Nb de jours écoulés depuis une date ISO
-function daysSince(iso) {
-  if (!iso) return null
-  var d = new Date(iso)
-  var now = new Date()
-  return Math.floor((now.getTime() - d.getTime()) / 86400000)
-}
-
-// Statut de conformité d'un type d'archive à partir du résumé (count + dernière période)
-function computeFreshness(summary, typeId, cadenceDays) {
-  var row = summary.filter(function(s) { return s.archive_type === typeId })[0]
-  if (!row || !row.n) {
-    return {code: "missing", label: "Aucun relevé", color: "#C8166A", days: null, lastEnd: null, n: 0}
-  }
-  var days = daysSince(row.last_end)
-  if (days <= cadenceDays) return {code: "ok", label: "À jour", color: "#00A352", days: days, lastEnd: row.last_end, n: row.n}
-  if (days <= cadenceDays * 2) return {code: "late", label: "En retard", color: "#E8A100", days: days, lastEnd: row.last_end, n: row.n}
-  return {code: "crit", label: "Très en retard", color: "#C8166A", days: days, lastEnd: row.last_end, n: row.n}
-}
-
 // ============================================================
 // Composant principal
 // ============================================================
 
 export default function LegalTab() {
-  var [activeSection, setActiveSection] = useState("conformite")
+  var [activeSection, setActiveSection] = useState("references")
   var [archives, setArchives] = useState([])
   var [loadingArchives, setLoadingArchives] = useState(false)
   var [legalDocs, setLegalDocs] = useState([])
   var [loadingDocs, setLoadingDocs] = useState(false)
-  var [summary, setSummary] = useState([])
   var [toast, setToast] = useState("")
 
   // Filtre archives
@@ -169,6 +148,7 @@ export default function LegalTab() {
   var defaultPeriod = getDefaultWeekPeriod()
   var [uploadPeriodStart, setUploadPeriodStart] = useState(defaultPeriod.start)
   var [uploadPeriodEnd, setUploadPeriodEnd] = useState(defaultPeriod.end)
+  var [uploadIsRange, setUploadIsRange] = useState(false)
   var [uploadFile, setUploadFile] = useState(null)
   var [uploadNotes, setUploadNotes] = useState("")
   var [uploading, setUploading] = useState(false)
@@ -201,30 +181,10 @@ export default function LegalTab() {
     setLoadingDocs(false)
   }
 
-  // ====== Résumé conformité (toutes archives, non filtré) ======
-  async function loadSummary() {
-    try {
-      var res = await supabase.from("legal_archives").select("archive_type, period_end")
-      var rows = res.data || []
-      var map = {}
-      for (var i = 0; i < rows.length; i++) {
-        var r = rows[i]
-        if (!map[r.archive_type]) map[r.archive_type] = {archive_type: r.archive_type, n: 0, last_end: null}
-        map[r.archive_type].n += 1
-        if (!map[r.archive_type].last_end || r.period_end > map[r.archive_type].last_end) {
-          map[r.archive_type].last_end = r.period_end
-        }
-      }
-      setSummary(Object.keys(map).map(function(k) { return map[k] }))
-    } catch (e) {
-      console.error(e)
-    }
-  }
 
   useEffect(function() {
     loadArchives()
     loadLegalDocs()
-    loadSummary()
   }, [])
 
   useEffect(function() {
@@ -238,13 +198,14 @@ export default function LegalTab() {
       setTimeout(function() { setToast("") }, 3000)
       return
     }
-    if (!uploadPeriodStart || !uploadPeriodEnd) {
-      setToast("Date de début et date de fin obligatoires")
+    if (!uploadPeriodStart) {
+      setToast("Date obligatoire")
       setTimeout(function() { setToast("") }, 3000)
       return
     }
-    if (uploadPeriodEnd < uploadPeriodStart) {
-      setToast("Date de fin doit être après la date de début")
+    var effEnd = uploadIsRange && uploadPeriodEnd ? uploadPeriodEnd : uploadPeriodStart
+    if (effEnd < uploadPeriodStart) {
+      setToast("La date de fin doit être après la date de début")
       setTimeout(function() { setToast("") }, 3000)
       return
     }
@@ -254,7 +215,7 @@ export default function LegalTab() {
       var folder = typeConfig ? typeConfig.bucket_folder : "autres"
       var ext = uploadFile.name.split(".").pop().toLowerCase()
       var safeStart = uploadPeriodStart.replace(/-/g, "")
-      var safeEnd = uploadPeriodEnd.replace(/-/g, "")
+      var safeEnd = effEnd.replace(/-/g, "")
       var path = folder + "/" + safeStart + "_" + safeEnd + "_" + Date.now() + "." + ext
 
       var up = await supabase.storage.from("legal-archives").upload(path, uploadFile)
@@ -263,7 +224,7 @@ export default function LegalTab() {
       var ins = await supabase.from("legal_archives").insert([{
         archive_type: uploadType,
         period_start: uploadPeriodStart,
-        period_end: uploadPeriodEnd,
+        period_end: effEnd,
         file_path: path,
         file_name: uploadFile.name,
         mime_type: uploadFile.type,
@@ -283,8 +244,7 @@ export default function LegalTab() {
       setUploadPeriodEnd(newDefault.end)
       setUploadOpen(false)
       loadArchives()
-      loadSummary()
-    } catch (e) {
+      } catch (e) {
       console.error(e)
       setToast("Erreur : " + (e.message || "upload échoué"))
       setTimeout(function() { setToast("") }, 4000)
@@ -314,8 +274,7 @@ export default function LegalTab() {
       setToast("✓ Archive supprimée")
       setTimeout(function() { setToast("") }, 2500)
       loadArchives()
-      loadSummary()
-    } catch (e) {
+      } catch (e) {
       console.error(e)
     }
   }
@@ -376,26 +335,12 @@ export default function LegalTab() {
     return legalDocs.filter(function(d) { return d.notes === "ref:" + key })[0]
   }
 
-  // ====== Stats conformité (calculées au rendu) ======
-  var refTotalCount = 0
-  var refLoadedCount = 0
-  for (var ci = 0; ci < REFERENCE_DOCUMENTS.length; ci++) {
-    var catItems = REFERENCE_DOCUMENTS[ci].items
-    for (var ii = 0; ii < catItems.length; ii++) {
-      refTotalCount += 1
-      var rdoc = getReferenceDocBy(catItems[ii].key)
-      if (rdoc && rdoc.file_path) refLoadedCount += 1
-    }
-  }
-  var fresh = ARCHIVE_TYPES.map(function(t) { return {t: t, f: computeFreshness(summary, t.id, t.cadence)} })
-  var nFreshOk = fresh.filter(function(x) { return x.f.code === "ok" }).length
-  var nFreshAlert = fresh.filter(function(x) { return x.f.code !== "ok" }).length
-
   var openUploadFor = function(typeId) {
     setUploadType(typeId)
-    var nd = getDefaultWeekPeriod()
-    setUploadPeriodStart(nd.start)
-    setUploadPeriodEnd(nd.end)
+    var today = new Date().toISOString().slice(0, 10)
+    setUploadIsRange(false)
+    setUploadPeriodStart(today)
+    setUploadPeriodEnd(today)
     setUploadFile(null)
     setUploadNotes("")
     setUploadOpen(true)
@@ -424,8 +369,7 @@ export default function LegalTab() {
       {/* Tabs internes */}
       <div style={{display:"flex",gap:6,marginBottom:18,borderBottom:"3px solid #191923",paddingBottom:0}}>
         {[
-          {id:"conformite",label:"✅ Conformité",color:"#FF82D7"},
-          {id:"references",label:"📚 Documents de référence",color:"#FF82D7"},
+          {id:"references",label:"📚 Documents",color:"#FF82D7"},
           {id:"archives",label:"📁 Archives périodiques",color:"#FFEB5A"}
         ].map(function(s) {
           var active = activeSection === s.id
@@ -450,99 +394,6 @@ export default function LegalTab() {
           )
         })}
       </div>
-
-      {/* ============================================================ */}
-      {/* SECTION 0 : CONFORMITÉ (vue d'ensemble)                       */}
-      {/* ============================================================ */}
-      {activeSection === "conformite" && (
-        <div>
-          {/* Bandeau synthèse */}
-          <div style={{background:"#FF82D7",border:"3px solid #191923",boxShadow:"4px 4px 0 #191923",padding:"16px 18px",marginBottom:18}}>
-            <div style={{fontFamily:"'Yellowtail',cursive",fontSize:26,color:"#FFFFFF",lineHeight:1}}>État de conformité</div>
-            <div style={{fontSize:12,color:"#FFFFFF",marginTop:6,fontWeight:700,lineHeight:1.5}}>
-              {refLoadedCount}/{refTotalCount} documents de référence chargés · {nFreshOk} relevé{nFreshOk > 1 ? "s" : ""} à jour · {nFreshAlert} à surveiller
-            </div>
-          </div>
-
-          {/* Cartes statut par type de relevé */}
-          <div style={{fontWeight:900,fontSize:13,textTransform:"uppercase",letterSpacing:1,color:"#FF82D7",marginBottom:8,paddingBottom:4,borderBottom:"2px solid #FF82D7"}}>
-            Relevés périodiques
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(260px, 1fr))",gap:10,marginBottom:24}}>
-            {fresh.map(function(x) {
-              var t = x.t
-              var f = x.f
-              return (
-                <div key={t.id} style={{
-                  background:"#FFFFFF",
-                  border:"2px solid #191923",
-                  borderLeft:"6px solid "+f.color,
-                  padding:"12px 14px",
-                  boxShadow:"2px 2px 0 #191923",
-                  display:"flex",
-                  flexDirection:"column",
-                  gap:8
-                }}>
-                  <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                    <div style={{fontSize:24,lineHeight:1}}>{t.icon}</div>
-                    <div style={{flex:1}}>
-                      <div style={{fontWeight:900,fontSize:12,textTransform:"uppercase",letterSpacing:.5,color:"#191923",lineHeight:1.2}}>{t.label}</div>
-                      <div style={{fontSize:10,color:"#888",marginTop:2}}>{t.freq}</div>
-                    </div>
-                    <span style={{background:f.color,color:"#FFFFFF",fontWeight:900,fontSize:9,textTransform:"uppercase",letterSpacing:.5,padding:"3px 7px",whiteSpace:"nowrap"}}>{f.label}</span>
-                  </div>
-                  <div style={{fontSize:10,color:"#666",lineHeight:1.4,minHeight:28}}>
-                    {f.n > 0
-                      ? "Dernier relevé : " + fmtDate(f.lastEnd) + " · il y a " + f.days + " j · " + f.n + " archive" + (f.n > 1 ? "s" : "")
-                      : "Aucune fiche archivée dans le système."}
-                  </div>
-                  <button className="btn btn-p btn-sm" style={{width:"100%",fontSize:11,justifyContent:"center"}}
-                    onClick={function() { openUploadFor(t.id) }}>
-                    📤 Archiver une fiche
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Documents de référence — résumé */}
-          <div style={{fontWeight:900,fontSize:13,textTransform:"uppercase",letterSpacing:1,color:"#FF82D7",marginBottom:8,paddingBottom:4,borderBottom:"2px solid #FF82D7"}}>
-            Documents de référence
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(260px, 1fr))",gap:10,marginBottom:24}}>
-            {REFERENCE_DOCUMENTS.map(function(cat) {
-              var total = cat.items.length
-              var loaded = cat.items.filter(function(it) { var d = getReferenceDocBy(it.key); return d && d.file_path }).length
-              var complete = loaded === total
-              return (
-                <div key={cat.category} style={{
-                  background:"#FFFFFF",
-                  border:"2px solid #191923",
-                  borderLeft:"6px solid "+(complete ? "#00A352" : "#E8A100"),
-                  padding:"12px 14px",
-                  boxShadow:"2px 2px 0 #191923"
-                }}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-                    <div style={{fontWeight:900,fontSize:12,textTransform:"uppercase",letterSpacing:.5,color:"#191923"}}>{cat.label}</div>
-                    <span style={{background:complete ? "#00A352" : "#E8A100",color:"#FFFFFF",fontWeight:900,fontSize:10,padding:"3px 8px",whiteSpace:"nowrap"}}>{loaded}/{total}</span>
-                  </div>
-                  <div style={{fontSize:10,color:"#666",marginTop:6,lineHeight:1.4}}>
-                    {complete ? "Tous les documents sont chargés." : (total - loaded) + " document" + ((total - loaded) > 1 ? "s" : "") + " à charger."}
-                  </div>
-                  <button className="btn btn-sm" style={{marginTop:8,fontSize:10}} onClick={function() { setActiveSection("references") }}>
-                    Ouvrir →
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Rappel légal */}
-          <div style={{background:"#FFFEF2",border:"2px solid #191923",borderLeft:"6px solid #FFEB5A",padding:"12px 16px",boxShadow:"2px 2px 0 #191923",fontSize:11,color:"#444",lineHeight:1.6}}>
-            <strong>Rappel conservation :</strong> fiches d&apos;enregistrement (températures, hygiène, nuisibles) à conserver <strong>6 mois minimum</strong> (règlement CE 178/2002). DUERP, registre du personnel et registre de sécurité ERP tenus à jour en permanence. Le statut ci-dessus est calculé à partir des fiches réellement archivées dans l&apos;outil.
-          </div>
-        </div>
-      )}
 
       {/* ============================================================ */}
       {/* SECTION 1 : DOCUMENTS DE RÉFÉRENCE                            */}
@@ -589,12 +440,12 @@ export default function LegalTab() {
                         )}
                         <div style={{display:"flex",gap:6}}>
                           {hasFile && (
-                            <button className="btn btn-sm" onClick={function() { downloadReference(doc) }} style={{flex:1,fontSize:10}}>
-                              ⬇ Télécharger
+                            <button className="btn btn-p btn-sm" onClick={function() { downloadReference(doc) }} style={{flex:3,fontSize:12,fontWeight:900,justifyContent:"center"}}>
+                              📂 Ouvrir
                             </button>
                           )}
-                          <label className="btn btn-p btn-sm" style={{flex:1,fontSize:10,cursor:"pointer",textAlign:"center"}}>
-                            {hasFile ? "↻ Remplacer" : "📤 Charger"}
+                          <label className={hasFile ? "btn btn-sm" : "btn btn-p btn-sm"} style={{flex:hasFile?1:"auto",width:hasFile?"auto":"100%",fontSize:hasFile?10:12,cursor:"pointer",textAlign:"center",justifyContent:"center"}} title={hasFile ? "Remplacer le fichier" : "Charger le fichier"}>
+                            {hasFile ? "↻" : "📤 Charger"}
                             <input
                               type="file"
                               accept=".pdf,image/*"
@@ -653,15 +504,7 @@ export default function LegalTab() {
                     </div>
                   </div>
                   <button className="btn btn-p btn-sm" style={{width:"100%",fontSize:11,justifyContent:"center"}}
-                    onClick={function() {
-                      setUploadType(t.id)
-                      var newDefault = getDefaultWeekPeriod()
-                      setUploadPeriodStart(newDefault.start)
-                      setUploadPeriodEnd(newDefault.end)
-                      setUploadFile(null)
-                      setUploadNotes("")
-                      setUploadOpen(true)
-                    }}>
+                    onClick={function() { openUploadFor(t.id) }}>
                     📤 Archiver une fiche
                   </button>
                 </div>
@@ -785,22 +628,30 @@ export default function LegalTab() {
                 </select>
               </div>
 
-              {/* Période */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-                <div>
-                  <label style={{display:"block",fontWeight:900,fontSize:11,textTransform:"uppercase",letterSpacing:1,color:"#FF82D7",marginBottom:4}}>Période · début *</label>
-                  <input type="date" value={uploadPeriodStart} onChange={function(e) { setUploadPeriodStart(e.target.value) }}
-                    style={{width:"100%",padding:"8px 10px",border:"2px solid #191923",fontWeight:700,fontSize:13}} required />
-                </div>
-                <div>
-                  <label style={{display:"block",fontWeight:900,fontSize:11,textTransform:"uppercase",letterSpacing:1,color:"#FF82D7",marginBottom:4}}>Période · fin *</label>
-                  <input type="date" value={uploadPeriodEnd} onChange={function(e) { setUploadPeriodEnd(e.target.value) }}
-                    style={{width:"100%",padding:"8px 10px",border:"2px solid #191923",fontWeight:700,fontSize:13}} required />
-                </div>
+              {/* Date (+ plage optionnelle) */}
+              <div style={{marginBottom:14}}>
+                <label style={{display:"block",fontWeight:900,fontSize:11,textTransform:"uppercase",letterSpacing:1,color:"#FF82D7",marginBottom:4}}>
+                  {uploadIsRange ? "Période · début *" : "Date *"}
+                </label>
+                <input type="date" value={uploadPeriodStart} onChange={function(e) { setUploadPeriodStart(e.target.value) }}
+                  style={{width:"100%",padding:"8px 10px",border:"2px solid #191923",fontWeight:700,fontSize:13}} required />
+
+                <label style={{display:"flex",alignItems:"center",gap:8,marginTop:10,cursor:"pointer",fontSize:11,fontWeight:700,color:"#191923"}}>
+                  <input type="checkbox" checked={uploadIsRange} onChange={function(e) { setUploadIsRange(e.target.checked) }} style={{width:16,height:16}} />
+                  C&apos;est une plage de dates (relevé hebdo, mois entier…)
+                </label>
+
+                {uploadIsRange && (
+                  <div style={{marginTop:8}}>
+                    <label style={{display:"block",fontWeight:900,fontSize:11,textTransform:"uppercase",letterSpacing:1,color:"#FF82D7",marginBottom:4}}>Période · fin *</label>
+                    <input type="date" value={uploadPeriodEnd} onChange={function(e) { setUploadPeriodEnd(e.target.value) }}
+                      style={{width:"100%",padding:"8px 10px",border:"2px solid #191923",fontWeight:700,fontSize:13}} />
+                  </div>
+                )}
               </div>
 
               <div style={{background:"#FFFEF2",border:"1px dashed #999",padding:"6px 10px",fontSize:10,color:"#666",marginBottom:14,lineHeight:1.4}}>
-                💡 Pré-rempli avec la semaine en cours (lundi → dimanche). Modifie librement la période. Tu peux archiver une journée seule (mêmes dates) ou un mois entier.
+                💡 Par défaut, une seule date (ex: date de collecte des huiles). Coche &laquo; plage de dates &raquo; uniquement pour un relevé qui couvre une semaine ou un mois.
               </div>
 
               {/* Fichier */}
@@ -830,7 +681,7 @@ export default function LegalTab() {
                 <button className="btn btn-sm" onClick={function() { setUploadOpen(false) }} disabled={uploading}>
                   Annuler
                 </button>
-                <button className="btn btn-p btn-sm" onClick={handleUpload} disabled={uploading || !uploadFile || !uploadPeriodStart || !uploadPeriodEnd}
+                <button className="btn btn-p btn-sm" onClick={handleUpload} disabled={uploading || !uploadFile || !uploadPeriodStart || (uploadIsRange && !uploadPeriodEnd)}
                   style={{minWidth:130,fontSize:12}}>
                   {uploading ? "⏳ Upload..." : "📤 Archiver"}
                 </button>
