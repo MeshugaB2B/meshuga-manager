@@ -36,6 +36,7 @@ var NAV_SECTIONS = [
       { id: 'dash', label: 'Dashboard', icon: '⚡' },
       { id: 'pilotage', label: 'Analytics', icon: '📈' },
       { id: 'tasks', label: 'Tâches', icon: '✅' },
+      { id: 'reporting', label: 'Bilan hebdo', icon: '📊', edwardOnly: true },
     ]
   },
   {
@@ -45,7 +46,6 @@ var NAV_SECTIONS = [
       { id: 'crm', label: 'CRM Prospects', icon: '◎', badgeKey: 'crm' },
       { id: 'chasse', label: 'Prospection', icon: '🔍' },
       { id: 'devis', label: 'Devis', icon: '📄', badgeKey: 'devis' },
-      { id: 'reporting', label: 'Reporting CR', icon: '📋', edwardOnly: true },
     ]
   },
   {
