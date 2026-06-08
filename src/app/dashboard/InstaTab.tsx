@@ -107,7 +107,7 @@ export default function InstaTab(props) {
           </div>
 
           <div style={{display:'flex',gap:6,marginBottom:10}}>
-            {['media','comments','messages'].map(function(tab){return(
+            {['media','messages','comments'].map(function(tab){return(
               <button key={tab} className={'btn btn-sm'+(instaTab===tab?' btn-p':'')} onClick={function(){setInstaTab(tab); setSelMsg(null)}}>
                 {tab==='media'?'📷 Posts':tab==='comments'?'💬 Commentaires':'✉️ Messages'}
               </button>
