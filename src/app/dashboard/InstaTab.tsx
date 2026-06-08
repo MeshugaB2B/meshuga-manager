@@ -91,7 +91,7 @@ export default function InstaTab(props) {
 
       {!instaLoading && instaData && instaData.ok && instaData.connected && (
         <div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8,marginBottom:10}}>
             <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
               <div className="kl">Abonnés</div>
               <div className="kv" style={{fontSize:24,color:'#FF82D7'}}>{instaData.followers ? instaData.followers.toLocaleString('fr-FR') : '--'}</div>
@@ -100,16 +100,12 @@ export default function InstaTab(props) {
               <div className="kl">Posts</div>
               <div className="kv" style={{fontSize:24}}>{instaData.mediaCount || '--'}</div>
             </div>
-            <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
-              <div className="kl">À répondre</div>
-              <div className="kv" style={{fontSize:24,color:instaData.unreadMessages>0?'#CC0066':'#191923'}}>{instaData.unreadMessages || 0}</div>
-            </div>
           </div>
 
           <div style={{display:'flex',gap:6,marginBottom:10}}>
-            {['media','messages','comments'].map(function(tab){return(
-              <button key={tab} className={'btn btn-sm'+(instaTab===tab?' btn-p':'')} onClick={function(){setInstaTab(tab); setSelMsg(null)}}>
-                {tab==='media'?'📷 Posts':tab==='comments'?'💬 Commentaires':'✉️ Messages'}
+            {['media','comments'].map(function(tab){return(
+              <button key={tab} className={'btn btn-sm'+(instaTab===tab?' btn-p':'')} onClick={function(){setInstaTab(tab)}}>
+                {tab==='media'?'📷 Posts':'💬 Commentaires'}
               </button>
             )})}
           </div>
@@ -153,53 +149,6 @@ export default function InstaTab(props) {
             </div>
           )}
 
-          {instaTab === 'messages' && (
-            <div>
-              <div className="yt" style={{fontSize:16,marginBottom:6}}>Messages directs</div>
-              <div style={{fontSize:11,opacity:.55,marginBottom:10,lineHeight:1.5}}>Tu peux répondre dans les 24h suivant le dernier message du client (règle Instagram). Au-delà, réponds depuis l&apos;app.</div>
-
-              {selThread === null && threadsArr.length === 0 && (
-                <div style={{fontSize:12,opacity:.4,padding:20,textAlign:'center'}}>Aucun message récent</div>
-              )}
-
-              {selThread === null && threadsArr.map(function(m,i){
-                var needReply = m.messages && m.messages.length && !m.messages[m.messages.length-1].fromMe
-                return (
-                  <div key={i} className="card" style={{marginBottom:8,borderLeft:'4px solid '+(needReply?'#FF82D7':'#EBEBEB'),cursor:'pointer'}} onClick={function(){ setSelMsg(i); setReplyText('') }}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-                      <div style={{fontWeight:900,fontSize:13}}>@{m.username}{needReply ? <span style={{fontSize:9,background:'#FF82D7',padding:'1px 5px',borderRadius:3,fontWeight:900,color:'#191923',marginLeft:6}}>À RÉPONDRE</span> : null}</div>
-                      <div style={{fontSize:10,opacity:.4,flexShrink:0}}>{m.date}</div>
-                    </div>
-                    <div style={{fontSize:12,lineHeight:1.5,color:'#444',marginTop:4,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{m.lastMessage}</div>
-                  </div>
-                )
-              })}
-
-              {selThread !== null && (
-                <div>
-                  <button className="btn btn-sm" style={{marginBottom:10}} onClick={function(){ setSelMsg(null); setReplyText('') }}>← Retour</button>
-                  <div style={{fontWeight:900,fontSize:14,marginBottom:8}}>@{selThread.username}</div>
-                  <div style={{background:'#FFFFFF',border:'2px solid #191923',borderRadius:7,padding:12,maxHeight:320,overflowY:'auto',marginBottom:10}}>
-                    {threadMsgs.length === 0 && <div style={{fontSize:12,opacity:.4}}>Pas de messages à afficher.</div>}
-                    {threadMsgs.map(function(mm,j){return(
-                      <div key={j} style={{display:'flex',justifyContent: mm.fromMe?'flex-end':'flex-start',marginBottom:6}}>
-                        <div style={{maxWidth:'78%',background: mm.fromMe?'#FF82D7':'#F0F0F0',color:'#191923',padding:'7px 10px',borderRadius:10,fontSize:12,lineHeight:1.45}}>
-                          {mm.text}
-                          <div style={{fontSize:9,opacity:.5,marginTop:3}}>{mm.date}</div>
-                        </div>
-                      </div>
-                    )})}
-                  </div>
-                  <textarea className="inp" placeholder="Ta réponse..." value={replyText} onChange={function(e){ setReplyText(e.target.value) }} style={{minHeight:70}} />
-                  <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
-                    <button className="btn btn-sm btn-y" disabled={drafting} onClick={function(){ aiDraft(selThread) }}>{drafting?'...':'✨ Brouillon IA'}</button>
-                    <button className="btn btn-sm btn-p" disabled={sending} onClick={function(){ sendReply(selThread) }}>{sending?'Envoi...':'Envoyer'}</button>
-                    <a href="https://www.instagram.com/direct/inbox/" target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{marginLeft:'auto'}}>↗ Ouvrir l&apos;app</a>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       )}
     </div>
