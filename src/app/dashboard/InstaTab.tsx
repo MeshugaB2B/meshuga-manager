@@ -121,9 +121,9 @@ export default function InstaTab(props) {
           {instaTab === 'media' && (
             <div>
               <div className="yt" style={{fontSize:16,marginBottom:8}}>Posts récents</div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8}}>
                 {(instaData.media||[]).map(function(p,i){return(
-                  <a key={i} href={p.permalink} target="_blank" rel="noopener noreferrer" style={{textDecoration:'none',color:'inherit'}}>
+                  <a key={i} href={p.permalink} target="_blank" rel="noopener noreferrer" style={{textDecoration:'none',color:'inherit',minWidth:0}}>
                     <div className="card" style={{padding:10,cursor:'pointer'}}>
                       {p.thumbnailUrl && <img src={p.thumbnailUrl} alt="" style={{width:'100%',aspectRatio:'1',objectFit:'cover',borderRadius:4,marginBottom:6}} />}
                       {!p.thumbnailUrl && <div style={{width:'100%',aspectRatio:'1',background:'#FFEB5A',borderRadius:4,marginBottom:6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:28}}>📷</div>}
