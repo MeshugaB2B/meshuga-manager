@@ -9,6 +9,7 @@ import InvoicesReceivedWidget from './InvoicesReceivedWidget'
 import NotifsTab from './NotifsTab'
 import JournalTab from './JournalTab'
 import InstaTab from './InstaTab'
+import GmbTab from './GmbTab'
 import DashboardModals from './DashboardModals'
 import QuotesTab from './catering/QuotesTab'
 import QuoteEditor from './catering/QuoteEditor'
@@ -1255,86 +1256,7 @@ function DashboardImpl() {
             </div>
           )}
 
-          {page === 'gmb' && (
-            <div>
-              <div className='ph'>
-                <div><div className='pt'>Google My Business</div><div className='ps'>{gmbData ? gmbData.rating + ' ★ · ' + gmbData.totalRatings + ' avis' : 'Chargement...'}</div></div>
-                <div style={{display:'flex',gap:6}}>
-                  {gmbData && gmbData.mock && <span style={{fontSize:10,background:'#FF6B2B',color:'#fff',padding:'2px 6px',borderRadius:3,fontWeight:900}}>DEMO</span>}
-                  <button className='btn btn-sm btn-y' onClick={function(){navigator.clipboard.writeText('https://g.page/r/CUKxo2Ia8TH1EBM/review');toast('Lien avis copie ! 📋')}}>📋 Lien avis</button>
-                  <a href='https://business.google.com' target='_blank' rel='noopener noreferrer' className='btn btn-sm'>Gerer →</a>
-                </div>
-              </div>
-              {gmbLoading && <div style={{textAlign:'center',padding:60,opacity:.4}}><div style={{fontSize:36}}>⭐</div><div style={{fontWeight:900,fontSize:12,textTransform:'uppercase',marginTop:8}}>Chargement des avis...</div></div>}
-              {gmbData && (
-                <div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
-                    <div className='kc' style={{background:'#191923',textAlign:'center'}}>
-                      <div className='kl' style={{color:'rgba(255,235,90,.7)'}}>Note Google</div>
-                      <div style={{fontSize:36,fontWeight:900,color:'#FFEB5A',fontFamily:'Arial Narrow,Arial,sans-serif'}}>{gmbData.rating}</div>
-                      <div style={{color:'#FFEB5A',fontSize:16,letterSpacing:2}}>{'★'.repeat(Math.round(gmbData.rating))}</div>
-                      <div style={{fontSize:11,color:'rgba(255,255,255,.4)',marginTop:2}}>{gmbData.totalRatings} avis</div>
-                    </div>
-                    <div className='kc' style={{background:'#FFF',textAlign:'center',cursor:'pointer'}} onClick={function(){setGmbFilter(gmbFilter==='noreply'?'all':'noreply')}}>
-                      <div className='kl'>Sans reponse</div>
-                      <div className='kv' style={{fontSize:28,color:gmbData.withoutReply>0?'#CC0066':'#009D3A'}}>{gmbData.withoutReply}</div>
-                      <div style={{fontSize:10,opacity:.4,marginTop:2}}>{gmbData.withoutReply>0?'⚠️ A traiter':'✅ RAS'}</div>
-                    </div>
-                    <div className='kc' style={{background:'#FFF',textAlign:'center'}}>
-                      <div className='kl'>Ce mois</div>
-                      <div className='kv' style={{fontSize:28}}>{gmbData.reviews.filter(function(r){var d=new Date(r.date);var now=new Date();return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()}).length}</div>
-                      <div style={{fontSize:10,opacity:.4,marginTop:2}}>nouveaux avis</div>
-                    </div>
-                  </div>
-                  <div style={{display:'flex',gap:6,marginBottom:8}}>
-                    {['all','5','4','3','noreply'].map(function(f){return(
-                      <button key={f} className={'btn btn-sm'+(gmbFilter===f?' btn-n':'')} onClick={function(){setGmbFilter(f)}} style={{fontSize:10}}>
-                        {f==='all'?'Tous':f==='noreply'?'Sans reponse':f+'★'}
-                      </button>
-                    )})}
-                  </div>
-                  {gmbData.reviews.slice().sort(function(a,b){return new Date(b.date).getTime()-new Date(a.date).getTime()}).filter(function(r){
-                    if(gmbFilter==='noreply') return !r.replied
-                    if(gmbFilter==='5') return r.rating===5
-                    if(gmbFilter==='4') return r.rating===4
-                    if(gmbFilter==='3') return r.rating<=3
-                    return true
-                  }).map(function(r,i){return(
-                    <div key={i} className='card' style={{marginBottom:8,borderLeft:r.rating<=2?'4px solid #CC0066':r.rating===3?'4px solid #FF6B2B':r.rating===4?'4px solid #FFEB5A':'4px solid #009D3A'}}>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
-                        <div>
-                          <div style={{fontWeight:900,fontSize:13}}>{r.author}</div>
-                          <div style={{fontSize:11,opacity:.5}}>{new Date(r.date).toLocaleDateString('fr-FR')}</div>
-                        </div>
-                        <div style={{display:'flex',gap:4,alignItems:'center'}}>
-                          <span style={{color:'#FFEB5A',fontSize:13,letterSpacing:1}}>{'★'.repeat(r.rating)}{'☆'.repeat(5-r.rating)}</span>
-                          {!r.replied && <span style={{fontSize:9,background:'#CC0066',color:'#fff',padding:'1px 5px',borderRadius:3,fontWeight:900}}>SANS REPONSE</span>}
-                        </div>
-                      </div>
-                      {r.text && <div style={{fontSize:12,lineHeight:1.5,color:'#444',marginBottom:r.replied||!r.text?0:8}}>{r.text}</div>}
-                      {!r.replied && (
-                        <button className='btn btn-sm btn-y' style={{fontSize:10,marginTop:6}} onClick={function(){window.open('https://business.google.com/reviews','_blank')}}>
-                          ✍️ Repondre sur Google Business
-                        </button>
-                      )}
-                      {r.replied && (
-                        <div style={{marginTop:8,borderLeft:'3px solid #009D3A',paddingLeft:10,background:'#F0FFF4',borderRadius:'0 4px 4px 0',padding:'8px 10px'}}>
-                          <div style={{fontSize:10,fontWeight:900,color:'#009D3A',marginBottom:3}}>✅ Réponse de Meshuga :</div>
-                          {r.reply_text
-                            ? <div style={{fontSize:12,lineHeight:1.5,color:'#333'}}>{r.reply_text}</div>
-                            : <div style={{fontSize:11,color:'#009D3A',fontStyle:'italic'}}>Réponse envoyée sur Google Business</div>
-                          }
-                        </div>
-                      )}
-                    </div>
-                  )})}
-                  <div style={{textAlign:'center',padding:'12px 0',opacity:.4,fontSize:12}}>
-                    Google Places API · {gmbData.mock?'Mode demonstration - Ajoutez GOOGLE_MAPS_SERVER_KEY dans Vercel pour les vrais avis':'Donnees en temps reel'}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+         {page === 'gmb' && <GmbTab />}
 
           {page === 'devis' && (
             <div>
