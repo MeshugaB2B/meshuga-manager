@@ -63,7 +63,7 @@ var NAV_SECTIONS = [
     items: [
       { id: 'rh', label: 'Ressources Humaines', icon: '👥', badgeKey: 'rh' },
       { id: 'legal', label: 'Légal & Docs', icon: '🗂️' },
-      { id: 'journal', label: 'Journal Emy', icon: '📓', edwardOnly: true },
+      { id: 'journal', label: 'Suivi commercial', icon: '📊', edwardOnly: true },
     ]
   },
   {
