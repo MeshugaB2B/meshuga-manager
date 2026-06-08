@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { weekFromMonday, buildWeeklyMetrics, synthesizeWeek, buildReportPage, verifyWeek } from '@/lib/weeklyReport'
+import { weekFromMonday, buildWeeklyMetrics, synthesizeWeek, buildReportPage, buildPlanHtml, ackUrl, verifyWeek } from '@/lib/weeklyReport'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +27,22 @@ export async function GET(req) {
     var sb = getSupabase()
     var m = await buildWeeklyMetrics(sb, w)
     var synth = await synthesizeWeek(m)
-    return htmlResponse(buildReportPage(m, synth))
+
+    // Récupère le plan stocké + statut de lecture
+    var planHtml = ''
+    var readInfo = null
+    try {
+      var row = await sb.from('weekly_reports').select('plan_json, read_at, read_by').eq('week_start', week).order('created_at', { ascending: false }).limit(1).single()
+      if (row && row.data) {
+        readInfo = { read_at: row.data.read_at, read_by: row.data.read_by }
+        var pj = row.data.plan_json
+        if (pj && pj.plan) {
+          planHtml = buildPlanHtml(pj.plan, pj.forecast, pj.school, pj.pubHols, pj.syncedTasks, pj.planLabel, ackUrl(week))
+        }
+      }
+    } catch (e) { /* pas de plan stocké : on affiche le bilan seul */ }
+
+    return htmlResponse(buildReportPage(m, synth, planHtml, readInfo))
   } catch (e) {
     return htmlResponse('<!DOCTYPE html><body style="font-family:sans-serif;padding:40px;">Erreur de génération du rapport.</body>', 500)
   }
