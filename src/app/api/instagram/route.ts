@@ -67,7 +67,7 @@ export async function GET() {
     let messages: any[] = []
     try {
       const inboxRes = await fetch(
-        'https://graph.facebook.com/v19.0/me/conversations?platform=instagram&fields=participants,messages{message,created_time,from}&access_token=' + token
+        'https://graph.instagram.com/v23.0/me/conversations?platform=instagram&fields=id,updated_time,participants,messages{id,message,created_time,from}&access_token=' + token
       )
       const inboxData = await inboxRes.json()
       if (!inboxData.error) {
