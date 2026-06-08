@@ -1816,7 +1816,7 @@ function DashboardImpl() {
           <div className={page === "legal" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("legal"); setMenuOpen(false) }}><div className="mms-tile-ico">{"🗂️"}</div><div className="mms-tile-lbl">Légal</div></div>
           {!isEmy && <div className={page === "journal" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("journal"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📓"}</div><div className="mms-tile-lbl">Journal</div></div>}
         </div>
-        <div className="mms-sec">Marketing</div>
+        <div className="mms-sec">Réseaux & Avis</div>
         <div className="mms-grid">
           <div className={page === "instagram" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("instagram"); setMenuOpen(false) }}><div className="mms-tile-ico">{"📸"}</div><div className="mms-tile-lbl">Instagram</div></div>
           <div className={page === "gmb" ? "mms-tile active" : "mms-tile"} onClick={function(){ nav("gmb"); setMenuOpen(false) }}><div className="mms-tile-ico">{"⭐"}</div><div className="mms-tile-lbl">Google Biz</div></div>
