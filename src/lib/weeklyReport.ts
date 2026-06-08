@@ -97,6 +97,219 @@ export function lastCompletedWeek() {
 
 export function weekFromMonday(mondayStr) { return buildWeekObj(parseYmd(mondayStr)) }
 
+// ============================================================
+// PLAN DE LA SEMAINE A VENIR (meteo, vacances, evenements, conseils, taches)
+// ============================================================
+var JOURS_FR = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+var PARIS_LAT = 48.8566
+var PARIS_LON = 2.3522
+
+// Semaine a venir = semaine en cours (le bilan part le lundi matin)
+export function upcomingWeek() {
+  var now = new Date()
+  var todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  return buildWeekObj(mondayOf(todayUtc))
+}
+
+var FR_PUBLIC_HOLIDAYS = {
+  '2026-01-01': "Jour de l'An", '2026-04-06': 'Lundi de Paques', '2026-05-01': 'Fete du Travail',
+  '2026-05-08': 'Victoire 1945', '2026-05-14': 'Ascension', '2026-05-25': 'Lundi de Pentecote',
+  '2026-07-14': 'Fete nationale', '2026-08-15': 'Assomption', '2026-11-01': 'Toussaint',
+  '2026-11-11': 'Armistice', '2026-12-25': 'Noel',
+  '2027-01-01': "Jour de l'An", '2027-03-29': 'Lundi de Paques', '2027-05-01': 'Fete du Travail',
+  '2027-05-08': 'Victoire 1945', '2027-05-06': 'Ascension', '2027-05-17': 'Lundi de Pentecote',
+  '2027-07-14': 'Fete nationale', '2027-08-15': 'Assomption', '2027-11-01': 'Toussaint',
+  '2027-11-11': 'Armistice', '2027-12-25': 'Noel'
+}
+
+function getPublicHolidays(week) {
+  var out = []
+  var d = parseYmd(week.startStr)
+  for (var i = 0; i < 7; i++) {
+    var key = ymd(d)
+    if (FR_PUBLIC_HOLIDAYS[key]) out.push({ date: key, name: FR_PUBLIC_HOLIDAYS[key] })
+    d = addDays(d, 1)
+  }
+  return out
+}
+
+function weatherLabel(code) {
+  var c = parseInt(code, 10)
+  if (c === 0) return { emoji: '\u2600\uFE0F', label: 'Ensoleille' }
+  if (c <= 3) return { emoji: '\u26C5', label: 'Nuageux' }
+  if (c === 45 || c === 48) return { emoji: '\uD83C\uDF2B\uFE0F', label: 'Brouillard' }
+  if (c >= 51 && c <= 57) return { emoji: '\uD83C\uDF26\uFE0F', label: 'Bruine' }
+  if (c >= 61 && c <= 67) return { emoji: '\uD83C\uDF27\uFE0F', label: 'Pluie' }
+  if (c >= 71 && c <= 77) return { emoji: '\u2744\uFE0F', label: 'Neige' }
+  if (c >= 80 && c <= 82) return { emoji: '\uD83C\uDF27\uFE0F', label: 'Averses' }
+  if (c >= 85 && c <= 86) return { emoji: '\uD83C\uDF28\uFE0F', label: 'Averses de neige' }
+  if (c >= 95) return { emoji: '\u26C8\uFE0F', label: 'Orage' }
+  return { emoji: '\uD83C\uDF21\uFE0F', label: '-' }
+}
+
+async function getForecast(week) {
+  try {
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + PARIS_LAT + '&longitude=' + PARIS_LON
+      + '&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum'
+      + '&timezone=Europe%2FParis&start_date=' + week.startStr + '&end_date=' + week.endStr
+    var res = await fetch(url)
+    var data = await res.json()
+    if (!data || !data.daily || !data.daily.time) return []
+    var out = []
+    for (var i = 0; i < data.daily.time.length; i++) {
+      var dt = parseYmd(data.daily.time[i])
+      var wl = weatherLabel(data.daily.weathercode[i])
+      out.push({
+        date: data.daily.time[i],
+        jour: JOURS_FR[(dt.getUTCDay() + 6) % 7],
+        tmax: Math.round(data.daily.temperature_2m_max[i]),
+        tmin: Math.round(data.daily.temperature_2m_min[i]),
+        precip: data.daily.precipitation_sum[i],
+        emoji: wl.emoji, label: wl.label
+      })
+    }
+    return out
+  } catch (e) { console.error('[weeklyReport] forecast echouee:', e); return [] }
+}
+
+async function getSchoolHolidays(week) {
+  try {
+    var where = encodeURIComponent('zones="Zone C" and start_date<="' + week.endStr + 'T23:59:59+00:00" and end_date>="' + week.startStr + 'T00:00:00+00:00"')
+    var url = 'https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records?where=' + where + '&limit=3'
+    var res = await fetch(url)
+    var data = await res.json()
+    if (data && data.results && data.results.length) {
+      var r = data.results[0]
+      return { name: r.description || 'Vacances scolaires', start: (r.start_date || '').slice(0, 10), end: (r.end_date || '').slice(0, 10) }
+    }
+    return null
+  } catch (e) { console.error('[weeklyReport] vacances echouees:', e); return null }
+}
+
+export function ackUrl(weekStart) {
+  var base = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://meshuga-manager.vercel.app').replace(/\/$/, '')
+  return base + '/api/weekly-report/ack?week=' + weekStart + '&t=' + signWeek(weekStart) + '&r=emy'
+}
+
+function weatherSummaryTxt(forecast) {
+  if (!forecast || !forecast.length) return 'previsions indisponibles'
+  return forecast.map(function (f) { return f.jour + ' ' + f.tmax + 'C' + (f.precip >= 2 ? ' pluie' : '') }).join(', ')
+}
+
+export async function synthesizePlan(ctx) {
+  var forecast = ctx.forecast || []
+  var hot = forecast.filter(function (f) { return f.tmax >= 28 }).length
+  var rainy = forecast.filter(function (f) { return f.precip >= 2 }).length
+  var cold = forecast.filter(function (f) { return f.tmax <= 8 }).length
+  var fbMeteo = []
+  if (hot) fbMeteo.push('Forte chaleur prevue (' + hot + 'j) : mettre en avant la Pink Limonade et les boissons fraiches, soigner la terrasse.')
+  if (rainy) fbMeteo.push('Jours de pluie (' + rainy + 'j) : pousser la livraison (Uber/Deliveroo) et le click & collect.')
+  if (cold) fbMeteo.push('Temps frais : mettre en avant les produits chauds.')
+  if (!fbMeteo.length) fbMeteo.push('Meteo clemente : journee terrasse, mettre les nouveautes en avant en vitrine.')
+  var fallback = {
+    prospection: [
+      'Contacter 20 prospects bureaux/entreprises du quartier (6e, 7e, 8e).',
+      'Relancer les devis Meshuga Events en attente de reponse.',
+      'Caler 1 degustation decouverte (dejeuner offert) avec un prospect chaud.'
+    ],
+    meteo: fbMeteo,
+    frequentation: ctx.schoolHoliday ? ('Vacances scolaires (' + ctx.schoolHoliday.name + ') : frequentation bureaux en baisse, mais hausse possible cote touristes/familles au 6e.') : 'Semaine ordinaire : frequentation standard attendue.',
+    events_note: (ctx.publicHolidays && ctx.publicHolidays.length) ? ('Jour ferie cette semaine : ' + ctx.publicHolidays.map(function (h) { return h.name + ' (' + h.date.slice(8, 10) + '/' + h.date.slice(5, 7) + ')' }).join(', ') + ' - anticiper affluence et planning.') : '',
+    taches: [
+      { title: 'Contacter 20 prospects bureaux du quartier', priority: 'high', day: 1 },
+      { title: 'Relancer les devis en attente', priority: 'medium', day: 2 },
+      { title: 'Caler 1 degustation decouverte', priority: 'high', day: 3 }
+    ]
+  }
+  var apiKey = process.env.ANTHROPIC_API_KEY || ''
+  if (!apiKey) return fallback
+  var prompt = "Tu es le conseiller commercial et operationnel du restaurant street-food Meshuga (Paris 6e, 3 rue Vavin), marque traiteur Meshuga Events. "
+    + "Prepare le plan de LA SEMAINE A VENIR (" + ctx.weekLabel + ") pour Edward (gerant) et Emy (commerciale B2B).\n"
+    + "Contexte reel :\n"
+    + "- Meteo Paris (jour, T max, pluie) : " + weatherSummaryTxt(forecast) + "\n"
+    + "- Vacances scolaires zone C (Paris) : " + (ctx.schoolHoliday ? ('OUI - ' + ctx.schoolHoliday.name) : 'non') + "\n"
+    + "- Jours feries cette semaine : " + ((ctx.publicHolidays && ctx.publicHolidays.length) ? ctx.publicHolidays.map(function (h) { return h.name + ' ' + h.date }).join(', ') : 'aucun') + "\n"
+    + "- Prospects B2B en attente de contact : " + (ctx.backlog || 0) + "\n\n"
+    + "Consignes : conseils concrets, realistes, actionnables, sans flatterie. Pour la meteo, donne des actions concretes (chaleur -> boissons/limonade/terrasse ; pluie -> livraison). Pour les evenements parisiens, reste PRUDENT et indicatif (ne cite que des evenements recurrents notoires si vraiment pertinents, jamais inventes).\n"
+    + 'Reponds UNIQUEMENT en JSON valide (pas de markdown, pas de backticks) : {"prospection":["..3 max.."],"meteo":["..2 max.."],"frequentation":"1 phrase hausse/baisse + pourquoi","events_note":"court, indicatif, peut etre vide","taches":[{"title":"action concrete et courte pour Emy","priority":"high|medium|low","day":0}]}. '
+    + 'Les taches (3 a 5) doivent reprendre concretement les conseils de prospection et de meteo. "day" = 0 (lundi) a 4 (vendredi). En francais.'
+  try {
+    var res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 800, messages: [{ role: 'user', content: prompt }] })
+    })
+    var data = await res.json()
+    var txt = ''
+    if (data && data.content) { data.content.forEach(function (b) { if (b.type === 'text') txt += b.text }) }
+    txt = txt.replace(/```json/g, '').replace(/```/g, '').trim()
+    var parsed = JSON.parse(txt)
+    if (!parsed.prospection || !parsed.prospection.length) parsed.prospection = fallback.prospection
+    if (!parsed.meteo || !parsed.meteo.length) parsed.meteo = fallback.meteo
+    if (!parsed.frequentation) parsed.frequentation = fallback.frequentation
+    if (!parsed.taches || !parsed.taches.length) parsed.taches = fallback.taches
+    if (parsed.events_note == null) parsed.events_note = fallback.events_note
+    return parsed
+  } catch (e) {
+    console.error('[weeklyReport] synthese plan echouee, fallback:', e)
+    return fallback
+  }
+}
+
+export async function syncPlanTasks(sb, week, taches) {
+  var inserted = []
+  try {
+    await sb.from('tasks').delete().eq('category', 'plan_hebdo').eq('status', 'todo').gte('deadline', week.startStr).lte('deadline', week.endStr)
+  } catch (e) { console.error('[weeklyReport] delete plan tasks:', e) }
+  var rows = (taches || []).slice(0, 6).map(function (t) {
+    var off = parseInt(t.day != null ? t.day : 0, 10)
+    if (isNaN(off) || off < 0) off = 0
+    if (off > 6) off = 6
+    var dl = ymd(addDays(parseYmd(week.startStr), off))
+    var pr = (t.priority === 'high' || t.priority === 'low') ? t.priority : 'medium'
+    return { title: String(t.title || 'Action').slice(0, 200), assignee: 'emy', status: 'todo', priority: pr, deadline: dl, category: 'plan_hebdo', description: 'Plan de la semaine (genere automatiquement le lundi)' }
+  })
+  if (!rows.length) return inserted
+  try {
+    var ins = await sb.from('tasks').insert(rows).select('title, deadline, priority')
+    inserted = ins.data || rows
+  } catch (e) { console.error('[weeklyReport] insert plan tasks:', e); inserted = rows }
+  return inserted
+}
+
+export function buildPlanHtml(plan, forecast, school, pubHols, syncedTasks, planLabel, ackUrlStr) {
+  plan = plan || {}
+  var fc = forecast || []
+  var weatherRow = fc.length
+    ? '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;"><tr>' + fc.map(function (f) {
+        return '<td style="text-align:center;padding:6px 2px;border:1px solid #EBEBEB;"><div style="font-weight:700;text-transform:capitalize;color:#191923;">' + esc(f.jour.slice(0, 3)) + '</div><div style="font-size:18px;">' + f.emoji + '</div><div style="font-weight:900;color:#191923;">' + f.tmax + 'C</div></td>'
+      }).join('') + '</tr></table>'
+    : '<div style="font-size:12px;color:#888;margin-bottom:10px;">Previsions meteo indisponibles.</div>'
+  var holLine = ''
+  if (school) holLine += '<div style="font-size:12px;color:#191923;margin-bottom:3px;">\uD83C\uDFEB <b>Vacances scolaires (Paris)</b> - ' + esc(school.name) + '</div>'
+  if (pubHols && pubHols.length) holLine += '<div style="font-size:12px;color:#191923;margin-bottom:3px;">\uD83C\uDF8C <b>Jour ferie</b> : ' + pubHols.map(function (h) { return esc(h.name) + ' (' + h.date.slice(8, 10) + '/' + h.date.slice(5, 7) + ')' }).join(', ') + '</div>'
+  var ul = function (arr) { return '<ul style="margin:4px 0 10px;padding-left:18px;font-size:13px;color:#191923;line-height:1.5;">' + (arr || []).map(function (x) { return '<li style="margin-bottom:4px;">' + esc(x) + '</li>' }).join('') + '</ul>' }
+  var tasksList = (syncedTasks && syncedTasks.length)
+    ? '<ul style="margin:4px 0 0;padding-left:18px;font-size:13px;color:#191923;line-height:1.5;">' + syncedTasks.map(function (t) { return '<li style="margin-bottom:4px;"><b>' + esc(t.title) + '</b>' + (t.deadline ? ' <span style="color:#777;">- ' + t.deadline.slice(8, 10) + '/' + t.deadline.slice(5, 7) + '</span>' : '') + '</li>' }).join('') + '</ul>'
+    : '<div style="font-size:12px;color:#888;">Aucune tache generee.</div>'
+  var ackBtn = ackUrlStr
+    ? '<div style="text-align:center;margin-top:16px;border-top:1.5px dashed #CCC;padding-top:14px;"><div style="font-size:11px;color:#777;margin-bottom:8px;">Emy, merci de confirmer ta lecture :</div><a href="' + ackUrlStr + '" style="display:inline-block;background:#FFEB5A;color:#191923;border:2px solid #191923;border-radius:8px;padding:11px 22px;font-weight:900;font-size:14px;text-decoration:none;box-shadow:3px 3px 0 #191923;">\u2705 J\'ai lu le plan de la semaine</a></div>'
+    : ''
+  return ''
+    + '<div style="background:#191923;border-radius:8px 8px 0 0;padding:12px 16px;margin-top:8px;"><div style="font-family:Yellowtail,cursive;font-size:24px;color:#FFEB5A;line-height:1;">Plan de la semaine</div><div style="font-size:11px;color:#FFFFFF;opacity:.8;margin-top:2px;">' + esc(planLabel || '') + '</div></div>'
+    + '<div style="background:#FFFFFF;border:2px solid #191923;border-top:none;border-radius:0 0 8px 8px;padding:16px;box-shadow:4px 4px 0 #191923;margin-bottom:18px;">'
+      + '<div style="font-weight:900;font-size:13px;color:#191923;margin-bottom:6px;">\uD83C\uDF24\uFE0F Meteo de la semaine</div>' + weatherRow
+      + ((plan.meteo && plan.meteo.length) ? ul(plan.meteo) : '')
+      + (holLine ? ('<div style="margin:8px 0;">' + holLine + '</div>') : '')
+      + (plan.frequentation ? '<div style="font-size:13px;color:#191923;background:#FFFEF2;border-left:4px solid #FFEB5A;padding:8px 10px;margin:8px 0;"><b>Frequentation :</b> ' + esc(plan.frequentation) + '</div>' : '')
+      + (plan.events_note ? '<div style="font-size:12px;color:#777;margin-bottom:8px;">\uD83D\uDCCC ' + esc(plan.events_note) + '</div>' : '')
+      + '<div style="font-weight:900;font-size:13px;color:#191923;margin:12px 0 2px;">\uD83D\uDCE3 Prospection</div>' + ul(plan.prospection)
+      + '<div style="font-weight:900;font-size:13px;color:#191923;margin:12px 0 4px;">\u2705 A faire cette semaine <span style="font-weight:400;color:#777;font-size:11px;">(synchronise avec les taches d\'Emy)</span></div>' + tasksList
+      + ackBtn
+    + '</div>'
+}
+
+
 // ---- Formatage --------------------------------------------------------------
 export function euro(n) {
   var v = Math.round((Number(n) || 0) * 100) / 100
@@ -289,7 +502,7 @@ function channelBars(obj, total) {
   }).join('')
 }
 
-export function buildEmailHtml(m, synth) {
+export function buildEmailHtml(m, synth, planHtml) {
   var deltaBadge = m.ca.deltaPct == null
     ? ''
     : '<span style="display:inline-block;font-size:13px;font-weight:900;padding:2px 10px;border:2px solid #191923;border-radius:20px;background:' + (m.ca.deltaPct >= 0 ? '#FFEB5A' : '#FF82D7') + ';color:#191923;">' + esc(pct(m.ca.deltaPct)) + ' vs S-1</span>'
@@ -372,6 +585,7 @@ export function buildEmailHtml(m, synth) {
   '</div>' +
 
   tasksAgendaBlock +
+  (planHtml || '') +
 
   '<div style="font-size:12px;color:#777;border-top:1.5px solid #EBEBEB;padding-top:12px;">' + commercialLine + '</div>' +
   '<div style="font-size:11px;color:#AAA;margin-top:14px;text-align:center;">Bilan généré automatiquement par Meshuga Manager.</div>' +
@@ -389,13 +603,17 @@ export function buildSmsBody(m, url) {
 }
 
 // ---- Page web du rapport (lien SMS) — même rendu que l'email + bouton PDF ----
-export function buildReportPage(m, synth) {
-  var inner = buildEmailHtml(m, synth)
+export function buildReportPage(m, synth, planHtml, readInfo) {
+  var inner = buildEmailHtml(m, synth, planHtml)
+  var readBanner = readInfo && readInfo.read_at
+    ? '<div style="background:#D0F5E0;border:2px solid #191923;color:#0A7D2E;font-weight:900;text-align:center;padding:8px;font-size:13px;">\u2705 Lu par ' + esc(readInfo.read_by || 'Emy') + ' le ' + new Date(readInfo.read_at).toLocaleString("fr-FR") + '</div>'
+    : ''
   return '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8" />'
     + '<meta name="viewport" content="width=device-width, initial-scale=1" />'
     + '<title>Bilan Meshuga — ' + esc(m.weekLabel) + '</title>'
     + '<style>body{margin:0;background:#FFFFFF;} @media print{.no-print{display:none !important;}}</style>'
     + '</head><body>'
+    + readBanner
     + '<div class="no-print" style="position:sticky;top:0;background:#191923;padding:10px 16px;text-align:right;z-index:10;">'
     + '<button onclick="window.print()" style="background:#FF82D7;color:#FFFFFF;border:2px solid #FFFFFF;border-radius:6px;padding:8px 16px;font-weight:900;font-size:14px;cursor:pointer;">📄 Télécharger / Imprimer en PDF</button>'
     + '</div>'
@@ -423,6 +641,19 @@ export async function runWeeklyReport(sb, week, doSend) {
   var metrics = await buildWeeklyMetrics(sb, week)
   var synth = await synthesizeWeek(metrics)
 
+  // ---- Plan de la semaine a venir ----
+  var planWeek = upcomingWeek()
+  var forecast = await getForecast(planWeek)
+  var school = await getSchoolHolidays(planWeek)
+  var pubHols = getPublicHolidays(planWeek)
+  var backlog = 0
+  try { var bk = await sb.from('chasse_prospects').select('id', { count: 'exact', head: true }).eq('status', 'to_contact'); backlog = bk.count || 0 } catch (e) {}
+  var plan = await synthesizePlan({ weekLabel: planWeek.label, forecast: forecast, schoolHoliday: school, publicHolidays: pubHols, backlog: backlog })
+  var syncedTasks = doSend
+    ? await syncPlanTasks(sb, planWeek, plan.taches)
+    : (plan.taches || []).map(function (t) { var off = parseInt(t.day != null ? t.day : 0, 10); if (isNaN(off) || off < 0) off = 0; if (off > 6) off = 6; return { title: t.title, priority: t.priority, deadline: ymd(addDays(parseYmd(planWeek.startStr), off)) } })
+  var planHtml = buildPlanHtml(plan, forecast, school, pubHols, syncedTasks, planWeek.label, ackUrl(metrics.weekStart))
+
   var snapshot = {
     week_label: metrics.weekLabel,
     week_start: metrics.weekStart,
@@ -437,7 +668,8 @@ export async function runWeeklyReport(sb, week, doSend) {
     next_week_priorities: (synth.priorites || []).join('\n'),
     free_notes: 'Tickets ' + metrics.tickets.total + ' | Panier ' + (Math.round(metrics.ticketMoyen * 100) / 100) + ' | Jours Z ' + metrics.daysWithZ + '/7',
     status: 'auto',
-    submitted_at: new Date().toISOString()
+    submitted_at: new Date().toISOString(),
+    plan_json: { plan: plan, forecast: forecast, school: school, pubHols: pubHols, syncedTasks: syncedTasks, planLabel: planWeek.label }
   }
   var savedId = null
   try {
@@ -446,7 +678,7 @@ export async function runWeeklyReport(sb, week, doSend) {
     if (ins.error) console.error('[weeklyReport] insert:', ins.error.message)
   } catch (e) { console.error('[weeklyReport] insert exception:', e) }
 
-  var result = { ok: true, week: week, metrics: metrics, synthesis: synth, savedId: savedId, emailSent: false, smsSent: false, recipients: [], errors: [] }
+  var result = { ok: true, week: week, metrics: metrics, synthesis: synth, plan: plan, syncedTasks: syncedTasks, savedId: savedId, emailSent: false, smsSent: false, recipients: [], errors: [] }
   if (!metrics.hasData) { result.note = 'Aucune donnee de caisse sur la periode — rien envoye.'; return result }
   if (!doSend) return result
 
@@ -459,7 +691,7 @@ export async function runWeeklyReport(sb, week, doSend) {
       var er = await sendBrevoEmail({
         to: toList,
         subject: '\uD83D\uDCCA Bilan Meshuga — ' + metrics.weekLabel,
-        htmlContent: buildEmailHtml(metrics, synth),
+        htmlContent: buildEmailHtml(metrics, synth, planHtml),
         sender: { email: 'hello@meshuga.fr', name: 'Meshuga Reporting' }
       })
       if (er && er.ok) { result.emailSent = true; result.emailId = er.messageId || null }
