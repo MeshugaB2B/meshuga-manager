@@ -64,6 +64,7 @@ export async function GET() {
     }
 
     // Messages directs (best-effort : permission Meta souvent à valider séparément)
+    const myId = String(profile.id || '')
     let messages: any[] = []
     try {
       const inboxRes = await fetch(
@@ -71,18 +72,35 @@ export async function GET() {
       )
       const inboxData = await inboxRes.json()
       if (!inboxData.error) {
-        messages = (inboxData.data || []).slice(0, 10).map(function (conv: any) {
-          const lastMsg = conv.messages && conv.messages.data && conv.messages.data[0]
-          const participant = ((conv.participants && conv.participants.data) || []).find(function (p: any) { return p.username !== 'meshuga.deli' })
+        messages = (inboxData.data || []).slice(0, 20).map(function (conv: any) {
+          const msgs = (conv.messages && conv.messages.data) || []
+          const other = ((conv.participants && conv.participants.data) || []).find(function (p: any) { return String(p.id) !== myId })
+          const last = msgs[0]
+          // L'API renvoie les messages du plus récent au plus ancien -> on inverse pour l'affichage chronologique
+          const thread = msgs.slice().reverse().map(function (m: any) {
+            return {
+              text: m.message || '',
+              fromMe: !!(m.from && String(m.from.id) === myId),
+              date: m.created_time ? new Date(m.created_time).toLocaleString('fr-FR') : '',
+            }
+          })
           return {
-            username: participant ? (participant.username || participant.name) : 'utilisateur',
-            lastMessage: lastMsg ? lastMsg.message : '',
-            date: lastMsg ? new Date(lastMsg.created_time).toLocaleDateString('fr-FR') : '',
-            read: false,
+            conversationId: conv.id || null,
+            recipientId: other ? other.id : (last && last.from ? last.from.id : null),
+            username: other ? (other.username || other.name || 'utilisateur') : 'utilisateur',
+            lastMessage: last ? (last.message || '') : '',
+            date: last && last.created_time ? new Date(last.created_time).toLocaleDateString('fr-FR') : '',
+            updatedTime: conv.updated_time || '',
+            messages: thread,
           }
         })
       }
     } catch (e) { messages = [] }
+
+    // "À répondre" = fils dont le dernier message vient du client (pas de nous)
+    const toReply = messages.filter(function (m: any) {
+      return m.messages && m.messages.length && !m.messages[m.messages.length - 1].fromMe
+    }).length
 
     return NextResponse.json({
       ok: true,
@@ -90,7 +108,7 @@ export async function GET() {
       username: profile.username || '',
       followers: profile.followers_count || 0,
       mediaCount: profile.media_count || 0,
-      unreadMessages: messages.length,
+      unreadMessages: toReply,
       comments,
       messages,
       media,
