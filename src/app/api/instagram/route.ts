@@ -66,11 +66,15 @@ export async function GET() {
     // Messages directs (best-effort : permission Meta souvent à valider séparément)
     const myId = String(profile.id || '')
     let messages: any[] = []
+    let mdebug: string | null = null
     try {
       const inboxRes = await fetch(
         'https://graph.instagram.com/v23.0/me/conversations?platform=instagram&fields=id,updated_time,participants,messages{id,message,created_time,from}&access_token=' + token
       )
       const inboxData = await inboxRes.json()
+      if (inboxData.error) {
+        mdebug = 'conv_error: ' + String(inboxData.error.message || JSON.stringify(inboxData.error)).slice(0, 220)
+      }
       if (!inboxData.error) {
         messages = (inboxData.data || []).slice(0, 20).map(function (conv: any) {
           const msgs = (conv.messages && conv.messages.data) || []
@@ -95,7 +99,8 @@ export async function GET() {
           }
         })
       }
-    } catch (e) { messages = [] }
+      if (!messages.length && !mdebug) mdebug = 'conv_ok_0_conversations'
+    } catch (e: any) { messages = []; mdebug = 'exception: ' + String(e && e.message ? e.message : e).slice(0, 180) }
 
     // "À répondre" = fils dont le dernier message vient du client (pas de nous)
     const toReply = messages.filter(function (m: any) {
@@ -109,6 +114,7 @@ export async function GET() {
       followers: profile.followers_count || 0,
       mediaCount: profile.media_count || 0,
       unreadMessages: toReply,
+      mdebug,
       comments,
       messages,
       media,
