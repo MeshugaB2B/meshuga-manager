@@ -296,7 +296,7 @@ export function buildPlanHtml(plan, forecast, school, pubHols, syncedTasks, plan
     ? '<div style="text-align:center;margin-top:16px;border-top:1.5px dashed #CCC;padding-top:14px;"><div style="font-size:11px;color:#777;margin-bottom:8px;">Emy, merci de confirmer ta lecture :</div><a href="' + ackUrlStr + '" style="display:inline-block;background:#FFEB5A;color:#191923;border:2px solid #191923;border-radius:8px;padding:11px 22px;font-weight:900;font-size:14px;text-decoration:none;box-shadow:3px 3px 0 #191923;">\u2705 J\'ai lu le plan de la semaine</a></div>'
     : ''
   return ''
-    + '<div style="background:#191923;border-radius:8px 8px 0 0;padding:12px 16px;margin-top:8px;"><div style="font-family:Yellowtail,cursive;font-size:24px;color:#FFEB5A;line-height:1;">Plan de la semaine</div><div style="font-size:11px;color:#FFFFFF;opacity:.8;margin-top:2px;">' + esc(planLabel || '') + '</div></div>'
+    + '<div style="background:#191923;border-radius:8px 8px 0 0;padding:12px 16px;margin-top:8px;"><div style="font-size:20px;font-weight:900;color:#FFEB5A;line-height:1.1;text-transform:uppercase;letter-spacing:1px;">Plan de la semaine</div><div style="font-size:11px;color:#FFFFFF;opacity:.8;margin-top:3px;">' + esc(planLabel || '') + '</div></div>'
     + '<div style="background:#FFFFFF;border:2px solid #191923;border-top:none;border-radius:0 0 8px 8px;padding:16px;box-shadow:4px 4px 0 #191923;margin-bottom:18px;">'
       + '<div style="font-weight:900;font-size:13px;color:#191923;margin-bottom:6px;">\uD83C\uDF24\uFE0F Meteo de la semaine</div>' + weatherRow
       + ((plan.meteo && plan.meteo.length) ? ul(plan.meteo) : '')
