@@ -11,7 +11,7 @@ import { LOGO_PINK } from './logos'
 //   2. 💼 Commercial B2B    : CRM, Chasse, Devis, Reporting (Edward only)
 //   3. 🍳 Cuisine & Achats  : Recettes, Achats, Annuaire
 //   4. 👥 Équipe & Admin    : RH, Légal, Journal Emy (Edward only)
-//   5. 📣 Marketing         : Instagram, Google My Business
+//   5. 📣 Réseaux & Avis     : Instagram, Google My Business
 //   6. 🗂️ Outils            : Calendrier, Notifications, Coffre-fort
 //
 // Features :
@@ -68,7 +68,7 @@ var NAV_SECTIONS = [
   },
   {
     id: 'marketing',
-    label: 'Marketing',
+    label: 'Réseaux & Avis',
     items: [
       { id: 'instagram', label: 'Instagram', icon: '📸' },
       { id: 'gmb', label: 'Google My Biz.', icon: '⭐' },
