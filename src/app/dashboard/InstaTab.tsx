@@ -25,7 +25,6 @@ export default function InstaTab(props) {
           <div className="ps">Commentaires et messages</div>
         </div>
         <div style={{display:'flex',gap:6,alignItems:'center'}}>
-          {instaData && instaData.mock && <span style={{fontSize:10,background:'#FF6B2B',color:'#fff',padding:'2px 6px',borderRadius:3,fontWeight:900}}>DEMO</span>}
           <a href="https://www.instagram.com/meshuga.deli/" target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p">Ouvrir Instagram →</a>
         </div>
       </div>
@@ -37,20 +36,24 @@ export default function InstaTab(props) {
         </div>
       )}
 
-      {!instaLoading && instaData && !instaData.ok && (
+      {!instaLoading && instaData && (!instaData.ok || !instaData.connected) && (
         <div className="card" style={{borderLeft:'4px solid #FF6B2B',padding:'16px 20px'}}>
-          <div style={{fontWeight:900,marginBottom:6}}>⚙️ Configuration requise</div>
-          <div style={{fontSize:12,opacity:.7,lineHeight:1.7}}>
+          <div style={{fontWeight:900,marginBottom:6}}>📸 Instagram non connecté</div>
+          {instaData && instaData.reason === 'token_invalid' && (
+            <div style={{fontSize:12,color:'#C8166A',fontWeight:700,marginBottom:8}}>⚠️ Jeton invalide ou expiré — régénère un jeton longue durée et mets à jour INSTAGRAM_ACCESS_TOKEN dans Vercel.</div>
+          )}
+          <div style={{fontSize:12,opacity:.75,lineHeight:1.8}}>
+            Aucune donnée fictive ici : la tab affichera tes vraies stats dès que le compte sera relié.<br/><br/>
             Pour connecter Instagram :<br/>
-            1. Crée une app Meta sur <a href="https://developers.facebook.com" target="_blank" style={{color:'#005FFF'}}>developers.facebook.com</a><br/>
-            2. Active <strong>Instagram Graph API</strong> + permissions <code>instagram_basic</code>, <code>instagram_manage_comments</code>, <code>pages_messaging</code><br/>
-            3. Ajoute <strong>INSTAGRAM_ACCESS_TOKEN</strong> dans tes variables Vercel<br/>
-            4. Redéploie
+            1. Passe le compte <strong>@meshuga.deli</strong> en mode <strong>Professionnel / Business</strong> et relie-le à une <strong>Page Facebook</strong>.<br/>
+            2. Crée une app sur <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" style={{color:'#005FFF'}}>developers.facebook.com</a> et active <strong>Instagram Graph API</strong> (permissions <code>instagram_basic</code>, <code>instagram_manage_comments</code> ; <code>instagram_manage_messages</code> pour les DM, soumise à validation Meta).<br/>
+            3. Génère un <strong>jeton longue durée</strong> et ajoute-le dans Vercel sous <strong>INSTAGRAM_ACCESS_TOKEN</strong>.<br/>
+            4. Redéploie — la tab basculera automatiquement sur tes vraies données.
           </div>
         </div>
       )}
 
-      {!instaLoading && instaData && instaData.ok && (
+      {!instaLoading && instaData && instaData.ok && instaData.connected && (
         <div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
             <div className="kc" style={{background:'#FFFFFF',textAlign:'center'}}>
