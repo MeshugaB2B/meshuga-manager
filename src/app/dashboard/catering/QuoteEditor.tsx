@@ -2,27 +2,33 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { LOGO_PINK, STAMP_PINK } from '../logos'
+import {
+  buildOfferingMap,
+  aiOptionToVariant,
+  computeVariant,
+  computeCoverage,
+  normalizeStatus,
+  statusLabel,
+  statusColor,
+  coeffColor,
+  fmtEur
+} from '@/lib/catering/cateringCore'
+import { buildDevisHtml } from '@/lib/catering/cateringPdf'
 
 // ============================================================
-// QuoteEditor.tsx — Phase 3 du Dashboard B2B Catering Meshuga
-// Éditeur de devis catering (single quote, pas multi-options).
-// Architecture: src/app/dashboard/catering/QuoteEditor.tsx
-// Lit catering_offerings depuis Supabase, sauvegarde dans devis.
-// Marges/coeffs internes uniquement (Edward + Emy).
-// Multi-options + PDF brandé = Phase 4.
+// QuoteEditor.tsx — Éditeur de devis Meshuga Events (multi-formules)
+// Branché sur le moteur unique cateringCore + le générateur cateringPdf.
+// Props : { supabase, profile, devisId, prospects, onClose, onSaved, toast }
+// Gère 1 à 3 formules (variants). Un devis simple = 1 formule.
 // ============================================================
 
-// ---------- LABELS / CONFIG (hors composant pour SWC) ----------
-
-var STATUS_LABELS = {
-  brouillon: 'Brouillon',
-  envoye: 'Envoyé',
-  accepte: 'Accepté',
-  refuse: 'Refusé',
-  a_modifier: 'À modifier',
-  facture: 'Facturé',
-  paye: 'Soldé'
-}
+var EVENT_FORMATS = [
+  { id: 'cocktail', label: '🍸 Cocktail dînatoire' },
+  { id: 'business_lunch', label: '🥪 Business lunch' },
+  { id: 'soiree', label: '🥂 Soirée' },
+  { id: 'petit_dej', label: '🥐 Petit-déjeuner' },
+  { id: 'autre', label: 'Événement' }
+]
 
 var CATEGORY_TABS = [
   { id: 'box_mini', label: 'Box minis', emoji: '📦' },
@@ -34,790 +40,136 @@ var CATEGORY_TABS = [
 ]
 
 var SUBCAT_LABELS = {
-  // box_mini
-  daily: 'Daily',
-  classic: 'Classic',
-  signature: 'Signature',
-  premium_lobster: 'Premium Lobster',
-  canapes_desserts: 'Canapés & desserts',
-  // platter
-  lobster: 'Lobster',
-  // lunch_box
-  standard: 'Standard',
-  volume: 'Volume (30+)',
-  // live_forfait
-  animation: 'Forfaits animation',
-  // live_mini
-  premium: 'Premium',
-  tarama: 'Tarama',
-  verrine: 'Verrines',
-  // addon
-  beverage: 'Boissons',
-  food: 'Food',
-  live_extra: 'Heures sup live',
-  lunch: 'Upgrades lunch'
+  daily: 'Daily', classic: 'Classic', signature: 'Signature', premium_lobster: 'Premium Lobster',
+  canapes_desserts: 'Canapés & desserts', lobster: 'Lobster', standard: 'Standard', volume: 'Volume (30+)',
+  animation: 'Forfaits animation', premium: 'Premium', tarama: 'Tarama', verrine: 'Verrines',
+  beverage: 'Boissons', food: 'Food', live_extra: 'Heures sup live', lunch: 'Upgrades lunch'
 }
 
-var EVENT_FORMATS = [
-  { id: 'cocktail', label: 'Cocktail dînatoire' },
-  { id: 'lunch', label: 'Déjeuner / lunch' },
-  { id: 'soiree', label: 'Soirée' },
-  { id: 'autre', label: 'Autre' }
-]
+var DEFAULT_VARIANT_LABELS = { essentiel: 'Essentiel', signature: 'Signature', excellence: 'Excellence' }
 
-// ---------- HELPERS PURS ----------
+// ---------- Helpers purs ----------
 
-var fmtEur = function(n) {
-  var v = Number(n) || 0
-  return v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+var todayIso = function() {
+  var d = new Date()
+  return d.toISOString().split('T')[0]
 }
 
-var fmtEur0 = function(n) {
-  var v = Number(n) || 0
-  return v.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €'
+var addDaysIso = function(n) {
+  var d = new Date()
+  d.setDate(d.getDate() + n)
+  return d.toISOString().split('T')[0]
 }
 
-var getLivePlancher = function(offering) {
-  if (!offering) return 0
-  var direct = Number(offering.cost_direct_ht)
-  if (!direct || isNaN(direct)) return 0
-  return direct * 1.2
+var genNumero = function() {
+  var y = new Date().getFullYear()
+  var stamp = String(Date.now()).slice(-4)
+  return 'DEV-' + y + '-' + stamp
 }
 
-var maxLiveRemise = function(offering) {
-  if (!offering) return 0
-  var pv = Number(offering.pv_ht) || 0
-  var plancher = getLivePlancher(offering)
-  if (pv <= 0 || plancher <= 0) return 0
-  // remise max = (pv - plancher) / pv * 100, plafonnée à 100
-  var max = ((pv - plancher) / pv) * 100
-  if (max < 0) return 0
-  if (max > 100) return 100
-  return Math.floor(max)
-}
-
-// Parse une composition Meshuga style "10 Hot Dog · 10 THE MELT · 10 PBN"
-// Retourne [{qty, name}] avec name normalisé (sans "mini", "canapés", "sandwich")
-// Ignore les lignes sans quantité numérique au début (chips, coleslaw, etc.)
-// Ignore aussi les compositions qui contiennent "au choix" (lunch box monoplat).
-var parseComposition = function(comp, multiplier) {
-  if (!comp) return []
-  var lower = comp.toLowerCase()
-  if (lower.indexOf('au choix') > -1) return []
-  var mult = Number(multiplier) || 1
-  // Séparateurs : middle dot · ou bullet •
-  var parts = comp.split(/[·•]/)
-  var out = []
-  parts.forEach(function(rawPart) {
-    var p = rawPart.trim()
-    if (!p) return
-    var m = p.match(/^(\d+)\s+(.+)$/)
-    if (!m) return
-    var n = parseInt(m[1], 10)
-    var rawName = m[2].trim()
-    // Filtre des "non-sandwichs" qu'on ignore dans le décompte
-    var lowName = rawName.toLowerCase()
-    if (
-      lowName.indexOf('boisson') > -1 ||
-      lowName.indexOf('chips') > -1 ||
-      lowName.indexOf('coleslaw') > -1 ||
-      lowName.indexOf('cookie') > -1 ||
-      lowName.indexOf('frites') > -1
-    ) return
-    // Normalisation : supprime mini / canapé / canapés / sandwich + parenthèses
-    var name = rawName
-      .replace(/\(.*?\)/g, '')
-      .replace(/\b(mini|minis|canap[ée]s?|sandwich|sandwiches)\b/gi, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-    if (!name) return
-    // Homogénéisation finale : strip "THE " en début + uppercase
-    // Ex: "THE LOBSTER" + "Lobster" => fusionnent en "LOBSTER"
-    name = name.replace(/^the\s+/i, '').toUpperCase().trim()
-    if (!name) return
-    out.push({ qty: n * mult, name: name })
+// Normalise les lignes (offering_id, qty, remise_pct)
+var normLines = function(arr) {
+  if (!Array.isArray(arr)) return []
+  return arr.map(function(l) {
+    return {
+      offering_id: l.offering_id,
+      qty: Number(l.qty) || 0,
+      remise_pct: Number(l.remise_pct) || 0
+    }
   })
-  return out
 }
 
-// Echappement HTML pour insertion sûre dans le PDF
-var escapeHtml = function(s) {
-  if (s === null || s === undefined) return ''
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
-// Format euros pour HTML (string)
-var fmtEurStr = function(n) {
-  var v = Number(n) || 0
-  return v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
-}
-
-// Liste de prénoms typiquement féminins (ASCII lowercase) — utilisée pour deviner le genre
-// si la civilité (M./Mme) n'est pas explicite dans clientContact.
-// Liste réaliste pour un usage France/B2B parisien — pas exhaustive mais suffisante.
-var FEMALE_FIRST_NAMES = [
-  'agathe','agnes','alice','alicia','aline','amandine','amelie','anais','anita','anna','anne','annick',
-  'apolline','astrid','audrey','aurelie','aurore','barbara','beatrice','benedicte','bernadette',
-  'brigitte','camille','candice','capucine','carine','carla','carole','caroline','catherine','cecile',
-  'celia','celine','chantal','charlotte','chloe','christelle','christiane','christine','claire',
-  'clara','claude','claudine','clemence','clementine','colette','constance','coralie','corinne',
-  'cyrielle','daphne','delphine','diane','dominique','dorothee','edith','elena','eleonore','eliane',
-  'eliette','elisa','elisabeth','elise','elodie','eloise','elsa','emilie','emma','emmanuelle','estelle',
-  'eva','eve','fabienne','fanny','fatima','flavie','flora','florence','florine','francine','francoise',
-  'gabrielle','garance','genevieve','genevieve','ghislaine','gisele','helene','heloise','hermine',
-  'huguette','ines','ingrid','irene','isabelle','jacqueline','jeanne','jennifer','jessica','joelle',
-  'josephine','josette','josiane','julie','juliette','justine','karen','karine','katia','laetitia',
-  'laure','laurence','laurie','lea','leila','leonie','leonore','liliane','lina','linda','lise','lisa',
-  'lola','lou','louise','louna','lucie','ludivine','lydie','madeleine','madeline','magali','manon',
-  'margaux','margot','marguerite','maria','marianne','marie','marielle','marion','marlene','martine',
-  'maryline','mathilde','maud','maxime','melanie','melissa','michele','micheline','milena','mireille',
-  'monique','morgane','muriel','mylene','nadege','nadia','nadine','nancy','natacha','nathalie',
-  'nelly','nicole','nina','noemie','nora','odette','odile','olivia','ophelie','oriane','pascale',
-  'patricia','paule','pauline','peggy','perrine','philomene','priscillia','prune','rachel','raphaelle',
-  'raymonde','rebecca','regine','renee','romane','rosalie','rose','roxane','sabine','sabrina',
-  'salome','samira','sandra','sandrine','sara','sarah','severine','sidonie','simone','sofia','solange',
-  'solene','sonia','sophie','stephanie','suzanne','sylvia','sylvie','tania','tatiana','therese',
-  'thais','tiphaine','typhaine','valentine','valerie','vanessa','veronique','victoire','victoria',
-  'violaine','violette','virginie','vivienne','yasmine','yolande','yvette','yvonne','zelie','zoe'
-]
-
-// Normalise un prénom : enlève accents, met en lowercase, trim
-var normalizeFirstName = function(s) {
-  if (!s) return ''
-  return String(s)
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // remove accents
-    .replace(/[^a-z\-]/g, '')
-    .trim()
-}
-
-// Devine le genre d'un prénom : 'F' (féminin), 'M' (masculin), '' (inconnu)
-var guessGender = function(firstName) {
-  var n = normalizeFirstName(firstName)
-  if (!n) return ''
-  // gestion prénoms composés : on prend le premier
-  var first = n.split('-')[0]
-  if (FEMALE_FIRST_NAMES.indexOf(first) > -1) return 'F'
-  // si pas dans la liste féminine, on assume masculin pour les prénoms français courants
-  // (heuristique faillible mais raisonnable en B2B)
-  return 'M'
-}
-
-// Construit la salutation perso à partir du contact client
-// Inputs : clientContact (ex: "Pierre Dupont", "Mme Martin", "Sophie", "M. Jean Bernard")
-// Output : "Cher Monsieur Dupont", "Chère Madame Martin", "Cher Pierre", "Bonjour" en fallback
-var buildSalutation = function(rawContact) {
-  var c = (rawContact || '').trim()
-  if (!c) return 'Bonjour'
-
-  // Détecte civilité explicite en début de chaîne
-  var lc = c.toLowerCase()
-  var explicitCiv = ''
-  var rest = c
-  if (/^(m\.|mr\.?|monsieur)\s+/i.test(lc)) {
-    explicitCiv = 'M'
-    rest = c.replace(/^(m\.|mr\.?|monsieur)\s+/i, '').trim()
-  } else if (/^(mme|madame)\s+/i.test(lc)) {
-    explicitCiv = 'F'
-    rest = c.replace(/^(mme|madame)\s+/i, '').trim()
-  } else if (/^(mlle|mademoiselle)\s+/i.test(lc)) {
-    explicitCiv = 'F'
-    rest = c.replace(/^(mlle|mademoiselle)\s+/i, '').trim()
+// Transforme la colonne `variants` (jsonb) en formules éditables
+var parseVariants = function(d) {
+  var vs = d.variants
+  if (typeof vs === 'string') {
+    try { vs = JSON.parse(vs) } catch (e) { vs = null }
   }
-
-  var parts = rest.split(/\s+/).filter(function(p) { return p.length > 0 })
-
-  if (explicitCiv) {
-    // On a la civilité, on prend le NOM (dernier mot) si possible
-    if (parts.length >= 2) {
-      var lastName = parts[parts.length - 1]
-      return (explicitCiv === 'F' ? 'Chère Madame ' : 'Cher Monsieur ') + lastName
-    } else if (parts.length === 1) {
-      // Civilité + 1 seul nom : on l'utilise (ex: "Mme Martin")
-      return (explicitCiv === 'F' ? 'Chère Madame ' : 'Cher Monsieur ') + parts[0]
-    }
-    return (explicitCiv === 'F' ? 'Chère Madame' : 'Cher Monsieur')
-  }
-
-  // Pas de civilité explicite : on essaie de deviner via le prénom
-  if (parts.length === 0) return 'Bonjour'
-  var firstName = parts[0]
-  // Capitalisation propre
-  var firstNameCap = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
-  var gender = guessGender(firstName)
-  if (gender === 'F') return 'Chère ' + firstNameCap
-  if (gender === 'M') return 'Cher ' + firstNameCap
-  // genre inconnu : tonalité neutre
-  return 'Bonjour ' + firstNameCap
-}
-
-// Format date FR longue : "jeudi 30 avril 2026" (sans virgule, lecture naturelle)
-var formatDateLongFr = function(isoDate) {
-  if (!isoDate) return ''
-  try {
-    var d = new Date(isoDate + 'T12:00:00')
-    if (isNaN(d.getTime())) return isoDate
-    return d.toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    })
-  } catch (e) {
-    return isoDate
-  }
-}
-
-// Libellé long du format événementiel
-var EVENT_FORMAT_LABELS = {
-  cocktail: 'votre cocktail dînatoire',
-  lunch: 'votre lunch',
-  soiree: 'votre soirée',
-  petit_dej: 'votre petit-déjeuner d\'entreprise',
-  buffet: 'votre buffet',
-  autre: 'votre événement'
-}
-var formatLabel = function(f) {
-  return EVENT_FORMAT_LABELS[f] || 'votre événement'
-}
-
-// Génère le HTML complet du devis catering brandé Meshuga
-// d = { numero, validite, clientNom, clientContact, clientEmail, clientPhone,
-//       eventDate, eventLieu, nbPersonnes, eventFormat, lineDetails,
-//       miseEnPlace, miseEnPlaceOffert, livraison, livraisonOffert,
-//       remiseTotalPct, notes, totals, sandwichBreakdown, coverage }
-var generateCateringPdfHtml = function(d, stampUrl, logotypeUrl) {
-  var todayStr = new Date().toLocaleDateString('fr-FR')
-  var validiteStr = ''
-  if (d.validite) {
-    var vd = new Date(d.validite + 'T12:00:00')
-    if (!isNaN(vd.getTime())) validiteStr = vd.toLocaleDateString('fr-FR')
-  }
-  var eventDateStr = ''
-  if (d.eventDate) {
-    var ed = new Date(d.eventDate + 'T12:00:00')
-    if (!isNaN(ed.getTime())) eventDateStr = ed.toLocaleDateString('fr-FR')
-  }
-  var formatLabels = {
-    cocktail: 'Cocktail dînatoire',
-    lunch: 'Déjeuner / Lunch',
-    soiree: 'Soirée',
-    autre: 'Événement'
-  }
-  var formatLbl = formatLabels[d.eventFormat] || 'Événement'
-
-  // Items rows
-  var itemRows = ''
-  d.lineDetails.forEach(function(l) {
-    var compDiv = l.offering.composition
-      ? '<div class="comp">' + escapeHtml(l.offering.composition) + '</div>'
-      : (l.offering.tagline ? '<div class="tag">' + escapeHtml(l.offering.tagline) + '</div>' : '')
-    var sizeBadge = l.offering.size_pers
-      ? '<span class="size-badge">' + l.offering.size_pers + ' pcs</span>'
-      : ''
-    var remiseBadge = l.remisePct > 0
-      ? '<div class="rem-badge">Remise -' + l.remisePct + '%</div>'
-      : ''
-    itemRows +=
-      '<tr>' +
-        '<td><div class="item-name">' + escapeHtml(l.offering.name) + ' ' + sizeBadge + '</div>' +
-          compDiv + remiseBadge +
-        '</td>' +
-        '<td class="c">' + l.qty + '</td>' +
-        '<td class="r">' + fmtEurStr(l.pvHt) + '</td>' +
-        '<td class="r b">' + fmtEurStr(l.totalLigneHT) + '</td>' +
-      '</tr>'
-  })
-
-  // MEP row
-  var mepRow = ''
-  if (Number(d.miseEnPlace) > 0 || d.miseEnPlaceOffert) {
-    var mepLbl = d.miseEnPlaceOffert
-      ? '<span class="strike">Mise en place / installation</span> <span class="offert">OFFERTE</span>'
-      : 'Mise en place / installation'
-    var mepPu = d.miseEnPlaceOffert
-      ? '<span class="strike">' + fmtEurStr(d.miseEnPlace) + '</span>'
-      : fmtEurStr(d.miseEnPlace)
-    var mepTot = d.miseEnPlaceOffert
-      ? '<span class="offert b">0,00 €</span>'
-      : '<strong>' + fmtEurStr(d.miseEnPlace) + '</strong>'
-    mepRow = '<tr><td>' + mepLbl + '</td><td class="c">1</td><td class="r">' + mepPu + '</td><td class="r">' + mepTot + '</td></tr>'
-  }
-
-  // Livraison row
-  var livRow = ''
-  if (Number(d.livraison) > 0 || d.livraisonOffert) {
-    var livLbl = d.livraisonOffert
-      ? '<span class="strike">Frais de livraison</span> <span class="offert">OFFERTS</span>'
-      : 'Frais de livraison'
-    var livPu = d.livraisonOffert
-      ? '<span class="strike">' + fmtEurStr(d.livraison) + '</span>'
-      : fmtEurStr(d.livraison)
-    var livTot = d.livraisonOffert
-      ? '<span class="offert b">0,00 €</span>'
-      : '<strong>' + fmtEurStr(d.livraison) + '</strong>'
-    livRow = '<tr><td>' + livLbl + '</td><td class="c">1</td><td class="r">' + livPu + '</td><td class="r">' + livTot + '</td></tr>'
-  }
-
-  // Remise row
-  var remRow = ''
-  if (d.totals.remiseGlobale > 0) {
-    remRow =
-      '<tr class="remise-row"><td>Remise commerciale (' + d.remiseTotalPct + '%)</td>' +
-      '<td class="c">—</td><td class="r">—</td>' +
-      '<td class="r b">−' + fmtEurStr(d.totals.remiseGlobale) + '</td></tr>'
-  }
-
-  // Breakdown HTML — tableau 2 colonnes, qté rose à gauche + nom MAJ à droite
-  var breakdownHtml = ''
-  if (d.sandwichBreakdown && d.sandwichBreakdown.length > 0) {
-    var rows = ''
-    var totalPieces = 0
-    d.sandwichBreakdown.forEach(function(s) {
-      totalPieces += s.qty
-      rows += '<div class="bd-row"><span class="bd-qty">' + s.qty + '</span><span class="bd-name">' + escapeHtml(s.name) + '</span></div>'
-    })
-    // Si nombre de recettes impair, on comble la dernière case avec une cellule blanche
-    // sinon le fond noir de la grille se voit à travers
-    if (d.sandwichBreakdown.length % 2 === 1) {
-      rows += '<div class="bd-row bd-row-filler"></div>'
-    }
-    breakdownHtml =
-      '<div class="breakdown">' +
-        '<div class="breakdown-title">Détail des recettes incluses</div>' +
-        '<div class="breakdown-sub">' + totalPieces + ' pièces réparties dans les boxes ci-dessous</div>' +
-        '<div class="breakdown-grid">' + rows + '</div>' +
-      '</div>'
-  }
-
-  // Coverage strip
-  var coverageHtml = ''
-  if (d.coverage) {
-    var covParts = []
-    if (d.coverage.nbMinis > 0) covParts.push('<strong>' + d.coverage.nbMinis + '</strong> minis')
-    if (d.coverage.nbLunch > 0) covParts.push('<strong>' + d.coverage.nbLunch + '</strong> lunch box')
-    if (d.coverage.nbPlateauxParts > 0) covParts.push('<strong>' + d.coverage.nbPlateauxParts + '</strong> parts plateaux')
-    if (d.coverage.nbLiveForfait > 0 && d.coverage.liveForfaitNames && d.coverage.liveForfaitNames.length > 0) {
-      covParts.push(escapeHtml(d.coverage.liveForfaitNames.join(' + ')))
-    }
-    if (covParts.length > 0) {
-      var perPersonNote = ''
-      if (d.nbPersonnes > 0 && d.totals && d.totals.totalTTC > 0) {
-        perPersonNote = '<br><span class="cov-pp">soit ' + fmtEurStr(d.totals.totalTTC / d.nbPersonnes) + ' TTC / personne</span>'
+  if (Array.isArray(vs) && vs.length > 0) {
+    return vs.map(function(v) {
+      if (v && Array.isArray(v.lines)) {
+        return { key: v.key || '', label: v.label || '', description: v.description || '', lines: normLines(v.lines) }
       }
-      coverageHtml =
-        '<div class="cov">' + covParts.join(' &middot; ') +
-        ' <span class="cov-pers">pour ' + d.nbPersonnes + ' personnes</span>' +
-        perPersonNote +
-        '</div>'
-    }
+      // Option générée par l'IA (champ items)
+      var conv = aiOptionToVariant(v)
+      return { key: conv.key, label: conv.label, description: conv.description, lines: normLines(conv.lines) }
+    })
   }
-
-  // Notes
-  var notesHtml = ''
-  if (d.notes && d.notes.trim()) {
-    notesHtml =
-      '<div class="notes-block">' +
-        '<div class="notes-title">Notes</div>' +
-        '<div class="notes-content">' + escapeHtml(d.notes).replace(/\n/g, '<br>') + '</div>' +
-      '</div>'
+  // Devis simple : une seule formule depuis items
+  var items = Array.isArray(d.items) ? d.items : []
+  if (items.length > 0) {
+    return [{ key: 'formule', label: 'Formule', description: '', lines: normLines(items) }]
   }
-
-  // Per-person price
-  var perPersonHtml = ''
-  if (d.nbPersonnes > 0 && d.totals.totalTTC > 0) {
-    perPersonHtml = '<div class="per-person">soit ' + fmtEurStr(d.totals.totalTTC / d.nbPersonnes) + ' TTC / personne</div>'
-  }
-
-  // Logo HTML
-  // Stamp pour le header (rond, compact)
-  var stampHtml = stampUrl
-    ? '<img src="' + stampUrl + '" alt="meshuga"/>'
-    : '<div class="logo-text-fb">meshuga</div>'
-
-  // Logotype pour le footer (rectangulaire, signature finale)
-  var logotypeHtml = logotypeUrl
-    ? '<img src="' + logotypeUrl + '" alt="meshuga" class="footer-logo-img"/>'
-    : '<div class="logo-text-fb" style="font-size:28px">meshuga</div>'
-
-  // CSS du PDF (une seule string concaténée)
-  var css =
-    '*{margin:0;padding:0;box-sizing:border-box}' +
-    'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:11px;background:#FFFFFF}' +
-    '@page{size:A4;margin:10mm 16mm 18mm 16mm}' +
-    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.tc-grid,.breakdown,.notes-block,.footer,.footer-brand,.sig,.rib{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title,.sig-title{page-break-after:avoid;break-after:avoid}.rib-grid,.sig-grid,.sig-box{page-break-inside:avoid;break-inside:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px;padding-top:12px}p,.legal{orphans:3;widows:3}}' +
-    '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;display:flex;flex-direction:column;background:#FFFFFF}' +
-    '.content{flex:1}' +
-    '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px}' +
-    '.logo{display:flex;align-items:center;gap:14px}' +
-    '.logo img{height:75px;width:75px;display:block;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;image-rendering:high-quality;border-radius:50%}' +
-    '.logo-tag{display:flex;flex-direction:column;justify-content:center}' +
-    '.logo-name{font-family:Yellowtail,cursive;font-size:26px;color:#191923;line-height:1}' +
-    '.logo-sub-pink{font-family:"Arial Narrow",Arial,sans-serif;font-size:8.5px;color:#FF82D7;letter-spacing:1.6px;text-transform:uppercase;font-weight:900;margin-top:3px}' +
-    '.logo-text-fb{font-family:Yellowtail,cursive;font-size:36px;color:#191923;line-height:1}' +
-    '.logo-sub{font-size:8.5px;color:#999;margin-top:4px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700}' +
-    '.doc-info{text-align:right}' +
-    '.doc-type{font-family:Yellowtail,cursive;font-size:42px;color:#191923;line-height:.95}' +
-    '.doc-num{font-size:10px;color:#666;margin-top:3px;font-weight:700}' +
-    '.parties{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:11px}' +
-    '.party{background:#FAFAFA;border-radius:5px;padding:9px 12px;border-left:4px solid #FFEB5A}' +
-    '.party.client{border-left-color:#FF82D7}' +
-    '.party-label{font-family:Yellowtail,cursive;font-size:14px;color:#888;margin-bottom:4px;line-height:1}' +
-    '.party-name{font-size:13px;font-weight:900;margin-bottom:3px}' +
-    '.party-detail{font-size:9.5px;color:#555;margin-top:1px;line-height:1.5}' +
-    '.event-detail{margin-top:6px;font-size:10px;color:#191923;line-height:1.5}' +
-    '.cov{background:#FFEB5A;border:2px solid #191923;border-radius:5px;padding:7px 14px;margin-bottom:11px;font-size:11px;text-align:center;letter-spacing:.3px;box-shadow:2px 2px 0 #191923}' +
-    '.cov strong{font-weight:900;font-size:12px}' +
-    '.cov-pers{font-style:italic;color:#191923;opacity:.7;margin-left:4px}' +
-    '.cov-pp{font-size:10px;font-weight:700;font-style:italic;color:#191923;opacity:.85;letter-spacing:.2px}' +
-    'table.items{width:100%;border-collapse:collapse;margin-bottom:8px}' +
-    'table.items thead th{padding:8px 10px;font-size:8.5px;text-transform:uppercase;letter-spacing:1.2px;font-weight:900;color:#191923;border-top:2px solid #191923;border-bottom:2px solid #191923;text-align:left;background:#FFFFFF}' +
-    'table.items thead th.w-qty{text-align:center;width:9%}' +
-    'table.items thead th.w-pu{text-align:right;width:18%}' +
-    'table.items thead th.w-tot{text-align:right;width:20%}' +
-    'table.items tbody td{padding:8px 10px;border-bottom:1px solid #EBEBEB;font-size:10.5px;vertical-align:top}' +
-    'table.items tbody tr:nth-child(even) td{background:#FAFAFA}' +
-    '.item-name{font-weight:900;font-size:11px;margin-bottom:3px;color:#191923}' +
-    '.size-badge{display:inline-block;background:#FFEB5A;border:1px solid #191923;border-radius:9px;padding:0 6px;font-size:8px;font-weight:900;margin-left:4px;letter-spacing:.5px;vertical-align:middle}' +
-    '.comp{font-size:9px;color:#555;line-height:1.4;margin-top:2px}' +
-    '.tag{font-size:9px;color:#888;line-height:1.4;font-style:italic;margin-top:2px}' +
-    '.rem-badge{display:inline-block;font-size:8.5px;color:#FF82D7;font-weight:900;margin-top:3px;background:#FFF1FA;border:1px solid #FF82D7;border-radius:3px;padding:1px 5px;letter-spacing:.3px}' +
-    '.c{text-align:center}' +
-    '.r{text-align:right}' +
-    '.b{font-weight:900}' +
-    '.strike{text-decoration:line-through;opacity:.5}' +
-    '.offert{color:#009D3A;font-weight:900}' +
-    '.remise-row td{color:#FF82D7}' +
-    '.breakdown{margin:0 0 11px;padding:9px 12px;background:#FFFAEC;border-radius:5px;border-left:4px solid #FFEB5A;page-break-inside:avoid;break-inside:avoid}' +
-    '.breakdown-title{font-family:Yellowtail,cursive;font-size:16px;color:#191923;margin-bottom:6px;line-height:1}' +
-    '.breakdown-sub{font-size:9px;color:#888;font-style:italic;margin-bottom:8px;letter-spacing:.2px}' +
-    '.breakdown-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:#191923;border:1.5px solid #191923;border-radius:4px;overflow:hidden}' +
-    '.bd-row{display:flex;align-items:center;padding:6px 12px;background:#FFFFFF;font-size:11px;gap:10px}' +
-    '.bd-row-filler{background:#FFFFFF}' +
-    '.bd-qty{font-weight:900;font-size:14px;color:#FF82D7;min-width:34px;text-align:right;font-family:"Arial Narrow",Arial,sans-serif;flex-shrink:0}' +
-    '.bd-name{font-weight:900;color:#191923;letter-spacing:.3px;flex:1;text-transform:uppercase}' +
-    '.tc-grid{display:grid;grid-template-columns:1fr 290px;gap:16px;align-items:start;margin-bottom:11px}' +
-    '.tc-cond{background:#FAFAFA;border-left:4px solid #FF82D7;border-radius:0 4px 4px 0;padding:10px 13px}' +
-    '.tc-cond .cond-title{font-family:Yellowtail,cursive;font-size:16px;color:#191923;margin-bottom:4px;line-height:1}' +
-    '.tc-cond .cond{font-size:9.5px;color:#444;line-height:1.55}' +
-    '.tc-totals{display:flex;flex-direction:column;justify-content:flex-start}' +
-    '.t-row{display:flex;justify-content:space-between;padding:5px 4px;border-bottom:1px solid #EBEBEB;font-size:11.5px}' +
-    '.t-row.gray{color:#888;font-size:10px}' +
-    '.t-row strong{font-weight:900;font-size:12px}' +
-    '.t-final{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#FFEB5A;border:2px solid #191923;border-radius:5px;margin-top:6px;box-shadow:3px 3px 0 #191923}' +
-    '.t-final .lbl{font-family:Yellowtail,cursive;font-size:22px;color:#191923;line-height:1}' +
-    '.t-final .amt{font-weight:900;font-size:16px;color:#191923}' +
-    '.per-person{text-align:right;font-size:9.5px;color:#888;margin-top:4px;font-style:italic}' +
-    '.notes-block{background:#FFF9E5;border-left:4px solid #FFEB5A;padding:9px 13px;margin-bottom:10px;border-radius:0 4px 4px 0}' +
-    '.notes-title{font-family:Yellowtail,cursive;font-size:14px;color:#191923;margin-bottom:4px;line-height:1}' +
-    '.notes-content{font-size:10px;line-height:1.55;color:#333}' +
-    '.rib{border:1.5px solid #191923;border-radius:5px;padding:9px 14px;margin-bottom:10px;background:#FFFFFF}' +
-    '.rib-title{font-family:Yellowtail,cursive;font-size:16px;color:#FF82D7;margin-bottom:6px;line-height:1}' +
-    '.rib-grid{display:grid;grid-template-columns:1fr 1fr 2fr 1fr;gap:12px}' +
-    '.rib-item label{display:block;font-size:7px;text-transform:uppercase;letter-spacing:1px;color:#aaa;margin-bottom:3px;font-weight:900}' +
-    '.rib-item span{font-size:10.5px;font-weight:900;font-family:"Arial Narrow",Arial,sans-serif;color:#191923;letter-spacing:1.2px}' +
-    '.sig{border:2px solid #191923;border-radius:5px;padding:9px 13px 11px;margin-bottom:10px;background:#FFFFFF;box-shadow:3px 3px 0 #FF82D7}' +
-    '.sig-title{font-family:Yellowtail,cursive;font-size:18px;color:#191923;margin-bottom:4px;line-height:1}' +
-    '.sig-legal{font-size:8px;color:#444;line-height:1.5;margin-bottom:8px;text-align:justify}' +
-    '.sig-grid{display:grid;grid-template-columns:1fr 1fr 2fr;gap:12px;margin-bottom:9px}' +
-    '.sig-field label{display:block;font-size:7px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:5px;font-weight:900}' +
-    '.sig-line{height:16px;border-bottom:1.2px solid #191923}' +
-    '.sig-box{border:1.5px dashed #191923;border-radius:4px;height:90px;padding:5px 9px;position:relative}' +
-    '.sig-box label{display:block;font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:900}' +
-    '.cgv-pagebreak{height:0}' +
-    '.cgv{padding-top:28px}' +
-    '.cgv-header{padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px;page-break-inside:avoid;break-inside:avoid;page-break-after:avoid;break-after:avoid}' +
-    '.cgv-title{font-family:Yellowtail,cursive;font-size:32px;color:#191923;line-height:1}' +
-    '.cgv-sub{font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;color:#777;letter-spacing:.4px;margin-top:4px}' +
-    '.cgv-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}' +
-    '.cgv-art{margin-bottom:9px;page-break-inside:avoid;break-inside:avoid}' +
-    '.cgv-art h4{font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#FF82D7;margin-bottom:3px;line-height:1.2}' +
-    '.cgv-art p{font-size:8.5px;color:#333;line-height:1.55;text-align:justify}' +
-    '.footer{padding:10px 0 0;border-top:1px solid #EBEBEB;margin-top:auto}' +
-    '.footer-brand{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:8px;padding-bottom:8px}' +
-    '.footer-logo-img{height:34px;width:auto;display:block;image-rendering:high-quality}' +
-    '.footer-meta{font-family:"Arial Narrow",Arial,sans-serif;font-size:11px;color:#191923;letter-spacing:.5px;font-weight:400;text-align:right}' +
-    '.legal{font-size:7px;color:#777;line-height:1.7;text-align:justify}' +
-    '.no-print{text-align:center;padding:24px 16px;background:#FFFFFF;border-top:2px dashed #FF82D7;margin-top:16px}' +
-    '.no-print p{margin-bottom:14px;font-size:11px;color:#666;line-height:1.6}' +
-    '.no-print button{padding:11px 28px;background:#FFEB5A;color:#191923;border:2px solid #191923;border-radius:5px;font-size:13px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;box-shadow:3px 3px 0 #191923;font-family:Arial,sans-serif;margin:0 4px}' +
-    '.no-print button.close-btn{background:#FFFFFF}' +
-    '.no-print button:active{transform:translate(1px,1px);box-shadow:1px 1px 0 #191923}'
-
-  // FULL HTML
-  return '<!DOCTYPE html><html lang="fr"><head>' +
-    '<meta charset="UTF-8">' +
-    '<title>Devis ' + escapeHtml(d.numero) + ' &mdash; MESHUGA</title>' +
-    '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">' +
-    '<style>' + css + '</style>' +
-    '</head><body>' +
-    '<div class="page">' +
-      '<div class="content">' +
-        // HEADER
-        '<div class="header">' +
-          '<div class="logo">' + stampHtml +
-            '<div class="logo-tag">' +
-              '<div class="logo-name">meshuga</div>' +
-              '<div class="logo-sub-pink">Catering &middot; Paris</div>' +
-            '</div>' +
-          '</div>' +
-          '<div class="doc-info">' +
-            '<div class="doc-type">Devis</div>' +
-            '<div class="doc-num">N&deg; ' + escapeHtml(d.numero) + '</div>' +
-            '<div class="doc-num">&Eacute;mis le ' + todayStr + '</div>' +
-            (validiteStr ? '<div class="doc-num">Valable jusqu&#39;au ' + validiteStr + '</div>' : '') +
-          '</div>' +
-        '</div>' +
-        // PARTIES
-        '<div class="parties">' +
-          '<div class="party">' +
-            '<div class="party-label">&Eacute;metteur</div>' +
-            '<div class="party-name">SAS AEGIA FOOD</div>' +
-            '<div class="party-detail">Enseigne : MESHUGA</div>' +
-            '<div class="party-detail">3 rue Vavin, 75006 Paris</div>' +
-            '<div class="party-detail">SIRET 904 639 531 00014</div>' +
-            '<div class="party-detail">TVA FR31904639531</div>' +
-            '<div class="party-detail">events@meshuga.fr</div>' +
-          '</div>' +
-          '<div class="party client">' +
-            '<div class="party-label">Client</div>' +
-            '<div class="party-name">' + escapeHtml(d.clientNom) + '</div>' +
-            (d.clientContact ? '<div class="party-detail">' + escapeHtml(d.clientContact) + '</div>' : '') +
-            (d.clientEmail ? '<div class="party-detail">' + escapeHtml(d.clientEmail) + '</div>' : '') +
-            (d.clientPhone ? '<div class="party-detail">' + escapeHtml(d.clientPhone) + '</div>' : '') +
-            '<div class="event-detail">' +
-              '<strong>' + formatLbl + '</strong> &middot; ' + d.nbPersonnes + ' pers.' +
-              (eventDateStr ? ' &middot; ' + eventDateStr : '') +
-              (d.eventLieu ? '<br>Lieu : ' + escapeHtml(d.eventLieu) : '') +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        // COVERAGE (résumé visuel global pour pers.)
-        coverageHtml +
-        // BREAKDOWN (détail des recettes — déplacé en haut sous coverage)
-        breakdownHtml +
-        // TABLE
-        '<table class="items">' +
-          '<thead><tr>' +
-            '<th class="w-name">D&eacute;signation</th>' +
-            '<th class="w-qty">Qt&eacute;</th>' +
-            '<th class="w-pu">PU HT</th>' +
-            '<th class="w-tot">Total HT</th>' +
-          '</tr></thead>' +
-          '<tbody>' + itemRows + mepRow + livRow + remRow + '</tbody>' +
-        '</table>' +
-        // TOTALS + CONDITIONS côte à côte
-        '<div class="tc-grid">' +
-          '<div class="tc-cond">' +
-            '<div class="cond-title">Conditions de r&egrave;glement</div>' +
-            '<div class="cond">Acompte de 30 % &agrave; la commande. Solde imp&eacute;rativement <strong>72 h (3 jours ouvr&eacute;s) avant la prestation</strong>, &agrave; d&eacute;faut prestation non garantie et acompte conserv&eacute;. Devis valable 30 jours. Pour valider, retournez le devis sign&eacute; avec la mention "Bon pour accord" + virement de l&#39;acompte. Conditions d&eacute;taill&eacute;es : voir CGV en derni&egrave;re page.</div>' +
-          '</div>' +
-          '<div class="tc-totals">' +
-            '<div class="t-row"><span>Total HT</span><strong>' + fmtEurStr(d.totals.totalHT) + '</strong></div>' +
-            '<div class="t-row gray"><span>TVA (10 % food / 20 % prestations)</span><span>' + fmtEurStr(d.totals.tva) + '</span></div>' +
-            '<div class="t-final"><span class="lbl">Total TTC</span><span class="amt">' + fmtEurStr(d.totals.totalTTC) + '</span></div>' +
-            perPersonHtml +
-          '</div>' +
-        '</div>' +
-        // NOTES
-        notesHtml +
-        // RIB
-        // RIB
-        '<div class="rib">' +
-          '<div class="rib-title">Coordonn&eacute;es bancaires</div>' +
-          '<div class="rib-grid">' +
-            '<div class="rib-item"><label>Titulaire</label><span>SAS AEGIA FOOD</span></div>' +
-            '<div class="rib-item"><label>Banque</label><span>Banque Populaire</span></div>' +
-            '<div class="rib-item"><label>IBAN</label><span>FR76 1020 7000 8723 2175 3218 077</span></div>' +
-            '<div class="rib-item"><label>BIC</label><span>CCBPFRPPMTG</span></div>' +
-          '</div>' +
-        '</div>' +
-        // SIGNATURE
-        '<div class="sig">' +
-          '<div class="sig-title">Bon pour accord</div>' +
-          '<div class="sig-legal">Le client reconna&icirc;t avoir pris connaissance des conditions de vente du pr&eacute;sent devis et des conditions g&eacute;n&eacute;rales de vente jointes en derni&egrave;re page, et accepte sans r&eacute;serve l&#39;ensemble des prestations, quantit&eacute;s et tarifs mentionn&eacute;s. La signature ci-dessous, accompagn&eacute;e de la mention manuscrite "Bon pour accord", vaut acceptation ferme et d&eacute;finitive de la commande et engage le signataire au r&egrave;glement de l&#39;acompte.</div>' +
-          '<div class="sig-grid">' +
-            '<div class="sig-field"><label>Date</label><div class="sig-line"></div></div>' +
-            '<div class="sig-field"><label>Lieu</label><div class="sig-line"></div></div>' +
-            '<div class="sig-field"><label>Nom &amp; qualit&eacute; du signataire</label><div class="sig-line"></div></div>' +
-          '</div>' +
-          '<div class="sig-box"><label>Signature et cachet (mention "Bon pour accord")</label></div>' +
-        '</div>' +
-        // CGV (page 2 ou 3 selon longueur du devis)
-        '<div class="cgv-pagebreak"></div>' +
-        '<div class="cgv">' +
-          '<div class="cgv-header">' +
-            '<div class="cgv-title">Conditions G&eacute;n&eacute;rales de Vente</div>' +
-            '<div class="cgv-sub">SAS AEGIA FOOD (enseigne MESHUGA) &middot; Applicables &agrave; toute commande de prestation traiteur &eacute;v&eacute;nementiel</div>' +
-          '</div>' +
-          '<div class="cgv-cols">' +
-            // COL 1
-            '<div>' +
-              '<div class="cgv-art"><h4>1. Champ d&#39;application</h4><p>Les pr&eacute;sentes Conditions G&eacute;n&eacute;rales de Vente (ci-apr&egrave;s "CGV") r&eacute;gissent l&#39;ensemble des prestations de traiteur &eacute;v&eacute;nementiel B2B fournies par la soci&eacute;t&eacute; SAS AEGIA FOOD (ci-apr&egrave;s "AEGIA FOOD"), exer&ccedil;ant sous l&#39;enseigne MESHUGA, &agrave; ses clients professionnels. Toute commande emporte adh&eacute;sion sans r&eacute;serve aux pr&eacute;sentes CGV, qui pr&eacute;valent sur tout autre document du client.</p></div>' +
-              '<div class="cgv-art"><h4>2. Devis et commande</h4><p>Tout devis est valable 30 jours &agrave; compter de sa date d&#39;&eacute;mission. La commande est ferme et d&eacute;finitive d&egrave;s r&eacute;ception du devis sign&eacute; portant la mention manuscrite "Bon pour accord", accompagn&eacute; du r&egrave;glement de l&#39;acompte. La signature peut &ecirc;tre olographe ou &eacute;lectronique conform&eacute;ment aux articles 1366 et 1367 du Code civil.</p></div>' +
-              '<div class="cgv-art"><h4>3. Confirmation des effectifs</h4><p>Le nombre d&eacute;finitif de convives doit &ecirc;tre confirm&eacute; au plus tard 7 jours avant la date de l&#39;&eacute;v&eacute;nement. &Agrave; d&eacute;faut, le nombre figurant sur le devis est r&eacute;put&eacute; d&eacute;finitif. Toute majoration ult&eacute;rieure est sous r&eacute;serve de disponibilit&eacute; et entra&icirc;ne une facturation compl&eacute;mentaire au tarif unitaire indiqu&eacute;. Aucune minoration n&#39;est accept&eacute;e en de&ccedil;&agrave; de 7 jours.</p></div>' +
-              '<div class="cgv-art"><h4>4. Prix et facturation</h4><p>Les prix sont indiqu&eacute;s en euros, hors taxes (HT) et toutes taxes comprises (TTC). La TVA applicable est de 10 % sur les denr&eacute;es alimentaires et 20 % sur les prestations de service (animation live, mise en place, livraison). Toute prestation suppl&eacute;mentaire non pr&eacute;vue au devis fait l&#39;objet d&#39;un avenant ou d&#39;une facture compl&eacute;mentaire.</p></div>' +
-              '<div class="cgv-art"><h4>5. Modalit&eacute;s de paiement</h4><p>Un acompte de 30 % du montant TTC est exigible &agrave; la commande, par virement bancaire sur le compte ci-dessus. Le solde, soit 70 % du montant TTC, est d&ucirc; <strong>imp&eacute;rativement 72 heures (3 jours ouvr&eacute;s) avant la date de l&#39;&eacute;v&eacute;nement</strong>. &Agrave; d&eacute;faut de r&eacute;ception du solde dans ce d&eacute;lai, AEGIA FOOD se r&eacute;serve le droit d&#39;annuler unilat&eacute;ralement la prestation, sans qu&#39;aucune indemnit&eacute; ne soit due au client. Dans ce cas, l&#39;acompte est d&eacute;finitivement acquis &agrave; AEGIA FOOD &agrave; titre d&#39;indemnit&eacute; forfaitaire, sans pr&eacute;judice de la facturation des frais d&eacute;j&agrave; engag&eacute;s (mati&egrave;res premi&egrave;res, sous-traitance, locations, personnel mobilis&eacute;). Aucun escompte n&#39;est accord&eacute; pour paiement anticip&eacute;.</p></div>' +
-              '<div class="cgv-art"><h4>6. Retard de paiement</h4><p>Pour toute facture &eacute;mise <em>apr&egrave;s</em> la prestation (avenant, prestation suppl&eacute;mentaire, dommages, indemnit&eacute;s), le paiement est exigible &agrave; r&eacute;ception. Conform&eacute;ment &agrave; l&#39;article L. 441-10 du Code de commerce, tout retard entra&icirc;ne de plein droit l&#39;application de p&eacute;nalit&eacute;s calcul&eacute;es au taux d&#39;int&eacute;r&ecirc;t appliqu&eacute; par la Banque centrale europ&eacute;enne &agrave; son op&eacute;ration de refinancement la plus r&eacute;cente, major&eacute; de 10 points de pourcentage, ainsi qu&#39;une indemnit&eacute; forfaitaire pour frais de recouvrement de 40 &euro; (article D. 441-5 du Code de commerce). Pour les paiements pr&eacute;-prestation (acompte et solde), les modalit&eacute;s de l&#39;article 5 s&#39;appliquent.</p></div>' +
-              '<div class="cgv-art"><h4>7. Annulation par le client</h4><p>Toute annulation doit &ecirc;tre notifi&eacute;e par &eacute;crit (courriel ou courrier recommand&eacute;). Les conditions financi&egrave;res appliqu&eacute;es sont les suivantes : <strong>plus de 30 jours</strong> avant la prestation : acompte rembours&eacute;, hors frais d&eacute;j&agrave; engag&eacute;s ; <strong>entre 30 et 15 jours</strong> : 50 % du montant TTC d&ucirc; ; <strong>entre 14 et 8 jours</strong> : 75 % du montant TTC d&ucirc; ; <strong>7 jours ou moins (ou non-paiement du solde &agrave; J-3)</strong> : 100 % du montant TTC d&ucirc;.</p></div>' +
-            '</div>' +
-            // COL 2
-            '<div>' +
-              '<div class="cgv-art"><h4>8. Hygi&egrave;ne, allerg&egrave;nes et r&eacute;gimes alimentaires</h4><p>AEGIA FOOD respecte la r&eacute;glementation HACCP et la d&eacute;claration des 14 allerg&egrave;nes majeurs (r&egrave;glement UE 1169/2011). Le client s&#39;engage &agrave; communiquer toute exigence di&eacute;t&eacute;tique, allergie ou intol&eacute;rance des convives au moins 7 jours avant l&#39;&eacute;v&eacute;nement. La responsabilit&eacute; d&#39;AEGIA FOOD ne saurait &ecirc;tre engag&eacute;e en cas de r&eacute;action cons&eacute;cutive &agrave; une information non communiqu&eacute;e ou erron&eacute;e.</p></div>' +
-              '<div class="cgv-art"><h4>9. Prestation sur site et live cooking</h4><p>Pour les prestations avec animation sur site, le client met &agrave; disposition gratuitement : un acc&egrave;s direct au lieu (ascenseur de service le cas &eacute;ch&eacute;ant), un point d&#39;eau, l&#39;alimentation &eacute;lectrique requise et un espace de pr&eacute;paration suffisant. Tout retard imputable au client (acc&egrave;s, autorisations, mat&eacute;riel manquant) ne peut pr&eacute;tendre &agrave; minoration. Le client demeure responsable du mat&eacute;riel d&#39;AEGIA FOOD mis &agrave; disposition.</p></div>' +
-              '<div class="cgv-art"><h4>10. Livraison</h4><p>La livraison est effectu&eacute;e &agrave; l&#39;adresse indiqu&eacute;e par le client, dans le cr&eacute;neau convenu. En cas d&#39;impossibilit&eacute; de livraison du fait du client (absence, acc&egrave;s impossible, adresse erron&eacute;e), les denr&eacute;es restent factur&eacute;es. Une nouvelle livraison est sous r&eacute;serve de disponibilit&eacute; et factur&eacute;e en suppl&eacute;ment.</p></div>' +
-              '<div class="cgv-art"><h4>11. Cha&icirc;ne du froid et conservation</h4><p>Les denr&eacute;es livr&eacute;es doivent &ecirc;tre consomm&eacute;es dans les 4 heures suivant la livraison ou la fin de la prestation, &agrave; temp&eacute;rature ambiante n&#39;exc&eacute;dant pas 22&deg;C. Au-del&agrave;, ou en cas de rupture de la cha&icirc;ne du froid imputable au client, la responsabilit&eacute; d&#39;AEGIA FOOD ne peut &ecirc;tre engag&eacute;e.</p></div>' +
-              '<div class="cgv-art"><h4>12. Force majeure</h4><p>Les obligations des parties sont suspendues en cas de force majeure au sens de l&#39;article 1218 du Code civil (intemp&eacute;ries exceptionnelles, gr&egrave;ve g&eacute;n&eacute;rale, pand&eacute;mie, mesure administrative). Les parties s&#39;efforceront de bonne foi de reporter l&#39;&eacute;v&eacute;nement. &Agrave; d&eacute;faut, l&#39;acompte est conserv&eacute; &agrave; titre de couverture des frais d&eacute;j&agrave; engag&eacute;s.</p></div>' +
-              '<div class="cgv-art"><h4>13. Droit &agrave; l&#39;image</h4><p>AEGIA FOOD pourra r&eacute;aliser des photographies et vid&eacute;os de ses prestations &agrave; des fins de communication (site internet, r&eacute;seaux sociaux, supports commerciaux et &eacute;ditoriaux). En signant le pr&eacute;sent devis, le client accepte que ces images puissent &ecirc;tre captur&eacute;es lors de l&#39;&eacute;v&eacute;nement et exploit&eacute;es librement par AEGIA FOOD, sur tout support et pour toute dur&eacute;e. Aucun convive ne sera identifi&eacute; nominativement. Toute opposition particuli&egrave;re relative &agrave; un convive identifiable doit &ecirc;tre formul&eacute;e par &eacute;crit avant le d&eacute;but de la prestation.</p></div>' +
-              '<div class="cgv-art"><h4>14. Donn&eacute;es personnelles</h4><p>Les donn&eacute;es collect&eacute;es sont trait&eacute;es conform&eacute;ment au RGPD et &agrave; la loi Informatique et Libert&eacute;s. Le client dispose d&#39;un droit d&#39;acc&egrave;s, de rectification, d&#39;effacement, de portabilit&eacute; et d&#39;opposition exer&ccedil;able par courriel &agrave; events@meshuga.fr.</p></div>' +
-              '<div class="cgv-art"><h4>15. Litiges et droit applicable</h4><p>Les pr&eacute;sentes CGV sont soumises au droit fran&ccedil;ais. &Agrave; d&eacute;faut de r&egrave;glement amiable, tout litige sera de la comp&eacute;tence exclusive du Tribunal de commerce de Paris, m&ecirc;me en cas de pluralit&eacute; de d&eacute;fendeurs ou d&#39;appel en garantie.</p></div>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-      // FOOTER (logotype + texte + mentions)
-      '<div class="footer">' +
-        '<div class="footer-brand">' +
-          logotypeHtml +
-          '<div class="footer-meta">3 rue Vavin, Paris 6e &middot; events@meshuga.fr</div>' +
-        '</div>' +
-        '<div class="legal">SAS AEGIA FOOD (enseigne MESHUGA) &middot; SAS au capital de 1 000 &euro; &middot; RCS Paris 904 639 531 &middot; SIRET 904 639 531 00014 &middot; APE 56.10C &middot; TVA intracommunautaire FR31904639531 &middot; 3 rue Vavin 75006 Paris &middot; TVA &agrave; taux r&eacute;duit (10 %) sur les produits alimentaires et taux normal (20 %) sur les prestations de service. Tout commencement d&#39;ex&eacute;cution vaut acceptation du pr&eacute;sent devis.</div>' +
-      '</div>' +
-    '</div>' +
-    // PRINT BAR (n'apparaît pas à l'impression)
-    '<div class="no-print">' +
-      '<p>Pour enregistrer en PDF : cliquez sur <strong>Imprimer</strong> puis choisissez <strong>Enregistrer au format PDF</strong> comme imprimante.<br>Pensez &agrave; d&eacute;cocher <em>En-t&ecirc;tes et pieds de page</em> dans les options.</p>' +
-      '<button onclick="window.print()">📄 Imprimer / Enregistrer PDF</button>' +
-      '<button class="close-btn" onclick="window.close()">Fermer</button>' +
-    '</div>' +
-    '</body></html>'
+  return [{ key: 'formule', label: 'Formule', description: '', lines: [] }]
 }
 
-// ---------- CSS (scope qe-) ----------
+// ---------- CSS ----------
 
 var QE_CSS =
-  '.qe-root{display:flex;flex-direction:column;gap:12px}' +
-  '.qe-header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;background:#FFFFFF;border:2px solid #191923;border-radius:7px;padding:12px 14px;box-shadow:3px 3px 0 #191923}' +
-  '.qe-num{font-family:Yellowtail,cursive;font-size:22px;line-height:1;margin-bottom:2px}' +
-  '.qe-num-sub{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;opacity:.5}' +
-  '.qe-status-pill{display:inline-flex;align-items:center;padding:3px 9px;border-radius:11px;border:2px solid #191923;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;background:#FFEB5A;margin-top:4px}' +
+  '.qe-root{font-family:"Arial Narrow",Arial,sans-serif;color:#191923}' +
+  '.qe-header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:12px}' +
+  '.qe-num{font-size:18px;font-weight:900;letter-spacing:.5px}' +
+  '.qe-num-sub{font-size:11px;opacity:.6;margin-bottom:4px}' +
+  '.qe-status-pill{display:inline-block;padding:3px 10px;border-radius:11px;border:2px solid #191923;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.5px}' +
   '.qe-actions{display:flex;gap:6px;flex-wrap:wrap}' +
-  '.qe-error{background:#FF82D7;border:2px solid #191923;border-radius:7px;padding:10px 14px;font-size:12px;font-weight:900;box-shadow:3px 3px 0 #191923}' +
-  '.qe-loading{padding:50px;text-align:center;font-family:Yellowtail,cursive;font-size:22px;opacity:.6}' +
-  '.qe-grid{display:grid;grid-template-columns:1fr;gap:12px}' +
-  '@media(min-width:1100px){.qe-grid{grid-template-columns:1fr 380px}}' +
-  '.qe-col-left{display:flex;flex-direction:column;gap:12px;min-width:0}' +
-  '.qe-col-right{display:flex;flex-direction:column;gap:12px;min-width:0}' +
-  '@media(min-width:1100px){.qe-col-right{position:sticky;top:14px;align-self:start;max-height:calc(100vh - 30px);overflow-y:auto}}' +
-  '.qe-card{background:#FFFFFF;border:2px solid #191923;border-radius:7px;padding:14px;box-shadow:3px 3px 0 #191923}' +
-  '.qe-card-title{font-family:Yellowtail,cursive;font-size:18px;line-height:1;margin-bottom:10px}' +
-  '.qe-fg{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}' +
-  '.qe-fg2{display:grid;grid-template-columns:1fr 1fr;gap:10px}' +
-  '.qe-fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}' +
-  '.qe-lbl{font-family:Yellowtail,cursive;font-size:13px;display:block;margin-bottom:3px;line-height:1}' +
-  '.qe-inp{width:100%;padding:7px 10px;border-radius:4px;border:2px solid #191923;font-family:Arial Narrow,Arial,sans-serif;font-size:12px;background:#FFFFFF;color:#191923;outline:none;box-shadow:2px 2px 0 #191923}' +
-  '.qe-inp:focus{box-shadow:2px 2px 0 #FF82D7}' +
-  '.qe-textarea{min-height:60px;resize:vertical}' +
-  '.qe-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}' +
-  '.qe-tab{padding:7px 11px;border-radius:14px;border:2px solid #191923;background:#FFFFFF;font-family:Arial Narrow,Arial,sans-serif;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;color:#191923;white-space:nowrap;transition:transform .1s}' +
-  '.qe-tab:active{transform:translate(1px,1px)}' +
-  '.qe-tab.on{background:#FF82D7}' +
-  '.qe-subgroup{margin-bottom:14px}' +
-  '.qe-subgroup-title{font-family:Yellowtail,cursive;font-size:15px;margin-bottom:6px;opacity:.7}' +
-  '.qe-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}' +
-  '.qe-pick{background:#FFFFFF;border:2px solid #191923;border-radius:5px;padding:9px 10px;cursor:pointer;display:flex;flex-direction:column;gap:3px;transition:transform .1s}' +
-  '.qe-pick:hover{background:#FFEB5A}' +
-  '.qe-pick:active{transform:translate(1px,1px)}' +
-  '.qe-pick-name{font-weight:900;font-size:12px;line-height:1.2;text-transform:uppercase;letter-spacing:-.2px}' +
-  '.qe-pick-tag{font-size:10px;line-height:1.3;color:#191923;opacity:.6}' +
-  '.qe-pick-comp{font-size:10px;line-height:1.4;color:#191923;background:#FFEB5A;border-radius:3px;padding:4px 6px;margin-top:4px;border:1.5px solid #191923;font-weight:700}' +
-  '.qe-line-comp{font-size:10px;line-height:1.4;color:#191923;opacity:.65;margin-top:2px;font-style:italic}' +
-  '.qe-pick-row{display:flex;justify-content:space-between;align-items:center;margin-top:3px;gap:6px}' +
-  '.qe-pick-price{font-weight:900;font-size:13px}' +
-  '.qe-pick-size{font-family:Yellowtail,cursive;font-size:12px;opacity:.6}' +
-  '.qe-pick-flags{display:flex;gap:3px;flex-wrap:wrap;margin-top:3px}' +
-  '.qe-flag{display:inline-block;padding:1px 5px;border-radius:3px;border:1.5px solid #191923;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.3px;line-height:1.4}' +
-  '.qe-flag-volume{background:#005FFF;color:#fff;border-color:#005FFF}' +
-  '.qe-flag-exclu{background:#FF82D7}' +
-  '.qe-flag-hot{background:#CC0066;color:#fff;border-color:#CC0066}' +
-  '.qe-line{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #EBEBEB}' +
-  '.qe-line:last-child{border-bottom:none}' +
-  '@media(max-width:680px){.qe-line{grid-template-columns:1fr auto;row-gap:6px}}' +
-  '.qe-line-name{font-weight:900;font-size:13px;line-height:1.2}' +
-  '.qe-line-meta{font-size:11px;opacity:.6;margin-top:1px}' +
-  '.qe-line-internes{font-size:10px;color:#005FFF;font-weight:700;margin-top:2px;font-family:Arial Narrow,Arial,sans-serif}' +
-  '.qe-qty{display:flex;align-items:center;gap:4px}' +
-  '.qe-qty-btn{width:26px;height:26px;border-radius:4px;border:2px solid #191923;background:#FFFFFF;font-weight:900;font-size:14px;cursor:pointer;box-shadow:1px 1px 0 #191923;display:flex;align-items:center;justify-content:center;line-height:1}' +
-  '.qe-qty-btn:active{transform:translate(1px,1px);box-shadow:0 0 0 #191923}' +
-  '.qe-qty-input{width:48px;text-align:center;border:2px solid #191923;border-radius:4px;padding:4px;font-weight:900;font-size:12px;font-family:Arial Narrow,Arial,sans-serif}' +
-  '.qe-line-total{font-weight:900;font-size:14px;text-align:right;min-width:80px}' +
-  '.qe-rm{background:transparent;border:1.5px solid #CC0066;color:#CC0066;border-radius:4px;width:24px;height:24px;cursor:pointer;font-weight:900;font-size:12px;line-height:1}' +
-  '.qe-rm:hover{background:#CC0066;color:#fff}' +
-  '.qe-live-row{margin-top:8px;padding:10px;background:#FFF8E7;border:1.5px dashed #FFEB5A;border-radius:5px}' +
-  '.qe-live-row-title{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;color:#191923}' +
-  '.qe-slider{width:100%;accent-color:#FF82D7}' +
-  '.qe-slider-meta{display:flex;justify-content:space-between;font-size:10px;font-family:Arial Narrow,Arial,sans-serif;margin-top:2px;opacity:.6}' +
-  '.qe-empty-lines{padding:24px 12px;text-align:center;font-family:Yellowtail,cursive;font-size:18px;opacity:.4}' +
-  '.qe-recap-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #EBEBEB;font-size:12px}' +
-  '.qe-recap-row.gray{color:#888;font-size:11px}' +
-  '.qe-recap-row strong{font-weight:900}' +
-  '.qe-recap-final{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;background:#FFEB5A;border:2px solid #191923;border-radius:5px;margin-top:8px;box-shadow:2px 2px 0 #191923}' +
-  '.qe-recap-final-lbl{font-family:Yellowtail,cursive;font-size:20px;line-height:1}' +
-  '.qe-recap-final-amt{font-weight:900;font-size:17px}' +
-  '.qe-recap-internes{margin-top:10px;padding:10px 12px;background:#FFFFFF;color:#191923;border-radius:5px;border:2px solid #191923;border-left:6px solid #FF82D7;box-shadow:2px 2px 0 #191923}' +
-  '.qe-recap-internes-title{font-family:Yellowtail,cursive;font-size:15px;color:#191923;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}' +
-  '.qe-recap-internes-toggle{background:#FFFFFF;border:1.5px solid #191923;color:#191923;border-radius:3px;padding:1px 6px;font-size:9px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.3px}' +
-  '.qe-recap-internes-row{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;color:#191923}' +
-  '.qe-recap-internes-row strong{font-weight:900}' +
-  '.qe-coeff-good{color:#009D3A}' +
-  '.qe-coeff-warn{color:#CC6600}' +
-  '.qe-coeff-bad{color:#CC0066}' +
-  '.qe-checkbox-row{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:900}' +
-  '.qe-checkbox-row input{width:14px;height:14px;accent-color:#009D3A}' +
-  '.qe-toggle-internes{position:absolute;top:14px;right:14px}' +
-  '.qe-densite-suggest{font-size:10px;background:#005FFF;color:#fff;padding:3px 8px;border-radius:3px;font-weight:900;display:inline-block;margin-top:2px}' +
-  '.qe-livraison-auto{font-size:10px;color:#009D3A;font-weight:900;margin-top:3px;font-style:italic}' +
-  '.qe-cov{position:sticky;top:8px;z-index:10;background:#FFEB5A;color:#191923;border:2px solid #191923;border-radius:7px;padding:10px 14px;box-shadow:3px 3px 0 #FF82D7;margin-bottom:0}' +
-  '.qe-cov-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;flex-wrap:wrap}' +
-  '.qe-cov-title{font-family:Yellowtail,cursive;font-size:15px;color:#191923;line-height:1}' +
-  '.qe-cov-status{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.4px;padding:3px 8px;border-radius:3px;display:inline-block;border:1.5px solid #191923;line-height:1.4;white-space:nowrap}' +
-  '.qe-cov-status.ok{background:#7AFF82;color:#191923}' +
-  '.qe-cov-status.warn{background:#FFFFFF;color:#191923}' +
-  '.qe-cov-status.under{background:#FF82D7;color:#191923}' +
-  '.qe-cov-status.over{background:#005FFF;color:#FFFFFF;border-color:#005FFF}' +
-  '.qe-cov-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:6px}' +
-  '.qe-cov-cell{background:#FFFFFF;border:1.5px solid #191923;border-radius:4px;padding:6px 8px;line-height:1}' +
-  '.qe-cov-num{font-weight:900;font-size:18px;color:#191923;line-height:1}' +
-  '.qe-cov-lbl{font-family:Yellowtail,cursive;font-size:12px;color:#191923;opacity:.7;margin-top:3px;line-height:1}' +
-  '.qe-cov-sub{font-size:9px;color:#191923;opacity:.55;margin-top:2px;line-height:1.2;font-family:Arial Narrow,Arial,sans-serif}' +
-  '.qe-cov-empty{font-size:11px;color:#191923;opacity:.6;font-style:italic;padding:4px 0}' +
-  '.qe-cov-bd{margin-top:8px;padding-top:8px;border-top:1.5px dashed #191923}' +
-  '.qe-cov-bd-title{font-family:Yellowtail,cursive;font-size:13px;color:#191923;margin-bottom:4px;line-height:1}' +
-  '.qe-cov-bd-list{display:flex;flex-wrap:wrap;gap:5px}' +
-  '.qe-cov-bd-pill{display:inline-flex;align-items:center;background:#FFFFFF;border:1.5px solid #191923;border-radius:11px;padding:2px 9px;font-size:11px;font-weight:900;color:#191923;line-height:1.5;letter-spacing:-.1px}' +
-  '.qe-cov-bd-pill strong{margin-right:4px;color:#FF82D7;font-size:12px}' +
-  '.qe-modal-overlay{position:fixed;inset:0;background:rgba(25,25,35,.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:14px;animation:qe-fadeIn .15s ease-out}' +
-  '@keyframes qe-fadeIn{from{opacity:0}to{opacity:1}}' +
-  '.qe-modal{background:#FFFFFF;border:2px solid #191923;border-radius:9px;box-shadow:5px 5px 0 #FF82D7;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding:18px 20px}' +
-  '.qe-modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px;padding-bottom:11px;border-bottom:2px solid #FFEB5A}' +
-  '.qe-modal-title{font-family:Yellowtail,cursive;font-size:24px;color:#191923;line-height:1}' +
-  '.qe-modal-sub{font-size:11px;color:#555;margin-top:3px;line-height:1.4}' +
-  '.qe-modal-close{background:transparent;border:none;font-size:22px;cursor:pointer;color:#191923;line-height:1;padding:4px 8px}' +
-  '.qe-modal-close:hover{background:#FFEB5A;border-radius:4px}' +
-  '.qe-modal-error{background:#FF82D7;color:#191923;border:2px solid #191923;border-radius:5px;padding:8px 12px;font-weight:900;font-size:12px;margin-bottom:12px;line-height:1.4}' +
-  '.qe-modal-info{background:#FFFAEC;border-left:4px solid #FFEB5A;padding:9px 12px;border-radius:0 4px 4px 0;margin-bottom:12px;font-size:11px;line-height:1.5;color:#191923}' +
-  '.qe-modal-info strong{color:#191923}' +
-  '.qe-modal-actions{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1.5px dashed #DDD;justify-content:flex-end;flex-wrap:wrap}' +
-  '.qe-modal-actions button{flex:1;justify-content:center;min-width:120px}'
+  '.qe-btn{border:2px solid #191923;border-radius:6px;padding:8px 13px;font-family:inherit;font-size:12px;font-weight:900;cursor:pointer;background:#fff;box-shadow:2px 2px 0 #191923;text-transform:uppercase;letter-spacing:.4px}' +
+  '.qe-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 #191923}' +
+  '.qe-btn.y{background:#FFEB5A}.qe-btn.p{background:#FF82D7;color:#fff}.qe-btn.g{background:#7AFF82}.qe-btn.r{background:#fff;color:#CC0066}' +
+  '.qe-btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}' +
+  '.qe-error{background:#FF82D7;border:2px solid #191923;border-radius:7px;padding:10px;font-size:12px;font-weight:900;margin-bottom:10px;box-shadow:3px 3px 0 #191923}' +
+  '.qe-card{background:#fff;border:2px solid #191923;border-radius:8px;box-shadow:3px 3px 0 #191923;padding:12px;margin-bottom:11px}' +
+  '.qe-card-title{font-family:Yellowtail,cursive;font-size:18px;margin-bottom:8px;line-height:1}' +
+  '.qe-ctx{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px}' +
+  '.qe-ctx b{font-weight:900}' +
+  '.qe-fg{margin-bottom:8px}' +
+  '.qe-fg2{display:grid;grid-template-columns:1fr 1fr;gap:8px}' +
+  '.qe-lbl{display:block;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:#7a7a82;margin-bottom:3px}' +
+  '.qe-inp{width:100%;padding:7px 9px;border:1.5px solid #191923;border-radius:6px;font-family:inherit;font-size:13px;font-weight:700;background:#fff}' +
+  '.qe-textarea{min-height:60px;resize:vertical;font-weight:400}' +
+  '.qe-tabs-f{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch;margin-bottom:11px}' +
+  '.qe-tab-f{flex:1;min-width:120px;border:2px solid #191923;border-radius:8px;background:#fff;box-shadow:2px 2px 0 #191923;cursor:pointer;padding:8px 10px;text-align:center;position:relative}' +
+  '.qe-tab-f:active{transform:translate(1px,1px);box-shadow:1px 1px 0 #191923}' +
+  '.qe-tab-f.on{background:#FF82D7;color:#fff}' +
+  '.qe-tab-f .t{font-size:14px;font-weight:900}.qe-tab-f .s{font-size:11px;opacity:.8}' +
+  '.qe-tab-reco{position:absolute;top:-9px;right:6px;background:#FFEB5A;color:#191923;font-size:8.5px;font-weight:900;padding:1px 6px;border-radius:4px;border:1.5px solid #191923}' +
+  '.qe-tab-add{border:2px dashed #191923;border-radius:8px;background:#fff;cursor:pointer;padding:8px 12px;font-weight:900;font-size:12px}' +
+  '.qe-grid{display:grid;grid-template-columns:1fr;gap:11px}' +
+  '@media(min-width:880px){.qe-grid{grid-template-columns:1.4fr 1fr}}' +
+  '.qe-cov-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap}' +
+  '.qe-cov-bar-out{flex:1;min-width:160px;height:14px;background:#f0f0f0;border:1.5px solid #191923;border-radius:8px;overflow:hidden}' +
+  '.qe-cov-bar-in{height:100%;transition:width .15s}' +
+  '.qe-cov-hint{font-size:11px;font-weight:900;margin-top:4px}' +
+  '.qe-catchips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px}' +
+  '.qe-catchip{padding:5px 10px;border:1.5px solid #191923;border-radius:13px;background:#fff;font-size:11px;font-weight:900;white-space:nowrap;cursor:pointer}' +
+  '.qe-catchip.on{background:#FFEB5A}' +
+  '.qe-subgroup-title{font-family:Yellowtail,cursive;font-size:15px;margin:6px 0 4px}' +
+  '.qe-picks{display:grid;grid-template-columns:1fr 1fr;gap:6px}' +
+  '.qe-pick{border:1.5px solid #191923;border-radius:6px;padding:7px 9px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:#fff}' +
+  '.qe-pick:hover{background:#FFFCEB}' +
+  '.qe-pick-name{font-size:12px;font-weight:700;line-height:1.2}' +
+  '.qe-pick-pv{font-size:11px;font-weight:900;color:#FF82D7;white-space:nowrap;margin-left:8px}' +
+  '.qe-line{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed #ddd}' +
+  '.qe-line-name{flex:1;font-size:12.5px;font-weight:700;min-width:0}' +
+  '.qe-q{display:flex;align-items:center;border:1.5px solid #191923;border-radius:6px;overflow:hidden}' +
+  '.qe-q b{padding:2px 9px;background:#FFEB5A;font-size:13px;font-weight:900;cursor:pointer;user-select:none}' +
+  '.qe-q span{padding:2px 9px;font-size:13px;font-weight:900;min-width:34px;text-align:center}' +
+  '.qe-line-tot{font-size:12.5px;font-weight:900;min-width:64px;text-align:right}' +
+  '.qe-rm{border:none;background:none;color:#bbb;cursor:pointer;font-size:14px;padding:0 2px}' +
+  '.qe-rrow{display:flex;justify-content:space-between;font-size:13px;padding:3px 0}' +
+  '.qe-rrow.gray span{color:#7a7a82}' +
+  '.qe-final{display:flex;justify-content:space-between;align-items:center;background:#191923;color:#FFEB5A;border-radius:6px;padding:8px 11px;margin-top:6px}' +
+  '.qe-final .l{font-size:12px;font-weight:900}.qe-final .a{font-size:17px;font-weight:900}' +
+  '.qe-int{border:1.5px dashed #FF82D7;border-radius:6px;padding:8px 10px;margin-top:9px;background:#FFF5FB}' +
+  '.qe-int-title{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:#993556;margin-bottom:4px}' +
+  '.qe-check{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;margin-top:5px;cursor:pointer}' +
+  '.qe-ov{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(25,25,35,.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:18px}' +
+  '.qe-modal{background:#fff;border:3px solid #191923;border-radius:10px;box-shadow:6px 6px 0 #FF82D7;max-width:480px;width:100%;padding:20px;max-height:92vh;overflow-y:auto}' +
+  '.qe-modal h3{font-family:Yellowtail,cursive;font-size:24px;font-weight:400;margin-bottom:8px}' +
+  '.qe-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}' +
+  '.qe-warn{background:#FFF1FA;border:2px solid #CC0066;border-radius:6px;padding:9px 11px;font-size:12px;font-weight:700;color:#CC0066;margin:8px 0}'
 
 // ============================================================
-// COMPOSANT PRINCIPAL
+// COMPOSANT
 // ============================================================
 
 export default function QuoteEditor(props) {
@@ -827,21 +179,13 @@ export default function QuoteEditor(props) {
   var prospects = props && props.prospects ? props.prospects : []
   var onClose = props && props.onClose ? props.onClose : function() {}
   var onSaved = props && props.onSaved ? props.onSaved : function() {}
-  var toastFn = props && props.toast ? props.toast : function() {}
+  var toast = props && props.toast ? props.toast : function() {}
 
   var [loading, setLoading] = useState(true)
   var [saving, setSaving] = useState(false)
-  var [sendModalOpen, setSendModalOpen] = useState(false)
-  var [sending, setSending] = useState(false)
-  var [sendError, setSendError] = useState('')
-  var [emailTo, setEmailTo] = useState('')
-  var [emailCc, setEmailCc] = useState('')
-  var [emailSubject, setEmailSubject] = useState('')
-  var [emailMessage, setEmailMessage] = useState('')
   var [error, setError] = useState('')
   var [offerings, setOfferings] = useState([])
-  var [activeCategory, setActiveCategory] = useState('box_mini')
-  var [showInternes, setShowInternes] = useState(true)
+  var [curId, setCurId] = useState(devisId || null)
 
   var [numero, setNumero] = useState('')
   var [statut, setStatut] = useState('brouillon')
@@ -855,57 +199,64 @@ export default function QuoteEditor(props) {
 
   var [eventDate, setEventDate] = useState('')
   var [eventLieu, setEventLieu] = useState('')
-  var [nbPersonnes, setNbPersonnes] = useState(50)
+  var [nbPersonnes, setNbPersonnes] = useState(40)
   var [eventFormat, setEventFormat] = useState('cocktail')
+  var [itemFormat, setItemFormat] = useState('mini')
+  var [eventHour, setEventHour] = useState('')
 
-  var [lines, setLines] = useState([])
+  var [variants, setVariants] = useState([{ key: 'formule', label: 'Formule', description: '', lines: [] }])
+  var [activeIdx, setActiveIdx] = useState(0)
 
   var [livraison, setLivraison] = useState(30)
   var [livraisonOffert, setLivraisonOffert] = useState(false)
   var [miseEnPlace, setMiseEnPlace] = useState(0)
   var [miseEnPlaceOffert, setMiseEnPlaceOffert] = useState(false)
-  var [remiseTotalPct, setRemiseTotalPct] = useState(0)
+  var [remiseGlobalePct, setRemiseGlobalePct] = useState(0)
 
   var [notes, setNotes] = useState('')
   var [notesInternes, setNotesInternes] = useState('')
 
-  // Charge offerings
+  var [activeCategory, setActiveCategory] = useState('box_mini')
+  var [showInternes, setShowInternes] = useState(true)
+  var [ctxOpen, setCtxOpen] = useState(true)
+
+  var [sendOpen, setSendOpen] = useState(false)
+  var [sending, setSending] = useState(false)
+  var [sendError, setSendError] = useState('')
+  var [emailTo, setEmailTo] = useState('')
+  var [emailCc, setEmailCc] = useState('')
+  var [emailSubject, setEmailSubject] = useState('')
+  var [emailMessage, setEmailMessage] = useState('')
+
+  var [delOpen, setDelOpen] = useState(false)
+  var [deleting, setDeleting] = useState(false)
+  var [delError, setDelError] = useState('')
+
+  // ---- Chargement du catalogue ----
   useEffect(function() {
+    if (!supabase) { setLoading(false); return }
     var run = async function() {
-      if (!supabase) {
-        setLoading(false)
-        return
-      }
-      setLoading(true)
       try {
         var res = await supabase
           .from('catering_offerings')
           .select('*')
           .eq('is_active', true)
           .order('display_order', { ascending: true })
-        if (res.error) {
-          setError(res.error.message || 'Erreur de chargement des offres')
-          setOfferings([])
-        } else {
-          setOfferings(res.data || [])
-        }
+        if (res.error) setError(res.error.message || 'Erreur chargement catalogue')
+        else setOfferings(res.data || [])
       } catch (e) {
-        setError(e && e.message ? e.message : 'Erreur de chargement')
+        setError(e && e.message ? e.message : 'Erreur chargement catalogue')
       }
       setLoading(false)
     }
     run()
   }, [supabase])
 
-  // Charge devis si édition, sinon initialise un nouveau
+  // ---- Chargement du devis ----
   useEffect(function() {
     if (!devisId) {
-      var year = new Date().getFullYear()
-      var stamp = String(Date.now()).slice(-4)
-      setNumero('DEV-' + year + '-' + stamp)
-      var v = new Date()
-      v.setDate(v.getDate() + 30)
-      setValidite(v.toISOString().split('T')[0])
+      setNumero(genNumero())
+      setValidite(addDaysIso(30))
       return
     }
     if (!supabase) return
@@ -914,9 +265,9 @@ export default function QuoteEditor(props) {
         var res = await supabase.from('devis').select('*').eq('id', devisId).single()
         if (res.data) {
           var d = res.data
-          setNumero(d.numero || '')
-          setStatut(d.statut || 'brouillon')
-          setValidite(d.date_validite || '')
+          setNumero(d.numero || genNumero())
+          setStatut(normalizeStatus(d))
+          setValidite(d.date_validite || addDaysIso(30))
           setClientSelector(d.prospect_id ? String(d.prospect_id) : '')
           setClientNom(d.client_nom || '')
           setClientContact(d.client_contact || '')
@@ -924,16 +275,19 @@ export default function QuoteEditor(props) {
           setClientPhone(d.client_phone || '')
           setEventDate(d.event_date || '')
           setEventLieu(d.event_lieu || '')
-          setNbPersonnes(d.nb_personnes || 50)
-          setEventFormat(d.format || 'cocktail')
-          setLines(Array.isArray(d.items) ? d.items : [])
-          setLivraison(Number(d.livraison) || 30)
+          setNbPersonnes(Number(d.nb_personnes) || 40)
+          setEventFormat(d.event_format || d.format || 'cocktail')
+          setItemFormat(d.item_format || 'mini')
+          setEventHour(d.event_hour || '')
+          setLivraison(d.livraison != null ? Number(d.livraison) : 30)
           setLivraisonOffert(!!d.livraison_offert)
           setMiseEnPlace(Number(d.mise_en_place) || 0)
           setMiseEnPlaceOffert(!!d.mise_en_place_offert)
-          setRemiseTotalPct(Number(d.remise_total_pct) || 0)
+          setRemiseGlobalePct(Number(d.remise_total_pct) || 0)
           setNotes(d.notes || '')
           setNotesInternes(d.notes_internes || '')
+          setVariants(parseVariants(d))
+          setActiveIdx(0)
         }
       } catch (e) {
         setError('Erreur de chargement du devis')
@@ -942,897 +296,554 @@ export default function QuoteEditor(props) {
     run()
   }, [supabase, devisId])
 
-  // Index offerings par id pour lookup rapide
-  var offeringsById = useMemo(
-    function() {
-      var map = {}
-      offerings.forEach(function(o) {
-        map[o.id] = o
-      })
-      return map
-    },
-    [offerings]
-  )
+  var offeringsById = useMemo(function() {
+    return buildOfferingMap(offerings)
+  }, [offerings])
 
-  // Lignes enrichies avec détails
-  var lineDetails = useMemo(
-    function() {
-      var out = []
-      lines.forEach(function(line) {
-        var o = offeringsById[line.offering_id]
-        if (!o) return
-        var qty = Number(line.qty) || 0
-        var remisePct = Number(line.remisePct) || 0
-        var pvHt = Number(o.pv_ht) || 0
-        var fcHt = Number(o.fc_ht) || 0
-        var tvaPct = Number(o.tva_pct) || 10
-        var brutHT = pvHt * qty
-        var remiseMontant = brutHT * remisePct / 100
-        var totalLigneHT = brutHT - remiseMontant
-        var fcLigneHT = fcHt * qty
-        var margeLigneHT = totalLigneHT - fcLigneHT
-        var tvaLigneHT = totalLigneHT * tvaPct / 100
-        var coeffLigne = fcLigneHT > 0 ? totalLigneHT / fcLigneHT : 0
-        out.push({
-          offering: o,
-          qty: qty,
-          remisePct: remisePct,
-          pvHt: pvHt,
-          fcHt: fcHt,
-          tvaPct: tvaPct,
-          totalLigneHT: totalLigneHT,
-          fcLigneHT: fcLigneHT,
-          margeLigneHT: margeLigneHT,
-          tvaLigneHT: tvaLigneHT,
-          coeffLigne: coeffLigne
-        })
-      })
-      return out
-    },
-    [lines, offeringsById]
-  )
+  var activeVariant = variants[activeIdx] || { lines: [] }
 
-  // Totaux globaux
-  var totals = useMemo(
-    function() {
-      var sousTotalHT = 0
-      var totalFcHT = 0
-      var tvaItems = 0
-      lineDetails.forEach(function(l) {
-        sousTotalHT += l.totalLigneHT
-        totalFcHT += l.fcLigneHT
-        tvaItems += l.tvaLigneHT
-      })
-      var fraisHT = 0
-      if (!miseEnPlaceOffert) fraisHT += Number(miseEnPlace) || 0
-      if (!livraisonOffert) fraisHT += Number(livraison) || 0
-      // Frais à 20% (prestation)
-      var tvaFrais = fraisHT * 0.2
-      var totalAvantRemise = sousTotalHT + fraisHT
-      var remiseGlobale = (totalAvantRemise * (Number(remiseTotalPct) || 0)) / 100
-      var totalHT = totalAvantRemise - remiseGlobale
-      var tvaTotal = tvaItems + tvaFrais
-      // TVA proportionnelle si remise globale
-      if (totalAvantRemise > 0 && remiseGlobale > 0) {
-        tvaTotal = tvaTotal * (totalHT / totalAvantRemise)
-      }
-      var totalTTC = totalHT + tvaTotal
-      var totalMargeHT = totalHT - totalFcHT
-      var coeffReel = totalFcHT > 0 ? totalHT / totalFcHT : 0
-      return {
-        sousTotalHT: sousTotalHT,
-        fraisHT: fraisHT,
-        remiseGlobale: remiseGlobale,
-        totalHT: totalHT,
-        tva: tvaTotal,
-        totalTTC: totalTTC,
-        totalFcHT: totalFcHT,
-        totalMargeHT: totalMargeHT,
-        coeffReel: coeffReel
-      }
-    },
-    [lineDetails, livraison, livraisonOffert, miseEnPlace, miseEnPlaceOffert, remiseTotalPct]
-  )
+  var totals = useMemo(function() {
+    var fr = {
+      livraison: livraison, livraison_offert: livraisonOffert,
+      mise_en_place: miseEnPlace, mise_en_place_offert: miseEnPlaceOffert,
+      remise_globale_pct: remiseGlobalePct
+    }
+    var v = variants[activeIdx] || { lines: [] }
+    return computeVariant(v, offeringsById, fr, nbPersonnes)
+  }, [variants, activeIdx, offeringsById, livraison, livraisonOffert, miseEnPlace, miseEnPlaceOffert, remiseGlobalePct, nbPersonnes])
 
-  // Auto-suggest livraison offerte si > 500 HT
-  var livraisonAutoOfferte = totals.sousTotalHT > 500 && livraison > 0 && !livraisonOffert
+  var coverage = useMemo(function() {
+    return computeCoverage(totals.lines, nbPersonnes, eventFormat, itemFormat)
+  }, [totals, nbPersonnes, eventFormat, itemFormat])
 
-  // Couverture pièces (compteurs minis / lunch / parts / forfaits)
-  var coverage = useMemo(
-    function() {
-      var nbMinis = 0
-      var nbLunch = 0
-      var nbPlateauxParts = 0
-      var nbLiveForfait = 0
-      var nbAddons = 0
-      var nbBoxes = 0
-      var liveForfaitNames = []
-      lineDetails.forEach(function(l) {
-        var o = l.offering
-        var qty = l.qty
-        if (o.category === 'box_mini') {
-          nbMinis += qty * (Number(o.size_pers) || 40)
-          nbBoxes += qty
-        } else if (o.category === 'live_mini') {
-          nbMinis += qty
-        } else if (o.category === 'lunch_box') {
-          nbLunch += qty
-        } else if (o.category === 'platter') {
-          nbPlateauxParts += qty * (Number(o.size_pers) || 0)
-        } else if (o.category === 'live_forfait') {
-          nbLiveForfait += qty
-          liveForfaitNames.push(qty + '× ' + o.name)
-        } else if (o.category === 'addon') {
-          nbAddons += qty
-        }
-      })
-      var status = null
-      var statusLabel = null
-      var ratio = nbPersonnes > 0 ? nbMinis / nbPersonnes : 0
-      if (eventFormat === 'cocktail' && nbPersonnes > 0 && nbMinis > 0) {
-        if (ratio < 6) {
-          status = 'under'
-          statusLabel = '⚠ Sous-dimensionné · viser 6 à 8 minis/pers (manque ' + Math.ceil(6 * nbPersonnes - nbMinis) + ')'
-        } else if (ratio <= 8) {
-          status = 'ok'
-          statusLabel = '✓ Couverture OK (' + ratio.toFixed(1) + ' minis/pers)'
-        } else if (ratio <= 12) {
-          status = 'warn'
-          statusLabel = '↑ Confortable (' + ratio.toFixed(1) + ' minis/pers)'
-        } else {
-          status = 'over'
-          statusLabel = '↑↑ Très généreux (' + ratio.toFixed(1) + ' minis/pers)'
-        }
-      } else if (eventFormat === 'lunch' && nbPersonnes > 0 && (nbLunch > 0 || nbMinis > 0 || nbPlateauxParts > 0)) {
-        if (nbLunch > 0 && nbLunch < nbPersonnes) {
-          status = 'under'
-          statusLabel = '⚠ Manque ' + (nbPersonnes - nbLunch) + ' lunch box'
-        } else if (nbLunch === nbPersonnes && nbLunch > 0) {
-          status = 'ok'
-          statusLabel = '✓ Couverture exacte'
-        } else if (nbLunch > nbPersonnes) {
-          status = 'over'
-          statusLabel = '+' + (nbLunch - nbPersonnes) + ' lunch box en plus'
-        }
-      } else if (eventFormat === 'soiree' && nbPersonnes > 0 && nbMinis > 0) {
-        if (ratio < 8) {
-          status = 'under'
-          statusLabel = '⚠ Sous-dimensionné · viser 8 à 12 minis/pers'
-        } else if (ratio <= 12) {
-          status = 'ok'
-          statusLabel = '✓ Couverture OK (' + ratio.toFixed(1) + ' minis/pers)'
-        } else {
-          status = 'warn'
-          statusLabel = '↑ Très généreux (' + ratio.toFixed(1) + ' minis/pers)'
-        }
-      }
-      return {
-        nbMinis: nbMinis,
-        nbLunch: nbLunch,
-        nbPlateauxParts: nbPlateauxParts,
-        nbLiveForfait: nbLiveForfait,
-        nbAddons: nbAddons,
-        nbBoxes: nbBoxes,
-        liveForfaitNames: liveForfaitNames,
-        ratio: ratio,
-        status: status,
-        statusLabel: statusLabel
-      }
-    },
-    [lineDetails, eventFormat, nbPersonnes]
-  )
+  var variantInfos = useMemo(function() {
+    var fr = {
+      livraison: livraison, livraison_offert: livraisonOffert,
+      mise_en_place: miseEnPlace, mise_en_place_offert: miseEnPlaceOffert,
+      remise_globale_pct: remiseGlobalePct
+    }
+    return variants.map(function(v) {
+      var t = computeVariant(v, offeringsById, fr, nbPersonnes)
+      return { ttc: t.total_ttc, pp: t.per_pers_ttc }
+    })
+  }, [variants, offeringsById, livraison, livraisonOffert, miseEnPlace, miseEnPlaceOffert, remiseGlobalePct, nbPersonnes])
 
-  var hasAnyItem = coverage.nbMinis > 0 || coverage.nbLunch > 0 || coverage.nbPlateauxParts > 0 || coverage.nbLiveForfait > 0 || coverage.nbAddons > 0
+  var grouped = useMemo(function() {
+    var order = []
+    var map = {}
+    offerings.forEach(function(o) {
+      if (o.category !== activeCategory) return
+      var sub = o.subcategory || 'autre'
+      if (!map[sub]) { map[sub] = []; order.push(sub) }
+      map[sub].push(o)
+    })
+    return { order: order, map: map }
+  }, [offerings, activeCategory])
 
-  // Décompte par recette : agrège la composition de chaque ligne
-  // Ex: 2× HOUSTON ST + 1× THE FLATIRON => {Hot Dog:20, THE MELT:28, THE EGG:28, PBN:20, THE REUBEN:8, LOX:8, SPICY TUNA:8, Chicken Caesar:8}
-  var sandwichBreakdown = useMemo(
-    function() {
-      var totals = {}
-      lineDetails.forEach(function(l) {
-        // Skip live_forfait : composition descriptive (cuisinier, ardoises, etc.) pas comptable
-        if (l.offering.category === 'live_forfait') return
-        // Skip addon : compositions soit vides soit non comptables
-        if (l.offering.category === 'addon') return
-        var parsed = parseComposition(l.offering.composition, l.qty)
-        parsed.forEach(function(it) {
-          if (!totals[it.name]) totals[it.name] = 0
-          totals[it.name] += it.qty
-        })
-      })
-      // Convertir en array trié par qty décroissante
-      var arr = []
-      Object.keys(totals).forEach(function(k) {
-        arr.push({ name: k, qty: totals[k] })
-      })
-      arr.sort(function(a, b) {
-        return b.qty - a.qty
-      })
-      return arr
-    },
-    [lineDetails]
-  )
+  // ---- Mutations formules ----
+  var setActiveLines = function(newLines) {
+    setVariants(function(prev) {
+      var c = prev.slice()
+      c[activeIdx] = Object.assign({}, c[activeIdx], { lines: newLines })
+      return c
+    })
+  }
 
-  // Densité suggérée
-  var densiteSuggeree = useMemo(
-    function() {
-      if (eventFormat === 'cocktail') return Math.round(nbPersonnes * 6) + ' à ' + Math.round(nbPersonnes * 8) + ' minis'
-      if (eventFormat === 'lunch') return nbPersonnes + ' lunch box'
-      if (eventFormat === 'soiree') return Math.round(nbPersonnes * 8) + ' à ' + Math.round(nbPersonnes * 12) + ' minis'
-      return ''
-    },
-    [eventFormat, nbPersonnes]
-  )
-
-  // Handlers
   var addItem = function(offeringId) {
-    var idx = lines.findIndex(function(l) {
-      return l.offering_id === offeringId
-    })
-    if (idx >= 0) {
-      var newLines = lines.slice()
-      newLines[idx] = Object.assign({}, newLines[idx], {
-        qty: (Number(newLines[idx].qty) || 0) + 1
-      })
-      setLines(newLines)
+    var lines = (activeVariant.lines || []).slice()
+    var found = -1
+    var i
+    for (i = 0; i < lines.length; i++) {
+      if (lines[i].offering_id === offeringId) { found = i; break }
+    }
+    if (found > -1) {
+      lines[found] = Object.assign({}, lines[found], { qty: (Number(lines[found].qty) || 0) + 1 })
     } else {
-      setLines(lines.concat([{ offering_id: offeringId, qty: 1, remisePct: 0 }]))
+      lines.push({ offering_id: offeringId, qty: 1, remise_pct: 0 })
     }
+    setActiveLines(lines)
   }
 
-  var removeItem = function(idx) {
-    setLines(
-      lines.filter(function(_, i) {
-        return i !== idx
-      })
-    )
+  var updateQty = function(idx, q) {
+    var lines = (activeVariant.lines || []).slice()
+    if (!lines[idx]) return
+    var nq = Number(q)
+    if (isNaN(nq) || nq < 0) nq = 0
+    lines[idx] = Object.assign({}, lines[idx], { qty: nq })
+    setActiveLines(lines)
   }
 
-  var updateQty = function(idx, newQty) {
-    var q = Math.max(0, parseInt(newQty, 10) || 0)
-    if (q === 0) {
-      removeItem(idx)
-      return
-    }
-    var newLines = lines.slice()
-    newLines[idx] = Object.assign({}, newLines[idx], { qty: q })
-    setLines(newLines)
+  var stepQty = function(idx, delta) {
+    var lines = activeVariant.lines || []
+    if (!lines[idx]) return
+    updateQty(idx, (Number(lines[idx].qty) || 0) + delta)
   }
 
-  var updateRemise = function(idx, pct) {
-    var p = Math.max(0, Math.min(100, parseFloat(pct) || 0))
-    var newLines = lines.slice()
-    newLines[idx] = Object.assign({}, newLines[idx], { remisePct: p })
-    setLines(newLines)
+  var removeLine = function(idx) {
+    var lines = (activeVariant.lines || []).slice()
+    lines.splice(idx, 1)
+    setActiveLines(lines)
   }
 
-  var pickProspect = function(pid) {
-    setClientSelector(pid)
-    if (!pid) return
-    var p = prospects.find(function(x) {
-      return String(x.id) === String(pid)
+  var addVariant = function() {
+    setVariants(function(prev) {
+      var c = prev.slice()
+      c.push({ key: 'formule_' + (c.length + 1), label: 'Formule ' + (c.length + 1), description: '', lines: [] })
+      return c
     })
+    setActiveIdx(variants.length)
+  }
+
+  var removeVariant = function(i) {
+    if (variants.length <= 1) return
+    setVariants(function(prev) {
+      var c = prev.slice()
+      c.splice(i, 1)
+      return c
+    })
+    setActiveIdx(0)
+  }
+
+  var pickProspect = function(id) {
+    setClientSelector(id)
+    if (!id) return
+    var p = null
+    var k
+    for (k = 0; k < prospects.length; k++) {
+      if (String(prospects[k].id) === String(id)) { p = prospects[k]; break }
+    }
     if (!p) return
-    setClientNom(p.name || '')
+    setClientNom(p.name || p.company_name || '')
+    setClientContact(p.contact_name || p.contact || '')
     setClientEmail(p.email || '')
     setClientPhone(p.phone || '')
   }
 
-  var handleSave = async function() {
-    if (!clientNom.trim()) {
-      toastFn('Nom du client requis')
-      return
+  // ---- Construction du payload PDF pour une formule ----
+  var makePayload = function(idx) {
+    var fr = {
+      livraison: livraison, livraison_offert: livraisonOffert,
+      mise_en_place: miseEnPlace, mise_en_place_offert: miseEnPlaceOffert,
+      remise_globale_pct: remiseGlobalePct
     }
-    if (lineDetails.length === 0) {
-      toastFn('Sélectionne au moins un item')
-      return
-    }
-    if (!supabase) {
-      toastFn('Connexion Supabase indisponible')
-      return
-    }
-    setSaving(true)
-    try {
-      var responsableEmail = (profile && profile.email) || ''
-      var responsablePrenom = 'Edward'
-      if (profile) {
-        if (profile.full_name && (profile.full_name === 'Emy' || profile.full_name === 'Edward')) {
-          responsablePrenom = profile.full_name
-        } else if (profile.role === 'emy') {
-          responsablePrenom = 'Emy'
-        } else if (profile.email && profile.email.toLowerCase().indexOf('emy') > -1) {
-          responsablePrenom = 'Emy'
-        }
-      }
-
-      var payload = {
-        numero: numero,
-        statut: statut,
-        prospect_id: clientSelector ? String(clientSelector) : null,
-        client_nom: clientNom,
-        client_contact: clientContact || '',
-        client_email: clientEmail || '',
-        client_phone: clientPhone || '',
-        event_date: eventDate || null,
-        event_lieu: eventLieu || '',
-        nb_personnes: nbPersonnes,
-        format: eventFormat,
-        items: lines,
-        mise_en_place: miseEnPlace,
-        mise_en_place_offert: miseEnPlaceOffert,
-        livraison: livraison,
-        livraison_offert: livraisonOffert,
-        remise_total_pct: remiseTotalPct,
-        remise_montant: totals.remiseGlobale,
-        total_ht: totals.totalHT,
-        tva: totals.tva,
-        total_ttc: totals.totalTTC,
-        total_marge_ht: totals.totalMargeHT,
-        total_fc_ht: totals.totalFcHT,
-        notes: notes,
-        notes_internes: notesInternes,
-        date_validite: validite || null,
-        responsable_email: responsableEmail,
-        responsable_prenom: responsablePrenom
-      }
-
-      var res
-      if (devisId) {
-        res = await supabase.from('devis').update(payload).eq('id', devisId).select().single()
-      } else {
-        res = await supabase.from('devis').insert(payload).select().single()
-      }
-      if (res.error) {
-        toastFn('Erreur : ' + res.error.message)
-        setSaving(false)
-        return
-      }
-      toastFn('Devis sauvegardé ✓')
-      onSaved(res.data)
-    } catch (e) {
-      toastFn('Erreur : ' + (e && e.message ? e.message : 'inconnue'))
-    }
-    setSaving(false)
-  }
-
-  // Génère et ouvre l'aperçu PDF dans une nouvelle fenêtre (impression > sauvegarde PDF)
-  var handlePreviewPDF = function() {
-    if (lineDetails.length === 0) {
-      toastFn('Ajoute au moins un item pour générer le PDF')
-      return
-    }
-    if (!clientNom.trim()) {
-      toastFn('Nom du client requis pour le PDF')
-      return
-    }
-    var w = window.open('', '_blank')
-    if (!w) {
-      toastFn('Le navigateur a bloqué la fenêtre. Autorise les popups pour ce site.')
-      return
-    }
-    w.document.write(buildPdfHtml())
-    w.document.close()
-    w.focus()
-  }
-
-  // Construit le HTML complet du PDF (réutilisé pour preview et envoi)
-  var buildPdfHtml = function() {
-    return generateCateringPdfHtml(
-      {
-        numero: numero,
-        validite: validite,
-        clientNom: clientNom,
-        clientContact: clientContact,
-        clientEmail: clientEmail,
-        clientPhone: clientPhone,
-        eventDate: eventDate,
-        eventLieu: eventLieu,
-        nbPersonnes: nbPersonnes,
-        eventFormat: eventFormat,
-        lineDetails: lineDetails,
-        miseEnPlace: miseEnPlace,
-        miseEnPlaceOffert: miseEnPlaceOffert,
-        livraison: livraison,
-        livraisonOffert: livraisonOffert,
-        remiseTotalPct: remiseTotalPct,
-        notes: notes,
-        totals: totals,
-        sandwichBreakdown: sandwichBreakdown,
-        coverage: coverage
+    var v = variants[idx] || { lines: [] }
+    var t = computeVariant(v, offeringsById, fr, nbPersonnes)
+    var cov = computeCoverage(t.lines, nbPersonnes, eventFormat, itemFormat)
+    return {
+      numero: numero,
+      validite: validite,
+      client: { nom: clientNom, contact: clientContact, email: clientEmail, phone: clientPhone },
+      event: { date: eventDate, lieu: eventLieu, format: eventFormat, nbPersonnes: nbPersonnes },
+      lines: t.lines,
+      totals: t,
+      coverage: cov,
+      formuleLabel: variantLabel(v, idx),
+      frais: {
+        livraison: livraison, livraison_offert: livraisonOffert,
+        mise_en_place: miseEnPlace, mise_en_place_offert: miseEnPlaceOffert
       },
-      STAMP_PINK,
-      LOGO_PINK
-    )
+      offeringMap: offeringsById,
+      notes: notes
+    }
   }
 
-  // Ouvre la modal d'envoi avec pré-fill intelligent
-  var handleOpenSendModal = function() {
-    if (lineDetails.length === 0) {
-      toastFn('Ajoute au moins un item avant d\'envoyer')
-      return
-    }
-    if (!clientNom.trim()) {
-      toastFn('Nom du client requis')
-      return
-    }
-    if (!devisId) {
-      toastFn('Sauvegarde le devis avant de l\'envoyer')
-      return
-    }
-    setSendError('')
-    setEmailTo(clientEmail || '')
-    setEmailCc('')
-    setEmailSubject('Votre devis Meshuga Events ' + numero)
-
-    // Personnalisation : salutation selon contact + détails événement
-    var salutation = buildSalutation(clientContact)
-    var dateStr = eventDate ? formatDateLongFr(eventDate) : ''
-    var formatStr = formatLabel(eventFormat)
-    var nbStr = nbPersonnes ? String(nbPersonnes) : ''
-
-    // Récap chiffré du devis
-    var totalTTC = totals && totals.totalTTC ? Number(totals.totalTTC) : 0
-    var totalTtcStr = totalTTC.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
-    var perPersonneStr = ''
-    if (nbPersonnes && Number(nbPersonnes) > 0 && totalTTC > 0) {
-      var perPers = totalTTC / Number(nbPersonnes)
-      perPersonneStr = perPers.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' € / personne'
-    }
-
-    // Signature : Edward ou Emy selon profil connecté
-    // Signataire : utilise profile.full_name si dispo (calculé en amont par DashboardContent),
-    // sinon fallback sur la détection email "emy" / "edward".
-    var signataire = 'Edward' // default
-    if (profile) {
-      if (profile.full_name && (profile.full_name === 'Emy' || profile.full_name === 'Edward')) {
-        signataire = profile.full_name
-      } else if (profile.role === 'emy') {
-        signataire = 'Emy'
-      } else if (profile.email && profile.email.toLowerCase().indexOf('emy') > -1) {
-        signataire = 'Emy'
-      }
-    }
-
-    // Construction du message
-    // ⚠️ FUTURE-PROOF MULTI-OPTIONS : quand on passera au multi-options en Phase 4V3,
-    // remplacer le bloc "details" par une boucle sur les 3 options avec chacune leur total.
-    // L'architecture du mail (salutation + intro + details + clôture) reste la même.
-    var lines = []
-    lines.push(salutation + ',')
-    lines.push('')
-    var introParts = ['Suite à votre demande, nous avons le plaisir de vous adresser ci-joint le devis pour ' + formatStr]
-    if (nbStr) introParts.push('(' + nbStr + ' personnes)')
-    if (dateStr) introParts.push('prévu le ' + dateStr)
-    lines.push(introParts.join(' ') + '.')
-    lines.push('')
-
-    // Récap chiffré (mis en avant)
-    lines.push('Récapitulatif :')
-    if (nbStr) lines.push('• ' + nbStr + ' personnes')
-    if (formatStr) lines.push('• Format : ' + formatStr.replace(/^votre /, ''))
-    if (dateStr) lines.push('• Date : ' + dateStr)
-    if (totalTtcStr) lines.push('• Montant total TTC : ' + totalTtcStr + (perPersonneStr ? ' (soit ' + perPersonneStr + ')' : ''))
-    lines.push('')
-
-    // Mention "alternatives possibles" (préparation au multi-options sans mentir)
-    lines.push('Cette proposition est entièrement modulable : n\'hésitez pas à nous solliciter pour vous adresser des alternatives ajustées à votre budget ou à vos préférences.')
-    lines.push('')
-
-    lines.push('Vous trouverez le détail complet de la prestation dans le devis ci-joint, ainsi que nos conditions de règlement et nos CGV.')
-    lines.push('')
-    lines.push('Restant à votre disposition pour toute question,')
-    lines.push('')
-    lines.push('Bien cordialement,')
-    lines.push(signataire)
-    lines.push('Meshuga Events')
-
-    var defaultMsg = lines.join('\n')
-    setEmailMessage(defaultMsg)
-    setSendModalOpen(true)
+  var variantLabel = function(v, i) {
+    if (v && v.label) return v.label
+    if (v && v.key && DEFAULT_VARIANT_LABELS[v.key]) return DEFAULT_VARIANT_LABELS[v.key]
+    return 'Formule ' + (i + 1)
   }
 
-  // Envoie le devis via la route /api/catering/send-devis
-  var handleSendEmail = async function() {
-    setSendError('')
-    if (!emailTo || !emailTo.trim()) {
-      setSendError('Adresse destinataire requise')
-      return
+  var recommendedIdx = function() {
+    var i
+    for (i = 0; i < variants.length; i++) {
+      if (variants[i] && variants[i].key === 'signature') return i
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTo.trim())) {
-      setSendError('Adresse email invalide')
-      return
+    return activeIdx
+  }
+
+  // ---- Aperçu PDF ----
+  var handlePreview = function() {
+    var html = buildDevisHtml(makePayload(activeIdx), { stampUrl: STAMP_PINK, logotypeUrl: LOGO_PINK })
+    var w = window.open('', '_blank')
+    if (w) { w.document.open(); w.document.write(html); w.document.close() }
+  }
+
+  // ---- Sauvegarde ----
+  var buildSavePayload = function() {
+    var fr = {
+      livraison: livraison, livraison_offert: livraisonOffert,
+      mise_en_place: miseEnPlace, mise_en_place_offert: miseEnPlaceOffert,
+      remise_globale_pct: remiseGlobalePct
     }
-    if (emailCc && emailCc.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailCc.trim())) {
-      setSendError('CC : adresse email invalide')
-      return
-    }
-    if (!emailSubject.trim()) {
-      setSendError('Sujet requis')
-      return
-    }
-    setSending(true)
-    try {
-      var pdfHtml = buildPdfHtml()
-      var res = await fetch('/api/catering/send-devis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          devisId: devisId,
-          to: emailTo.trim(),
-          cc: emailCc ? emailCc.trim() : '',
-          bcc: '',
-          subject: emailSubject.trim(),
-          message: emailMessage,
-          pdfHtml: pdfHtml
-        })
-      })
-      var json = await res.json()
-      if (!res.ok || !json.ok) {
-        setSendError(json.error || 'Erreur d\'envoi (HTTP ' + res.status + ')')
-        setSending(false)
-        return
-      }
-      toastFn('📤 Devis envoyé à ' + emailTo + ' ✓')
-      setSendModalOpen(false)
-      setSending(false)
-      // Recharge l'état devis (statut, sent_at, sent_count) sans fermer l'éditeur
-      if (devisId && supabase) {
-        try {
-          var refresh = await supabase.from('devis').select('statut, sent_at').eq('id', devisId).single()
-          if (refresh.data && refresh.data.statut) {
-            setStatut(refresh.data.statut)
-          }
-        } catch (e) {
-          // silent : pas grave si le refresh statut rate, l'envoi a réussi
+    var recIdx = recommendedIdx()
+    var recTotals = computeVariant(variants[recIdx] || { lines: [] }, offeringsById, fr, nbPersonnes)
+    var variantsStore = variants.map(function(v, i) {
+      var t = computeVariant(v, offeringsById, fr, nbPersonnes)
+      return {
+        key: v.key || ('formule_' + (i + 1)),
+        label: variantLabel(v, i),
+        description: v.description || '',
+        lines: v.lines || [],
+        totals: {
+          total_ht: t.total_ht, total_tva: t.tva, total_ttc: t.total_ttc,
+          per_personne_ht: t.per_pers_ht, per_personne_ttc: t.per_pers_ttc,
+          marge_ht: t.marge_ht, fc_total: t.fc_total, coeff: t.coeff
         }
       }
-    } catch (e) {
-      setSendError('Erreur réseau : ' + (e && e.message ? e.message : 'inconnue'))
-      setSending(false)
+    })
+    var responsablePrenom = 'Edward'
+    if (profile && (profile.full_name === 'Emy' || profile.role === 'emy')) responsablePrenom = 'Emy'
+    return {
+      numero: numero,
+      statut: statut,
+      date_validite: validite || null,
+      prospect_id: clientSelector || null,
+      client_nom: clientNom || '',
+      client_contact: clientContact || '',
+      client_email: clientEmail || '',
+      client_phone: clientPhone || '',
+      event_date: eventDate || null,
+      event_lieu: eventLieu || '',
+      nb_personnes: Number(nbPersonnes) || 0,
+      format: eventFormat,
+      event_format: eventFormat,
+      item_format: itemFormat,
+      event_hour: eventHour || '',
+      items: (variants[recIdx] && variants[recIdx].lines) || [],
+      variants: variantsStore,
+      livraison: Number(livraison) || 0,
+      livraison_offert: !!livraisonOffert,
+      mise_en_place: Number(miseEnPlace) || 0,
+      mise_en_place_offert: !!miseEnPlaceOffert,
+      remise_total_pct: Number(remiseGlobalePct) || 0,
+      total_ht: recTotals.total_ht,
+      tva: recTotals.tva,
+      total_ttc: recTotals.total_ttc,
+      total_marge_ht: recTotals.marge_ht,
+      total_fc_ht: recTotals.fc_total,
+      notes: notes || '',
+      notes_internes: notesInternes || '',
+      responsable_email: (profile && profile.email) || '',
+      responsable_prenom: responsablePrenom
     }
   }
 
-  // Filtre offerings par catégorie active + grouping par subcategory
-  var filteredOfferings = offerings.filter(function(o) {
-    return o.category === activeCategory
-  })
-  var groupedOfferings = useMemo(
-    function() {
-      var groups = {}
-      filteredOfferings.forEach(function(o) {
-        var sub = o.subcategory || 'autre'
-        if (!groups[sub]) groups[sub] = []
-        groups[sub].push(o)
+  // Persiste sans fermer l'éditeur. cb(savedRow)
+  var persist = function(cb) {
+    if (!supabase) { if (cb) cb(null); return }
+    if (!clientNom.trim()) { setError('Renseigne le nom du client avant de sauvegarder.'); if (cb) cb(null); return }
+    setSaving(true)
+    setError('')
+    var payload = buildSavePayload()
+    var run = async function() {
+      try {
+        var res
+        if (curId) {
+          res = await supabase.from('devis').update(payload).eq('id', curId).select().single()
+        } else {
+          res = await supabase.from('devis').insert([payload]).select().single()
+        }
+        setSaving(false)
+        if (res.error) { setError('Sauvegarde : ' + res.error.message); if (cb) cb(null); return }
+        if (res.data && res.data.id) setCurId(res.data.id)
+        if (cb) cb(res.data)
+      } catch (e) {
+        setSaving(false)
+        setError(e && e.message ? e.message : 'Erreur de sauvegarde')
+        if (cb) cb(null)
+      }
+    }
+    run()
+  }
+
+  var handleSave = function() {
+    persist(function(saved) {
+      if (saved) toast('Devis enregistré ✓')
+    })
+  }
+
+  // ---- Envoi ----
+  var handleOpenSend = function() {
+    persist(function(saved) {
+      if (!saved) return
+      setEmailTo(clientEmail || '')
+      setEmailCc('')
+      setEmailSubject('Votre devis Meshuga Events — ' + numero)
+      var contactFirst = (clientContact || '').split(' ')[0]
+      var hello = contactFirst ? ('Bonjour ' + contactFirst + ',') : 'Bonjour,'
+      setEmailMessage(
+        hello + '\n\n' +
+        'Suite à notre échange, voici votre devis pour ' + (nbPersonnes) + ' personnes.\n' +
+        'Vous pouvez le consulter et l\'enregistrer via le lien ci-dessous.\n\n' +
+        'À très vite,\nL\'équipe Meshuga Events'
+      )
+      setSendError('')
+      setSendOpen(true)
+    })
+  }
+
+  var handleSend = function() {
+    if (!curId) { setSendError('Sauvegarde le devis avant l\'envoi.'); return }
+    setSending(true)
+    setSendError('')
+    var pdfHtml = buildDevisHtml(makePayload(activeIdx), { stampUrl: STAMP_PINK, logotypeUrl: LOGO_PINK })
+    var body = {
+      devisId: String(curId),
+      to: emailTo,
+      cc: emailCc,
+      subject: emailSubject,
+      message: emailMessage,
+      pdfHtml: pdfHtml
+    }
+    fetch('/api/catering/send-devis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+      .then(function(r) { return r.json() })
+      .then(function(data) {
+        setSending(false)
+        if (!data.ok) { setSendError(data.error || 'Erreur d\'envoi'); return }
+        setStatut('envoye')
+        setSendOpen(false)
+        toast('Devis envoyé ✓')
+      }, function(err) {
+        setSending(false)
+        setSendError('Réseau : ' + (err && err.message ? err.message : 'inconnu'))
       })
-      return groups
-    },
-    [filteredOfferings]
-  )
-  var subcatOrder = Object.keys(groupedOfferings)
-
-  // Coeff color helper (sans JSX)
-  var coeffClass = function(c) {
-    if (c >= 4.2) return 'qe-coeff-good'
-    if (c >= 3.5) return 'qe-coeff-warn'
-    return 'qe-coeff-bad'
   }
 
-  // Render loading
-  if (loading) {
-    return (
-      <div className="qe-root">
-        <style>{QE_CSS}</style>
-        <div className="qe-loading">Chargement de l'éditeur…</div>
-      </div>
-    )
+  // ---- Suppression ----
+  var confirmDelete = function() {
+    if (!curId) { onClose(); return }
+    setDeleting(true)
+    setDelError('')
+    var run = async function() {
+      try {
+        await supabase.from('devis_historique').delete().eq('devis_id', curId)
+        await supabase.from('devis_documents').delete().eq('devis_id', curId)
+        await supabase.from('devis').delete().eq('parent_devis_id', curId)
+        var res = await supabase.from('devis').delete().eq('id', curId)
+        if (res && res.error) { setDelError(res.error.message || 'Suppression impossible'); setDeleting(false); return }
+        setDeleting(false)
+        setDelOpen(false)
+        toast('Devis supprimé')
+        onSaved()
+      } catch (e) {
+        setDelError(e && e.message ? e.message : 'Suppression impossible')
+        setDeleting(false)
+      }
+    }
+    run()
   }
+
+  // ---- Rendu ----
+  var statutColors = statusColor(statut)
+  var covPct = coverage.recommended > 0 ? Math.min(100, Math.round((coverage.current / coverage.recommended) * 100)) : 0
+  var covColor = coverage.covered ? '#1D9E75' : '#EF9F27'
+  var canSend = (activeVariant.lines && activeVariant.lines.length > 0) && !!clientNom.trim()
 
   return (
     <div className="qe-root">
       <style>{QE_CSS}</style>
 
-      {/* HEADER */}
       <div className="qe-header">
         <div>
           <div className="qe-num">{numero || 'Nouveau devis'}</div>
-          <div className="qe-num-sub">{devisId ? 'Édition' : 'Création'}</div>
-          <div>
-            <span className="qe-status-pill">{STATUS_LABELS[statut] || statut}</span>
-          </div>
+          <div className="qe-num-sub">{curId ? 'Édition' : 'Création'}</div>
+          <span className="qe-status-pill" style={{ background: statutColors.bg, color: statutColors.fg }}>
+            {statusLabel(statut)}
+          </span>
         </div>
         <div className="qe-actions">
-          <button className="btn" onClick={onClose}>← Retour</button>
-          <button className="btn btn-y" onClick={handleSave} disabled={saving}>
-            {saving ? '⏳ Enregistrement…' : '💾 Sauvegarder'}
+          <button className="qe-btn" onClick={onClose}>← Retour</button>
+          <button className="qe-btn y" onClick={handleSave} disabled={saving}>
+            {saving ? '⏳…' : '💾 Sauver'}
           </button>
+          {curId ? (
+            <button className="qe-btn r" onClick={function() { setDelError(''); setDelOpen(true) }}>🗑 Supprimer</button>
+          ) : null}
         </div>
       </div>
 
       {error ? <div className="qe-error">⚠ {error}</div> : null}
 
-      {/* COMPTEUR COUVERTURE — sticky en haut, toujours visible */}
-      <div className="qe-cov">
-        <div className="qe-cov-head">
-          <div className="qe-cov-title">🍽 Couverture · {nbPersonnes} pers.</div>
-          {coverage.statusLabel ? (
-            <span className={'qe-cov-status ' + (coverage.status || 'warn')}>{coverage.statusLabel}</span>
-          ) : null}
+      {/* Contexte client + événement (repliable) */}
+      <div className="qe-card">
+        <div className="qe-ctx">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {ctxOpen ? (
+              <span style={{ fontFamily: 'Yellowtail,cursive', fontSize: 18 }}>Client &amp; événement</span>
+            ) : (
+              <span>
+                <b>{clientNom || 'Client à renseigner'}</b> · {nbPersonnes} pers · {eventDate || 'date ?'}
+                {eventLieu ? ' · ' + eventLieu : ''}
+              </span>
+            )}
+          </div>
+          <button className="qe-btn" onClick={function() { setCtxOpen(!ctxOpen) }}>
+            {ctxOpen ? 'Replier' : 'Modifier'}
+          </button>
         </div>
-        {!hasAnyItem ? (
-          <div className="qe-cov-empty">
-            Ajoute des items pour voir le décompte temps réel (minis, lunch box, plateaux…).
-          </div>
-        ) : (
-          <div className="qe-cov-grid">
-            {coverage.nbMinis > 0 ? (
-              <div className="qe-cov-cell">
-                <div className="qe-cov-num">{coverage.nbMinis}</div>
-                <div className="qe-cov-lbl">Minis (pcs)</div>
-                {coverage.nbBoxes > 0 ? (
-                  <div className="qe-cov-sub">{coverage.nbBoxes} box · {coverage.ratio.toFixed(1)}/pers</div>
-                ) : (
-                  <div className="qe-cov-sub">{coverage.ratio.toFixed(1)} / pers</div>
-                )}
-              </div>
-            ) : null}
-            {coverage.nbLunch > 0 ? (
-              <div className="qe-cov-cell">
-                <div className="qe-cov-num">{coverage.nbLunch}</div>
-                <div className="qe-cov-lbl">Lunch box</div>
-                {nbPersonnes > 0 ? (
-                  <div className="qe-cov-sub">{coverage.nbLunch}/{nbPersonnes} pers</div>
-                ) : null}
-              </div>
-            ) : null}
-            {coverage.nbPlateauxParts > 0 ? (
-              <div className="qe-cov-cell">
-                <div className="qe-cov-num">{coverage.nbPlateauxParts}</div>
-                <div className="qe-cov-lbl">Parts plateaux</div>
-                {nbPersonnes > 0 ? (
-                  <div className="qe-cov-sub">{(coverage.nbPlateauxParts / nbPersonnes).toFixed(1)}/pers</div>
-                ) : null}
-              </div>
-            ) : null}
-            {coverage.nbLiveForfait > 0 ? (
-              <div className="qe-cov-cell">
-                <div className="qe-cov-num">{coverage.nbLiveForfait}</div>
-                <div className="qe-cov-lbl">Live forfait</div>
-                <div className="qe-cov-sub">{coverage.liveForfaitNames.join(', ')}</div>
-              </div>
-            ) : null}
-            {coverage.nbAddons > 0 ? (
-              <div className="qe-cov-cell">
-                <div className="qe-cov-num">{coverage.nbAddons}</div>
-                <div className="qe-cov-lbl">Add-ons</div>
-              </div>
-            ) : null}
-          </div>
-        )}
-        {sandwichBreakdown.length > 0 ? (
-          <div className="qe-cov-bd">
-            <div className="qe-cov-bd-title">Détail par recette</div>
-            <div className="qe-cov-bd-list">
-              {sandwichBreakdown.map(function(s) {
-                return (
-                  <span key={s.name} className="qe-cov-bd-pill">
-                    <strong>{s.qty}</strong> {s.name}
-                  </span>
-                )
-              })}
-            </div>
-          </div>
-        ) : null}
-      </div>
 
-      <div className="qe-grid">
-        {/* COL GAUCHE — édition */}
-        <div className="qe-col-left">
-
-          {/* CLIENT */}
-          <div className="qe-card">
-            <div className="qe-card-title">Client</div>
+        {ctxOpen ? (
+          <div style={{ marginTop: 10 }}>
             <div className="qe-fg">
               <label className="qe-lbl">Prospect existant (optionnel)</label>
-              <select
-                className="qe-inp"
-                value={clientSelector}
-                onChange={function(e) {
-                  pickProspect(e.target.value)
-                }}
-              >
+              <select className="qe-inp" value={clientSelector} onChange={function(e) { pickProspect(e.target.value) }}>
                 <option value="">— Nouveau client —</option>
                 {prospects.map(function(p) {
-                  return (
-                    <option key={p.id} value={String(p.id)}>
-                      {p.name}
-                    </option>
-                  )
+                  return <option key={p.id} value={String(p.id)}>{p.name || p.company_name || p.id}</option>
                 })}
               </select>
             </div>
             <div className="qe-fg">
               <label className="qe-lbl">Entreprise / Client *</label>
-              <input
-                className="qe-inp"
-                value={clientNom}
-                onChange={function(e) {
-                  setClientNom(e.target.value)
-                }}
-                placeholder="Nom du client"
-              />
+              <input className="qe-inp" value={clientNom} onChange={function(e) { setClientNom(e.target.value) }} placeholder="Nom du client" />
             </div>
             <div className="qe-fg2">
               <div className="qe-fg">
-                <label className="qe-lbl">Contact (personne)</label>
-                <input
-                  className="qe-inp"
-                  value={clientContact}
-                  onChange={function(e) {
-                    setClientContact(e.target.value)
-                  }}
-                  placeholder="Prénom Nom"
-                />
+                <label className="qe-lbl">Contact</label>
+                <input className="qe-inp" value={clientContact} onChange={function(e) { setClientContact(e.target.value) }} placeholder="Prénom Nom" />
               </div>
               <div className="qe-fg">
                 <label className="qe-lbl">Email</label>
-                <input
-                  className="qe-inp"
-                  value={clientEmail}
-                  onChange={function(e) {
-                    setClientEmail(e.target.value)
-                  }}
-                  placeholder="contact@..."
-                />
+                <input className="qe-inp" value={clientEmail} onChange={function(e) { setClientEmail(e.target.value) }} placeholder="contact@..." />
               </div>
             </div>
-            <div className="qe-fg">
-              <label className="qe-lbl">Téléphone</label>
-              <input
-                className="qe-inp"
-                value={clientPhone}
-                onChange={function(e) {
-                  setClientPhone(e.target.value)
-                }}
-                placeholder="06 ..."
-              />
-            </div>
-          </div>
-
-          {/* EVENT */}
-          <div className="qe-card">
-            <div className="qe-card-title">Événement</div>
             <div className="qe-fg2">
               <div className="qe-fg">
-                <label className="qe-lbl">Date</label>
-                <input
-                  type="date"
-                  className="qe-inp"
-                  value={eventDate}
-                  onChange={function(e) {
-                    setEventDate(e.target.value)
-                  }}
-                />
+                <label className="qe-lbl">Téléphone</label>
+                <input className="qe-inp" value={clientPhone} onChange={function(e) { setClientPhone(e.target.value) }} placeholder="06 ..." />
               </div>
               <div className="qe-fg">
                 <label className="qe-lbl">Lieu</label>
-                <input
-                  className="qe-inp"
-                  value={eventLieu}
-                  onChange={function(e) {
-                    setEventLieu(e.target.value)
-                  }}
-                  placeholder="Adresse"
-                />
+                <input className="qe-inp" value={eventLieu} onChange={function(e) { setEventLieu(e.target.value) }} placeholder="Adresse" />
               </div>
             </div>
             <div className="qe-fg2">
               <div className="qe-fg">
-                <label className="qe-lbl">Nombre de personnes</label>
-                <input
-                  type="number"
-                  className="qe-inp"
-                  value={nbPersonnes}
-                  min="1"
-                  onChange={function(e) {
-                    setNbPersonnes(parseInt(e.target.value, 10) || 1)
-                  }}
-                />
-                {densiteSuggeree ? (
-                  <span className="qe-densite-suggest">💡 Suggestion : {densiteSuggeree}</span>
-                ) : null}
+                <label className="qe-lbl">Date</label>
+                <input type="date" className="qe-inp" value={eventDate} onChange={function(e) { setEventDate(e.target.value) }} />
               </div>
               <div className="qe-fg">
+                <label className="qe-lbl">Validité du devis</label>
+                <input type="date" className="qe-inp" value={validite} onChange={function(e) { setValidite(e.target.value) }} />
+              </div>
+            </div>
+            <div className="qe-fg2">
+              <div className="qe-fg">
                 <label className="qe-lbl">Format</label>
-                <select
-                  className="qe-inp"
-                  value={eventFormat}
-                  onChange={function(e) {
-                    setEventFormat(e.target.value)
-                  }}
-                >
+                <select className="qe-inp" value={eventFormat} onChange={function(e) { setEventFormat(e.target.value) }}>
                   {EVENT_FORMATS.map(function(f) {
-                    return (
-                      <option key={f.id} value={f.id}>
-                        {f.label}
-                      </option>
-                    )
+                    return <option key={f.id} value={f.id}>{f.label}</option>
                   })}
                 </select>
               </div>
-            </div>
-            <div className="qe-fg">
-              <label className="qe-lbl">Validité du devis</label>
-              <input
-                type="date"
-                className="qe-inp"
-                value={validite}
-                onChange={function(e) {
-                  setValidite(e.target.value)
-                }}
-              />
+              {eventFormat === 'petit_dej' ? (
+                <div className="qe-fg">
+                  <label className="qe-lbl">Format items</label>
+                  <select className="qe-inp" value={itemFormat} onChange={function(e) { setItemFormat(e.target.value) }}>
+                    <option value="standard">Standard (1 sandwich/pers)</option>
+                    <option value="mini">Mini (2-3 minis/pers)</option>
+                  </select>
+                </div>
+              ) : null}
             </div>
           </div>
+        ) : null}
+      </div>
 
-          {/* SÉLECTION ITEMS */}
+      {/* Participants + couverture */}
+      <div className="qe-card">
+        <div className="qe-cov-wrap">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="qe-lbl" style={{ margin: 0 }}>Participants</span>
+            <input
+              type="number"
+              min="1"
+              className="qe-inp"
+              style={{ width: 70 }}
+              value={nbPersonnes}
+              onChange={function(e) { setNbPersonnes(parseInt(e.target.value, 10) || 1) }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+              <span className="qe-lbl" style={{ margin: 0 }}>Couverture</span>
+              <span style={{ fontSize: 12, fontWeight: 900 }}>{coverage.current} / {coverage.recommended}</span>
+            </div>
+            <div className="qe-cov-bar-out">
+              <div className="qe-cov-bar-in" style={{ width: covPct + '%', background: covColor }}></div>
+            </div>
+            <div className="qe-cov-hint" style={{ color: covColor }}>{coverage.label}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Onglets de formules */}
+      <div className="qe-tabs-f">
+        {variants.map(function(v, i) {
+          var info = variantInfos[i] || { pp: 0 }
+          var isReco = v.key === 'signature'
+          return (
+            <div
+              key={i}
+              className={'qe-tab-f' + (i === activeIdx ? ' on' : '')}
+              onClick={function() { setActiveIdx(i) }}
+            >
+              {isReco ? <span className="qe-tab-reco">RECO</span> : null}
+              <div className="t">{variantLabel(v, i)}</div>
+              <div className="s">{fmtEur(info.pp)} / pers</div>
+              {variants.length > 1 ? (
+                <span
+                  style={{ position: 'absolute', top: 4, left: 6, fontSize: 11, color: i === activeIdx ? '#fff' : '#bbb', cursor: 'pointer' }}
+                  onClick={function(e) { e.stopPropagation(); removeVariant(i) }}
+                  title="Retirer cette formule"
+                >
+                  ✕
+                </span>
+              ) : null}
+            </div>
+          )
+        })}
+        {variants.length < 3 ? (
+          <button className="qe-tab-add" onClick={addVariant}>+ Formule</button>
+        ) : null}
+      </div>
+
+      <div className="qe-grid">
+        {/* COLONNE GAUCHE — composition */}
+        <div>
           <div className="qe-card">
-            <div className="qe-card-title">Sélectionner des items</div>
-            <div className="qe-tabs">
+            <div className="qe-card-title">Catalogue</div>
+            <div className="qe-catchips">
               {CATEGORY_TABS.map(function(t) {
-                var count = offerings.filter(function(o) {
-                  return o.category === t.id
-                }).length
+                var count = offerings.filter(function(o) { return o.category === t.id }).length
                 return (
                   <button
                     key={t.id}
-                    className={'qe-tab' + (activeCategory === t.id ? ' on' : '')}
-                    onClick={function() {
-                      setActiveCategory(t.id)
-                    }}
+                    className={'qe-catchip' + (activeCategory === t.id ? ' on' : '')}
+                    onClick={function() { setActiveCategory(t.id) }}
                   >
                     {t.emoji} {t.label} ({count})
                   </button>
                 )
               })}
             </div>
-
-            {subcatOrder.length === 0 ? (
-              <div style={{ padding: 20, textAlign: 'center', opacity: 0.4, fontSize: 12 }}>
-                Aucun item dans cette catégorie.
-              </div>
+            {grouped.order.length === 0 ? (
+              <div style={{ padding: 16, textAlign: 'center', opacity: 0.4, fontSize: 12 }}>Aucun item dans cette catégorie.</div>
             ) : null}
-
-            {subcatOrder.map(function(sub) {
-              var items = groupedOfferings[sub]
+            {grouped.order.map(function(sub) {
               return (
-                <div key={sub} className="qe-subgroup">
+                <div key={sub}>
                   <div className="qe-subgroup-title">{SUBCAT_LABELS[sub] || sub}</div>
-                  <div className="qe-cards">
-                    {items.map(function(o) {
-                      var pv = Number(o.pv_ht) || 0
+                  <div className="qe-picks">
+                    {grouped.map[sub].map(function(o) {
                       return (
-                        <div
-                          key={o.id}
-                          className="qe-pick"
-                          onClick={function() {
-                            addItem(o.id)
-                          }}
-                        >
-                          <div className="qe-pick-name">{o.name}</div>
-                          {o.tagline ? <div className="qe-pick-tag">{o.tagline}</div> : null}
-                          {o.composition ? <div className="qe-pick-comp">📋 {o.composition}</div> : null}
-                          <div className="qe-pick-row">
-                            <span className="qe-pick-price">{fmtEur0(pv)} HT</span>
-                            <span className="qe-pick-size">
-                              {o.size_pers ? o.size_pers + ' pers./pièces' : 'pièce'}
-                            </span>
-                          </div>
-                          {o.flag_volume || o.flag_exclu || o.is_hot ? (
-                            <div className="qe-pick-flags">
-                              {o.flag_volume ? <span className="qe-flag qe-flag-volume">Volume</span> : null}
-                              {o.flag_exclu ? <span className="qe-flag qe-flag-exclu">Exclu B2B</span> : null}
-                              {o.is_hot ? <span className="qe-flag qe-flag-hot">Chaud</span> : null}
-                            </div>
-                          ) : null}
+                        <div key={o.id} className="qe-pick" onClick={function() { addItem(o.id) }}>
+                          <span className="qe-pick-name">{o.name}</span>
+                          <span className="qe-pick-pv">{fmtEur(Number(o.pv_ht) || 0)}</span>
                         </div>
                       )
                     })}
@@ -1842,451 +853,188 @@ export default function QuoteEditor(props) {
             })}
           </div>
 
-          {/* ITEMS SÉLECTIONNÉS */}
           <div className="qe-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <div className="qe-card-title" style={{ marginBottom: 0 }}>
-                Items sélectionnés ({lineDetails.length})
+            <div className="qe-card-title">Composition · {variantLabel(activeVariant, activeIdx)}</div>
+            {(!activeVariant.lines || activeVariant.lines.length === 0) ? (
+              <div style={{ padding: 12, textAlign: 'center', opacity: 0.5, fontSize: 12 }}>
+                Clique un item du catalogue pour l&apos;ajouter à cette formule.
               </div>
-              <button
-                className="qe-recap-internes-toggle"
-                style={{ background: showInternes ? '#191923' : 'transparent', color: showInternes ? '#FFEB5A' : '#191923', borderColor: '#191923' }}
-                onClick={function() {
-                  setShowInternes(!showInternes)
-                }}
-              >
-                {showInternes ? '👁 Internes ON' : '🔒 Internes OFF'}
-              </button>
-            </div>
-            {lineDetails.length === 0 ? (
-              <div className="qe-empty-lines">Aucun item — clique sur les cartes ci-dessus pour ajouter</div>
             ) : null}
-            {lineDetails.map(function(l, idx) {
-              var o = l.offering
-              var isLive = o.category === 'live_forfait'
-              var maxRem = isLive ? maxLiveRemise(o) : 0
-              var plancher = isLive ? getLivePlancher(o) : 0
-              var prixApresRemise = l.totalLigneHT
+            {(activeVariant.lines || []).map(function(l, idx) {
+              var o = offeringsById[l.offering_id]
+              var name = o ? o.name : l.offering_id
+              var pv = o ? (Number(o.pv_ht) || 0) : 0
+              var lineTot = pv * (Number(l.qty) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
               return (
-                <div key={idx}>
-                  <div className="qe-line">
-                    <div style={{ minWidth: 0 }}>
-                      <div className="qe-line-name">{o.name}</div>
-                      <div className="qe-line-meta">
-                        {fmtEur(l.pvHt)} HT × {l.qty}
-                        {o.size_pers ? ' · ' + o.size_pers + ' pers.' : ''}
-                        {l.remisePct > 0 ? ' · -' + l.remisePct + '%' : ''}
-                      </div>
-                      {o.composition ? (
-                        <div className="qe-line-comp">📋 {o.composition}</div>
-                      ) : null}
-                      {showInternes ? (
-                        <div className="qe-line-internes">
-                          FC : {fmtEur(l.fcLigneHT)} · Marge : {fmtEur(l.margeLigneHT)} · Coeff : {l.coeffLigne.toFixed(2)}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="qe-qty">
-                      <button
-                        className="qe-qty-btn"
-                        onClick={function() {
-                          updateQty(idx, l.qty - 1)
-                        }}
-                      >
-                        −
-                      </button>
-                      <input
-                        className="qe-qty-input"
-                        type="number"
-                        min="0"
-                        value={l.qty}
-                        onChange={function(e) {
-                          updateQty(idx, e.target.value)
-                        }}
-                      />
-                      <button
-                        className="qe-qty-btn"
-                        onClick={function() {
-                          updateQty(idx, l.qty + 1)
-                        }}
-                      >
-                        +
-                      </button>
-                    </div>
-                    <div className="qe-line-total">{fmtEur(prixApresRemise)}</div>
-                    <button
-                      className="qe-rm"
-                      onClick={function() {
-                        removeItem(idx)
-                      }}
-                      title="Supprimer"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  {isLive && plancher > 0 ? (
-                    <div className="qe-live-row">
-                      <div className="qe-live-row-title">🔥 Remise live cooking (max {maxRem}%)</div>
-                      <input
-                        type="range"
-                        className="qe-slider"
-                        min="0"
-                        max={maxRem}
-                        step="1"
-                        value={l.remisePct || 0}
-                        onChange={function(e) {
-                          updateRemise(idx, e.target.value)
-                        }}
-                      />
-                      <div className="qe-slider-meta">
-                        <span>0% — {fmtEur(l.pvHt)}</span>
-                        <span style={{ fontWeight: 900, color: '#191923' }}>
-                          {l.remisePct || 0}% appliqué
-                        </span>
-                        <span>{maxRem}% — plancher {fmtEur(plancher)}</span>
-                      </div>
-                    </div>
-                  ) : null}
+                <div key={idx} className="qe-line">
+                  <span className="qe-line-name">{name}</span>
+                  <span className="qe-q">
+                    <b onClick={function() { stepQty(idx, -1) }}>−</b>
+                    <span>{l.qty}</span>
+                    <b onClick={function() { stepQty(idx, 1) }}>+</b>
+                  </span>
+                  <span className="qe-line-tot">{fmtEur(lineTot)}</span>
+                  <button className="qe-rm" title="Retirer" onClick={function() { removeLine(idx) }}>✕</button>
                 </div>
               )
             })}
           </div>
 
-          {/* FRAIS & REMISES */}
           <div className="qe-card">
-            <div className="qe-card-title">Frais & Remises</div>
+            <div className="qe-card-title">Frais &amp; remise</div>
             <div className="qe-fg2">
               <div className="qe-fg">
                 <label className="qe-lbl">Livraison HT</label>
                 <input
-                  type="number"
-                  className="qe-inp"
-                  value={livraison}
-                  min="0"
-                  onChange={function(e) {
-                    setLivraison(parseFloat(e.target.value) || 0)
-                  }}
-                  disabled={livraisonOffert}
+                  type="number" min="0" className="qe-inp" value={livraison} disabled={livraisonOffert}
+                  onChange={function(e) { setLivraison(parseFloat(e.target.value) || 0) }}
                 />
-                <div className="qe-checkbox-row" style={{ marginTop: 6 }}>
-                  <input
-                    type="checkbox"
-                    id="liv-offert"
-                    checked={livraisonOffert}
-                    onChange={function(e) {
-                      setLivraisonOffert(e.target.checked)
-                    }}
-                  />
-                  <label htmlFor="liv-offert">Offerte</label>
-                </div>
-                {livraisonAutoOfferte ? (
-                  <div className="qe-livraison-auto">💡 Total &gt; 500 € HT — pense à offrir</div>
-                ) : null}
+                <label className="qe-check">
+                  <input type="checkbox" checked={livraisonOffert} onChange={function(e) { setLivraisonOffert(e.target.checked) }} /> Offrir
+                </label>
               </div>
               <div className="qe-fg">
                 <label className="qe-lbl">Mise en place HT</label>
                 <input
-                  type="number"
-                  className="qe-inp"
-                  value={miseEnPlace}
-                  min="0"
-                  onChange={function(e) {
-                    setMiseEnPlace(parseFloat(e.target.value) || 0)
-                  }}
-                  disabled={miseEnPlaceOffert}
+                  type="number" min="0" className="qe-inp" value={miseEnPlace} disabled={miseEnPlaceOffert}
+                  onChange={function(e) { setMiseEnPlace(parseFloat(e.target.value) || 0) }}
                 />
-                <div className="qe-checkbox-row" style={{ marginTop: 6 }}>
-                  <input
-                    type="checkbox"
-                    id="mep-offert"
-                    checked={miseEnPlaceOffert}
-                    onChange={function(e) {
-                      setMiseEnPlaceOffert(e.target.checked)
-                    }}
-                  />
-                  <label htmlFor="mep-offert">Offerte</label>
-                </div>
+                <label className="qe-check">
+                  <input type="checkbox" checked={miseEnPlaceOffert} onChange={function(e) { setMiseEnPlaceOffert(e.target.checked) }} /> Offrir
+                </label>
               </div>
             </div>
             <div className="qe-fg">
-              <label className="qe-lbl">Remise globale sur le total (%)</label>
+              <label className="qe-lbl">Réduction globale (%)</label>
               <input
-                type="number"
-                className="qe-inp"
-                value={remiseTotalPct}
-                min="0"
-                max="100"
-                step="0.5"
-                onChange={function(e) {
-                  setRemiseTotalPct(parseFloat(e.target.value) || 0)
-                }}
+                type="number" min="0" max="100" step="0.5" className="qe-inp" style={{ width: 110 }}
+                value={remiseGlobalePct}
+                onChange={function(e) { setRemiseGlobalePct(parseFloat(e.target.value) || 0) }}
               />
             </div>
           </div>
 
-          {/* NOTES */}
           <div className="qe-card">
             <div className="qe-card-title">Notes</div>
             <div className="qe-fg">
-              <label className="qe-lbl">Notes client (visibles sur PDF)</label>
-              <textarea
-                className="qe-inp qe-textarea"
-                value={notes}
-                onChange={function(e) {
-                  setNotes(e.target.value)
-                }}
-                placeholder="Conditions spéciales, remarques pour le client..."
-              />
+              <label className="qe-lbl">Notes client (sur le devis)</label>
+              <textarea className="qe-inp qe-textarea" value={notes} onChange={function(e) { setNotes(e.target.value) }} placeholder="Conditions spéciales, remarques..." />
             </div>
             <div className="qe-fg">
-              <label className="qe-lbl">Notes internes (Edward + Emy uniquement)</label>
-              <textarea
-                className="qe-inp qe-textarea"
-                value={notesInternes}
-                onChange={function(e) {
-                  setNotesInternes(e.target.value)
-                }}
-                placeholder="Pense-bête, alertes, briefing équipe..."
-                style={{ background: '#FFFDE7' }}
-              />
+              <label className="qe-lbl">Notes internes (Edward + Emy)</label>
+              <textarea className="qe-inp qe-textarea" style={{ background: '#FFFDE7' }} value={notesInternes} onChange={function(e) { setNotesInternes(e.target.value) }} placeholder="Pense-bête, briefing équipe..." />
             </div>
           </div>
-
         </div>
 
-        {/* COL DROITE — récap sticky */}
-        <div className="qe-col-right">
+        {/* COLONNE DROITE — récap */}
+        <div>
           <div className="qe-card">
-            <div className="qe-card-title">Récapitulatif</div>
-
-          {sandwichBreakdown.length > 0 ? (
-            <div style={{ marginBottom: 10, paddingBottom: 8, borderBottom: '1.5px dashed #191923' }}>
-              <div className="qe-cov-bd-title" style={{ marginBottom: 6 }}>Détail par recette</div>
-              <div className="qe-cov-bd-list">
-                {sandwichBreakdown.map(function(s) {
-                  return (
-                    <span key={s.name} className="qe-cov-bd-pill">
-                      <strong>{s.qty}</strong> {s.name}
-                    </span>
-                  )
-                })}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="qe-recap-row">
-              <span>Sous-total items HT</span>
-              <strong>{fmtEur(totals.sousTotalHT)}</strong>
-            </div>
-            <div className="qe-recap-row gray">
-              <span>
-                {miseEnPlaceOffert
-                  ? '↪ Mise en place offerte'
-                  : 'Mise en place HT'}
-              </span>
-              <span>{miseEnPlaceOffert ? fmtEur(0) : fmtEur(miseEnPlace)}</span>
-            </div>
-            <div className="qe-recap-row gray">
-              <span>{livraisonOffert ? '↪ Livraison offerte' : 'Livraison HT'}</span>
-              <span>{livraisonOffert ? fmtEur(0) : fmtEur(livraison)}</span>
-            </div>
-            {totals.remiseGlobale > 0 ? (
-              <div className="qe-recap-row" style={{ color: '#CC0066' }}>
-                <span>Remise globale ({remiseTotalPct}%)</span>
-                <strong>−{fmtEur(totals.remiseGlobale)}</strong>
+            <div className="qe-card-title">Récapitulatif · {variantLabel(activeVariant, activeIdx)}</div>
+            <div className="qe-rrow"><span>Sous-total items HT</span><strong>{fmtEur(totals.sous_total_items_ht)}</strong></div>
+            {totals.remise_globale_montant > 0 ? (
+              <div className="qe-rrow" style={{ color: '#CC0066' }}>
+                <span>Remise ({totals.remise_globale_pct}%)</span><strong>−{fmtEur(totals.remise_globale_montant)}</strong>
               </div>
             ) : null}
-            <div className="qe-recap-row">
-              <span>
-                <strong>Total HT</strong>
-              </span>
-              <strong>{fmtEur(totals.totalHT)}</strong>
-            </div>
-            <div className="qe-recap-row gray">
-              <span>TVA (10 % food / 20 % presta)</span>
-              <span>{fmtEur(totals.tva)}</span>
-            </div>
-
-            <div className="qe-recap-final">
-              <span className="qe-recap-final-lbl">Total TTC</span>
-              <span className="qe-recap-final-amt">{fmtEur(totals.totalTTC)}</span>
-            </div>
-            <div style={{ fontSize: 10, opacity: 0.4, textAlign: 'right', marginTop: 3 }}>
-              {nbPersonnes > 0
-                ? 'soit ' + fmtEur(totals.totalTTC / nbPersonnes) + ' TTC / personne'
-                : ''}
+            <div className="qe-rrow gray"><span>{livraisonOffert ? '↪ Livraison offerte' : 'Livraison HT'}</span><span>{fmtEur(totals.livraison_eff)}</span></div>
+            {(miseEnPlace > 0 || miseEnPlaceOffert) ? (
+              <div className="qe-rrow gray"><span>{miseEnPlaceOffert ? '↪ Mise en place offerte' : 'Mise en place HT'}</span><span>{fmtEur(totals.mise_en_place_eff)}</span></div>
+            ) : null}
+            <div className="qe-rrow" style={{ borderTop: '1px solid #eee', marginTop: 2, paddingTop: 5 }}><span><strong>Total HT</strong></span><strong>{fmtEur(totals.total_ht)}</strong></div>
+            <div className="qe-rrow gray"><span>TVA (10/20%)</span><span>{fmtEur(totals.tva)}</span></div>
+            <div className="qe-final">
+              <div>
+                <div className="l">TOTAL TTC</div>
+                {nbPersonnes > 0 ? <div style={{ fontSize: 10, opacity: 0.8 }}>soit {fmtEur(totals.per_pers_ttc)} / pers</div> : null}
+              </div>
+              <span className="a">{fmtEur(totals.total_ttc)}</span>
             </div>
 
             {showInternes ? (
-              <div className="qe-recap-internes">
-                <div className="qe-recap-internes-title">
-                  <span>🔒 Internes</span>
-                  <button
-                    className="qe-recap-internes-toggle"
-                    onClick={function() {
-                      setShowInternes(false)
-                    }}
-                  >
-                    Masquer
-                  </button>
-                </div>
-                <div className="qe-recap-internes-row">
-                  <span>Food cost HT</span>
-                  <strong>{fmtEur(totals.totalFcHT)}</strong>
-                </div>
-                <div className="qe-recap-internes-row">
-                  <span>Marge HT</span>
-                  <strong>{fmtEur(totals.totalMargeHT)}</strong>
-                </div>
-                <div className="qe-recap-internes-row">
-                  <span>Coeff réel</span>
-                  <strong className={coeffClass(totals.coeffReel)}>
-                    {totals.coeffReel.toFixed(2)}
-                  </strong>
-                </div>
-                <div style={{ fontSize: 9, opacity: 0.6, marginTop: 6, lineHeight: 1.4 }}>
-                  Cible : 4,2+ (vert), 3,5–4,2 (jaune), &lt; 3,5 (rose).
-                </div>
+              <div className="qe-int">
+                <div className="qe-int-title">🔒 Interne (toi seul)</div>
+                <div className="qe-rrow"><span style={{ color: '#7a7a82' }}>Food cost HT</span><strong>{fmtEur(totals.fc_total)}</strong></div>
+                <div className="qe-rrow"><span style={{ color: '#7a7a82' }}>Marge HT</span><strong>{fmtEur(totals.marge_ht)}</strong></div>
+                <div className="qe-rrow"><span style={{ color: '#7a7a82' }}>Coefficient</span><strong style={{ color: coeffColor(totals.coeff) }}>{totals.coeff.toFixed(2).replace('.', ',')}</strong></div>
+                <div style={{ fontSize: 9, opacity: 0.6, marginTop: 5 }}>Cible : 4,2+ (vert) · 3,5–4,2 (ambre) · &lt; 3,5 (rose)</div>
+                <button className="qe-btn" style={{ marginTop: 7, fontSize: 10, padding: '5px 9px', boxShadow: 'none' }} onClick={function() { setShowInternes(false) }}>Masquer</button>
               </div>
             ) : (
-              <button
-                className="btn btn-sm"
-                style={{ width: '100%', marginTop: 10 }}
-                onClick={function() {
-                  setShowInternes(true)
-                }}
-              >
-                🔒 Afficher les internes
-              </button>
+              <button className="qe-btn" style={{ width: '100%', marginTop: 10 }} onClick={function() { setShowInternes(true) }}>🔒 Afficher les internes</button>
             )}
 
             <div style={{ display: 'flex', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
-              <button
-                className="btn btn-y"
-                style={{ flex: '1 1 100%', justifyContent: 'center' }}
-                onClick={handleSave}
-                disabled={saving}
-              >
+              <button className="qe-btn y" style={{ flex: '1 1 100%', justifyContent: 'center' }} onClick={handleSave} disabled={saving}>
                 {saving ? '⏳ Enregistrement…' : '💾 Sauvegarder'}
               </button>
-              <button
-                className="btn"
-                style={{ flex: 1, justifyContent: 'center', background: '#7AFF82', borderColor: '#191923' }}
-                onClick={handleOpenSendModal}
-                disabled={lineDetails.length === 0 || !clientNom.trim() || !devisId}
-                title={
-                  !devisId ? 'Sauvegarde le devis avant de l\'envoyer' :
-                  lineDetails.length === 0 ? 'Ajoute des items' :
-                  !clientNom.trim() ? 'Renseigne le nom du client' :
-                  'Envoyer le devis par email'
-                }
-              >
-                📤 Envoyer
-              </button>
-              <button
-                className="btn btn-p"
-                style={{ flex: 1, justifyContent: 'center' }}
-                onClick={handlePreviewPDF}
-                disabled={lineDetails.length === 0 || !clientNom.trim()}
-                title={lineDetails.length === 0 ? 'Ajoute des items' : (!clientNom.trim() ? 'Renseigne le nom du client' : 'Aperçu du PDF brandé')}
-              >
-                📄 Aperçu
-              </button>
-              <button
-                className="btn"
-                onClick={onClose}
-                style={{ flex: 1, justifyContent: 'center' }}
-              >
-                ← Retour
-              </button>
-            </div>
-            <div style={{ fontSize: 10, opacity: 0.5, marginTop: 8, textAlign: 'center', lineHeight: 1.4 }}>
-              {statut === 'envoye' || statut === 'accepte' || statut === 'facture' || statut === 'paye'
-                ? '✓ Devis déjà envoyé · 📤 pour relancer'
-                : 'Sauvegarde puis envoie au client'}
+              <button className="qe-btn p" style={{ flex: 1 }} onClick={handlePreview} disabled={!canSend} title={!canSend ? 'Ajoute des items + nom du client' : 'Aperçu PDF'}>📄 Aperçu</button>
+              <button className="qe-btn g" style={{ flex: 1 }} onClick={handleOpenSend} disabled={!canSend} title={!canSend ? 'Ajoute des items + nom du client' : 'Envoyer'}>📤 Envoyer</button>
             </div>
           </div>
         </div>
       </div>
-      {sendModalOpen ? (
-        <div className="qe-modal-overlay" onClick={function(){ if(!sending) setSendModalOpen(false) }}>
-          <div className="qe-modal" onClick={function(e){ e.stopPropagation() }}>
-            <div className="qe-modal-head">
-              <div>
-                <div className="qe-modal-title">Envoyer le devis par email</div>
-                <div className="qe-modal-sub">{numero} → {clientNom || 'Client'}</div>
-              </div>
-              <button className="qe-modal-close" onClick={function(){ if(!sending) setSendModalOpen(false) }} disabled={sending}>×</button>
+
+      {/* Modal envoi */}
+      {sendOpen ? (
+        <div className="qe-ov" onClick={function() { if (!sending) setSendOpen(false) }}>
+          <div className="qe-modal" onClick={function(e) { e.stopPropagation() }}>
+            <h3>Envoyer le devis</h3>
+            <div style={{ fontSize: 12, color: '#555', marginBottom: 10 }}>
+              {numero} → {clientNom || 'Client'} · formule {variantLabel(activeVariant, activeIdx)}.<br />
+              events@meshuga.fr est mis en copie cachée pour archive.
             </div>
-            <div className="qe-modal-info">
-              📎 Le devis sera envoyé en pièce jointe (HTML imprimable en PDF) avec un lien de visualisation valide 90 jours.<br />
-              <strong>events@meshuga.fr</strong> est automatiquement en copie cachée pour archive.
+            {sendError ? <div className="qe-warn">⚠ {sendError}</div> : null}
+            <div className="qe-fg">
+              <label className="qe-lbl">Destinataire *</label>
+              <input type="email" className="qe-inp" value={emailTo} onChange={function(e) { setEmailTo(e.target.value) }} placeholder="client@exemple.fr" disabled={sending} />
             </div>
-            {sendError ? <div className="qe-modal-error">⚠️ {sendError}</div> : null}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 4 }}>
-              <div>
-                <label style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6, color: '#666', display: 'block', marginBottom: 4 }}>Destinataire *</label>
-                <input
-                  type="email"
-                  value={emailTo}
-                  onChange={function(e){ setEmailTo(e.target.value) }}
-                  placeholder="client@exemple.fr"
-                  disabled={sending}
-                  style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #191923', borderRadius: 5, fontSize: 13, fontFamily: 'inherit' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6, color: '#666', display: 'block', marginBottom: 4 }}>Copie (CC) — optionnel</label>
-                <input
-                  type="email"
-                  value={emailCc}
-                  onChange={function(e){ setEmailCc(e.target.value) }}
-                  placeholder="autre@exemple.fr"
-                  disabled={sending}
-                  style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #DDD', borderRadius: 5, fontSize: 13, fontFamily: 'inherit' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6, color: '#666', display: 'block', marginBottom: 4 }}>Sujet *</label>
-                <input
-                  type="text"
-                  value={emailSubject}
-                  onChange={function(e){ setEmailSubject(e.target.value) }}
-                  disabled={sending}
-                  style={{ width: '100%', padding: '8px 10px', border: '1.5px solid #191923', borderRadius: 5, fontSize: 13, fontFamily: 'inherit' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.6, color: '#666', display: 'block', marginBottom: 4 }}>Message</label>
-                <textarea
-                  value={emailMessage}
-                  onChange={function(e){ setEmailMessage(e.target.value) }}
-                  disabled={sending}
-                  rows={9}
-                  style={{ width: '100%', padding: '9px 10px', border: '1.5px solid #DDD', borderRadius: 5, fontSize: 12, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5 }}
-                />
-              </div>
+            <div className="qe-fg">
+              <label className="qe-lbl">Copie (CC)</label>
+              <input type="email" className="qe-inp" value={emailCc} onChange={function(e) { setEmailCc(e.target.value) }} placeholder="optionnel" disabled={sending} />
+            </div>
+            <div className="qe-fg">
+              <label className="qe-lbl">Sujet *</label>
+              <input type="text" className="qe-inp" value={emailSubject} onChange={function(e) { setEmailSubject(e.target.value) }} disabled={sending} />
+            </div>
+            <div className="qe-fg">
+              <label className="qe-lbl">Message</label>
+              <textarea className="qe-inp qe-textarea" style={{ minHeight: 130 }} value={emailMessage} onChange={function(e) { setEmailMessage(e.target.value) }} disabled={sending} />
             </div>
             <div className="qe-modal-actions">
-              <button
-                className="btn"
-                onClick={function(){ if(!sending) setSendModalOpen(false) }}
-                disabled={sending}
-              >
-                Annuler
-              </button>
-              <button
-                className="btn"
-                style={{ background: '#7AFF82', borderColor: '#191923', fontWeight: 900 }}
-                onClick={handleSendEmail}
-                disabled={sending || !emailTo.trim() || !emailSubject.trim()}
-              >
-                {sending ? '⏳ Envoi en cours...' : '📤 Envoyer maintenant'}
+              <button className="qe-btn" onClick={function() { if (!sending) setSendOpen(false) }} disabled={sending}>Annuler</button>
+              <button className="qe-btn g" onClick={handleSend} disabled={sending || !emailTo.trim() || !emailSubject.trim()}>
+                {sending ? '⏳ Envoi…' : '📤 Envoyer maintenant'}
               </button>
             </div>
           </div>
         </div>
       ) : null}
+
+      {/* Modal suppression */}
+      {delOpen ? (
+        <div className="qe-ov" onClick={function() { if (!deleting) setDelOpen(false) }}>
+          <div className="qe-modal" onClick={function(e) { e.stopPropagation() }}>
+            <h3>Supprimer ce devis ?</h3>
+            <p style={{ fontSize: 13, lineHeight: 1.5 }}>
+              Suppression définitive de <strong>{numero}</strong>
+              {clientNom ? ' — ' + clientNom : ''}. Cette action est irréversible.
+            </p>
+            {statut === 'facture' || statut === 'solde' ? (
+              <div className="qe-warn">⚠ Ce devis est facturé : conservation conseillée pour la comptabilité.</div>
+            ) : null}
+            {delError ? <div className="qe-warn">⚠ {delError}</div> : null}
+            <div className="qe-modal-actions">
+              <button className="qe-btn" onClick={function() { if (!deleting) setDelOpen(false) }} disabled={deleting}>Annuler</button>
+              <button className="qe-btn r" style={{ background: '#CC0066', color: '#fff' }} onClick={confirmDelete} disabled={deleting}>
+                {deleting ? '⏳ Suppression…' : 'Supprimer définitivement'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {loading ? <div style={{ padding: 20, textAlign: 'center', opacity: 0.5 }}>Chargement…</div> : null}
     </div>
   )
 }
