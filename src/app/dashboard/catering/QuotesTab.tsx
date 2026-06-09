@@ -124,7 +124,16 @@ var QT_CSS =
   '.qt-empty p{font-size:13px;opacity:.7;margin-bottom:14px}' +
   '.qt-error{background:#FF82D7;border:2px solid #191923;border-radius:7px;padding:12px;font-size:12px;font-weight:900;margin-bottom:12px;box-shadow:3px 3px 0 #191923}' +
   '.qt-loading{padding:30px;text-align:center;font-family:Yellowtail,cursive;font-size:18px;opacity:.6}' +
-  '.qt-period-lbl{font-family:Yellowtail,cursive;font-size:13px;margin-right:4px}'
+  '.qt-period-lbl{font-family:Yellowtail,cursive;font-size:13px;margin-right:4px}' +
+  '.qt-del{flex-shrink:0;width:28px;height:28px;border-radius:6px;border:2px solid #191923;background:#FFFFFF;color:#CC0066;font-size:14px;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;padding:0;box-shadow:2px 2px 0 #191923;transition:all .1s}' +
+  '.qt-del:hover{background:#CC0066;color:#FFFFFF}' +
+  '.qt-del:active{transform:translate(1px,1px);box-shadow:1px 1px 0 #191923}' +
+  '.qt-ov{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(25,25,35,.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:18px}' +
+  '.qt-modal{background:#FFFFFF;border:3px solid #191923;border-radius:10px;box-shadow:6px 6px 0 #FF82D7;max-width:420px;width:100%;padding:20px}' +
+  '.qt-modal h3{font-family:Yellowtail,cursive;font-size:24px;font-weight:400;margin-bottom:8px;color:#191923}' +
+  '.qt-modal p{font-size:13px;line-height:1.5;margin-bottom:10px;color:#191923}' +
+  '.qt-modal .qt-warn{background:#FFF1FA;border:2px solid #CC0066;border-radius:6px;padding:9px 11px;font-size:12px;font-weight:700;color:#CC0066;margin-bottom:12px}' +
+  '.qt-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}'
 
 // ============================================================
 // COMPOSANT PRINCIPAL
@@ -142,6 +151,9 @@ export default function QuotesTab(props) {
   var [statusFilter, setStatusFilter] = useState('all')
   var [periodFilter, setPeriodFilter] = useState('all')
   var [search, setSearch] = useState('')
+  var [toDelete, setToDelete] = useState(null)
+  var [deleting, setDeleting] = useState(false)
+  var [delError, setDelError] = useState('')
 
   useEffect(function() {
     var run = async function() {
@@ -263,6 +275,52 @@ export default function QuotesTab(props) {
 
   var handleNew = function() {
     if (onNew) onNew()
+  }
+
+  var openDelete = function(d, e) {
+    if (e && e.stopPropagation) e.stopPropagation()
+    setDelError('')
+    setToDelete(d)
+  }
+
+  var closeDelete = function() {
+    if (deleting) return
+    setToDelete(null)
+    setDelError('')
+  }
+
+  var confirmDelete = function() {
+    if (!supabase || !toDelete) return
+    var id = toDelete.id
+    setDeleting(true)
+    setDelError('')
+    var run = async function() {
+      try {
+        // 1) Nettoyer les dépendances (clés étrangères) avant le devis
+        await supabase.from('devis_historique').delete().eq('devis_id', id)
+        await supabase.from('devis_documents').delete().eq('devis_id', id)
+        // 2) Sous-options éventuelles liées (legacy multi-lignes)
+        await supabase.from('devis').delete().eq('parent_devis_id', id)
+        // 3) Le devis lui-même
+        var res = await supabase.from('devis').delete().eq('id', id)
+        if (res && res.error) {
+          setDelError(res.error.message || 'Suppression impossible')
+          setDeleting(false)
+          return
+        }
+        setDevis(function(prev) {
+          return (prev || []).filter(function(x) {
+            return String(x.id) !== String(id)
+          })
+        })
+        setDeleting(false)
+        setToDelete(null)
+      } catch (err) {
+        setDelError(err && err.message ? err.message : 'Suppression impossible')
+        setDeleting(false)
+      }
+    }
+    run()
   }
 
   var currentYear = new Date().getFullYear()
@@ -482,9 +540,20 @@ export default function QuotesTab(props) {
                       ) : null}
                     </div>
                   </div>
-                  <span className="qt-pill" style={{ background: col.bg, color: col.fg }}>
-                    {STATUS_LABELS[st] || st}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <span className="qt-pill" style={{ background: col.bg, color: col.fg }}>
+                      {STATUS_LABELS[st] || st}
+                    </span>
+                    <button
+                      className="qt-del"
+                      title="Supprimer ce devis"
+                      onClick={function(e) {
+                        openDelete(d, e)
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
                 <div className="qt-card-row2">
                   <div>
@@ -512,6 +581,37 @@ export default function QuotesTab(props) {
               </div>
             )
           })}
+        </div>
+      ) : null}
+
+      {/* Modal confirmation suppression */}
+      {toDelete ? (
+        <div className="qt-ov" onClick={closeDelete}>
+          <div className="qt-modal" onClick={function(e) { e.stopPropagation() }}>
+            <h3>Supprimer ce devis ?</h3>
+            <p>
+              Tu es sur le point de supprimer définitivement le devis{' '}
+              <strong>{toDelete.numero || ('#' + String(toDelete.id))}</strong>
+              {toDelete.client_nom ? ' — ' + toDelete.client_nom : ''}. Cette action est irréversible.
+            </p>
+            {pickStatus(toDelete) === 'facture' || pickStatus(toDelete) === 'acquitte' ? (
+              <div className="qt-warn">⚠ Ce devis est facturé : sa conservation est conseillée pour la comptabilité.</div>
+            ) : null}
+            {delError ? <div className="qt-warn">⚠ {delError}</div> : null}
+            <div className="qt-modal-actions">
+              <button className="btn" onClick={closeDelete} disabled={deleting}>
+                Annuler
+              </button>
+              <button
+                className="btn"
+                style={{ background: '#CC0066', color: '#FFFFFF', borderColor: '#191923', fontWeight: 900 }}
+                onClick={confirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? '⏳ Suppression…' : 'Supprimer définitivement'}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
