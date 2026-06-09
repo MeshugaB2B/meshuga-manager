@@ -118,6 +118,7 @@ export default function GmbTab() {
 
                 <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
                   <button className="btn btn-sm btn-y" disabled={draftingIdx===idx} onClick={function(){ genDraft(idx, r) }}>{draftingIdx===idx?'...':'✨ Brouillon IA'}</button>
+                  {r.reviewUrl && <a href={r.reviewUrl} target="_blank" rel="noopener noreferrer" className="btn btn-sm">👁️ Voir l&apos;avis</a>}
                   <a href={manageUrl} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-p">↗ Répondre sur Google</a>
                 </div>
 
