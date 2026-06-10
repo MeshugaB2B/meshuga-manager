@@ -25,6 +25,7 @@ export interface ChoiceVariant {
   description?: string
   total_ttc: number
   per_personne_ttc: number
+  minis_per_pers?: number
   items: { name: string; qty: number }[]
 }
 
@@ -59,6 +60,8 @@ export interface ConfigPayload {
   event: { format?: string; nbPersonnes: number; date?: string; lieu?: string }
   startLines: { offering_id: string; qty: number }[]
   catalogue: ConfigCatalogueItem[]
+  perPersOptions?: number[]
+  perPersDefault?: number
   frais?: {
     livraison?: number
     livraison_offert?: boolean
@@ -129,7 +132,8 @@ export function buildDevisChoiceHtml(payload: ChoicePayload): string {
         '<div class="card-label">' + esc(v.label) + '</div>' +
         (v.description ? '<div class="card-desc">' + esc(v.description) + '</div>' : '<div class="card-desc"></div>') +
         '<div class="card-price">' + fmtEur(v.total_ttc) + '</div>' +
-        '<div class="card-pp">TTC &middot; ' + fmtEur(v.per_personne_ttc) + ' / personne</div>' +
+        '<div class="card-pp">TTC &middot; <b>' + fmtEur(v.per_personne_ttc) + ' / personne</b></div>' +
+        (v.minis_per_pers != null ? '<div class="card-minis">\u2248 ' + (Math.round((v.minis_per_pers || 0) * 10) / 10).toString().replace('.', ',') + ' minis / personne</div>' : '') +
         '<div class="card-items">' + itemsHtml + '</div>' +
         '<button class="btn-choose" onclick="choisir(\'' + esc(v.key) + '\')">Choisir &amp; personnaliser</button>' +
       '</div>'
@@ -155,11 +159,12 @@ export function buildDevisChoiceHtml(payload: ChoicePayload): string {
     '.card-label{font-family:Yellowtail,cursive;font-size:28px;line-height:1;margin-bottom:4px}' +
     '.card-desc{font-size:12px;color:#888;font-style:italic;margin-bottom:12px;min-height:32px;line-height:1.4}' +
     '.card-price{font-size:26px;font-weight:900;line-height:1}' +
-    '.card-pp{font-size:11px;color:#888;margin-bottom:14px}' +
+    '.card-pp{font-size:12px;color:#666;margin-bottom:6px}.card-pp b{color:#191923;font-weight:900}' +
+    '.card-minis{display:inline-block;background:#FFEB5A;border:1.5px solid #191923;border-radius:20px;padding:2px 11px;font-size:11px;font-weight:800;margin-bottom:14px;box-shadow:2px 2px 0 #191923}' +
     '.card-items{border-top:1px solid #EBEBEB;padding-top:11px;margin-bottom:16px;flex:1}' +
     '.ci{font-size:12px;color:#333;margin-bottom:5px;line-height:1.3}.ci-q{font-weight:900;color:#FF82D7}' +
     '.ci-more{font-size:11px;color:#aaa;font-style:italic;margin-top:4px}' +
-    '.btn-choose{width:100%;background:#FF82D7;color:#fff;border:2px solid #191923;border-radius:7px;padding:12px;font-family:inherit;font-size:14px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;box-shadow:3px 3px 0 #191923}' +
+    '.btn-choose{width:100%;background:#FF82D7;color:#fff;border:2px solid #191923;border-radius:9px;padding:9px 12px 11px;font-family:Yellowtail,cursive;font-size:22px;font-weight:400;line-height:1.1;cursor:pointer;letter-spacing:.3px;box-shadow:3px 3px 0 #191923}' +
     '.btn-choose:hover{background:#191923;color:#FFEB5A}' +
     '.btn-choose:active{transform:translate(1px,1px);box-shadow:1px 1px 0 #191923}' +
     '.foot{margin-top:34px;padding-top:16px;border-top:1px solid #EBEBEB;text-align:center;font-size:11px;color:#888;line-height:1.7}.foot .nm{font-family:Yellowtail,cursive;font-size:20px;color:#191923}'
@@ -201,10 +206,27 @@ var CONFIG_RUNTIME = [
   'function r2(n){return Math.round((Number(n)||0)*100)/100;}',
   'function eur(v){return (Number(v)||0).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";}',
   'var lines=CFG.startLines.map(function(l){return {id:l.offering_id,qty:Number(l.qty)||0};}).filter(function(l){return l.qty>0&&MAP[l.id];});',
-  'var addCat=null;',
+  'var addGroup=null;',
+  'var GROUPS=[',
+  ' {k:"minis",l:"Minis",e:"📦",f:function(o){return o.category==="box_mini";}},',
+  ' {k:"livemini",l:"Live minis",e:"🥗",f:function(o){return o.category==="live_mini";}},',
+  ' {k:"platter",l:"Plateaux",e:"🍽️",f:function(o){return o.category==="platter";}},',
+  ' {k:"lunch",l:"Lunch box",e:"🍱",f:function(o){return o.category==="lunch_box"||(o.category==="addon"&&o.subcategory==="lunch");}},',
+  ' {k:"live",l:"Live cooking",e:"🔥",f:function(o){return o.category==="live_forfait";}},',
+  ' {k:"drinks",l:"Boissons",e:"🥤",f:function(o){return o.subcategory==="beverage";}},',
+  ' {k:"desserts",l:"Desserts",e:"🍪",f:function(o){return o.subcategory==="food"||/sugar|cookie|nutella|dessert|sucr/i.test((o.name||"")+" "+(o.composition||""));}}',
+  '];',
+  'function descOf(o){if(!o)return "";var c=o.composition||"";var g=(c===""||c==="À la pièce"||c==="Par heure"||c==="Bonbonne 5L"||c.charAt(0)==="+");if(g)return (o.tagline||c||"");return c;}',
+  'var PP_OPTS=(CFG.perPersOptions&&CFG.perPersOptions.length)?CFG.perPersOptions:[2,3,4];',
+  'var PERPERS=Number(CFG.perPersDefault)||3;',
   'function pax(){var t=(document.getElementById("pax").textContent||"").replace(/[^0-9]/g,"");var n=parseInt(t,10);return n>0?n:1;}',
-  'function bumpPax(d){var el=document.getElementById("pax");el.textContent=String(Math.max(1,pax()+d));render();}',
+  'function bumpPax(d){var el=document.getElementById("pax");el.textContent=String(Math.max(1,pax()+d));rescaleMinis();render();}',
   'function findLine(id){for(var i=0;i<lines.length;i++){if(lines[i].id===id)return i;}return -1;}',
+  'function miniPiecesOf(o,q){if(o.category==="box_mini")return q*(Number(o.size_pers)||0);if(o.category==="live_mini")return q;return 0;}',
+  'function curMinis(){var m=0;for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(o)m+=miniPiecesOf(o,lines[i].qty);}return m;}',
+  'function rescaleMinis(){var target=pax()*PERPERS;var cur=curMinis();if(cur<=0||target<=0)return;var scale=target/cur;var bigId=null,bigSize=0;for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o||!isMini(o.category))continue;var sz=o.category==="box_mini"?(Number(o.size_pers)||1):1;if(sz>bigSize){bigSize=sz;bigId=lines[i].id;}lines[i].qty=Math.max(0,Math.round(lines[i].qty*scale));}for(var j=lines.length-1;j>=0;j--){var oo=MAP[lines[j].id];if(oo&&isMini(oo.category)&&lines[j].qty===0)lines.splice(j,1);}if(curMinis()===0&&bigId){var k=findLine(bigId);if(k>-1)lines[k].qty=1;else lines.push({id:bigId,qty:1});}}',
+  'function setPerPers(n){PERPERS=n;rescaleMinis();render();}',
+  'function renderPerPers(){var P=pax();var ach=P>0?(curMinis()/P):0;var C="";for(var i=0;i<PP_OPTS.length;i++){var n=PP_OPTS[i];C+=\'<button class="ppc\'+(n===PERPERS?" on":"")+\'" onclick="setPerPers(\'+n+\')">\'+n+\'</button>\';}document.getElementById("ppchips").innerHTML=C;document.getElementById("ppnote").textContent="\\u2248 "+ach.toFixed(1).replace(".",",")+" / pers r\\u00e9el";}',
   'function addItem(id){var i=findLine(id);if(i>-1)lines[i].qty++;else lines.push({id:id,qty:1});render();}',
   'function stepLine(i,d){lines[i].qty=Math.max(0,lines[i].qty+d);if(lines[i].qty===0)lines.splice(i,1);render();}',
   'function rmLine(i){lines.splice(i,1);render();}',
@@ -214,45 +236,51 @@ var CONFIG_RUNTIME = [
   'return {itemsHT:r2(itemsHT),fraisHT:r2(fraisHT),totalHT:r2(totalHT),tva:r2(tva),ttc:r2(ttc),minis:minis};}',
   'function render(){',
   ' var L="";for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o){continue;}var lt=(Number(o.pv_ht)||0)*lines[i].qty;',
-  '  L+=\'<div class="line"><span class="line-n">\'+o.name+\'</span><span class="q"><b onclick="stepLine(\'+i+\',-1)">−</b><span>\'+lines[i].qty+\'</span><b onclick="stepLine(\'+i+\',1)">+</b></span><span class="line-t">\'+eur(lt)+\'</span><button class="rm" onclick="rmLine(\'+i+\')">✕</button></div>\';}',
+  '  var sub=descOf(o);var pcs="";if(o.category==="box_mini")pcs=(lines[i].qty*(Number(o.size_pers)||0))+" pièces";else if(o.category==="live_mini")pcs=lines[i].qty+" pièces";if(pcs)sub=sub?(sub+" · "+pcs):pcs;',
+  '  L+=\'<div class="line"><div class="line-main"><span class="line-n">\'+o.name+\'</span><span class="q"><b onclick="stepLine(\'+i+\',-1)">−</b><span>\'+lines[i].qty+\'</span><b onclick="stepLine(\'+i+\',1)">+</b></span><span class="line-t">\'+eur(lt)+\'</span><button class="rm" onclick="rmLine(\'+i+\')">✕</button></div>\'+(sub?\'<div class="line-sub">\'+sub+\'</div>\':\'\')+\'</div>\';}',
   ' document.getElementById("lines").innerHTML=L||\'<div style="padding:10px;text-align:center;opacity:.5;font-size:12px">Votre panier est vide.</div>\';',
-  ' var present={};CFG.catalogue.forEach(function(o){present[o.category]=true;});var cats=CAT_ORDER.filter(function(c){return present[c];});',
-  ' if(!addCat||cats.indexOf(addCat)<0)addCat=cats[0];',
-  ' var C="";for(var c=0;c<cats.length;c++){var m=CAT_META[cats[c]]||{l:cats[c],e:""};C+=\'<button class="chip\'+(cats[c]===addCat?" on":"")+\'" onclick="setCat(\\\'\'+cats[c]+\'\\\')">\'+m.e+" "+m.l+\'</button>\';}',
+  ' var groups=GROUPS.filter(function(g){return CFG.catalogue.some(function(o){return g.f(o);});});',
+  ' if(!addGroup||!groups.some(function(g){return g.k===addGroup;}))addGroup=groups.length?groups[0].k:null;',
+  ' var C="";for(var c=0;c<groups.length;c++){var g=groups[c];C+=\'<button class="chip\'+(g.k===addGroup?" on":"")+\'" onclick="setCat(\\\'\'+g.k+\'\\\')">\'+g.e+" "+g.l+\'</button>\';}',
   ' document.getElementById("addcats").innerHTML=C;',
-  ' var items=CFG.catalogue.filter(function(o){return o.category===addCat;});var A="";for(var j=0;j<items.length;j++){var it=items[j];A+=\'<div class="addrow" onclick="addItem(\\\'\'+it.id+\'\\\')"><span style="font-size:12px;font-weight:700">\'+it.name+\'</span><span style="font-size:12px;font-weight:900;color:#FF82D7;white-space:nowrap">+ \'+eur(it.pv_ht)+\'</span></div>\';}',
+  ' var curG=null;for(var gi=0;gi<groups.length;gi++){if(groups[gi].k===addGroup)curG=groups[gi];}',
+  ' var items=curG?CFG.catalogue.filter(function(o){return curG.f(o);}):[];var A="";for(var j=0;j<items.length;j++){var it=items[j];var dd=descOf(it);A+=\'<div class="addrow" onclick="addItem(\\\'\'+it.id+\'\\\')"><div class="addrow-top"><span style="font-size:12.5px;font-weight:700">\'+it.name+\'</span><span style="font-size:12px;font-weight:900;color:#FF82D7;white-space:nowrap">+ \'+eur(it.pv_ht)+\'</span></div>\'+(dd?\'<div class="addrow-sub">\'+dd+\'</div>\':\'\')+\'</div>\';}',
   ' document.getElementById("addlist").innerHTML=A||\'<div style="opacity:.5;font-size:12px;padding:8px">Aucun article.</div>\';',
   ' var liveLine=null;for(var k=0;k<lines.length;k++){var oo=MAP[lines[k].id];if(oo&&oo.category==="live_forfait"){liveLine=oo;break;}}',
   ' var lc=document.getElementById("livecard");',
-  ' if(liveLine){lc.style.display="block";document.getElementById("liveincl").textContent=liveLine.composition||"Installation, prestation et chef Meshuga sur place · matériel et dressage minute inclus.";',
-  '  var extras=CFG.catalogue.filter(function(o){return o.subcategory==="live_extra";});var X="";for(var e=0;e<extras.length;e++){var ex=extras[e];var li=findLine(ex.id);var qn=li>-1?lines[li].qty:0;X+=\'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px"><span style="font-size:12px;font-weight:700">\'+ex.name+\' <span style=\\\'color:#888\\\'>(+\'+eur(ex.pv_ht)+\')</span></span><span class="q"><b onclick="decId(\\\'\'+ex.id+\'\\\')">−</b><span>\'+qn+\'</span><b onclick="addItem(\\\'\'+ex.id+\'\\\')">+</b></span></div>\';}',
+  ' if(liveLine){lc.style.display="block";var inc=liveLine.composition||"Installation, prestation et chef Meshuga sur place · matériel et dressage minute inclus.";if(liveLine.tagline)inc+=" · "+liveLine.tagline;document.getElementById("liveincl").textContent=inc;',
+  '  var sfx=String(liveLine.id).replace("live_","");var extras=CFG.catalogue.filter(function(o){return o.subcategory==="live_extra"&&String(o.id).indexOf(sfx)>-1;});var X="";for(var e=0;e<extras.length;e++){var ex=extras[e];var li=findLine(ex.id);var qn=li>-1?lines[li].qty:0;X+=\'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px"><span style="font-size:12px;font-weight:700">\'+ex.name+\' <span style=\\\'color:#888\\\'>(+\'+eur(ex.pv_ht)+\' / h)</span></span><span class="q"><b onclick="decId(\\\'\'+ex.id+\'\\\')">−</b><span>\'+qn+\'</span><b onclick="addItem(\\\'\'+ex.id+\'\\\')">+</b></span></div>\';}',
   '  document.getElementById("livextra").innerHTML=X;}else{lc.style.display="none";}',
   ' var t=compute();var P=pax();',
   ' document.getElementById("tht").textContent=eur(t.totalHT);',
+  ' var f3=CFG.frais;var fr="";',
+  ' if(f3.livraison_offert)fr+=\'<div class="frow"><span>Livraison</span><span class="off">Offerte ✓</span></div>\';else if((Number(f3.livraison)||0)>0)fr+=\'<div class="frow"><span>Livraison</span><span>\'+eur(f3.livraison)+\'</span></div>\';',
+  ' if(f3.mise_en_place_offert)fr+=\'<div class="frow"><span>Mise en place</span><span class="off">Offerte ✓</span></div>\';else if((Number(f3.mise_en_place)||0)>0)fr+=\'<div class="frow"><span>Mise en place</span><span>\'+eur(f3.mise_en_place)+\'</span></div>\';',
+  ' document.getElementById("fraisrows").innerHTML=fr;',
   ' document.getElementById("ttva").textContent=eur(t.tva);',
   ' document.getElementById("tttc").textContent=eur(t.ttc);',
   ' document.getElementById("tpp").textContent="soit "+eur(P>0?t.ttc/P:0)+" / pers";',
-  ' var target=TARGETS[CFG.format];if(target==null)target=TARGETS.autre;var reco=Math.round(P*target);var covered=target<=0?true:(t.minis>=reco);',
+  ' var reco=Math.round(P*PERPERS);var perGuest=P>0?(t.minis/P):0;',
   ' var pct=reco>0?Math.min(100,Math.round(t.minis/reco*100)):100;',
   ' document.getElementById("covbar").style.width=pct+"%";',
-  ' document.getElementById("covtxt").textContent=target<=0?(lines.length+" articles"):(t.minis+" / "+reco+" minis");',
-  ' var hint=document.getElementById("covhint");',
-  ' if(covered){hint.style.color="#191923";hint.innerHTML=target<=0?"✓ Formule valide":(\'<span style="background:#FFEB5A;border:1.5px solid #191923;border-radius:10px;padding:2px 9px">✓ Couvert</span> &nbsp;\'+(t.minis/P).toFixed(1).replace(".",",")+" minis par invité");}',
-  ' else{hint.style.color="#CC0066";hint.textContent="Il manque "+(reco-t.minis)+" minis pour vos "+P+" invités";}',
+  ' document.getElementById("covtxt").textContent=t.minis+" minis";',
+  ' var hint=document.getElementById("covhint");hint.style.color="#191923";',
+  ' hint.innerHTML=\'<span style="background:#FFEB5A;border:1.5px solid #191923;border-radius:10px;padding:2px 9px">\'+perGuest.toFixed(1).replace(".",",")+\' minis / invité</span>\';',
+  ' renderPerPers();',
   ' var cta=document.getElementById("cta");var ch=document.getElementById("ctahint");',
-  ' if(covered&&lines.length>0){cta.disabled=false;cta.style.background="#FF82D7";cta.style.color="#fff";cta.style.cursor="pointer";cta.style.boxShadow="3px 3px 0 #191923";ch.textContent="PDF final + signature électronique";}',
-  ' else{cta.disabled=true;cta.style.background="#EBEBEB";cta.style.color="#999";cta.style.cursor="not-allowed";cta.style.boxShadow="none";ch.textContent=lines.length===0?"Ajoutez au moins un article":"Complétez votre formule pour pouvoir signer";}',
+  ' if(lines.length>0&&t.minis>0){cta.disabled=false;cta.style.background="#FF82D7";cta.style.color="#fff";cta.style.cursor="pointer";cta.style.boxShadow="3px 3px 0 #191923";ch.textContent="PDF final + signature électronique";}',
+  ' else{cta.disabled=true;cta.style.background="#EBEBEB";cta.style.color="#999";cta.style.cursor="not-allowed";cta.style.boxShadow="none";ch.textContent="Ajoutez au moins un article";}',
   '}',
-  'function setCat(c){addCat=c;render();}',
+  'function setCat(c){addGroup=c;render();}',
   'function decId(id){var i=findLine(id);if(i>-1)stepLine(i,-1);}',
-  'function valider(){var t=compute();var P=pax();var target=TARGETS[CFG.format];if(target==null)target=TARGETS.autre;var reco=Math.round(P*target);if(lines.length===0||(target>0&&t.minis<reco))return;',
+  'function valider(){var t=compute();var P=pax();if(lines.length===0||t.minis<=0)return;',
   ' var btn=document.getElementById("cta");btn.disabled=true;document.getElementById("ov").style.display="flex";',
   ' fetch("/api/catering/configure",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({devisId:CFG.devisId,variantKey:CFG.variantKey,pax:P,lines:lines})})',
   ' .then(function(r){return r.json();}).then(function(d){if(d&&d.ok&&d.signUrl){window.location.href=d.signUrl;}else{document.getElementById("ov").style.display="none";btn.disabled=false;alert((d&&d.error)||"Une erreur est survenue. Merci de réessayer ou de nous écrire à events@meshuga.fr");}})',
   ' .catch(function(){document.getElementById("ov").style.display="none";btn.disabled=false;alert("Connexion impossible, merci de réessayer.");});',
   '}',
   'document.getElementById("pax").addEventListener("input",render);',
-  'render();'
+  'rescaleMinis();render();'
 ].join('\n')
 
 export function buildDevisConfigHtml(payload: ConfigPayload): string {
@@ -265,6 +293,8 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
     variantKey: payload.variantKey,
     format: ev.format || 'autre',
     paxInit: Number(ev.nbPersonnes) || 1,
+    perPersOptions: (payload.perPersOptions && payload.perPersOptions.length ? payload.perPersOptions : [2, 3, 4]),
+    perPersDefault: Number(payload.perPersDefault) || 3,
     startLines: payload.startLines || [],
     catalogue: payload.catalogue || [],
     frais: {
@@ -295,13 +325,19 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
     '.q{display:inline-flex;align-items:center;border:1.5px solid #191923;border-radius:6px;overflow:hidden}' +
     '.q b{padding:1px 8px;background:#FFEB5A;font-size:13px;font-weight:900;cursor:pointer;user-select:none}' +
     '.q span{padding:1px 8px;font-size:13px;font-weight:900;min-width:30px;text-align:center}' +
-    '.line{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed #ddd}' +
+    '.line{padding:8px 0;border-bottom:1px dashed #ddd}' +
+    '.line-main{display:flex;align-items:center;gap:8px}' +
     '.line-n{flex:1;font-size:12.5px;font-weight:700;min-width:0}' +
     '.line-t{font-size:12.5px;font-weight:900;min-width:60px;text-align:right}' +
+    '.line-sub{font-size:11px;color:#8a8a92;line-height:1.35;margin-top:3px}' +
+    '.frow{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#555}.frow .off{color:#1a8a4a;font-weight:900}' +
     '.rm{border:none;background:none;color:#bbb;cursor:pointer;font-size:14px;padding:0 2px}' +
     '.chip{padding:5px 11px;border:1.5px solid #191923;border-radius:14px;background:#fff;font-size:11px;font-weight:900;white-space:nowrap;cursor:pointer}.chip.on{background:#FFEB5A}' +
-    '.addrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 9px;border:1.5px solid #191923;border-radius:6px;background:#fff;cursor:pointer;margin-bottom:5px}.addrow:hover{background:#FFFCEB}' +
-    '.gridmain{display:grid;grid-template-columns:1fr;gap:12px}@media(min-width:820px){.gridmain{grid-template-columns:1.5fr 1fr}}' +
+    '.ppc{width:36px;height:36px;border:2px solid #191923;border-radius:9px;background:#fff;font-size:16px;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1}.ppc.on{background:#FF82D7;color:#fff;box-shadow:2px 2px 0 #191923}' +
+    '.addrow{padding:8px 10px;border:1.5px solid #191923;border-radius:7px;background:#fff;cursor:pointer;margin-bottom:6px}.addrow:hover{background:#FFFCEB}' +
+    '.addrow-top{display:flex;justify-content:space-between;align-items:center;gap:8px}' +
+    '.addrow-sub{font-size:11px;color:#8a8a92;line-height:1.35;margin-top:3px}' +
+    '.gridmain{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}.gridmain>div{min-width:0}@media(min-width:820px){.gridmain{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}}' +
     '.cta{width:100%;margin-top:12px;border:2px solid #191923;border-radius:8px;padding:14px;font-family:inherit;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;box-shadow:3px 3px 0 #191923}' +
     '.ttc-box{display:flex;justify-content:space-between;align-items:center;background:#FFEB5A;border:2px solid #191923;border-radius:7px;padding:9px 12px;margin-top:7px;box-shadow:3px 3px 0 #191923}' +
     '.overlay{position:fixed;inset:0;background:rgba(255,253,245,.9);display:none;align-items:center;justify-content:center;font-size:18px;font-weight:900;z-index:99}' +
@@ -330,6 +366,11 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
           '</div>' +
         '</div>' +
         '<div id="covhint" style="font-size:13px;font-weight:900;margin-top:8px"></div>' +
+        '<div id="perpers" style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:12px;padding-top:11px;border-top:1px dashed #E6E0CF">' +
+          '<span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:#7a7a82">Pièces / personne</span>' +
+          '<span id="ppchips" style="display:flex;gap:7px"></span>' +
+          '<span id="ppnote" style="font-size:11px;color:#888;font-weight:700"></span>' +
+        '</div>' +
       '</div>' +
       '<div class="gridmain">' +
         '<div>' +
@@ -340,6 +381,7 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
         '<div>' +
           '<div class="card" style="position:sticky;top:10px">' +
             '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:#7a7a82">Total HT</span><b id="tht"></b></div>' +
+            '<div id="fraisrows"></div>' +
             '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#888"><span>TVA</span><span id="ttva"></span></div>' +
             '<div class="ttc-box"><div><div class="yt" style="font-size:18px;line-height:1">Total TTC</div><div id="tpp" style="font-size:10px;color:#191923;opacity:.7"></div></div><span id="tttc" style="font-size:17px;font-weight:900"></span></div>' +
             '<button id="cta" class="cta" onclick="valider()">Valider et signer</button>' +
