@@ -208,7 +208,7 @@ var CONFIG_RUNTIME = [
   'function addItem(id){var i=findLine(id);if(i>-1)lines[i].qty++;else lines.push({id:id,qty:1});render();}',
   'function stepLine(i,d){lines[i].qty=Math.max(0,lines[i].qty+d);if(lines[i].qty===0)lines.splice(i,1);render();}',
   'function rmLine(i){lines.splice(i,1);render();}',
-  'function compute(){var itemsHT=0,tvaItems=0,minis=0;for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o)continue;var q=lines[i].qty;var pu=Number(o.pv_ht)||0;var ht=r2(pu*q);itemsHT+=ht;tvaItems+=ht*tvaRatio(o.tva_pct);if(isMini(o.category))minis+=q;}',
+  'function compute(){var itemsHT=0,tvaItems=0,minis=0;for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o)continue;var q=lines[i].qty;var pu=Number(o.pv_ht)||0;var ht=r2(pu*q);itemsHT+=ht;tvaItems+=ht*tvaRatio(o.tva_pct);if(o.category==="box_mini")minis+=q*(Number(o.size_pers)||0);else if(o.category==="live_mini")minis+=q;}',
   'var f=CFG.frais;var liv=f.livraison_offert?0:(Number(f.livraison)||0);var mep=f.mise_en_place_offert?0:(Number(f.mise_en_place)||0);var fraisHT=liv+mep;var tvaFrais=fraisHT*0.20;',
   'var totalHT=itemsHT+fraisHT;var tva=tvaItems+tvaFrais;var ttc=totalHT+tva;',
   'return {itemsHT:r2(itemsHT),fraisHT:r2(fraisHT),totalHT:r2(totalHT),tva:r2(tva),ttc:r2(ttc),minis:minis};}',
