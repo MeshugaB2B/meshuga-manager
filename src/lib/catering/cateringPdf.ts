@@ -334,14 +334,14 @@ export function buildDevisHtml(payload: DevisPdfPayload, assets?: DevisPdfAssets
             '<div class="cgv-col">' + buildCgvCol1() + '</div>' +
             '<div class="cgv-col">' + buildCgvCol2() + '</div>' +
           '</div>' +
+          '<div class="footer cgv-footer">' +
+            '<div class="footer-brand">' +
+              logotypeHtml +
+              '<div class="footer-meta">3 rue Vavin, Paris 6e &middot; events@meshuga.fr</div>' +
+            '</div>' +
+            '<div class="legal">SAS AEGIA FOOD (enseigne MESHUGA) &middot; SAS au capital de 1 000 &euro; &middot; RCS Paris 904 639 531 &middot; SIRET 904 639 531 00014 &middot; APE 56.10C &middot; TVA intracommunautaire FR31904639531 &middot; 3 rue Vavin 75006 Paris &middot; TVA &agrave; taux r&eacute;duit (10 %) sur les produits alimentaires et taux normal (20 %) sur les prestations de service. Tout commencement d&#39;ex&eacute;cution vaut acceptation du pr&eacute;sent devis.</div>' +
+          '</div>' +
         '</div>' +
-      '</div>' +
-      '<div class="footer">' +
-        '<div class="footer-brand">' +
-          logotypeHtml +
-          '<div class="footer-meta">3 rue Vavin, Paris 6e &middot; events@meshuga.fr</div>' +
-        '</div>' +
-        '<div class="legal">SAS AEGIA FOOD (enseigne MESHUGA) &middot; SAS au capital de 1 000 &euro; &middot; RCS Paris 904 639 531 &middot; SIRET 904 639 531 00014 &middot; APE 56.10C &middot; TVA intracommunautaire FR31904639531 &middot; 3 rue Vavin 75006 Paris &middot; TVA &agrave; taux r&eacute;duit (10 %) sur les produits alimentaires et taux normal (20 %) sur les prestations de service. Tout commencement d&#39;ex&eacute;cution vaut acceptation du pr&eacute;sent devis.</div>' +
       '</div>' +
     '</div>' +
     '<div class="no-print">' +
@@ -366,7 +366,7 @@ function buildCss(): string {
   return '*{margin:0;padding:0;box-sizing:border-box}' +
     'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:11px;background:#FFFFFF}' +
     '@page{size:A4;margin:10mm 16mm 18mm 16mm}' +
-    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.tc-grid,.breakdown,.notes-block,.footer,.footer-brand,.sig,.rib{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title,.sig-title{page-break-after:avoid;break-after:avoid}.rib-grid,.sig-grid,.sig-box{page-break-inside:avoid;break-inside:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px !important;padding-top:12px}p,.legal{orphans:3;widows:3}}' +
+    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.tc-grid,.breakdown,.notes-block,.footer,.footer-brand,.sig,.rib{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title,.sig-title{page-break-after:avoid;break-after:avoid}.rib-grid,.sig-grid,.sig-box{page-break-inside:avoid;break-inside:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px !important;padding-top:12px}p,.legal{orphans:3;widows:3}.cgv-footer{margin-top:14px !important}}' +
     '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;background:#FFFFFF}' +
     '.content{}' +
     '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px}' +
@@ -445,15 +445,15 @@ function buildCss(): string {
     '.sig-box{border:1.5px dashed #191923;border-radius:4px;height:90px;padding:5px 9px;position:relative}' +
     '.sig-box label{display:block;font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:900}' +
     '.cgv-pagebreak{height:0}' +
-    '.cgv{page-break-before:always;break-before:page;padding-top:4mm}' +
+    '.cgv{page-break-before:always;break-before:page;padding-top:4mm;display:flex;flex-direction:column;height:262mm}' +
     '.cgv-header{padding-bottom:13px;border-bottom:3px solid #FF82D7;margin-bottom:22px;page-break-inside:avoid;break-inside:avoid;page-break-after:avoid;break-after:avoid}' +
     '.cgv-title{font-family:Yellowtail,cursive;font-size:38px;color:#191923;line-height:1}' +
     '.cgv-sub{font-family:"Arial Narrow",Arial,sans-serif;font-size:11px;color:#777;letter-spacing:.4px;margin-top:4px}' +
-    '.cgv-cols{display:grid;grid-template-columns:1fr 1fr;column-gap:34px}' +
-    '.cgv-col{}' +
-    '.cgv-art{margin-bottom:13px;page-break-inside:avoid;break-inside:avoid}' +
-    '.cgv-art h4{font-family:"Arial Narrow",Arial,sans-serif;font-size:10.5px;margin-bottom:5px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#FF82D7;line-height:1.2}' +
-    '.cgv-art p{font-size:10px;color:#2a2a2a;line-height:1.62;text-align:justify;margin:0}' +
+    '.cgv-cols{display:flex;gap:34px;flex:1;min-height:0}' +
+    '.cgv-col{flex:1;display:flex;flex-direction:column;justify-content:space-between}' +
+    '.cgv-art{margin-bottom:0;page-break-inside:avoid;break-inside:avoid}' +
+    '.cgv-art h4{font-family:"Arial Narrow",Arial,sans-serif;font-size:10px;margin-bottom:4px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#FF82D7;line-height:1.2}' +
+    '.cgv-art p{font-size:9.5px;color:#2a2a2a;line-height:1.5;text-align:justify;margin:0}' +
     '.footer{padding:10px 0 0;border-top:1px solid #EBEBEB;margin-top:18px}' +
     '.footer-brand{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:8px;padding-bottom:8px}' +
     '.footer-logo-img{height:34px;width:auto;display:block;image-rendering:high-quality}' +
