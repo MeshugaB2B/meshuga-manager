@@ -16,6 +16,7 @@
 // ============================================================
 
 import { fmtEur } from './cateringCore'
+import { MESHUGA_LOGO_PINK_DATA_URI } from '../meshugaLogo'
 
 // ---------- Types ----------
 
@@ -167,7 +168,7 @@ export function buildDevisChoiceHtml(payload: ChoicePayload): string {
     '.btn-choose{width:100%;background:#FF82D7;color:#fff;border:2px solid #191923;border-radius:9px;padding:9px 12px 11px;font-family:Yellowtail,cursive;font-size:22px;font-weight:400;line-height:1.1;cursor:pointer;letter-spacing:.3px;box-shadow:3px 3px 0 #191923}' +
     '.btn-choose:hover{background:#191923;color:#FFEB5A}' +
     '.btn-choose:active{transform:translate(1px,1px);box-shadow:1px 1px 0 #191923}' +
-    '.foot{margin-top:34px;padding-top:16px;border-top:1px solid #EBEBEB;text-align:center;font-size:11px;color:#888;line-height:1.7}.foot .nm{font-family:Yellowtail,cursive;font-size:20px;color:#191923}'
+    '.foot{margin-top:34px;padding-top:16px;border-top:1px solid #EBEBEB;text-align:center;font-size:11px;color:#888;line-height:1.7}.foot-logo{display:block;height:30px;margin:0 auto 8px}'
 
   var script =
     '<script>function choisir(k){var u=new URL(window.location.href);u.searchParams.set("formule",k);window.location.href=u.toString();}</script>'
@@ -186,8 +187,8 @@ export function buildDevisChoiceHtml(payload: ChoicePayload): string {
       '</div>' +
       '<div class="intro">Choisissez la formule qui vous convient — vous pourrez ensuite la personnaliser librement avant de valider.</div>' +
       '<div class="grid">' + cards + '</div>' +
-      '<div class="foot"><div class="nm">meshuga</div>SAS AEGIA FOOD (enseigne MESHUGA) &middot; 3 rue Vavin, 75006 Paris &middot; events@meshuga.fr</div>' +
-    '</div></body></html>'
+      '<div class="foot"><img class="foot-logo" src="' + MESHUGA_LOGO_PINK_DATA_URI + '" alt="Meshuga">SAS AEGIA FOOD (enseigne MESHUGA) &middot; 3 rue Vavin, 75006 Paris &middot; events@meshuga.fr</div>' +
+    '</div>' + script + '</body></html>'
 }
 
 // ============================================================
@@ -347,6 +348,7 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
     '.mr-n{font-weight:700}' +
     '.mr-c{font-weight:900;color:#FF82D7;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:10px}' +
     '.mr-tot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;background:#FFEB5A;border:2px solid #191923;border-radius:7px;padding:7px 11px;font-weight:900;font-size:13px;box-shadow:2px 2px 0 #191923}' +
+    '.boxhint{background:#FFF5FB;border:1.5px solid #FF82D7;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:600;color:#191923;line-height:1.5;margin-bottom:10px}' +
     '.overlay{position:fixed;inset:0;background:rgba(255,253,245,.9);display:none;align-items:center;justify-content:center;font-size:18px;font-weight:900;z-index:99}' +
     '.foot{margin-top:30px;padding-top:14px;border-top:1px solid #EBEBEB;text-align:center;font-size:11px;color:#888;line-height:1.7}'
 
@@ -384,7 +386,7 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
           '<div class="card"><div class="yt" style="font-size:17px;margin-bottom:4px">Votre panier</div><div id="lines"></div></div>' +
           '<div class="card" id="recapcard" style="display:none"><div class="yt" style="font-size:17px;margin-bottom:6px">Le détail de vos minis</div><div style="font-size:11px;color:#888;margin-bottom:8px">Le nombre total de chaque mini, toutes vos box réunies.</div><div id="minirecap"></div></div>' +
           '<div class="card" id="livecard" style="display:none;background:#FFF7FC;border-color:#FF82D7"><div style="font-size:13px;font-weight:900;margin-bottom:4px">🔥 Live cooking — ce qui est inclus</div><div id="liveincl" style="font-size:11.5px;color:#555;line-height:1.6;margin-bottom:8px"></div><div id="livextra"></div></div>' +
-          '<div class="card"><div class="yt" style="font-size:17px;margin-bottom:8px">Ajouter à votre formule</div><div id="addcats" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px"></div><div id="addlist" style="max-height:220px;overflow-y:auto"></div></div>' +
+          '<div class="card"><div class="yt" style="font-size:17px;margin-bottom:8px">Ajouter à votre formule</div><div class="boxhint">🥪 Vous pouvez composer votre box sur mesure ! Mélangez les minis comme vous voulez — gardez simplement entre <b>35 et 40 minis par box</b> pour un dressage au top.</div><div id="addcats" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px"></div><div id="addlist" style="max-height:220px;overflow-y:auto"></div></div>' +
         '</div>' +
         '<div>' +
           '<div class="card" style="position:sticky;top:10px">' +
