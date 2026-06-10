@@ -467,3 +467,37 @@ export function computeCoverage(
     label: label
   }
 }
+
+export interface MiniAggLine {
+  name: string
+  count: number
+}
+
+// Agrège les minis par recette à partir des compositions des box.
+// box_mini : parse "N Recette · N Recette" puis × qty. live_mini : 1 pièce par qty.
+// Renvoie les recettes dans l'ordre de première apparition.
+export function aggregateMinis(lines: VariantLine[], map: OfferingMap): MiniAggLine[] {
+  var acc: { [k: string]: number } = {}
+  var order: string[] = []
+  ;(lines || []).forEach(function (l) {
+    var o = map[String(l.offering_id)]
+    if (!o) return
+    var qty = Number(l.qty) || 0
+    if (qty <= 0) return
+    var comp = (o as any).composition ? String((o as any).composition) : ''
+    if (o.category === 'box_mini' && comp) {
+      comp.split(/\s*·\s*/).forEach(function (seg) {
+        var m = seg.match(/^(\d+)\s+(.+)$/)
+        if (!m) return
+        var nm = m[2].trim()
+        if (acc[nm] == null) { acc[nm] = 0; order.push(nm) }
+        acc[nm] += parseInt(m[1], 10) * qty
+      })
+    } else if (o.category === 'live_mini') {
+      var nm2 = o.name
+      if (acc[nm2] == null) { acc[nm2] = 0; order.push(nm2) }
+      acc[nm2] += qty
+    }
+  })
+  return order.map(function (nm) { return { name: nm, count: acc[nm] } })
+}
