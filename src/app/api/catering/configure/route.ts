@@ -90,10 +90,9 @@ export async function POST(req: NextRequest) {
   var totals = computeVariant(variant as any, map, frais as any, pax)
   var coverage = computeCoverage(totals.lines, pax, devis.event_format || '', devis.item_format || undefined)
 
-  // Défense en profondeur : la couverture doit être atteinte (l'UI client le bloque déjà)
-  if (!coverage.covered) {
-    return bad('La formule ne couvre pas le nombre d\u2019invités indiqué.')
-  }
+  // Nouveau modèle : le client choisit lui-même le nombre de pièces/personne via le
+  // sélecteur du configurateur. On ne bloque donc plus sur une cible fixe — la couverture
+  // reste calculée et stockée à titre informatif.
 
   // 6. Token : réutiliser si déjà présent (et non signé), sinon créer
   var token = devis.signature_token
