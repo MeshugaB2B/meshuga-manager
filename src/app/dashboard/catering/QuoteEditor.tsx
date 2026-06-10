@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { LOGO_PINK, STAMP_PINK } from '../logos'
 import {
   buildOfferingMap,
@@ -176,6 +176,10 @@ var QE_CSS =
   '.qe-recap-list{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px}' +
   '.qe-recap-chip{background:#FFF5FB;border:1.5px solid #FF82D7;border-radius:13px;padding:3px 9px;font-size:11px;font-weight:600;color:#191923;white-space:nowrap}' +
   '.qe-recap-tot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;background:#FFEB5A;border:2px solid #191923;border-radius:7px;padding:8px 11px;font-size:13px;font-weight:700;box-shadow:2px 2px 0 #191923}' +
+  '.qe-ac{position:absolute;top:100%;left:0;right:0;z-index:50;background:#fff;border:2px solid #191923;border-radius:7px;box-shadow:3px 3px 0 #191923;margin-top:3px;max-height:230px;overflow-y:auto}' +
+  '.qe-ac-item{padding:8px 10px;font-size:12.5px;font-weight:600;cursor:pointer;border-bottom:1px solid #f0f0f0;line-height:1.3}' +
+  '.qe-ac-item:hover{background:#FFF5FB}' +
+  '.qe-ac-load{position:absolute;right:10px;bottom:9px;font-size:13px;font-weight:900;color:#FF82D7}' +
   '@media(max-width:640px){.qe-picks{grid-template-columns:1fr}.qe-recap-tot{font-size:12px}}'
 
 // ============================================================
@@ -209,6 +213,11 @@ export default function QuoteEditor(props) {
 
   var [eventDate, setEventDate] = useState('')
   var [eventLieu, setEventLieu] = useState('')
+  var [addrSugg, setAddrSugg] = useState([])
+  var [addrOpen, setAddrOpen] = useState(false)
+  var [addrLoading, setAddrLoading] = useState(false)
+  var addrTimer = useRef(null)
+  var addrBlurTimer = useRef(null)
   var [nbPersonnes, setNbPersonnes] = useState(40)
   var [eventFormat, setEventFormat] = useState('cocktail')
   var [itemFormat, setItemFormat] = useState('mini')
@@ -469,6 +478,38 @@ export default function QuoteEditor(props) {
       if (variants[i] && variants[i].key === 'signature') return i
     }
     return activeIdx
+  }
+
+  // ---- Autocomplétion adresse (proxy serveur Places API) ----
+  var fetchAddr = function(q) {
+    setAddrLoading(true)
+    fetch('/api/places/autocomplete?q=' + encodeURIComponent(q))
+      .then(function(r) { return r.json() })
+      .then(function(d) {
+        setAddrLoading(false)
+        if (d && d.ok && d.suggestions && d.suggestions.length) {
+          setAddrSugg(d.suggestions); setAddrOpen(true)
+        } else { setAddrSugg([]); setAddrOpen(false) }
+      }, function() { setAddrLoading(false); setAddrSugg([]); setAddrOpen(false) })
+  }
+  var onLieuChange = function(e) {
+    var val = e.target.value
+    setEventLieu(val)
+    if (addrTimer.current) clearTimeout(addrTimer.current)
+    var q = (val || '').trim()
+    if (q.length < 3) { setAddrSugg([]); setAddrOpen(false); return }
+    addrTimer.current = setTimeout(function() { fetchAddr(q) }, 280)
+  }
+  var pickAddr = function(s) {
+    if (addrBlurTimer.current) clearTimeout(addrBlurTimer.current)
+    setEventLieu(s.text)
+    setAddrSugg([]); setAddrOpen(false)
+  }
+  var onLieuBlur = function() {
+    addrBlurTimer.current = setTimeout(function() { setAddrOpen(false) }, 160)
+  }
+  var onLieuFocus = function() {
+    if (addrSugg.length > 0) setAddrOpen(true)
   }
 
   // ---- Aperçu PDF ----
@@ -780,9 +821,29 @@ export default function QuoteEditor(props) {
                 <label className="qe-lbl">Téléphone</label>
                 <input className="qe-inp" value={clientPhone} onChange={function(e) { setClientPhone(e.target.value) }} placeholder="06 ..." />
               </div>
-              <div className="qe-fg">
+              <div className="qe-fg" style={{ position: 'relative' }}>
                 <label className="qe-lbl">Lieu</label>
-                <input className="qe-inp" value={eventLieu} onChange={function(e) { setEventLieu(e.target.value) }} placeholder="Adresse" />
+                <input
+                  className="qe-inp"
+                  value={eventLieu}
+                  onChange={onLieuChange}
+                  onFocus={onLieuFocus}
+                  onBlur={onLieuBlur}
+                  placeholder="Adresse de livraison…"
+                  autoComplete="off"
+                />
+                {addrLoading ? <span className="qe-ac-load">…</span> : null}
+                {addrOpen && addrSugg.length > 0 ? (
+                  <div className="qe-ac">
+                    {addrSugg.map(function(s, k) {
+                      return (
+                        <div key={k} className="qe-ac-item" onMouseDown={function() { pickAddr(s) }}>
+                          📍 {s.text}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : null}
               </div>
             </div>
             <div className="qe-fg2">
