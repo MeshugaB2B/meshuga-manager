@@ -100,6 +100,8 @@ export interface LineComputed {
   fc_ligne: number
   marge_ligne: number
   is_mini: boolean
+  size_pers: number
+  mini_pieces: number
 }
 
 export interface VariantTotals {
@@ -313,6 +315,15 @@ export function computeLine(line: VariantLine, map: OfferingMap): LineComputed {
   var tvaLigne = totalLigneHT * tvaToRatio(tvaPct)
   var fcLigne = fcUnit * qty
 
+  // Pièces réelles de minis (pour la couverture) :
+  //  - box_mini : une box contient size_pers pièces → qty × size_pers
+  //  - live_mini : pièces à l'unité → qty
+  //  - autres catégories : non comptées comme minis
+  var sizePers = o && o.size_pers != null ? Number(o.size_pers) || 0 : 0
+  var miniPieces = 0
+  if (category === CAT_BOX_MINI) miniPieces = qty * sizePers
+  else if (category === CAT_LIVE_MINI) miniPieces = qty
+
   return {
     offering_id: line.offering_id,
     name: name,
@@ -328,7 +339,9 @@ export function computeLine(line: VariantLine, map: OfferingMap): LineComputed {
     fc_unitaire: round2(fcUnit),
     fc_ligne: round2(fcLigne),
     marge_ligne: round2(totalLigneHT - fcLigne),
-    is_mini: isMiniCategory(category)
+    is_mini: isMiniCategory(category),
+    size_pers: sizePers,
+    mini_pieces: miniPieces
   }
 }
 
@@ -412,7 +425,7 @@ export function computeCoverage(
   var nbLunch = 0
   var nbPlateauxParts = 0
   ;(lines || []).forEach(function (l) {
-    if (l.is_mini) nbMinis += l.qty
+    if (l.is_mini) nbMinis += l.mini_pieces
     else if (l.category === CAT_LUNCH_BOX) nbLunch += l.qty
     else if (l.category === CAT_PLATTER) nbPlateauxParts += l.qty // parts approximatives
   })
