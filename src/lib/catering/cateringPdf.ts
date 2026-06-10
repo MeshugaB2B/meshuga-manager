@@ -445,15 +445,15 @@ function buildCss(): string {
     '.sig-box{border:1.5px dashed #191923;border-radius:4px;height:90px;padding:5px 9px;position:relative}' +
     '.sig-box label{display:block;font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:900}' +
     '.cgv-pagebreak{height:0}' +
-    '.cgv{page-break-before:always;break-before:page;padding-top:0;display:flex;flex-direction:column;min-height:228mm}' +
+    '.cgv{page-break-before:always;break-before:page;padding-top:4mm}' +
     '.cgv-header{padding-bottom:13px;border-bottom:3px solid #FF82D7;margin-bottom:22px;page-break-inside:avoid;break-inside:avoid;page-break-after:avoid;break-after:avoid}' +
     '.cgv-title{font-family:Yellowtail,cursive;font-size:38px;color:#191923;line-height:1}' +
     '.cgv-sub{font-family:"Arial Narrow",Arial,sans-serif;font-size:11px;color:#777;letter-spacing:.4px;margin-top:4px}' +
-    '.cgv-cols{display:flex;gap:32px;flex:1}' +
-    '.cgv-col{flex:1;display:flex;flex-direction:column;justify-content:space-between}' +
-    '.cgv-art{page-break-inside:avoid;break-inside:avoid}' +
-    '.cgv-art h4{font-family:"Arial Narrow",Arial,sans-serif;font-size:11px;margin-bottom:5px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#FF82D7;margin-bottom:3px;line-height:1.2}' +
-    '.cgv-art p{font-size:10px;color:#2a2a2a;line-height:1.72;text-align:justify;margin:0}' +
+    '.cgv-cols{display:grid;grid-template-columns:1fr 1fr;column-gap:34px}' +
+    '.cgv-col{}' +
+    '.cgv-art{margin-bottom:13px;page-break-inside:avoid;break-inside:avoid}' +
+    '.cgv-art h4{font-family:"Arial Narrow",Arial,sans-serif;font-size:10.5px;margin-bottom:5px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#FF82D7;line-height:1.2}' +
+    '.cgv-art p{font-size:10px;color:#2a2a2a;line-height:1.62;text-align:justify;margin:0}' +
     '.footer{padding:10px 0 0;border-top:1px solid #EBEBEB;margin-top:auto}' +
     '.footer-brand{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:8px;padding-bottom:8px}' +
     '.footer-logo-img{height:34px;width:auto;display:block;image-rendering:high-quality}' +
