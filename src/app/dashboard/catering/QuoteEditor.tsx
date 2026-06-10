@@ -144,11 +144,15 @@ var QE_CSS =
   '.qe-catchip.on{background:#FFEB5A}' +
   '.qe-subgroup-title{font-family:Yellowtail,cursive;font-size:15px;margin:6px 0 4px}' +
   '.qe-picks{display:grid;grid-template-columns:1fr 1fr;gap:6px}' +
-  '.qe-pick{border:1.5px solid #191923;border-radius:6px;padding:7px 9px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:#fff}' +
+  '.qe-pick{border:1.5px solid #191923;border-radius:6px;padding:7px 9px;display:flex;flex-direction:column;gap:3px;cursor:pointer;background:#fff}' +
+  '.qe-pick-top{display:flex;justify-content:space-between;align-items:center;gap:8px}' +
+  '.qe-pick-comp{font-size:10px;font-weight:600;color:#8a8a92;line-height:1.3}' +
   '.qe-pick:hover{background:#FFFCEB}' +
   '.qe-pick-name{font-size:12px;font-weight:700;line-height:1.2}' +
   '.qe-pick-pv{font-size:11px;font-weight:900;color:#FF82D7;white-space:nowrap;margin-left:8px}' +
-  '.qe-line{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed #ddd}' +
+  '.qe-line{display:flex;flex-direction:column;gap:4px;padding:7px 0;border-bottom:1px dashed #ddd}' +
+  '.qe-line-top{display:flex;align-items:center;gap:8px}' +
+  '.qe-line-comp{font-size:10.5px;font-weight:600;color:#8a8a92;line-height:1.3}' +
   '.qe-line-name{flex:1;font-size:12.5px;font-weight:700;min-width:0}' +
   '.qe-q{display:flex;align-items:center;border:1.5px solid #191923;border-radius:6px;overflow:hidden}' +
   '.qe-q b{padding:2px 9px;background:#FFEB5A;font-size:13px;font-weight:900;cursor:pointer;user-select:none}' +
@@ -166,7 +170,13 @@ var QE_CSS =
   '.qe-modal{background:#fff;border:3px solid #191923;border-radius:10px;box-shadow:6px 6px 0 #FF82D7;max-width:480px;width:100%;padding:20px;max-height:92vh;overflow-y:auto}' +
   '.qe-modal h3{font-family:Yellowtail,cursive;font-size:24px;font-weight:400;margin-bottom:8px}' +
   '.qe-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}' +
-  '.qe-warn{background:#FFF1FA;border:2px solid #CC0066;border-radius:6px;padding:9px 11px;font-size:12px;font-weight:700;color:#CC0066;margin:8px 0}'
+  '.qe-warn{background:#FFF1FA;border:2px solid #CC0066;border-radius:6px;padding:9px 11px;font-size:12px;font-weight:700;color:#CC0066;margin:8px 0}' +
+  '.qe-recap{margin-top:10px;border-top:2px solid #191923;padding-top:9px}' +
+  '.qe-recap-h{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:#993556;margin-bottom:6px}' +
+  '.qe-recap-list{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px}' +
+  '.qe-recap-chip{background:#FFF5FB;border:1.5px solid #FF82D7;border-radius:13px;padding:3px 9px;font-size:11px;font-weight:600;color:#191923;white-space:nowrap}' +
+  '.qe-recap-tot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;background:#FFEB5A;border:2px solid #191923;border-radius:7px;padding:8px 11px;font-size:13px;font-weight:700;box-shadow:2px 2px 0 #191923}' +
+  '@media(max-width:640px){.qe-picks{grid-template-columns:1fr}.qe-recap-tot{font-size:12px}}'
 
 // ============================================================
 // COMPOSANT
@@ -643,6 +653,43 @@ export default function QuoteEditor(props) {
   var covColor = coverage.covered ? '#1D9E75' : '#EF9F27'
   var canSend = (activeVariant.lines && activeVariant.lines.length > 0) && !!clientNom.trim()
 
+  // Agrégat des minis par recette (récap clair pour le client)
+  var aggregateMinis = function(lines) {
+    var acc = {}
+    var order = []
+    ;(lines || []).forEach(function(l) {
+      var o = offeringsById[l.offering_id]
+      if (!o) return
+      var qy = Number(l.qty) || 0
+      if (qy <= 0) return
+      if (o.category === 'box_mini' && o.composition) {
+        var segs = String(o.composition).split(/\s*·\s*/)
+        segs.forEach(function(seg) {
+          var m = seg.match(/^(\d+)\s+(.+)$/)
+          if (!m) return
+          var nm = m[2].trim()
+          if (acc[nm] == null) { acc[nm] = 0; order.push(nm) }
+          acc[nm] += parseInt(m[1], 10) * qy
+        })
+      } else if (o.category === 'live_mini') {
+        var nm2 = o.name
+        if (acc[nm2] == null) { acc[nm2] = 0; order.push(nm2) }
+        acc[nm2] += qy
+      }
+    })
+    return order.map(function(nm) { return { name: nm, count: acc[nm] } })
+  }
+  var miniAgg = aggregateMinis(activeVariant.lines || [])
+  var minisPerPers = nbPersonnes > 0 ? (coverage.current / nbPersonnes) : 0
+
+  // Ordre d'affichage des formules : prix/pers croissant (Essentiel → Signature → Excellence)
+  var tabOrder = variants.map(function(v, i) { return i })
+  tabOrder.sort(function(a, b) {
+    var pa = variantInfos[a] ? variantInfos[a].pp : 0
+    var pb = variantInfos[b] ? variantInfos[b].pp : 0
+    return pa - pb
+  })
+
   return (
     <div className="qe-root">
       <style>{QE_CSS}</style>
@@ -783,7 +830,8 @@ export default function QuoteEditor(props) {
 
       {/* Onglets de formules */}
       <div className="qe-tabs-f">
-        {variants.map(function(v, i) {
+        {tabOrder.map(function(i) {
+          var v = variants[i]
           var info = variantInfos[i] || { pp: 0 }
           var isReco = v.key === 'signature'
           return (
@@ -842,8 +890,11 @@ export default function QuoteEditor(props) {
                     {grouped.map[sub].map(function(o) {
                       return (
                         <div key={o.id} className="qe-pick" onClick={function() { addItem(o.id) }}>
-                          <span className="qe-pick-name">{o.name}</span>
-                          <span className="qe-pick-pv">{fmtEur(Number(o.pv_ht) || 0)}</span>
+                          <div className="qe-pick-top">
+                            <span className="qe-pick-name">{o.name}</span>
+                            <span className="qe-pick-pv">{fmtEur(Number(o.pv_ht) || 0)}</span>
+                          </div>
+                          {o.composition ? <div className="qe-pick-comp">{o.composition}</div> : null}
                         </div>
                       )
                     })}
@@ -867,17 +918,38 @@ export default function QuoteEditor(props) {
               var lineTot = pv * (Number(l.qty) || 0) * (1 - (Number(l.remise_pct) || 0) / 100)
               return (
                 <div key={idx} className="qe-line">
-                  <span className="qe-line-name">{name}</span>
-                  <span className="qe-q">
-                    <b onClick={function() { stepQty(idx, -1) }}>−</b>
-                    <span>{l.qty}</span>
-                    <b onClick={function() { stepQty(idx, 1) }}>+</b>
-                  </span>
-                  <span className="qe-line-tot">{fmtEur(lineTot)}</span>
-                  <button className="qe-rm" title="Retirer" onClick={function() { removeLine(idx) }}>✕</button>
+                  <div className="qe-line-top">
+                    <span className="qe-line-name">{name}</span>
+                    <span className="qe-q">
+                      <b onClick={function() { stepQty(idx, -1) }}>−</b>
+                      <span>{l.qty}</span>
+                      <b onClick={function() { stepQty(idx, 1) }}>+</b>
+                    </span>
+                    <span className="qe-line-tot">{fmtEur(lineTot)}</span>
+                    <button className="qe-rm" title="Retirer" onClick={function() { removeLine(idx) }}>✕</button>
+                  </div>
+                  {o && o.composition ? <div className="qe-line-comp">{o.composition}</div> : null}
                 </div>
               )
             })}
+            {(activeVariant.lines && activeVariant.lines.length > 0) ? (
+              <div className="qe-recap">
+                {miniAgg.length > 0 ? (
+                  <div className="qe-recap-minis">
+                    <div className="qe-recap-h">Total des minis · ce que reçoit le client</div>
+                    <div className="qe-recap-list">
+                      {miniAgg.map(function(mi, k) {
+                        return <span key={k} className="qe-recap-chip"><b>{mi.count}</b> {mi.name}</span>
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+                <div className="qe-recap-tot">
+                  <span><b>{coverage.current}</b> minis · <b>{minisPerPers.toFixed(1).replace('.', ',')}</b> / pers</span>
+                  <span><b>{fmtEur(totals.per_pers_ttc)}</b> TTC / pers</span>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="qe-card">
