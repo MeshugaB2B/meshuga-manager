@@ -121,7 +121,7 @@ export function buildDevisChoiceHtml(payload: ChoicePayload): string {
     var itemsTop = (v.items || []).slice(0, 6)
     var itemsHtml = ''
     itemsTop.forEach(function (it) {
-      itemsHtml += '<div class="ci"><span class="ci-q">' + it.qty + '×</span> ' + esc(it.name) + '</div>'
+      itemsHtml += '<div class="ci"><span class="ci-q">&bull;</span> ' + esc(it.name) + '</div>'
     })
     var more = (v.items || []).length - itemsTop.length
     if (more > 0) itemsHtml += '<div class="ci-more">+ ' + more + ' autres</div>'
