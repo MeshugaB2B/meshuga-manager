@@ -113,6 +113,9 @@ function buildSystemPrompt(): string {
     '1. UTILISATION DU CATALOGUE',
     '   Utilise UNIQUEMENT les `id` du catalogue donné. Aucune invention.',
     '   Si un item demandé n\'existe pas dans le catalogue, ignore-le.',
+    '   IMPORTANT box_mini : "size:Npers" = N mini-pièces DÉJÀ contenues dans la box. `qty` = nombre de BOXES, PAS de pièces.',
+    '   Pour viser X pièces/pers : pièces totales = X × nbPersonnes, puis qty ≈ pièces / size de la box. Ex : 200 pièces avec des box de 40 → ~5 boxes au total (réparties sur le mix).',
+    '   Le serveur recalibre les quantités de minis pour atteindre la cible exacte : concentre-toi sur un bon MIX et de bonnes proportions, pas sur le compte précis.',
     '',
     '2. RÈGLES MÉTIER PAR TYPE DE PRESTATION',
     '',
@@ -325,6 +328,46 @@ function computeTotals(
   }
 }
 
+// Cible de pièces de minis par personne (déterministe, fiabilise le dimensionnement IA).
+// 0 = pas de recalage (formats non concernés).
+function miniTargetPerPers(format: string, key: string, meshugaIsOnly: boolean): number {
+  if (format !== 'cocktail' && format !== 'soiree') return 0
+  if (meshugaIsOnly) return key === 'excellence' ? 6 : 5
+  return key === 'essentiel' ? 2 : 3
+}
+
+// Recale les quantités de minis (box_mini : qty×size_pers pièces ; live_mini : qty pièces)
+// pour viser pax × perPers pièces, en conservant le mix proposé par l'IA.
+function rescaleMiniItems(
+  rawItems: { offering_id: string; qty: number }[],
+  catalogMap: { [id: string]: CatalogItem },
+  pax: number,
+  perPers: number
+): { offering_id: string; qty: number }[] {
+  if (perPers <= 0 || pax <= 0) return rawItems
+  var cur = 0
+  rawItems.forEach(function (r) {
+    var c = catalogMap[r.offering_id]
+    if (!c) return
+    var q = Number(r.qty) || 0
+    if (c.category === 'box_mini') cur += q * (Number(c.size_pers) || 0)
+    else if (c.category === 'live_mini') cur += q
+  })
+  if (cur <= 0) return rawItems
+  var target = Math.round(pax * perPers)
+  var f = target / cur
+  if (f > 0.95 && f < 1.05) return rawItems // déjà dans la cible
+  rawItems.forEach(function (r) {
+    var c = catalogMap[r.offering_id]
+    if (!c) return
+    if (c.category === 'box_mini' || c.category === 'live_mini') {
+      var q = Number(r.qty) || 0
+      r.qty = Math.max(1, Math.round(q * f))
+    }
+  })
+  return rawItems
+}
+
 export async function POST(req: NextRequest) {
   // 1. Validate ENV
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return serverError('Supabase ENV missing')
@@ -447,6 +490,8 @@ export async function POST(req: NextRequest) {
       key = keys[i] || 'option_' + i
     }
     var rawItems = Array.isArray(opt.items) ? opt.items : []
+    var perPers = miniTargetPerPers(brief.eventFormat, key, brief.meshugaIsOnly)
+    rawItems = rescaleMiniItems(rawItems, catalogMap, brief.nbPersonnes, perPers)
     var totals = computeTotals(rawItems, catalogMap, brief.nbPersonnes)
     enriched.push({
       key: key,
