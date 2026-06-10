@@ -82,7 +82,8 @@ async function notifyAfterSignature(req: NextRequest, d: any, signerName: string
         viewUrl: viewUrl,
         iban: process.env.MESHUGA_IBAN || '',
         bic: process.env.MESHUGA_BIC || '',
-        bankName: process.env.MESHUGA_BANK_NAME || ''
+        bankName: process.env.MESHUGA_BANK_NAME || '',
+        origin: origin
       }
       await sendBrevoEmail({
         to: [{ email: d.client_email, name: d.client_nom || '' }],
