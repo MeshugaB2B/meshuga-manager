@@ -42,7 +42,7 @@ function sharedHead(title: string): string {
     '<meta charset="UTF-8">' +
     '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">' +
     '<title>' + esc(title) + '</title>' +
-    '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&family=Dancing+Script:wght@600&display=swap" rel="stylesheet">' +
+    '<link href="https://fonts.googleapis.com/css2?family=Yellowtail&display=swap" rel="stylesheet">' +
     '<style>' +
     '*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}' +
     'body{margin:0;font-family:"Arial Narrow",Arial,Helvetica,sans-serif;color:#191923;background:#FFF7FB}' +
@@ -68,7 +68,7 @@ function sharedHead(title: string): string {
     '.chk input{width:22px;height:22px;flex:0 0 22px;margin-top:1px;accent-color:#FF82D7}' +
     '.lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#191923;margin:14px 0 6px}' +
     '.inp{width:100%;border:2px solid #191923;border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;background:#fff}' +
-    '.sigprev{margin-top:8px;border:2px dashed #E3C7DA;border-radius:10px;background:#FFFCFE;min-height:64px;display:flex;align-items:center;justify-content:center;font-family:"Dancing Script",cursive;font-size:34px;color:#191923;padding:6px 12px;line-height:1;word-break:break-word;text-align:center}' +
+    '.sigprev{margin-top:8px;border:2px dashed #E3C7DA;border-radius:10px;background:#FFFCFE;min-height:70px;display:flex;align-items:center;justify-content:center;font-family:Yellowtail,cursive;font-size:38px;color:#FF82D7;padding:8px 12px;line-height:1.05;word-break:break-word;text-align:center}' +
     '.sigprev.empty{color:#CDB9C6;font-size:15px;font-family:inherit}' +
     '.cta{width:100%;margin-top:18px;border:2px solid #191923;border-radius:12px;padding:15px;font-size:16px;font-weight:900;cursor:pointer;background:#FF82D7;color:#fff;box-shadow:3px 3px 0 #191923}' +
     '.cta:disabled{background:#EBEBEB;color:#999;box-shadow:none;cursor:not-allowed}' +
