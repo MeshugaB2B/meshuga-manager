@@ -1,12 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
+import { sendBrevoEmail } from '@/lib/brevo'
+import { sendTwilioSms, normalizePhoneFR } from '@/lib/twilio'
+import {
+  buildAcompteEmailHtml,
+  buildAcompteEmailText,
+  buildSignerNotifSms,
+  buildSignerNotifEmailHtml
+} from '@/lib/catering/cateringNotify'
 
 export const runtime = 'nodejs'
+export const maxDuration = 30
 
 var SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 var SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 var MAX_OTP_ATTEMPTS = 5
+
+var FMT_LABELS: { [k: string]: string } = {
+  petit_dej: 'Petit-déjeuner',
+  business_lunch: 'Business lunch',
+  cocktail: 'Cocktail dînatoire',
+  soiree: 'Soirée',
+  autre: 'Prestation'
+}
 
 function bad(msg: string, code?: number) {
   return NextResponse.json({ ok: false, error: msg }, { status: code || 400 })
@@ -20,6 +37,100 @@ function clientIp(req: NextRequest): string {
 
 function hashCode(code: string, token: string): string {
   return createHash('sha256').update(code + '|' + token).digest('hex')
+}
+
+function frDateShort(d: any): string {
+  if (!d) return ''
+  try {
+    var dt = new Date(d)
+    if (isNaN(dt.getTime())) return String(d)
+    return dt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+  } catch (e) {
+    return String(d)
+  }
+}
+
+function round2(n: number): number {
+  return Math.round((Number(n) || 0) * 100) / 100
+}
+
+// Notifications post-signature : best-effort, chaque canal isolé.
+// N'impacte JAMAIS le succès de la signature (déjà enregistrée en base).
+async function notifyAfterSignature(req: NextRequest, d: any, signerName: string, verifiedPhone: string) {
+  var totals = (d.config_data && d.config_data.totals) ? d.config_data.totals : {}
+  var totalTTC = Number(totals.total_ttc) || Number(d.total_ttc) || 0
+  var acompte = round2(totalTTC * 0.30)
+  var solde = round2(totalTTC - acompte)
+
+  var origin = (process.env.NEXT_PUBLIC_APP_URL || req.headers.get('origin') || 'https://meshuga-manager.vercel.app').replace(/\/+$/, '')
+  var viewUrl = origin + '/api/catering/view-devis/' + d.id
+  var eventDateLabel = frDateShort(d.event_date)
+  var formatLabel = FMT_LABELS[d.event_format] || 'Prestation'
+
+  // 1. Email d'acompte au client
+  if (d.client_email) {
+    try {
+      var emailPayload = {
+        clientNom: d.client_nom || '',
+        numero: d.numero || '',
+        totalTTC: totalTTC,
+        acompte: acompte,
+        solde: solde,
+        eventDateLabel: eventDateLabel,
+        eventLieu: d.event_lieu || '',
+        formatLabel: formatLabel,
+        viewUrl: viewUrl,
+        iban: process.env.MESHUGA_IBAN || '',
+        bic: process.env.MESHUGA_BIC || '',
+        bankName: process.env.MESHUGA_BANK_NAME || ''
+      }
+      await sendBrevoEmail({
+        to: [{ email: d.client_email, name: d.client_nom || '' }],
+        subject: 'Votre devis ' + (d.numero || '') + ' est signé \u2014 modalités d\u2019acompte',
+        htmlContent: buildAcompteEmailHtml(emailPayload),
+        textContent: buildAcompteEmailText(emailPayload),
+        sender: { email: 'hello@meshuga.fr', name: 'Meshuga Events' },
+        replyTo: { email: 'events@meshuga.fr', name: 'Meshuga Events' }
+      })
+    } catch (e) {
+      console.error('[devis-sign] email acompte client échoué:', e)
+    }
+  }
+
+  // 2. Email de notification à Edward (+ Emy en copie)
+  try {
+    var edwardEmail = process.env.EDWARD_NOTIFICATION_EMAIL || 'edward@meshuga.fr'
+    await sendBrevoEmail({
+      to: [{ email: edwardEmail, name: 'Edward' }],
+      cc: [{ email: 'emy@meshuga.fr', name: 'Emy' }],
+      subject: '\u270D\uFE0F Devis ' + (d.numero || '') + ' signé par ' + signerName,
+      htmlContent: buildSignerNotifEmailHtml({
+        signerName: signerName,
+        signerPhone: verifiedPhone,
+        numero: d.numero || '',
+        totalTTC: totalTTC,
+        acompte: acompte,
+        clientNom: d.client_nom || '',
+        managerUrl: origin + '/dashboard'
+      }),
+      sender: { email: 'hello@meshuga.fr', name: 'Meshuga Events' }
+    })
+  } catch (e) {
+    console.error('[devis-sign] email notif Edward échoué:', e)
+  }
+
+  // 3. SMS à Edward
+  try {
+    var edwardPhone = normalizePhoneFR(process.env.EDWARD_NOTIFICATION_PHONE || '')
+    if (edwardPhone) {
+      await sendTwilioSms({
+        to: edwardPhone,
+        body: buildSignerNotifSms({ signerName: signerName, numero: d.numero || '', totalTTC: totalTTC })
+      })
+    }
+  } catch (e) {
+    console.error('[devis-sign] SMS notif Edward échoué:', e)
+  }
 }
 
 export async function POST(req: NextRequest, ctx: { params: { token: string } }) {
@@ -52,7 +163,7 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
 
   var res = await supabase
     .from('devis')
-    .select('id, numero, statut, config_data, signature_status, signed_at, signature_otp_hash, signature_otp_expires_at, signature_otp_phone, signature_otp_attempts')
+    .select('id, numero, statut, config_data, total_ttc, client_email, client_nom, event_date, event_lieu, event_format, signature_status, signed_at, signature_otp_hash, signature_otp_expires_at, signature_otp_phone, signature_otp_attempts')
     .eq('signature_token', token)
     .single()
   if (res.error || !res.data) return bad('Lien invalide', 404)
@@ -129,15 +240,20 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
       signer_phone: verifiedPhone,
       signature_audit_data: audit,
       statut: 'accepte',
-      // on purge le code OTP après usage
       signature_otp_hash: null,
       signature_otp_expires_at: null,
       signature_otp_attempts: 0
     })
     .eq('id', d.id)
-    .eq('signature_status', d.signature_status) // garde-fou anti double-signature concurrente
+    .eq('signature_status', d.signature_status)
   if (upd.error) return bad('Enregistrement impossible : ' + upd.error.message, 500)
 
-  // NB : génération du PDF signé + email d'acompte = étape suivante (Step 4).
+  // Notifications (email d'acompte client + alerte Edward) — best-effort
+  try {
+    await notifyAfterSignature(req, d, signerName, verifiedPhone)
+  } catch (e) {
+    console.error('[devis-sign] notifications post-signature échouées:', e)
+  }
+
   return NextResponse.json({ ok: true, documentHash: documentHash })
 }
