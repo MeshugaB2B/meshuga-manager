@@ -643,8 +643,11 @@ export default function QuoteEditor(props) {
       var hello = contactFirst ? ('Bonjour ' + contactFirst + ',') : 'Bonjour,'
       setEmailMessage(
         hello + '\n\n' +
-        'Suite à notre échange, voici votre devis pour ' + (nbPersonnes) + ' personnes.\n' +
-        'Vous pouvez le consulter et l\'enregistrer via le lien ci-dessous.\n\n' +
+        'Un grand merci d\'avoir pensé à Meshuga pour votre événement, et de nous accorder votre confiance — on a hâte de régaler vos invités !\n\n' +
+        'Nous vous avons préparé trois propositions sur mesure pour ' + (nbPersonnes) + ' personnes. En un clic, vous pourrez :\n' +
+        '• Découvrir et comparer nos 3 formules\n' +
+        '• Les personnaliser librement — quantités, pièces, boissons…\n' +
+        '• Valider et signer votre devis en ligne, en quelques minutes\n\n' +
         'À très vite,\nL\'équipe Meshuga Events'
       )
       setSendError('')
