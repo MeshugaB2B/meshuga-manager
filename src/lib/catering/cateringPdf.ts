@@ -221,6 +221,10 @@ export function buildDevisHtml(payload: DevisPdfPayload, assets?: DevisPdfAssets
   var stampHtml = a.stampUrl
     ? '<img src="' + a.stampUrl + '" alt="meshuga"/>'
     : '<div class="logo-text-fb">meshuga</div>'
+  // En-tête : logotype rose (charte : fond blanc → logotype rose, jamais le stamp)
+  var headerLogoHtml = a.logotypeUrl
+    ? '<img src="' + a.logotypeUrl + '" alt="meshuga" class="header-logo-img"/>'
+    : '<div class="logo-text-fb" style="font-size:28px">meshuga</div>'
   var logotypeHtml = a.logotypeUrl
     ? '<img src="' + a.logotypeUrl + '" alt="meshuga" class="footer-logo-img"/>'
     : '<div class="logo-text-fb" style="font-size:28px">meshuga</div>'
@@ -241,9 +245,8 @@ export function buildDevisHtml(payload: DevisPdfPayload, assets?: DevisPdfAssets
     '<div class="page">' +
       '<div class="content">' +
         '<div class="header">' +
-          '<div class="logo">' + stampHtml +
+          '<div class="logo">' + headerLogoHtml +
             '<div class="logo-tag">' +
-              '<div class="logo-name">meshuga</div>' +
               '<div class="logo-sub-pink">Events &middot; Paris</div>' +
             '</div>' +
           '</div>' +
@@ -292,7 +295,7 @@ export function buildDevisHtml(payload: DevisPdfPayload, assets?: DevisPdfAssets
         '<div class="tc-grid">' +
           '<div class="tc-cond">' +
             '<div class="cond-title">Conditions de r&egrave;glement</div>' +
-            '<div class="cond">Acompte de 30 % &agrave; la commande. Solde imp&eacute;rativement <strong>72 h (3 jours ouvr&eacute;s) avant la prestation</strong>, &agrave; d&eacute;faut prestation non garantie et acompte conserv&eacute;. Devis valable 30 jours. Pour valider, retournez le devis sign&eacute; avec la mention "Bon pour accord" + virement de l&#39;acompte. Conditions d&eacute;taill&eacute;es : voir CGV en derni&egrave;re page.</div>' +
+            '<div class="cond">Acompte de 30 % &agrave; la commande. Solde imp&eacute;rativement <strong>5 jours ouvr&eacute;s avant la prestation, sauf accord pr&eacute;alable stipul&eacute; par &eacute;crit</strong>, &agrave; d&eacute;faut prestation non garantie et acompte conserv&eacute;. Devis valable 30 jours. Pour valider, retournez le devis sign&eacute; avec la mention "Bon pour accord" + virement de l&#39;acompte. Conditions d&eacute;taill&eacute;es : voir CGV en derni&egrave;re page.</div>' +
           '</div>' +
           '<div class="tc-totals">' +
             '<div class="t-row"><span>Total HT</span><strong>' + fmtEur(totals.total_ht) + '</strong></div>' +
@@ -369,6 +372,7 @@ function buildCss(): string {
     '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px}' +
     '.logo{display:flex;align-items:center;gap:14px}' +
     '.logo img{height:75px;width:75px;display:block;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;image-rendering:high-quality;border-radius:50%}' +
+    '.header-logo-img{height:42px !important;width:auto !important;border-radius:0 !important}' +
     '.logo-tag{display:flex;flex-direction:column;justify-content:center}' +
     '.logo-name{font-family:Yellowtail,cursive;font-size:26px;color:#191923;line-height:1}' +
     '.logo-sub-pink{font-family:"Arial Narrow",Arial,sans-serif;font-size:8.5px;color:#FF82D7;letter-spacing:1.6px;text-transform:uppercase;font-weight:900;margin-top:3px}' +
@@ -441,14 +445,14 @@ function buildCss(): string {
     '.sig-box{border:1.5px dashed #191923;border-radius:4px;height:90px;padding:5px 9px;position:relative}' +
     '.sig-box label{display:block;font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:900}' +
     '.cgv-pagebreak{height:0}' +
-    '.cgv{padding-top:28px}' +
-    '.cgv-header{padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px;page-break-inside:avoid;break-inside:avoid;page-break-after:avoid;break-after:avoid}' +
-    '.cgv-title{font-family:Yellowtail,cursive;font-size:32px;color:#191923;line-height:1}' +
-    '.cgv-sub{font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;color:#777;letter-spacing:.4px;margin-top:4px}' +
-    '.cgv-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}' +
-    '.cgv-art{margin-bottom:9px;page-break-inside:avoid;break-inside:avoid}' +
-    '.cgv-art h4{font-family:"Arial Narrow",Arial,sans-serif;font-size:9.5px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#FF82D7;margin-bottom:3px;line-height:1.2}' +
-    '.cgv-art p{font-size:8.5px;color:#333;line-height:1.55;text-align:justify}' +
+    '.cgv{page-break-before:always;break-before:page;padding-top:0}' +
+    '.cgv-header{padding-bottom:13px;border-bottom:3px solid #FF82D7;margin-bottom:22px;page-break-inside:avoid;break-inside:avoid;page-break-after:avoid;break-after:avoid}' +
+    '.cgv-title{font-family:Yellowtail,cursive;font-size:38px;color:#191923;line-height:1}' +
+    '.cgv-sub{font-family:"Arial Narrow",Arial,sans-serif;font-size:11px;color:#777;letter-spacing:.4px;margin-top:4px}' +
+    '.cgv-cols{display:grid;grid-template-columns:1fr 1fr;gap:30px;column-gap:30px}' +
+    '.cgv-art{margin-bottom:15px;page-break-inside:avoid;break-inside:avoid}' +
+    '.cgv-art h4{font-family:"Arial Narrow",Arial,sans-serif;font-size:11px;margin-bottom:5px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#FF82D7;margin-bottom:3px;line-height:1.2}' +
+    '.cgv-art p{font-size:10px;color:#2a2a2a;line-height:1.7;text-align:justify}' +
     '.footer{padding:10px 0 0;border-top:1px solid #EBEBEB;margin-top:auto}' +
     '.footer-brand{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:8px;padding-bottom:8px}' +
     '.footer-logo-img{height:34px;width:auto;display:block;image-rendering:high-quality}' +
@@ -466,9 +470,9 @@ function buildCgvCol1(): string {
     '<div class="cgv-art"><h4>2. Devis et commande</h4><p>Tout devis est valable 30 jours &agrave; compter de sa date d&#39;&eacute;mission. La commande est ferme et d&eacute;finitive d&egrave;s r&eacute;ception du devis sign&eacute; portant la mention manuscrite "Bon pour accord", accompagn&eacute; du r&egrave;glement de l&#39;acompte. La signature peut &ecirc;tre olographe ou &eacute;lectronique conform&eacute;ment aux articles 1366 et 1367 du Code civil.</p></div>' +
     '<div class="cgv-art"><h4>3. Confirmation des effectifs</h4><p>Le nombre d&eacute;finitif de convives doit &ecirc;tre confirm&eacute; au plus tard 7 jours avant la date de l&#39;&eacute;v&eacute;nement. &Agrave; d&eacute;faut, le nombre figurant sur le devis est r&eacute;put&eacute; d&eacute;finitif. Toute majoration ult&eacute;rieure est sous r&eacute;serve de disponibilit&eacute; et entra&icirc;ne une facturation compl&eacute;mentaire au tarif unitaire indiqu&eacute;. Aucune minoration n&#39;est accept&eacute;e en de&ccedil;&agrave; de 7 jours.</p></div>' +
     '<div class="cgv-art"><h4>4. Prix et facturation</h4><p>Les prix sont indiqu&eacute;s en euros, hors taxes (HT) et toutes taxes comprises (TTC). La TVA applicable est de 10 % sur les denr&eacute;es alimentaires et 20 % sur les prestations de service (animation live, mise en place, livraison). Toute prestation suppl&eacute;mentaire non pr&eacute;vue au devis fait l&#39;objet d&#39;un avenant ou d&#39;une facture compl&eacute;mentaire.</p></div>' +
-    '<div class="cgv-art"><h4>5. Modalit&eacute;s de paiement</h4><p>Un acompte de 30 % du montant TTC est exigible &agrave; la commande, par virement bancaire sur le compte ci-dessus. Le solde, soit 70 % du montant TTC, est d&ucirc; <strong>imp&eacute;rativement 72 heures (3 jours ouvr&eacute;s) avant la date de l&#39;&eacute;v&eacute;nement</strong>. &Agrave; d&eacute;faut de r&eacute;ception du solde dans ce d&eacute;lai, AEGIA FOOD se r&eacute;serve le droit d&#39;annuler unilat&eacute;ralement la prestation, sans qu&#39;aucune indemnit&eacute; ne soit due au client. Dans ce cas, l&#39;acompte est d&eacute;finitivement acquis &agrave; AEGIA FOOD &agrave; titre d&#39;indemnit&eacute; forfaitaire, sans pr&eacute;judice de la facturation des frais d&eacute;j&agrave; engag&eacute;s (mati&egrave;res premi&egrave;res, sous-traitance, locations, personnel mobilis&eacute;). Aucun escompte n&#39;est accord&eacute; pour paiement anticip&eacute;.</p></div>' +
+    '<div class="cgv-art"><h4>5. Modalit&eacute;s de paiement</h4><p>Un acompte de 30 % du montant TTC est exigible &agrave; la commande, par virement bancaire sur le compte ci-dessus. Le solde, soit 70 % du montant TTC, est d&ucirc; <strong>imp&eacute;rativement 5 jours ouvr&eacute;s avant la date de l&#39;&eacute;v&eacute;nement, sauf accord pr&eacute;alable stipul&eacute; par &eacute;crit</strong>. &Agrave; d&eacute;faut de r&eacute;ception du solde dans ce d&eacute;lai, AEGIA FOOD se r&eacute;serve le droit d&#39;annuler unilat&eacute;ralement la prestation, sans qu&#39;aucune indemnit&eacute; ne soit due au client. Dans ce cas, l&#39;acompte est d&eacute;finitivement acquis &agrave; AEGIA FOOD &agrave; titre d&#39;indemnit&eacute; forfaitaire, sans pr&eacute;judice de la facturation des frais d&eacute;j&agrave; engag&eacute;s (mati&egrave;res premi&egrave;res, sous-traitance, locations, personnel mobilis&eacute;). Aucun escompte n&#39;est accord&eacute; pour paiement anticip&eacute;.</p></div>' +
     '<div class="cgv-art"><h4>6. Retard de paiement</h4><p>Pour toute facture &eacute;mise <em>apr&egrave;s</em> la prestation (avenant, prestation suppl&eacute;mentaire, dommages, indemnit&eacute;s), le paiement est exigible &agrave; r&eacute;ception. Conform&eacute;ment &agrave; l&#39;article L. 441-10 du Code de commerce, tout retard entra&icirc;ne de plein droit l&#39;application de p&eacute;nalit&eacute;s calcul&eacute;es au taux d&#39;int&eacute;r&ecirc;t appliqu&eacute; par la Banque centrale europ&eacute;enne &agrave; son op&eacute;ration de refinancement la plus r&eacute;cente, major&eacute; de 10 points de pourcentage, ainsi qu&#39;une indemnit&eacute; forfaitaire pour frais de recouvrement de 40 &euro; (article D. 441-5 du Code de commerce). Pour les paiements pr&eacute;-prestation (acompte et solde), les modalit&eacute;s de l&#39;article 5 s&#39;appliquent.</p></div>' +
-    '<div class="cgv-art"><h4>7. Annulation par le client</h4><p>Toute annulation doit &ecirc;tre notifi&eacute;e par &eacute;crit (courriel ou courrier recommand&eacute;). Les conditions financi&egrave;res appliqu&eacute;es sont les suivantes : <strong>plus de 30 jours</strong> avant la prestation : acompte rembours&eacute;, hors frais d&eacute;j&agrave; engag&eacute;s ; <strong>entre 30 et 15 jours</strong> : 50 % du montant TTC d&ucirc; ; <strong>entre 14 et 8 jours</strong> : 75 % du montant TTC d&ucirc; ; <strong>7 jours ou moins (ou non-paiement du solde &agrave; J-3)</strong> : 100 % du montant TTC d&ucirc;.</p></div>'
+    '<div class="cgv-art"><h4>7. Annulation par le client</h4><p>Toute annulation doit &ecirc;tre notifi&eacute;e par &eacute;crit (courriel ou courrier recommand&eacute;). Les conditions financi&egrave;res appliqu&eacute;es sont les suivantes : <strong>plus de 30 jours</strong> avant la prestation : acompte rembours&eacute;, hors frais d&eacute;j&agrave; engag&eacute;s ; <strong>entre 30 et 15 jours</strong> : 50 % du montant TTC d&ucirc; ; <strong>entre 14 et 8 jours</strong> : 75 % du montant TTC d&ucirc; ; <strong>7 jours ou moins (ou non-paiement du solde &agrave; J-5)</strong> : 100 % du montant TTC d&ucirc;.</p></div>'
 }
 
 function buildCgvCol2(): string {
