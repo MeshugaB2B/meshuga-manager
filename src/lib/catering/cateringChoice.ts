@@ -26,7 +26,7 @@ export interface ChoiceVariant {
   total_ttc: number
   per_personne_ttc: number
   minis_per_pers?: number
-  items: { name: string; qty: number }[]
+  items: { name: string; qty: number; composition?: string }[]
 }
 
 export interface ChoicePayload {
@@ -121,7 +121,7 @@ export function buildDevisChoiceHtml(payload: ChoicePayload): string {
     var itemsTop = (v.items || []).slice(0, 6)
     var itemsHtml = ''
     itemsTop.forEach(function (it) {
-      itemsHtml += '<div class="ci"><span class="ci-q">&bull;</span> ' + esc(it.name) + '</div>'
+      itemsHtml += '<div class="ci"><div class="ci-box">' + it.qty + ' &times; box ' + esc(it.name) + '</div>' + (it.composition ? '<div class="ci-comp">' + esc(it.composition) + '</div>' : '') + '</div>'
     })
     var more = (v.items || []).length - itemsTop.length
     if (more > 0) itemsHtml += '<div class="ci-more">+ ' + more + ' autres</div>'
@@ -162,7 +162,7 @@ export function buildDevisChoiceHtml(payload: ChoicePayload): string {
     '.card-pp{font-size:12px;color:#666;margin-bottom:6px}.card-pp b{color:#191923;font-weight:900}' +
     '.card-minis{display:inline-block;background:#FFEB5A;border:1.5px solid #191923;border-radius:20px;padding:2px 11px;font-size:11px;font-weight:800;margin-bottom:14px;box-shadow:2px 2px 0 #191923}' +
     '.card-items{border-top:1px solid #EBEBEB;padding-top:11px;margin-bottom:16px;flex:1}' +
-    '.ci{font-size:12px;color:#333;margin-bottom:5px;line-height:1.3}.ci-q{font-weight:900;color:#FF82D7}' +
+    '.ci{font-size:12.5px;color:#191923;margin-bottom:9px;line-height:1.3}.ci-box{font-weight:900}.ci-comp{font-size:11px;color:#8a8a92;font-weight:400;margin-top:2px;line-height:1.35}' +
     '.ci-more{font-size:11px;color:#aaa;font-style:italic;margin-top:4px}' +
     '.btn-choose{width:100%;background:#FF82D7;color:#fff;border:2px solid #191923;border-radius:9px;padding:9px 12px 11px;font-family:Yellowtail,cursive;font-size:22px;font-weight:400;line-height:1.1;cursor:pointer;letter-spacing:.3px;box-shadow:3px 3px 0 #191923}' +
     '.btn-choose:hover{background:#191923;color:#FFEB5A}' +
@@ -280,7 +280,7 @@ var CONFIG_RUNTIME = [
   ' .catch(function(){document.getElementById("ov").style.display="none";btn.disabled=false;alert("Connexion impossible, merci de réessayer.");});',
   '}',
   'document.getElementById("pax").addEventListener("input",render);',
-  'rescaleMinis();render();'
+  'var _ap=pax()>0?Math.round(curMinis()/pax()):PERPERS;if(PP_OPTS.indexOf(_ap)>-1)PERPERS=_ap;render();'
 ].join('\n')
 
 export function buildDevisConfigHtml(payload: ConfigPayload): string {
