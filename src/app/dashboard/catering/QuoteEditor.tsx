@@ -478,6 +478,23 @@ export default function QuoteEditor(props) {
     if (w) { w.document.open(); w.document.write(html); w.document.close() }
   }
 
+  // ---- Aperçu client : la vraie page de choix (3 formules) que verra le client ----
+  var handlePreviewClient = function() {
+    if (!clientNom.trim()) { setError('Renseigne le nom du client avant l\'aperçu.'); return }
+    var w = window.open('', '_blank')
+    if (w) {
+      w.document.open()
+      w.document.write('<!doctype html><meta charset="utf-8"><title>Aperçu client…</title><body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#191923;font-weight:700">Préparation de l\'aperçu client…</body>')
+      w.document.close()
+    }
+    persist(function(saved) {
+      var id = (saved && saved.id) ? saved.id : curId
+      if (!id) { if (w) w.close(); return }
+      var url = '/api/catering/choose/' + id
+      if (w) { w.location.href = url } else { window.open(url, '_blank') }
+    })
+  }
+
   // ---- Sauvegarde ----
   var buildSavePayload = function() {
     var fr = {
@@ -1040,7 +1057,8 @@ export default function QuoteEditor(props) {
               <button className="qe-btn y" style={{ flex: '1 1 100%', justifyContent: 'center' }} onClick={handleSave} disabled={saving}>
                 {saving ? '⏳ Enregistrement…' : '💾 Sauvegarder'}
               </button>
-              <button className="qe-btn p" style={{ flex: 1 }} onClick={handlePreview} disabled={!canSend} title={!canSend ? 'Ajoute des items + nom du client' : 'Aperçu PDF'}>📄 Aperçu</button>
+              <button className="qe-btn p" style={{ flex: '1 1 100%', justifyContent: 'center' }} onClick={handlePreviewClient} disabled={!canSend} title={!canSend ? 'Ajoute des items + nom du client' : 'Voir la page client (les 3 formules)'}>👁 Aperçu client (3 formules)</button>
+              <button className="qe-btn" style={{ flex: 1 }} onClick={handlePreview} disabled={!canSend} title={!canSend ? 'Ajoute des items + nom du client' : 'Aperçu PDF de la formule active'}>📄 PDF</button>
               <button className="qe-btn g" style={{ flex: 1 }} onClick={handleOpenSend} disabled={!canSend} title={!canSend ? 'Ajoute des items + nom du client' : 'Envoyer'}>📤 Envoyer</button>
             </div>
           </div>
