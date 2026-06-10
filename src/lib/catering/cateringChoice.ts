@@ -234,6 +234,8 @@ var CONFIG_RUNTIME = [
   'var f=CFG.frais;var liv=f.livraison_offert?0:(Number(f.livraison)||0);var mep=f.mise_en_place_offert?0:(Number(f.mise_en_place)||0);var fraisHT=liv+mep;var tvaFrais=fraisHT*0.20;',
   'var totalHT=itemsHT+fraisHT;var tva=tvaItems+tvaFrais;var ttc=totalHT+tva;',
   'return {itemsHT:r2(itemsHT),fraisHT:r2(fraisHT),totalHT:r2(totalHT),tva:r2(tva),ttc:r2(ttc),minis:minis};}',
+  'function aggMinis(){var acc={};var order=[];for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o)continue;var q=Number(lines[i].qty)||0;if(q<=0)continue;if(o.category==="box_mini"&&o.composition){var segs=String(o.composition).split(/\\s*·\\s*/);for(var j=0;j<segs.length;j++){var m=segs[j].match(/^(\\d+)\\s+(.+)$/);if(!m)continue;var nm=m[2].replace(/^\\s+|\\s+$/g,"");if(acc[nm]==null){acc[nm]=0;order.push(nm);}acc[nm]+=parseInt(m[1],10)*q;}}else if(o.category==="live_mini"){var n2=o.name;if(acc[n2]==null){acc[n2]=0;order.push(n2);}acc[n2]+=q;}}var out=[];for(var k=0;k<order.length;k++)out.push({name:order[k],count:acc[order[k]]});return out;}',
+  'function renderMiniRecap(){var a=aggMinis();var card=document.getElementById("recapcard");if(!a.length){card.style.display="none";return;}card.style.display="block";var H="";for(var i=0;i<a.length;i++){H+=\'<div class="mr-row"><span class="mr-n">\'+a[i].name+\'</span><span class="mr-c">\'+a[i].count+\'</span></div>\';}var P=pax();var tot=curMinis();H+=\'<div class="mr-tot"><span>\'+tot+\' minis au total</span><span>\'+(P>0?(tot/P).toFixed(1).replace(".",","):"0")+\' / pers</span></div>\';document.getElementById("minirecap").innerHTML=H;}',
   'function render(){',
   ' var L="";for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o){continue;}var lt=(Number(o.pv_ht)||0)*lines[i].qty;',
   '  var sub=descOf(o);var pcs="";if(o.category==="box_mini")pcs=(lines[i].qty*(Number(o.size_pers)||0))+" pièces";else if(o.category==="live_mini")pcs=lines[i].qty+" pièces";if(pcs)sub=sub?(sub+" · "+pcs):pcs;',
@@ -267,6 +269,7 @@ var CONFIG_RUNTIME = [
   ' var hint=document.getElementById("covhint");hint.style.color="#191923";',
   ' hint.innerHTML=\'<span style="background:#FFEB5A;border:1.5px solid #191923;border-radius:10px;padding:2px 9px">\'+perGuest.toFixed(1).replace(".",",")+\' minis / invité</span>\';',
   ' renderPerPers();',
+  ' renderMiniRecap();',
   ' var cta=document.getElementById("cta");var ch=document.getElementById("ctahint");',
   ' if(lines.length>0&&t.minis>0){cta.disabled=false;cta.style.background="#FF82D7";cta.style.color="#fff";cta.style.cursor="pointer";cta.style.boxShadow="3px 3px 0 #191923";ch.textContent="PDF final + signature électronique";}',
   ' else{cta.disabled=true;cta.style.background="#EBEBEB";cta.style.color="#999";cta.style.cursor="not-allowed";cta.style.boxShadow="none";ch.textContent="Ajoutez au moins un article";}',
@@ -340,6 +343,10 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
     '.gridmain{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}.gridmain>div{min-width:0}@media(min-width:820px){.gridmain{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}}' +
     '.cta{width:100%;margin-top:12px;border:2px solid #191923;border-radius:8px;padding:14px;font-family:inherit;font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;box-shadow:3px 3px 0 #191923}' +
     '.ttc-box{display:flex;justify-content:space-between;align-items:center;background:#FFEB5A;border:2px solid #191923;border-radius:7px;padding:9px 12px;margin-top:7px;box-shadow:3px 3px 0 #191923}' +
+    '.mr-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px dashed #e3e3e3;font-size:13px}' +
+    '.mr-n{font-weight:700}' +
+    '.mr-c{font-weight:900;color:#FF82D7;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:10px}' +
+    '.mr-tot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;background:#FFEB5A;border:2px solid #191923;border-radius:7px;padding:7px 11px;font-weight:900;font-size:13px;box-shadow:2px 2px 0 #191923}' +
     '.overlay{position:fixed;inset:0;background:rgba(255,253,245,.9);display:none;align-items:center;justify-content:center;font-size:18px;font-weight:900;z-index:99}' +
     '.foot{margin-top:30px;padding-top:14px;border-top:1px solid #EBEBEB;text-align:center;font-size:11px;color:#888;line-height:1.7}'
 
@@ -375,6 +382,7 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
       '<div class="gridmain">' +
         '<div>' +
           '<div class="card"><div class="yt" style="font-size:17px;margin-bottom:4px">Votre panier</div><div id="lines"></div></div>' +
+          '<div class="card" id="recapcard" style="display:none"><div class="yt" style="font-size:17px;margin-bottom:6px">Le détail de vos minis</div><div style="font-size:11px;color:#888;margin-bottom:8px">Le nombre total de chaque mini, toutes vos box réunies.</div><div id="minirecap"></div></div>' +
           '<div class="card" id="livecard" style="display:none;background:#FFF7FC;border-color:#FF82D7"><div style="font-size:13px;font-weight:900;margin-bottom:4px">🔥 Live cooking — ce qui est inclus</div><div id="liveincl" style="font-size:11.5px;color:#555;line-height:1.6;margin-bottom:8px"></div><div id="livextra"></div></div>' +
           '<div class="card"><div class="yt" style="font-size:17px;margin-bottom:8px">Ajouter à votre formule</div><div id="addcats" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px"></div><div id="addlist" style="max-height:220px;overflow-y:auto"></div></div>' +
         '</div>' +
