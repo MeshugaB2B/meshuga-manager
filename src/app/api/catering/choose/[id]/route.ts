@@ -35,31 +35,6 @@ function infoPage(title: string, msg: string, status: number) {
   return htmlResponse(body, status)
 }
 
-// Met à l'échelle (continue, sans arrondi boîte) les lignes de minis d'une formule
-// pour viser EXACTEMENT pax × perPers pièces. Utilisé seulement pour l'aperçu des
-// cartes : prix proportionnel + minis/personne = la cible (ordre des prix préservé).
-// L'arrondi en boîtes entières se fait côté configurateur.
-function scaleLinesContinuous(lines: any[], map: any, pax: number, perPers: number) {
-  var raw = (lines || []).map(function (l: any) {
-    return { offering_id: String(l.offering_id), qty: Number(l.qty) || 0 }
-  })
-  var target = pax * perPers
-  var cur = 0
-  raw.forEach(function (l: any) {
-    var o = map[l.offering_id]
-    if (!o) return
-    if (o.category === 'box_mini') cur += l.qty * (Number(o.size_pers) || 0)
-    else if (o.category === 'live_mini') cur += l.qty
-  })
-  if (cur <= 0 || target <= 0) return raw
-  var scale = target / cur
-  return raw.map(function (l: any) {
-    var o = map[l.offering_id]
-    var isMini = o && (o.category === 'box_mini' || o.category === 'live_mini')
-    return { offering_id: l.offering_id, qty: isMini ? l.qty * scale : l.qty }
-  })
-}
-
 export async function GET(req: NextRequest, ctx: { params: { id: string } }) {
   var devisId = ctx.params.id || ''
   if (!devisId) return infoPage('Oups…', 'Identifiant du devis manquant.', 400)
@@ -153,17 +128,19 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } }) {
   }
 
   // ===== Écran de choix des formules =====
-  // Aperçu prévisualisé au défaut (scaling continu) : prix et minis/personne
-  // réalistes et cohérents entre formules, plus de "10 / pers".
+  // Aperçu : formules affichées telles quelles (box entières) avec quantité + composition.
   var choiceVariants = variants.map(function (v2: any) {
-    var scaled = scaleLinesContinuous(v2.lines || [], map, pax, perPersDefault)
-    var totals = computeVariant({ key: v2.key, lines: scaled } as any, map, frais as any, pax)
-    var seen: any = {}
-    var items: any[] = []
-    ;(v2.lines || []).forEach(function (l: any) {
+    var lines = (v2.lines || []).map(function (l: any) {
+      return { offering_id: String(l.offering_id), qty: Number(l.qty) || 0 }
+    })
+    var totals = computeVariant({ key: v2.key, lines: lines } as any, map, frais as any, pax)
+    var items = lines.map(function (l: any) {
       var off = map[l.offering_id]
-      var nm = off ? off.name : l.offering_id
-      if (!seen[nm]) { seen[nm] = 1; items.push({ name: nm, qty: 1 }) }
+      return {
+        name: off ? off.name : l.offering_id,
+        qty: Number(l.qty) || 0,
+        composition: off && off.composition ? off.composition : ''
+      }
     })
     var minis = 0
     ;(totals.lines || []).forEach(function (lc: any) { minis += Number(lc.mini_pieces) || 0 })
