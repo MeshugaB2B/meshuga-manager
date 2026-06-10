@@ -367,8 +367,8 @@ function buildCss(): string {
     'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:11px;background:#FFFFFF}' +
     '@page{size:A4;margin:10mm 16mm 18mm 16mm}' +
     '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.tc-grid,.breakdown,.notes-block,.footer,.footer-brand,.sig,.rib{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title,.sig-title{page-break-after:avoid;break-after:avoid}.rib-grid,.sig-grid,.sig-box{page-break-inside:avoid;break-inside:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px !important;padding-top:12px}p,.legal{orphans:3;widows:3}}' +
-    '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;display:flex;flex-direction:column;background:#FFFFFF}' +
-    '.content{flex:1}' +
+    '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;background:#FFFFFF}' +
+    '.content{}' +
     '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px}' +
     '.logo{display:flex;align-items:center;gap:14px}' +
     '.logo img{height:75px;width:75px;display:block;image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges;image-rendering:high-quality;border-radius:50%}' +
@@ -454,7 +454,7 @@ function buildCss(): string {
     '.cgv-art{margin-bottom:13px;page-break-inside:avoid;break-inside:avoid}' +
     '.cgv-art h4{font-family:"Arial Narrow",Arial,sans-serif;font-size:10.5px;margin-bottom:5px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#FF82D7;line-height:1.2}' +
     '.cgv-art p{font-size:10px;color:#2a2a2a;line-height:1.62;text-align:justify;margin:0}' +
-    '.footer{padding:10px 0 0;border-top:1px solid #EBEBEB;margin-top:auto}' +
+    '.footer{padding:10px 0 0;border-top:1px solid #EBEBEB;margin-top:18px}' +
     '.footer-brand{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:8px;padding-bottom:8px}' +
     '.footer-logo-img{height:34px;width:auto;display:block;image-rendering:high-quality}' +
     '.footer-meta{font-family:"Arial Narrow",Arial,sans-serif;font-size:11px;color:#191923;letter-spacing:.5px;font-weight:400;text-align:right}' +
