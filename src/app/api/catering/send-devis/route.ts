@@ -57,7 +57,7 @@ function isValidEmail(s: string): boolean {
 
 // Wrappe un message texte simple en HTML stylé Meshuga (pour le corps du mail uniquement)
 // Met en forme intelligemment : titre "Récapitulatif :", lignes "•", montants en gras.
-function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: string): string {
+function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: string, origin: string): string {
   // Étape 1 : escape HTML (sécurité)
   var safe = (messageText || '')
     .replace(/&/g, '&amp;')
@@ -101,30 +101,58 @@ function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: 
   }
   var bodyHtml = rendered.join('')
 
+  var ogBase = (origin || '').replace(/\/$/, '')
+  var ctaLabel = 'Je découvre mon devis'
+  var ctaImg = ogBase + '/api/og/yellowtail?text=' + encodeURIComponent(ctaLabel) + '&size=32&color=FFFFFF'
+
   return (
-    '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
-    '<style>' +
-    'body{font-family:Arial,Helvetica,sans-serif;color:#191923;background:#FFFFFF;margin:0;padding:0}' +
-    '.wrap{max-width:600px;margin:0 auto;padding:24px 20px}' +
-    '.head{padding-bottom:8px;margin-bottom:20px;text-align:center}' +
-    '.head img{height:54px;width:auto;display:inline-block;max-width:100%}' +
-    '.cta{display:inline-block;background:#FF82D7;color:#FFFFFF !important;border:2px solid #191923;border-radius:8px;padding:14px 26px;font-weight:900;text-decoration:none !important;font-size:15px;box-shadow:3px 3px 0 #191923;margin:8px 0}' +
-    '.cta span{color:#FFFFFF !important;text-decoration:none !important}' +
-    '.foot{margin-top:30px;padding-top:14px;border-top:1px solid #EEE;font-size:11px;color:#777;line-height:1.6}' +
-    '.foot a{color:#FF82D7}' +
-    '</style></head><body>' +
-    '<div class="wrap">' +
-    '<div class="head"><img src="' + LOGO_PINK + '" alt="MESHUGA" /></div>' +
-    '<div class="msg">' + bodyHtml + '</div>' +
-    '<div style="text-align:center;margin:26px 0">' +
-    '<a href="' + pdfPublicUrl + '" class="cta" style="color:#FFFFFF !important;text-decoration:none"><span style="color:#FFFFFF !important;text-decoration:none">Voir mon devis &amp; choisir ma formule &rarr;</span></a>' +
-    '</div>' +
-    '<div class="foot">' +
-    'Cliquez ci-dessus pour découvrir votre devis, choisir votre formule et la valider en ligne en quelques minutes.<br>Le détail est aussi joint à ce message.<br>' +
-    'Une question ? Répondez simplement à ce mail, nous reviendrons vers vous.<br><br>' +
-    '<strong>SAS AEGIA FOOD (enseigne MESHUGA)</strong> — 3 rue Vavin, Paris 6e<br>' +
-    'events@meshuga.fr · meshuga.fr' +
-    '</div></div></body></html>'
+    '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<style>@media (max-width:620px){.cardw{width:100%!important}.px{padding-left:22px!important;padding-right:22px!important}}</style>' +
+    '</head>' +
+    '<body style="margin:0;padding:0;background:#FFFDF5;font-family:Arial,Helvetica,sans-serif;color:#191923">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFFDF5"><tr><td align="center" style="padding:26px 12px">' +
+      '<table role="presentation" class="cardw" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#FFFFFF;border:3px solid #191923;border-radius:16px;box-shadow:7px 7px 0 #FF82D7">' +
+        // Bandeau rose
+        '<tr><td style="background:#FF82D7;border-bottom:3px solid #191923;border-radius:13px 13px 0 0;padding:15px 30px;text-align:center">' +
+          '<div style="color:#FFFFFF;font-size:11px;letter-spacing:3px;font-weight:900;text-transform:uppercase">Meshuga Events &middot; Traiteur Paris</div>' +
+        '</td></tr>' +
+        // Logo rose sur blanc
+        '<tr><td class="px" style="padding:26px 30px 0;text-align:center">' +
+          '<img src="' + LOGO_PINK + '" alt="Meshuga" height="48" style="height:48px;width:auto;display:inline-block;max-width:70%" />' +
+        '</td></tr>' +
+        // Hero
+        '<tr><td class="px" style="padding:16px 30px 2px;text-align:center">' +
+          '<div style="font-size:24px;font-weight:900;line-height:1.2">Votre devis est prêt 🎉</div>' +
+          '<div style="font-size:12px;color:#999;margin-top:5px;letter-spacing:.5px">Devis ' + devisNumero + '</div>' +
+        '</td></tr>' +
+        // Corps du message
+        '<tr><td class="px" style="padding:16px 36px 2px">' + bodyHtml + '</td></tr>' +
+        // Bande des 3 étapes
+        '<tr><td class="px" style="padding:14px 30px 2px">' +
+          '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFEB5A;border:2px solid #191923;border-radius:11px;box-shadow:3px 3px 0 #191923"><tr>' +
+            '<td style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">1<br>Choisissez</td>' +
+            '<td style="padding:12px 4px;text-align:center;color:#191923;font-weight:900">&rarr;</td>' +
+            '<td style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">2<br>Personnalisez</td>' +
+            '<td style="padding:12px 4px;text-align:center;color:#191923;font-weight:900">&rarr;</td>' +
+            '<td style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">3<br>Signez</td>' +
+          '</tr></table>' +
+        '</td></tr>' +
+        // CTA Yellowtail blanc
+        '<tr><td align="center" style="padding:22px 30px 26px">' +
+          '<a href="' + pdfPublicUrl + '" style="display:inline-block;background:#FF82D7;border:3px solid #191923;border-radius:13px;padding:13px 32px;text-decoration:none;box-shadow:5px 5px 0 #191923;color:#FFFFFF !important;font-weight:900;font-size:18px">' +
+            '<img src="' + ctaImg + '" alt="' + ctaLabel + ' →" height="32" style="height:32px;width:auto;display:inline-block;border:0;vertical-align:middle" />' +
+          '</a>' +
+          '<div style="font-size:11px;color:#999;margin-top:13px">En quelques minutes, en ligne. Le détail est aussi joint à ce mail.</div>' +
+        '</td></tr>' +
+        // Footer
+        '<tr><td style="background:#FFFDF5;border-top:1px solid #EEE;border-radius:0 0 13px 13px;padding:18px 30px;text-align:center;font-size:11px;color:#888;line-height:1.7">' +
+          'Une question ? Répondez simplement à ce mail, on revient vers vous.<br>' +
+          '<strong style="color:#191923">SAS AEGIA FOOD</strong> (enseigne MESHUGA) &middot; 3 rue Vavin, 75006 Paris<br>' +
+          '<a href="mailto:events@meshuga.fr" style="color:#FF82D7;text-decoration:none">events@meshuga.fr</a> &middot; meshuga.fr' +
+        '</td></tr>' +
+      '</table>' +
+    '</td></tr></table>' +
+    '</body></html>'
   )
 }
 
@@ -227,7 +255,7 @@ export async function POST(req: NextRequest) {
   var chooseUrl = origin.replace(/\/$/, '') + '/api/catering/choose/' + devisId
 
   // 7. Build email body HTML
-  var emailHtml = buildEmailHtml(message, devisNumero, chooseUrl)
+  var emailHtml = buildEmailHtml(message, devisNumero, chooseUrl, origin)
 
   // 8. Build PDF attachment (HTML for now, see comment in QuoteEditor)
   // Resend supports HTML attachments - mais pour mieux ouvrir, on attache aussi en HTML.
