@@ -7,6 +7,7 @@ import {
   aiOptionToVariant,
   computeVariant,
   computeCoverage,
+  aggregateMinis,
   normalizeStatus,
   statusLabel,
   statusColor,
@@ -456,6 +457,7 @@ export default function QuoteEditor(props) {
       lines: t.lines,
       totals: t,
       coverage: cov,
+      breakdown: aggregateMinis(t.lines, offeringsById).map(function(mi) { return { qty: mi.count, name: mi.name } }),
       formuleLabel: variantLabel(v, idx),
       frais: {
         livraison: livraison, livraison_offert: livraisonOffert,
@@ -711,33 +713,8 @@ export default function QuoteEditor(props) {
   var covColor = coverage.covered ? '#1D9E75' : '#EF9F27'
   var canSend = (activeVariant.lines && activeVariant.lines.length > 0) && !!clientNom.trim()
 
-  // Agrégat des minis par recette (récap clair pour le client)
-  var aggregateMinis = function(lines) {
-    var acc = {}
-    var order = []
-    ;(lines || []).forEach(function(l) {
-      var o = offeringsById[l.offering_id]
-      if (!o) return
-      var qy = Number(l.qty) || 0
-      if (qy <= 0) return
-      if (o.category === 'box_mini' && o.composition) {
-        var segs = String(o.composition).split(/\s*·\s*/)
-        segs.forEach(function(seg) {
-          var m = seg.match(/^(\d+)\s+(.+)$/)
-          if (!m) return
-          var nm = m[2].trim()
-          if (acc[nm] == null) { acc[nm] = 0; order.push(nm) }
-          acc[nm] += parseInt(m[1], 10) * qy
-        })
-      } else if (o.category === 'live_mini') {
-        var nm2 = o.name
-        if (acc[nm2] == null) { acc[nm2] = 0; order.push(nm2) }
-        acc[nm2] += qy
-      }
-    })
-    return order.map(function(nm) { return { name: nm, count: acc[nm] } })
-  }
-  var miniAgg = aggregateMinis(activeVariant.lines || [])
+  // Agrégat des minis par recette (récap clair pour le client) — helper partagé
+  var miniAgg = aggregateMinis(activeVariant.lines || [], offeringsById)
   var minisPerPers = nbPersonnes > 0 ? (coverage.current / nbPersonnes) : 0
 
   // Ordre d'affichage des formules : prix/pers croissant (Essentiel → Signature → Excellence)
