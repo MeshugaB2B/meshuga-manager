@@ -85,10 +85,18 @@ function sharedHead(title: string): string {
     '</style></head>'
 }
 
+// Bandeau rose avec le logotype blanc (même origine que l'app, fiable).
+function bandHeader(): string {
+  return '<div class="band">' +
+    '<img src="/MESHUGA_Logotype_white.png" alt="Meshuga">' +
+    '<div class="tag">Events &middot; Paris</div>' +
+    '</div>'
+}
+
 export function buildDevisSignHtml(p: DevisSignPayload): string {
   var logo = p.logoUrl
-    ? '<img src="' + esc(p.logoUrl) + '" alt="meshuga">'
-    : '<div style="font-family:Yellowtail,cursive;font-size:30px;color:#fff">meshuga</div>'
+    ? '<img src="' + esc(p.logoUrl) + '" alt="Meshuga">'
+    : '<img src="/MESHUGA_Logotype_white.png" alt="Meshuga">'
 
   var itemsHtml = ''
   for (var i = 0; i < p.items.length; i++) {
@@ -190,11 +198,11 @@ function buildSignScript(token: string): string {
 }
 
 function doneInner(): string {
-  return '<div class="band"><div style="font-family:Yellowtail,cursive;font-size:30px;color:#fff">meshuga</div><div class="tag">Events &middot; Paris</div></div>' +
+  return bandHeader() +
     '<div class="card" style="text-align:center">' +
     '<div class="done-ico">🎉</div>' +
     '<div class="h">Merci, c&#39;est signé !</div>' +
-    '<div class="sub" style="margin-bottom:0">Votre commande est confirmée. Vous allez recevoir un email récapitulatif avec les modalités de règlement de l&#39;acompte. Notre équipe revient vers vous très vite.</div>' +
+    '<div class="sub" style="margin-bottom:0">C&#39;est officiel, votre commande est confirmée — et on a déjà hâte de régaler vos invités&nbsp;! Vous allez recevoir un email récapitulatif avec les modalités de règlement de l&#39;acompte. Notre équipe revient vers vous très vite.</div>' +
     '</div>' +
     '<div class="foot">SAS AEGIA FOOD (enseigne MESHUGA) &middot; events@meshuga.fr</div>'
 }
@@ -218,7 +226,7 @@ export function buildSignStateHtml(kind: string, info?: { numero?: string; signe
   }
   return sharedHead('MESHUGA') +
     '<body><div class="wrap">' +
-    '<div class="band"><div style="font-family:Yellowtail,cursive;font-size:30px;color:#fff">meshuga</div><div class="tag">Events &middot; Paris</div></div>' +
+    bandHeader() +
     body +
     '<div class="foot">SAS AEGIA FOOD (enseigne MESHUGA) &middot; events@meshuga.fr</div>' +
     '</div></body></html>'
