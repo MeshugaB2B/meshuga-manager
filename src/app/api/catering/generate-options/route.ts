@@ -201,7 +201,13 @@ function buildSystemPrompt(): string {
     '}',
     '',
     'Pas de calculs de prix dans ton output (le serveur calcule les totaux à partir du catalogue).',
-    'Génère TOUJOURS les 3 options dans cet ordre : essentiel → signature → excellence.'
+    'Génère TOUJOURS les 3 options dans cet ordre : essentiel → signature → excellence.',
+    '',
+    'IMPORTANT — quantité vs qualité :',
+    '- La QUANTITÉ (pièces / personne) est normalisée automatiquement par le serveur, à l\'identique pour les 3 formules. Ce qui distingue les formules, c\'est la QUALITÉ / la gamme des box choisies, pas la quantité.',
+    '- Pour chaque formule, propose 3 à 4 box DISTINCTES (catégorie box_mini), de la plus pertinente à la moins pertinente, cohérentes avec le niveau : Essentiel = classiques (daily / classic), Signature = classiques + pièces signature (LOX, tarama, reuben, flatiron), Excellence = premium (lobster : tribeca, oyster bay, plaza).',
+    '- L\'ordre des box compte : le serveur garde les premières pour couvrir la cible. Mets les plus représentatives de la gamme en premier.',
+    '- La description (max 80 chars) doit VENDRE la gamme (les produits phares), pas la quantité.'
   ].join('\n')
 }
 
@@ -330,14 +336,16 @@ function computeTotals(
 
 // Cible de pièces de minis par personne (déterministe, fiabilise le dimensionnement IA).
 // 0 = pas de recalage (formats non concernés).
-function miniTargetPerPers(format: string, key: string, meshugaIsOnly: boolean): number {
+function miniTargetPerPers(format: string, meshugaIsOnly: boolean): number {
+  // Cible HOMOGÈNE entre les 3 formules : la qualité distingue les tiers, pas la quantité.
   if (format !== 'cocktail' && format !== 'soiree') return 0
-  if (meshugaIsOnly) return key === 'excellence' ? 6 : 5
-  return key === 'essentiel' ? 2 : 3
+  return meshugaIsOnly ? 6 : 3
 }
 
-// Recale les quantités de minis (box_mini : qty×size_pers pièces ; live_mini : qty pièces)
-// pour viser pax × perPers pièces, en conservant le mix proposé par l'IA.
+// Recale les minis en BOÎTES ENTIÈRES pour couvrir pax × perPers pièces, arrondi au
+// SUPÉRIEUR. On garde le minimum de box distinctes (variété) ; pour les gros événements
+// on incrémente en round-robin. La sélection (qualité) vient de l'IA, la quantité est
+// normalisée ici → formules homogènes en quantité.
 function rescaleMiniItems(
   rawItems: { offering_id: string; qty: number }[],
   catalogMap: { [id: string]: CatalogItem },
@@ -345,27 +353,58 @@ function rescaleMiniItems(
   perPers: number
 ): { offering_id: string; qty: number }[] {
   if (perPers <= 0 || pax <= 0) return rawItems
-  var cur = 0
-  rawItems.forEach(function (r) {
-    var c = catalogMap[r.offering_id]
-    if (!c) return
-    var q = Number(r.qty) || 0
-    if (c.category === 'box_mini') cur += q * (Number(c.size_pers) || 0)
-    else if (c.category === 'live_mini') cur += q
-  })
-  if (cur <= 0) return rawItems
   var target = Math.round(pax * perPers)
-  var f = target / cur
-  if (f > 0.95 && f < 1.05) return rawItems // déjà dans la cible
+  if (target <= 0) return rawItems
+
+  var unitPieces = function (id: string): number {
+    var c = catalogMap[id]
+    if (!c) return 0
+    if (c.category === 'box_mini') return Number(c.size_pers) || 0
+    if (c.category === 'live_mini') return 1
+    return 0
+  }
+
+  // Sépare minis (dédoublonnés, dans l'ordre proposé) et non-minis.
+  var minis: { offering_id: string; qty: number }[] = []
+  var others: { offering_id: string; qty: number }[] = []
   rawItems.forEach(function (r) {
     var c = catalogMap[r.offering_id]
-    if (!c) return
-    if (c.category === 'box_mini' || c.category === 'live_mini') {
-      var q = Number(r.qty) || 0
-      r.qty = Math.max(1, Math.round(q * f))
+    if (c && (c.category === 'box_mini' || c.category === 'live_mini')) {
+      var exists = false
+      for (var k = 0; k < minis.length; k++) {
+        if (minis[k].offering_id === r.offering_id) { exists = true; break }
+      }
+      if (!exists && unitPieces(r.offering_id) > 0) minis.push({ offering_id: r.offering_id, qty: 1 })
+    } else {
+      others.push({ offering_id: r.offering_id, qty: Number(r.qty) || 0 })
     }
   })
-  return rawItems
+  if (minis.length === 0) return rawItems
+
+  // Phase A : minimum de box distinctes (1 chacune) pour couvrir la cible (arrondi au sup.).
+  var kept: { offering_id: string; qty: number }[] = []
+  var acc = 0
+  for (var i = 0; i < minis.length && acc < target; i++) {
+    kept.push({ offering_id: minis[i].offering_id, qty: 1 })
+    acc += unitPieces(minis[i].offering_id)
+  }
+  if (kept.length === 0) {
+    kept.push({ offering_id: minis[0].offering_id, qty: 1 })
+    acc += unitPieces(minis[0].offering_id)
+  }
+
+  // Phase B : gros événements → on monte les quantités en round-robin jusqu'à couvrir.
+  var idx = 0
+  var guard = 0
+  while (acc < target && guard < 2000) {
+    var line = kept[idx % kept.length]
+    line.qty += 1
+    acc += unitPieces(line.offering_id)
+    idx++
+    guard++
+  }
+
+  return others.concat(kept)
 }
 
 export async function POST(req: NextRequest) {
@@ -490,7 +529,7 @@ export async function POST(req: NextRequest) {
       key = keys[i] || 'option_' + i
     }
     var rawItems = Array.isArray(opt.items) ? opt.items : []
-    var perPers = miniTargetPerPers(brief.eventFormat, key, brief.meshugaIsOnly)
+    var perPers = miniTargetPerPers(brief.eventFormat, brief.meshugaIsOnly)
     rawItems = rescaleMiniItems(rawItems, catalogMap, brief.nbPersonnes, perPers)
     var totals = computeTotals(rawItems, catalogMap, brief.nbPersonnes)
     enriched.push({
