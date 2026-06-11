@@ -237,6 +237,7 @@ export default function QuoteEditor(props) {
   var [notesInternes, setNotesInternes] = useState('')
 
   var [activeCategory, setActiveCategory] = useState('box_mini')
+  var [piecesTarget, setPiecesTarget] = useState(0)
   var [showInternes, setShowInternes] = useState(true)
   var [ctxOpen, setCtxOpen] = useState(true)
 
@@ -367,6 +368,61 @@ export default function QuoteEditor(props) {
       c[activeIdx] = Object.assign({}, c[activeIdx], { lines: newLines })
       return c
     })
+  }
+
+  // Rescale les box minis de la formule active pour viser ~N pièces / personne.
+  // Plancher + plus grand reste : monotone, atteint la cible exacte, ne gèle jamais.
+  var applyPiecesPerPers = function(n) {
+    var lines = (activeVariant.lines || []).slice()
+    var boxes = []
+    var i
+    for (i = 0; i < lines.length; i++) {
+      var o = offeringsById[String(lines[i].offering_id)]
+      if (o && o.category === 'box_mini' && (Number(lines[i].qty) || 0) > 0) {
+        boxes.push({ idx: i, size: Number(o.size_pers) || 0, qty: Number(lines[i].qty) || 0 })
+      }
+    }
+    if (!boxes.length) { setPiecesTarget(n); return }
+    var curPieces = 0
+    for (i = 0; i < boxes.length; i++) curPieces += boxes[i].qty * boxes[i].size
+    if (curPieces <= 0) { setPiecesTarget(n); return }
+    var target = (Number(nbPersonnes) || 0) * n
+    var scale = target / curPieces
+    var alloc = []
+    var floorPieces = 0
+    for (i = 0; i < boxes.length; i++) {
+      var raw = boxes[i].qty * scale
+      var fl = Math.floor(raw)
+      if (fl < 0) fl = 0
+      alloc.push({ idx: boxes[i].idx, size: boxes[i].size, qty: fl, rem: raw - fl })
+      floorPieces += fl * boxes[i].size
+    }
+    var unit = alloc[0].size || 40
+    for (i = 0; i < alloc.length; i++) { if (alloc[i].size > 0) { unit = alloc[i].size; break } }
+    var need = Math.round((target - floorPieces) / unit)
+    if (need < 0) need = 0
+    var order = alloc.map(function(a, k) { return k }).sort(function(a, b) { return alloc[b].rem - alloc[a].rem })
+    var ai = 0
+    while (need > 0 && order.length) { alloc[order[ai % order.length]].qty++; need--; ai++ }
+    var tot = 0
+    for (i = 0; i < alloc.length; i++) tot += alloc[i].qty
+    if (tot === 0 && target > 0) {
+      var big = 0
+      var g
+      for (g = 1; g < alloc.length; g++) { if (alloc[g].size > alloc[big].size) big = g }
+      alloc[big].qty = 1
+    }
+    var newLines = lines.slice()
+    for (i = 0; i < alloc.length; i++) {
+      newLines[alloc[i].idx] = Object.assign({}, newLines[alloc[i].idx], { qty: alloc[i].qty })
+    }
+    newLines = newLines.filter(function(l) {
+      var oo = offeringsById[String(l.offering_id)]
+      if (oo && oo.category === 'box_mini' && (Number(l.qty) || 0) <= 0) return false
+      return true
+    })
+    setActiveLines(newLines)
+    setPiecesTarget(n)
   }
 
   var addItem = function(offeringId) {
@@ -719,6 +775,8 @@ export default function QuoteEditor(props) {
   // Agrégat des minis par recette (récap clair pour le client) — helper partagé
   var miniAgg = aggregateMinis(activeVariant.lines || [], offeringsById)
   var minisPerPers = nbPersonnes > 0 ? (coverage.current / nbPersonnes) : 0
+  var ppReal = nbPersonnes > 0 ? Math.round(coverage.current / nbPersonnes) : 0
+  var ppActive = piecesTarget > 0 ? piecesTarget : ppReal
 
   // Ordre d'affichage des formules : prix/pers croissant (Essentiel → Signature → Excellence)
   var tabOrder = variants.map(function(v, i) { return i })
@@ -882,6 +940,25 @@ export default function QuoteEditor(props) {
               <div className="qe-cov-bar-in" style={{ width: covPct + '%', background: covColor }}></div>
             </div>
             <div className="qe-cov-hint" style={{ color: covColor }}>{coverage.label}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              <span className="qe-lbl" style={{ margin: 0 }}>Pièces / personne</span>
+              {[2, 3, 4].map(function(n) {
+                var on = ppActive === n
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={function() { applyPiecesPerPers(n) }}
+                    style={{
+                      width: 38, height: 34, borderRadius: 9, cursor: 'pointer',
+                      border: '2px solid #191923', fontWeight: 900, fontSize: 14,
+                      background: on ? '#FF82D7' : '#fff', color: on ? '#fff' : '#191923'
+                    }}
+                  >{n}</button>
+                )
+              })}
+              <span style={{ fontSize: 12, color: '#888' }}>&asymp; {minisPerPers.toFixed(1).replace('.', ',')} / pers réel</span>
+            </div>
           </div>
         </div>
       </div>
