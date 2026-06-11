@@ -517,14 +517,7 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
         '<div>' +
           '<div class="card"><div class="yt" style="font-size:17px;margin-bottom:4px">Votre panier</div><div id="lines"></div></div>' +
 
-          // BLOC 1 — Nos box prêtes
-          '<div class="card">' +
-            '<div class="sec-h"><span class="sec-t">Nos box prêtes</span></div>' +
-            '<div class="sec-d">Nos assortiments signature, prêts à dévorer. Chaque box = 40 minis dressés par nos soins.</div>' +
-            '<div id="pretlist"></div>' +
-          '</div>' +
-
-          // BLOC 2 — Votre Box sur mesure
+          // BLOC 1 — Votre Box sur mesure (remontée : c'est le cœur de la personnalisation)
           '<div class="cmbox">' +
             '<div class="sec-h"><span class="sec-t">Votre Box sur mesure</span></div>' +
             '<div class="sec-d">Composez votre propre box en mélangeant nos minis à l&#39;unité. Chaque box accueille de <b>35 à 40 minis</b> — au-delà, une nouvelle box démarre automatiquement.</div>' +
@@ -533,6 +526,13 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
               '<div class="cmbarout" id="cmbarwrap"><div class="cmbarin" id="cmbar"></div></div>' +
               '<div class="cmlabel" id="cmlabel"></div>' +
             '</div>' +
+          '</div>' +
+
+          // BLOC 2 — Nos box prêtes
+          '<div class="card">' +
+            '<div class="sec-h"><span class="sec-t">Nos box prêtes</span></div>' +
+            '<div class="sec-d">Ou partez sur un de nos assortiments signature, prêts à dévorer. Chaque box = 40 minis dressés par nos soins.</div>' +
+            '<div id="pretlist"></div>' +
           '</div>' +
 
           // Rappel "Formule Livraison" (si pas de live cooking)
