@@ -147,11 +147,13 @@ function buildSignatureBlock(sig: DevisSignatureInfo): string {
   var empSigVisual = ''
   if (e) {
     if (e.svg && e.svg.indexOf('<svg') > -1) {
-      empSigVisual = '<div class="sgn-visual">' + e.svg + '</div>'
+      // La signature stockée est en rose (#FF82D7) ; on l'harmonise en noir comme celle du client.
+      var empSvg = String(e.svg).replace(/fill\s*=\s*"#?[Ff][Ff]82[Dd]7"/g, 'fill="#191923"').replace(/fill\s*:\s*#?[Ff][Ff]82[Dd]7/g, 'fill:#191923')
+      empSigVisual = '<div class="sgn-visual">' + empSvg + '</div>'
     } else if (e.png) {
       empSigVisual = '<div class="sgn-visual"><img src="' + escapeHtml(e.png) + '" alt="Signature" /></div>'
     } else {
-      empSigVisual = '<div class="sgn-name">' + escapeHtml(e.full_name || '') + '</div>'
+      empSigVisual = '<div class="sgn-visual"><span class="sgn-yt">' + escapeHtml(e.full_name || '') + '</span></div>'
     }
   }
 
@@ -167,6 +169,7 @@ function buildSignatureBlock(sig: DevisSignatureInfo): string {
         '<div class="sgn-role">Le Prestataire</div>' +
         '<div class="sgn-who">' + escapeHtml(e.company_name || 'SAS AEGIA FOOD') + ' (Meshuga)</div>' +
         empSigVisual +
+        '<div class="sgn-accord">Émis &amp; signé par mandat permanent</div>' +
         '<div class="sgn-proofs">' + empProofRows +
           '<div class="sgn-plegal">Signature électronique par mandat permanent &mdash; articles 1366 et 1367 du Code civil, règlement eIDAS n&deg; 910/2014.</div>' +
         '</div>' +
