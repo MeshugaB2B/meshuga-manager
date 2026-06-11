@@ -50,6 +50,28 @@ export interface DevisPdfPayload {
     mise_en_place?: number
     mise_en_place_offert?: boolean
   }
+  // Si présent → le bloc "Bon pour accord" bascule en mode SIGNÉ (2 signatures + preuves).
+  signature?: DevisSignatureInfo
+}
+
+export interface DevisSignatureInfo {
+  client: {
+    name: string
+    signed_at?: string // ISO
+    phone?: string // téléphone vérifié OTP
+    ip?: string
+    document_sha256?: string
+    tz?: string
+  }
+  employer?: {
+    full_name: string
+    quality?: string // ex : Président
+    company_name?: string // ex : SAS AEGIA FOOD
+    svg?: string // signature stylisée (SVG)
+    png?: string // signature stylisée (PNG data URI) — fallback si pas de SVG
+    mandate_activated_at?: string // ISO
+    consent_sha256?: string
+  }
 }
 
 export interface DevisPdfAssets {
@@ -83,6 +105,99 @@ function frDate(iso?: string): string {
     return d2.toLocaleDateString('fr-FR')
   }
   return d.toLocaleDateString('fr-FR')
+}
+
+// Date + heure FR (ex : "11/06/2026 à 10:29:17")
+function frDateTime(iso?: string, tz?: string): string {
+  if (!iso) return ''
+  var d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  try {
+    var datePart = d.toLocaleDateString('fr-FR', { timeZone: tz || 'Europe/Paris' })
+    var timePart = d.toLocaleTimeString('fr-FR', { timeZone: tz || 'Europe/Paris', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    return datePart + ' à ' + timePart
+  } catch (e) {
+    return d.toLocaleString('fr-FR')
+  }
+}
+
+// SHA-256 raccourci pour affichage (12 premiers + 6 derniers)
+function shortHash(h?: string): string {
+  if (!h) return ''
+  var s = String(h)
+  if (s.length <= 20) return s
+  return s.slice(0, 12) + '…' + s.slice(-6)
+}
+
+// Téléphone FR lisible (+33 6 58 58 58 01)
+function prettyPhone(p?: string): string {
+  if (!p) return ''
+  var s = String(p).replace(/\s+/g, '')
+  var m = s.match(/^\+33(\d)(\d{2})(\d{2})(\d{2})(\d{2})$/)
+  if (m) return '+33 ' + m[1] + ' ' + m[2] + ' ' + m[3] + ' ' + m[4] + ' ' + m[5]
+  return s
+}
+
+// Bloc "Bon pour accord" SIGNÉ : 2 colonnes (prestataire + client), preuves symétriques.
+function buildSignatureBlock(sig: DevisSignatureInfo): string {
+  var c = sig.client || ({} as any)
+  var e = sig.employer
+
+  // Colonne prestataire (signature stylisée + preuves mandat)
+  var empSigVisual = ''
+  if (e) {
+    if (e.svg && e.svg.indexOf('<svg') > -1) {
+      empSigVisual = '<div class="sgn-visual">' + e.svg + '</div>'
+    } else if (e.png) {
+      empSigVisual = '<div class="sgn-visual"><img src="' + escapeHtml(e.png) + '" alt="Signature" /></div>'
+    } else {
+      empSigVisual = '<div class="sgn-name">' + escapeHtml(e.full_name || '') + '</div>'
+    }
+  }
+
+  var empProofRows = ''
+  if (e) {
+    empProofRows += '<div class="sgn-prow"><span class="k">Signataire</span><span class="v">' + escapeHtml(e.full_name || '') + (e.quality ? ', ' + escapeHtml(e.quality) : '') + '</span></div>'
+    if (e.mandate_activated_at) empProofRows += '<div class="sgn-prow"><span class="k">Mandat permanent</span><span class="v">activé le ' + escapeHtml(frDateTime(e.mandate_activated_at)) + '</span></div>'
+    if (e.consent_sha256) empProofRows += '<div class="sgn-prow"><span class="k">Empreinte mandat (SHA-256)</span><span class="v">' + escapeHtml(shortHash(e.consent_sha256)) + '</span></div>'
+  }
+
+  var empCol = e
+    ? '<div class="sgn-col">' +
+        '<div class="sgn-role">Le Prestataire</div>' +
+        '<div class="sgn-who">' + escapeHtml(e.company_name || 'SAS AEGIA FOOD') + ' (Meshuga)</div>' +
+        empSigVisual +
+        '<div class="sgn-proofs">' + empProofRows +
+          '<div class="sgn-plegal">Signature électronique par mandat permanent &mdash; articles 1366 et 1367 du Code civil, règlement eIDAS n&deg; 910/2014.</div>' +
+        '</div>' +
+      '</div>'
+    : ''
+
+  // Colonne client (signature stylisée Yellowtail + preuves OTP)
+  var cliProofRows = ''
+  cliProofRows += '<div class="sgn-prow"><span class="k">Signataire</span><span class="v">' + escapeHtml(c.name || '') + '</span></div>'
+  if (c.signed_at) cliProofRows += '<div class="sgn-prow"><span class="k">Date &amp; heure</span><span class="v">' + escapeHtml(frDateTime(c.signed_at, c.tz)) + (c.tz ? ' (' + escapeHtml(c.tz) + ')' : '') + '</span></div>'
+  if (c.phone) cliProofRows += '<div class="sgn-prow"><span class="k">Tél. vérifié (OTP SMS)</span><span class="v">' + escapeHtml(prettyPhone(c.phone)) + '</span></div>'
+  if (c.ip) cliProofRows += '<div class="sgn-prow"><span class="k">Adresse IP</span><span class="v">' + escapeHtml(c.ip) + '</span></div>'
+  if (c.document_sha256) cliProofRows += '<div class="sgn-prow"><span class="k">Empreinte document (SHA-256)</span><span class="v">' + escapeHtml(shortHash(c.document_sha256)) + '</span></div>'
+
+  var cliCol =
+    '<div class="sgn-col">' +
+      '<div class="sgn-stamp">Signé &#10003;</div>' +
+      '<div class="sgn-role">Le Client</div>' +
+      '<div class="sgn-who">' + escapeHtml(c.name || '') + '</div>' +
+      '<div class="sgn-visual"><span class="sgn-yt">' + escapeHtml(c.name || '') + '</span></div>' +
+      '<div class="sgn-accord">&laquo; Bon pour accord &raquo;</div>' +
+      '<div class="sgn-proofs">' + cliProofRows +
+        '<div class="sgn-plegal">Signature électronique vérifiée par code SMS à usage unique et horodatée &mdash; articles 1366 et 1367 du Code civil, règlement eIDAS n&deg; 910/2014.</div>' +
+      '</div>' +
+    '</div>'
+
+  return '<div class="sig sig-signed">' +
+    '<div class="sig-title">Bon pour accord &mdash; Devis signé électroniquement</div>' +
+    '<div class="sig-legal">Le présent devis, émis par le prestataire et accepté par le client, vaut contrat ferme et définitif. La signature électronique du client, vérifiée par code SMS à usage unique et horodatée, emporte acceptation sans réserve de l&#39;ensemble des prestations, quantités et tarifs mentionnés, et engage le signataire au règlement de l&#39;acompte.</div>' +
+    '<div class="sgn-grid' + (e ? '' : ' sgn-grid-1') + '">' + empCol + cliCol + '</div>' +
+  '</div>'
 }
 
 export function buildDevisHtml(payload: DevisPdfPayload, assets?: DevisPdfAssets): string {
@@ -314,16 +429,18 @@ export function buildDevisHtml(payload: DevisPdfPayload, assets?: DevisPdfAssets
             '<div class="rib-item"><label>BIC</label><span>CCBPFRPPMTG</span></div>' +
           '</div>' +
         '</div>' +
-        '<div class="sig">' +
-          '<div class="sig-title">Bon pour accord</div>' +
-          '<div class="sig-legal">Le client reconna&icirc;t avoir pris connaissance des conditions de vente du pr&eacute;sent devis et des conditions g&eacute;n&eacute;rales de vente jointes en derni&egrave;re page, et accepte sans r&eacute;serve l&#39;ensemble des prestations, quantit&eacute;s et tarifs mentionn&eacute;s. La signature ci-dessous, accompagn&eacute;e de la mention manuscrite "Bon pour accord", vaut acceptation ferme et d&eacute;finitive de la commande et engage le signataire au r&egrave;glement de l&#39;acompte.</div>' +
-          '<div class="sig-grid">' +
-            '<div class="sig-field"><label>Date</label><div class="sig-line"></div></div>' +
-            '<div class="sig-field"><label>Lieu</label><div class="sig-line"></div></div>' +
-            '<div class="sig-field"><label>Nom &amp; qualit&eacute; du signataire</label><div class="sig-line"></div></div>' +
-          '</div>' +
-          '<div class="sig-box"><label>Signature et cachet (mention "Bon pour accord")</label></div>' +
-        '</div>' +
+        (payload.signature
+          ? buildSignatureBlock(payload.signature)
+          : '<div class="sig">' +
+              '<div class="sig-title">Bon pour accord</div>' +
+              '<div class="sig-legal">Le client reconna&icirc;t avoir pris connaissance des conditions de vente du pr&eacute;sent devis et des conditions g&eacute;n&eacute;rales de vente jointes en derni&egrave;re page, et accepte sans r&eacute;serve l&#39;ensemble des prestations, quantit&eacute;s et tarifs mentionn&eacute;s. La signature ci-dessous, accompagn&eacute;e de la mention manuscrite "Bon pour accord", vaut acceptation ferme et d&eacute;finitive de la commande et engage le signataire au r&egrave;glement de l&#39;acompte.</div>' +
+              '<div class="sig-grid">' +
+                '<div class="sig-field"><label>Date</label><div class="sig-line"></div></div>' +
+                '<div class="sig-field"><label>Lieu</label><div class="sig-line"></div></div>' +
+                '<div class="sig-field"><label>Nom &amp; qualit&eacute; du signataire</label><div class="sig-line"></div></div>' +
+              '</div>' +
+              '<div class="sig-box"><label>Signature et cachet (mention "Bon pour accord")</label></div>' +
+            '</div>') +
         '<div class="cgv-pagebreak"></div>' +
         '<div class="cgv">' +
           '<div class="cgv-header">' +
@@ -444,6 +561,23 @@ function buildCss(): string {
     '.sig-line{height:16px;border-bottom:1.2px solid #191923}' +
     '.sig-box{border:1.5px dashed #191923;border-radius:4px;height:90px;padding:5px 9px;position:relative}' +
     '.sig-box label{display:block;font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:900}' +
+    '.sig-signed{box-shadow:3px 3px 0 #1a8a4a}' +
+    '.sgn-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:4px}' +
+    '.sgn-grid-1{grid-template-columns:1fr}' +
+    '.sgn-col{border:1.5px solid #191923;border-radius:6px;padding:9px 11px 10px;background:#FFFFFF;position:relative;display:flex;flex-direction:column}' +
+    '.sgn-role{font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:900;margin-bottom:1px}' +
+    '.sgn-who{font-size:9px;font-weight:700;color:#555;margin-bottom:3px}' +
+    '.sgn-visual{height:46px;display:flex;align-items:center;margin:2px 0 1px}' +
+    '.sgn-visual svg{height:44px;width:auto;max-width:100%}' +
+    '.sgn-visual img{height:44px;width:auto;max-width:100%}' +
+    '.sgn-yt{font-family:Yellowtail,cursive;font-size:26px;color:#191923;line-height:1.05;word-break:break-word}' +
+    '.sgn-name{font-family:Yellowtail,cursive;font-size:26px;color:#191923}' +
+    '.sgn-accord{font-size:8px;color:#555;font-style:italic;margin-bottom:5px}' +
+    '.sgn-stamp{position:absolute;top:8px;right:9px;transform:rotate(-7deg);border:1.5px solid #1a8a4a;color:#1a8a4a;border-radius:5px;padding:1.5px 7px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.5px}' +
+    '.sgn-proofs{border-top:1px dotted #ccc;padding-top:5px;margin-top:auto}' +
+    '.sgn-prow{display:flex;justify-content:space-between;gap:7px;font-size:7.8px;padding:1.5px 0;line-height:1.35}' +
+    '.sgn-prow .k{color:#888}.sgn-prow .v{font-weight:700;text-align:right;word-break:break-all}' +
+    '.sgn-plegal{font-size:6.5px;color:#999;line-height:1.45;margin-top:5px;font-style:italic}' +
     '.cgv-pagebreak{height:0}' +
     '.cgv{page-break-before:always;break-before:page;padding-top:4mm;padding-bottom:32mm;display:flex;flex-direction:column;min-height:100vh;box-sizing:border-box}' +
     '.cgv-header{padding-bottom:13px;border-bottom:3px solid #FF82D7;margin-bottom:22px;page-break-inside:avoid;break-inside:avoid;page-break-after:avoid;break-after:avoid}' +
