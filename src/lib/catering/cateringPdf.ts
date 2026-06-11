@@ -58,7 +58,9 @@ export interface DevisSignatureInfo {
   client: {
     name: string
     signed_at?: string // ISO
-    phone?: string // téléphone vérifié OTP
+    channel?: string // 'sms' | 'email'
+    phone?: string // téléphone vérifié OTP (canal sms)
+    email?: string // email vérifié OTP (canal email)
     ip?: string
     document_sha256?: string
     tz?: string
@@ -177,10 +179,15 @@ function buildSignatureBlock(sig: DevisSignatureInfo): string {
     : ''
 
   // Colonne client (signature stylisée Yellowtail + preuves OTP)
+  var canalWord = (c.channel === 'email') ? 'email' : 'SMS'
   var cliProofRows = ''
   cliProofRows += '<div class="sgn-prow"><span class="k">Signataire</span><span class="v">' + escapeHtml(c.name || '') + '</span></div>'
   if (c.signed_at) cliProofRows += '<div class="sgn-prow"><span class="k">Date &amp; heure</span><span class="v">' + escapeHtml(frDateTime(c.signed_at, c.tz)) + (c.tz ? ' (' + escapeHtml(c.tz) + ')' : '') + '</span></div>'
-  if (c.phone) cliProofRows += '<div class="sgn-prow"><span class="k">Tél. vérifié (OTP SMS)</span><span class="v">' + escapeHtml(prettyPhone(c.phone)) + '</span></div>'
+  if (c.channel === 'email' && c.email) {
+    cliProofRows += '<div class="sgn-prow"><span class="k">Email vérifié (OTP)</span><span class="v">' + escapeHtml(c.email) + '</span></div>'
+  } else if (c.phone) {
+    cliProofRows += '<div class="sgn-prow"><span class="k">Tél. vérifié (OTP SMS)</span><span class="v">' + escapeHtml(prettyPhone(c.phone)) + '</span></div>'
+  }
   if (c.ip) cliProofRows += '<div class="sgn-prow"><span class="k">Adresse IP</span><span class="v">' + escapeHtml(c.ip) + '</span></div>'
   if (c.document_sha256) cliProofRows += '<div class="sgn-prow"><span class="k">Empreinte document (SHA-256)</span><span class="v">' + escapeHtml(shortHash(c.document_sha256)) + '</span></div>'
 
@@ -192,13 +199,13 @@ function buildSignatureBlock(sig: DevisSignatureInfo): string {
       '<div class="sgn-visual"><span class="sgn-yt">' + escapeHtml(c.name || '') + '</span></div>' +
       '<div class="sgn-accord">&laquo; Bon pour accord &raquo;</div>' +
       '<div class="sgn-proofs">' + cliProofRows +
-        '<div class="sgn-plegal">Signature électronique vérifiée par code SMS à usage unique et horodatée &mdash; articles 1366 et 1367 du Code civil, règlement eIDAS n&deg; 910/2014.</div>' +
+        '<div class="sgn-plegal">Signature électronique vérifiée par code ' + canalWord + ' à usage unique et horodatée &mdash; articles 1366 et 1367 du Code civil, règlement eIDAS n&deg; 910/2014.</div>' +
       '</div>' +
     '</div>'
 
   return '<div class="sig sig-signed">' +
     '<div class="sig-title">Bon pour accord &mdash; Devis signé électroniquement</div>' +
-    '<div class="sig-legal">Le présent devis, émis par le prestataire et accepté par le client, vaut contrat ferme et définitif. La signature électronique du client, vérifiée par code SMS à usage unique et horodatée, emporte acceptation sans réserve de l&#39;ensemble des prestations, quantités et tarifs mentionnés, et engage le signataire au règlement de l&#39;acompte.</div>' +
+    '<div class="sig-legal">Le présent devis, émis par le prestataire et accepté par le client, vaut contrat ferme et définitif. La signature électronique du client, vérifiée par code ' + canalWord + ' à usage unique et horodatée, emporte acceptation sans réserve de l&#39;ensemble des prestations, quantités et tarifs mentionnés, et engage le signataire au règlement de l&#39;acompte.</div>' +
     '<div class="sgn-grid' + (e ? '' : ' sgn-grid-1') + '">' + empCol + cliCol + '</div>' +
   '</div>'
 }
