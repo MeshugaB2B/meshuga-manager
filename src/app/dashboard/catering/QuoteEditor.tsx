@@ -40,6 +40,22 @@ var CATEGORY_TABS = [
   { id: 'addon', label: 'Add-ons', emoji: '➕' }
 ]
 
+// Box sur mesure : les 4 mini sandwichs composables, ORDONNÉS PAR MARGE HT décroissante
+// (Lobster > Signature > Tarama > Daily) — on met en avant le plus margé.
+var CUSTOM_MINI_IDS = ['live_mini_lobster', 'live_mini_signature', 'live_mini_tarama_sw', 'live_mini_daily']
+
+// Onglets « autres options » (tout sauf box minis et les 4 minis sur mesure)
+var OTHER_TABS = [
+  { id: 'live_forfait', label: 'Live cooking', emoji: '🔥' },
+  { id: 'platter', label: 'Plateaux', emoji: '🍽️' },
+  { id: 'lunch_box', label: 'Lunch box', emoji: '🍱' },
+  { id: 'live_mini', label: 'Autres minis', emoji: '🥗' },
+  { id: 'addon', label: 'Boissons & add-ons', emoji: '➕' }
+]
+
+var CUSTOM_BOX_SIZE = 40
+var CUSTOM_BOX_MIN = 35
+
 var SUBCAT_LABELS = {
   daily: 'Daily', classic: 'Classic', signature: 'Signature', premium_lobster: 'Premium Lobster',
   canapes_desserts: 'Canapés & desserts', lobster: 'Lobster', standard: 'Standard', volume: 'Volume (30+)',
@@ -181,6 +197,30 @@ var QE_CSS =
   '.qe-ac-item{padding:8px 10px;font-size:12.5px;font-weight:600;cursor:pointer;border-bottom:1px solid #f0f0f0;line-height:1.3}' +
   '.qe-ac-item:hover{background:#FFF5FB}' +
   '.qe-ac-load{position:absolute;right:10px;bottom:9px;font-size:13px;font-weight:900;color:#FF82D7}' +
+  // Box prêtes (compteur inline)
+  '.qe-sec-h{font-family:Yellowtail,cursive;font-size:17px;margin:2px 0 2px}' +
+  '.qe-sec-d{font-size:11px;color:#8a8a92;margin-bottom:9px;line-height:1.35}' +
+  '.qe-pbox{border:1.5px solid #191923;border-radius:7px;padding:8px 10px;margin-bottom:7px;background:#fff}' +
+  '.qe-pbox-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}' +
+  '.qe-pbox-n{font-size:12.5px;font-weight:900}' +
+  '.qe-pbox-marge{font-size:9.5px;font-weight:900;color:#1a8a4a;white-space:nowrap}' +
+  '.qe-pbox-c{font-size:10.5px;color:#8a8a92;line-height:1.35;margin:2px 0 7px}' +
+  '.qe-pbox-f{display:flex;justify-content:space-between;align-items:center;gap:8px}' +
+  '.qe-pbox-pv{font-size:11px;font-weight:900;color:#FF82D7}' +
+  '.qe-pbox-add{background:#FFEB5A;border:1.5px solid #191923;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:900;cursor:pointer;box-shadow:2px 2px 0 #191923}' +
+  // Box sur mesure
+  '.qe-cmbox{background:#FFF7FC;border:2px solid #FF82D7;border-radius:8px;padding:10px 11px;margin-bottom:11px;box-shadow:2px 2px 0 #FF82D7}' +
+  '.qe-urow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed #EBD7E6}' +
+  '.qe-urow:last-child{border-bottom:0}' +
+  '.qe-urow-n{font-size:12.5px;font-weight:800}.qe-urow-s{font-size:10px;color:#8a8a92;margin-top:1px;line-height:1.3}' +
+  '.qe-urow-r{display:flex;align-items:center;gap:9px;flex-shrink:0}' +
+  '.qe-urow-pv{font-size:11px;font-weight:900;color:#FF82D7;white-space:nowrap}' +
+  '.qe-urow-marge{font-size:9px;font-weight:900;color:#1a8a4a;white-space:nowrap}' +
+  '.qe-cmgauge{margin-top:9px}' +
+  '.qe-cmbar-out{height:18px;background:#fff;border:2px solid #191923;border-radius:9px;overflow:hidden}' +
+  '.qe-cmbar-in{height:100%;width:0;background:#FF82D7;transition:width .15s,background .15s}' +
+  '.qe-cmlabel{font-size:11.5px;font-weight:800;margin-top:6px;line-height:1.35}' +
+  '.qe-cm-ok{color:#1a8a4a}.qe-cm-warn{color:#CC0066}.qe-cm-empty{color:#888;font-weight:600}' +
   '@media(max-width:640px){.qe-picks{grid-template-columns:1fr}.qe-recap-tot{font-size:12px}}'
 
 // ============================================================
@@ -236,7 +276,7 @@ export default function QuoteEditor(props) {
   var [notes, setNotes] = useState('')
   var [notesInternes, setNotesInternes] = useState('')
 
-  var [activeCategory, setActiveCategory] = useState('box_mini')
+  var [activeCategory, setActiveCategory] = useState('live_forfait')
   var [piecesTarget, setPiecesTarget] = useState(0)
   var [showInternes, setShowInternes] = useState(true)
   var [ctxOpen, setCtxOpen] = useState(true)
@@ -337,6 +377,55 @@ export default function QuoteEditor(props) {
     return computeCoverage(totals.lines, nbPersonnes, eventFormat, itemFormat)
   }, [totals, nbPersonnes, eventFormat, itemFormat])
 
+  // Marge HT d'un offering (pv - food cost)
+  var margeOf = function(o) {
+    if (!o) return 0
+    return (Number(o.pv_ht) || 0) - (Number(o.fc_ht) || 0)
+  }
+
+  // Box prêtes triées par MARGE HT décroissante (on met en avant le plus margé)
+  var pretBoxes = useMemo(function() {
+    var arr = offerings.filter(function(o) { return o.category === 'box_mini' })
+    arr.sort(function(a, b) { return margeOf(b) - margeOf(a) })
+    return arr
+  }, [offerings])
+
+  // Les 4 minis "sur mesure", dans l'ordre de marge défini par CUSTOM_MINI_IDS
+  var customMinis = useMemo(function() {
+    var out = []
+    CUSTOM_MINI_IDS.forEach(function(id) {
+      var o = offeringsById[id]
+      if (o) out.push(o)
+    })
+    return out
+  }, [offeringsById])
+
+  // Quantité d'un mini sur mesure dans la formule active
+  var customQty = function(id) {
+    var lines = activeVariant.lines || []
+    var i
+    for (i = 0; i < lines.length; i++) {
+      if (lines[i].offering_id === id) return Number(lines[i].qty) || 0
+    }
+    return 0
+  }
+
+  // Stats box sur mesure (pièces, nb de box, remplissage box courante, validité 35-40)
+  var customStats = useMemo(function() {
+    var pieces = 0
+    var lines = activeVariant.lines || []
+    var i
+    for (i = 0; i < lines.length; i++) {
+      if (CUSTOM_MINI_IDS.indexOf(lines[i].offering_id) > -1) pieces += Number(lines[i].qty) || 0
+    }
+    var nbBox = pieces > 0 ? Math.ceil(pieces / CUSTOM_BOX_SIZE) : 0
+    var fill = pieces > 0 ? (pieces % CUSTOM_BOX_SIZE === 0 ? CUSTOM_BOX_SIZE : pieces % CUSTOM_BOX_SIZE) : 0
+    var rest = pieces % CUSTOM_BOX_SIZE
+    var valid = pieces === 0 || rest === 0 || rest >= CUSTOM_BOX_MIN
+    var need = (rest > 0 && rest < CUSTOM_BOX_MIN) ? (CUSTOM_BOX_MIN - rest) : 0
+    return { pieces: pieces, nbBox: nbBox, fill: fill, valid: valid, need: need }
+  }, [variants, activeIdx])
+
   var variantInfos = useMemo(function() {
     var fr = {
       livraison: livraison, livraison_offert: livraisonOffert,
@@ -354,6 +443,8 @@ export default function QuoteEditor(props) {
     var map = {}
     offerings.forEach(function(o) {
       if (o.category !== activeCategory) return
+      // Les 4 minis sur mesure ont déjà leur bloc dédié → on les retire de l'onglet "Autres minis"
+      if (CUSTOM_MINI_IDS.indexOf(o.id) > -1) return
       var sub = o.subcategory || 'autre'
       if (!map[sub]) { map[sub] = []; order.push(sub) }
       map[sub].push(o)
@@ -425,7 +516,8 @@ export default function QuoteEditor(props) {
     setPiecesTarget(n)
   }
 
-  var addItem = function(offeringId) {
+  var addItem = function(offeringId, delta) {
+    var d = (delta === undefined || delta === null) ? 1 : Number(delta)
     var lines = (activeVariant.lines || []).slice()
     var found = -1
     var i
@@ -433,9 +525,14 @@ export default function QuoteEditor(props) {
       if (lines[i].offering_id === offeringId) { found = i; break }
     }
     if (found > -1) {
-      lines[found] = Object.assign({}, lines[found], { qty: (Number(lines[found].qty) || 0) + 1 })
-    } else {
-      lines.push({ offering_id: offeringId, qty: 1, remise_pct: 0 })
+      var nq = (Number(lines[found].qty) || 0) + d
+      if (nq <= 0) {
+        lines.splice(found, 1)
+      } else {
+        lines[found] = Object.assign({}, lines[found], { qty: nq })
+      }
+    } else if (d > 0) {
+      lines.push({ offering_id: offeringId, qty: d, remise_pct: 0 })
     }
     setActiveLines(lines)
   }
@@ -998,10 +1095,81 @@ export default function QuoteEditor(props) {
       <div className="qe-grid">
         {/* COLONNE GAUCHE — composition */}
         <div>
+          <div className="qe-card qe-cmbox">
+            <div className="qe-sec-h">Votre Box sur mesure</div>
+            <div className="qe-sec-d">Composez en mélangeant les minis à l&apos;unité — 35 à 40 minis par box. Triés du plus margé au moins margé.</div>
+            {customMinis.map(function(o) {
+              var qn = customQty(o.id)
+              return (
+                <div key={o.id} className="qe-urow">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="qe-urow-n">{o.name}</div>
+                    {o.tagline ? <div className="qe-urow-s">{o.tagline}</div> : null}
+                  </div>
+                  <div className="qe-urow-r">
+                    <span className="qe-urow-marge">+{fmtEur(margeOf(o))}</span>
+                    <span className="qe-urow-pv">{fmtEur(Number(o.pv_ht) || 0)}</span>
+                    <span className="qe-q">
+                      <b onClick={function() { addItem(o.id, -1) }}>−</b>
+                      <span>{qn}</span>
+                      <b onClick={function() { addItem(o.id, 1) }}>+</b>
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+            <div className="qe-cmgauge">
+              <div className="qe-cmbar-out" style={{ borderColor: customStats.valid ? '#191923' : '#CC0066' }}>
+                <div className="qe-cmbar-in" style={{ width: (customStats.pieces > 0 ? Math.round(customStats.fill / CUSTOM_BOX_SIZE * 100) : 0) + '%', background: customStats.valid ? '#FF82D7' : '#CC0066' }}></div>
+              </div>
+              <div className="qe-cmlabel">
+                {customStats.pieces === 0 ? (
+                  <span className="qe-cm-empty">Ajoutez des minis pour composer une box (35 à 40 pièces).</span>
+                ) : customStats.valid ? (
+                  <span className="qe-cm-ok">Box {customStats.nbBox} : {customStats.fill}/{CUSTOM_BOX_SIZE} · {customStats.pieces} minis au total ✓</span>
+                ) : (
+                  <span className="qe-cm-warn">Box {customStats.nbBox} : {customStats.fill}/{CUSTOM_BOX_SIZE} · il manque {customStats.need} mini{customStats.need > 1 ? 's' : ''} (min. {CUSTOM_BOX_MIN})</span>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="qe-card">
-            <div className="qe-card-title">Catalogue</div>
+            <div className="qe-sec-h">Nos box prêtes</div>
+            <div className="qe-sec-d">Assortiments signature prêts à dévorer (40 minis). Triés par marge HT décroissante.</div>
+            {pretBoxes.length === 0 ? (
+              <div style={{ padding: 12, textAlign: 'center', opacity: 0.4, fontSize: 12 }}>Aucune box.</div>
+            ) : null}
+            {pretBoxes.map(function(o) {
+              var qn = customQty(o.id)
+              return (
+                <div key={o.id} className="qe-pbox">
+                  <div className="qe-pbox-h">
+                    <span className="qe-pbox-n">{o.name}</span>
+                    <span className="qe-pbox-marge">+{fmtEur(margeOf(o))} marge</span>
+                  </div>
+                  {o.composition ? <div className="qe-pbox-c">{o.composition}</div> : null}
+                  <div className="qe-pbox-f">
+                    <span className="qe-pbox-pv">{fmtEur(Number(o.pv_ht) || 0)} · {Number(o.size_pers) || 0} pièces</span>
+                    {qn > 0 ? (
+                      <span className="qe-q">
+                        <b onClick={function() { addItem(o.id, -1) }}>−</b>
+                        <span>{qn}</span>
+                        <b onClick={function() { addItem(o.id, 1) }}>+</b>
+                      </span>
+                    ) : (
+                      <button className="qe-pbox-add" onClick={function() { addItem(o.id, 1) }}>Ajouter</button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="qe-card">
+            <div className="qe-sec-h">Autres options</div>
             <div className="qe-catchips">
-              {CATEGORY_TABS.map(function(t) {
+              {OTHER_TABS.map(function(t) {
                 var count = offerings.filter(function(o) { return o.category === t.id }).length
                 return (
                   <button
@@ -1024,7 +1192,7 @@ export default function QuoteEditor(props) {
                   <div className="qe-picks">
                     {grouped.map[sub].map(function(o) {
                       return (
-                        <div key={o.id} className="qe-pick" onClick={function() { addItem(o.id) }}>
+                        <div key={o.id} className="qe-pick" onClick={function() { addItem(o.id, 1) }}>
                           <div className="qe-pick-top">
                             <span className="qe-pick-name">{o.name}</span>
                             <span className="qe-pick-pv">{fmtEur(Number(o.pv_ht) || 0)}</span>
