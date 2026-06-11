@@ -89,6 +89,7 @@ async function notifyAfterSignature(req: NextRequest, d: any, signerName: string
         eventLieu: d.event_lieu || '',
         formatLabel: formatLabel,
         viewUrl: viewUrl,
+        origin: origin,
         iban: process.env.MESHUGA_IBAN || '',
         bic: process.env.MESHUGA_BIC || '',
         bankName: process.env.MESHUGA_BANK_NAME || ''
