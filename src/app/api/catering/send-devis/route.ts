@@ -124,12 +124,8 @@ function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: 
     '<body class="pagebg" bgcolor="#FFFDF5" style="margin:0;padding:0;background:#FFFDF5;font-family:Arial,Helvetica,sans-serif;color:#191923">' +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFDF5" class="pagebg" style="background:#FFFDF5"><tr><td align="center" style="padding:26px 12px">' +
       '<table role="presentation" class="cardw lightbg" width="600" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="width:600px;max-width:600px;background:#FFFFFF;border:3px solid #191923;border-radius:16px;box-shadow:7px 7px 0 #FF82D7">' +
-        // Bandeau rose
-        '<tr><td class="rosebg" bgcolor="#FF82D7" style="background:#FF82D7;border-bottom:3px solid #191923;border-radius:13px 13px 0 0;padding:15px 30px;text-align:center">' +
-          '<div class="white" style="color:#FFFFFF;font-size:11px;letter-spacing:3px;font-weight:900;text-transform:uppercase">Meshuga Events &middot; Traiteur Paris</div>' +
-        '</td></tr>' +
-        // Logo rose sur blanc
-        '<tr><td class="px lightbg" bgcolor="#FFFFFF" style="padding:26px 30px 4px;text-align:center;background:#FFFFFF">' +
+        // Logo rose sur blanc (haut de carte)
+        '<tr><td class="px lightbg" bgcolor="#FFFFFF" style="padding:30px 30px 4px;text-align:center;background:#FFFFFF;border-radius:13px 13px 0 0">' +
           '<img src="' + LOGO_PINK + '" alt="Meshuga" height="48" style="height:48px;width:auto;display:inline-block;max-width:70%" />' +
         '</td></tr>' +
         // Hero — image Yellowtail rose (toujours lisible, jamais réécrit)
