@@ -119,6 +119,10 @@ export default function QuoteWizard(props) {
   var [nbPersonnes, setNbPersonnes] = useState('')
   var [eventDate, setEventDate] = useState('')
   var [eventLieu, setEventLieu] = useState('')
+  var [lieuSuggestions, setLieuSuggestions] = useState([])
+  var [lieuLoading, setLieuLoading] = useState(false)
+  var [lieuJustPicked, setLieuJustPicked] = useState(false)
+  var lieuTimeoutRef = useRef(null)
   var [logisticsMode, setLogisticsMode] = useState('') // livraison | live_cooking
   var [eventHour, setEventHour] = useState('')
   var [itemFormat, setItemFormat] = useState('') // standard | mini (selon type)
@@ -197,6 +201,49 @@ export default function QuoteWizard(props) {
     setSelectedProspect(null)
     setClientSearch('')
     setClientResults([])
+  }
+
+  // ---- Autocomplete adresse du LIEU de l'événement (Base Adresse Nationale, data.gouv.fr) ----
+  useEffect(function() {
+    if (lieuJustPicked) {
+      setLieuJustPicked(false)
+      setLieuSuggestions([])
+      return
+    }
+    if (!eventLieu || eventLieu.length < 3) {
+      setLieuSuggestions([])
+      return
+    }
+    if (lieuTimeoutRef.current) clearTimeout(lieuTimeoutRef.current)
+    lieuTimeoutRef.current = setTimeout(function() {
+      setLieuLoading(true)
+      var url = 'https://api-adresse.data.gouv.fr/search/?q=' + encodeURIComponent(eventLieu) + '&limit=6&autocomplete=1'
+      fetch(url)
+        .then(function(r) { return r.json() })
+        .then(function(data) {
+          setLieuLoading(false)
+          if (data && data.features) {
+            var sugg = data.features.map(function(f) {
+              return { label: f.properties.label }
+            })
+            setLieuSuggestions(sugg)
+          } else {
+            setLieuSuggestions([])
+          }
+        }, function() {
+          setLieuLoading(false)
+          setLieuSuggestions([])
+        })
+    }, 300)
+    return function() {
+      if (lieuTimeoutRef.current) clearTimeout(lieuTimeoutRef.current)
+    }
+  }, [eventLieu, lieuJustPicked])
+
+  function pickLieuSuggestion(label) {
+    setLieuJustPicked(true)
+    setEventLieu(label)
+    setLieuSuggestions([])
   }
 
   // ---- Validation brief ----
@@ -650,20 +697,41 @@ export default function QuoteWizard(props) {
 
                 <div style={s_section}>
                   <label style={s_label}>📍 Lieu (adresse de livraison ou de réception)</label>
-                  <input
-                    type="search"
-                    value={eventLieu}
-                    onChange={function(e) { setEventLieu(e.target.value) }}
-                    placeholder="12 rue de la Paix, 75002 Paris"
-                    style={s_input}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    data-lpignore="true"
-                    data-1p-ignore="true"
-                    data-form-type="other"
-                    name="mshg_eventlieu_xq7"
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="search"
+                      value={eventLieu}
+                      onChange={function(e) { setEventLieu(e.target.value) }}
+                      placeholder="12 rue de la Paix, 75002 Paris"
+                      style={s_input}
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      data-form-type="other"
+                      name="mshg_eventlieu_xq7"
+                    />
+                    {lieuLoading ? (
+                      <div style={{ position: 'absolute', right: '12px', top: '12px', fontSize: '12px', color: '#FF82D7', fontWeight: 900 }}>…</div>
+                    ) : null}
+                    {lieuSuggestions && lieuSuggestions.length > 0 ? (
+                      <div style={{ position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 50, border: '2px solid #191923', borderRadius: '6px', background: '#FFFFFF', marginTop: '4px', maxHeight: '210px', overflowY: 'auto', boxShadow: '3px 3px 0 #191923' }}>
+                        {lieuSuggestions.map(function(sg, i) {
+                          return (
+                            <div
+                              key={i}
+                              onMouseDown={function() { pickLieuSuggestion(sg.label) }}
+                              style={{ padding: '10px 12px', fontSize: '13px', cursor: 'pointer', borderBottom: '1px solid #F0F0F0', color: '#191923' }}
+                            >
+                              📍 {sg.label}
+                            </div>
+                          )
+                        })}
+                        <div style={{ padding: '6px 12px', fontSize: '10px', color: '#999', fontStyle: 'italic' }}>Suggestions Base Adresse Nationale (data.gouv.fr)</div>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
