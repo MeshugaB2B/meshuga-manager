@@ -196,96 +196,195 @@ export function buildDevisChoiceHtml(payload: ChoicePayload): string {
 // ============================================================
 
 // Script client (string) — réplique EXACTEMENT cateringCore.
-var CONFIG_RUNTIME = [
-  'var CFG=JSON.parse(document.getElementById("cfg").textContent);',
-  'var CAT_META={box_mini:{l:"Minis",e:"📦"},live_mini:{l:"Live minis",e:"🥗"},platter:{l:"Plateaux",e:"🍽️"},lunch_box:{l:"Lunch box",e:"🍱"},live_forfait:{l:"Live cooking",e:"🔥"},addon:{l:"Extras",e:"➕"}};',
-  'var CAT_ORDER=["box_mini","live_mini","platter","lunch_box","live_forfait","addon"];',
-  'var TARGETS={cocktail:3,soiree:3.5,petit_dej:2.5,business_lunch:0,autre:3};',
-  'var MAP={};CFG.catalogue.forEach(function(o){MAP[o.id]=o;});',
-  'function isMini(c){return c==="box_mini"||c==="live_mini";}',
-  'function tvaRatio(p){p=Number(p);if(!p||p<=0)return 0;return p>1?p/100:p;}',
-  'function r2(n){return Math.round((Number(n)||0)*100)/100;}',
-  'function eur(v){return (Number(v)||0).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";}',
-  'var lines=CFG.startLines.map(function(l){return {id:l.offering_id,qty:Number(l.qty)||0};}).filter(function(l){return l.qty>0&&MAP[l.id];});',
-  'var addGroup=null;',
-  'var GROUPS=[',
-  ' {k:"minis",l:"Minis",e:"📦",f:function(o){return o.category==="box_mini";}},',
-  ' {k:"livemini",l:"Live minis",e:"🥗",f:function(o){return o.category==="live_mini";}},',
-  ' {k:"platter",l:"Plateaux",e:"🍽️",f:function(o){return o.category==="platter";}},',
-  ' {k:"lunch",l:"Lunch box",e:"🍱",f:function(o){return o.category==="lunch_box"||(o.category==="addon"&&o.subcategory==="lunch");}},',
-  ' {k:"live",l:"Live cooking",e:"🔥",f:function(o){return o.category==="live_forfait";}},',
-  ' {k:"drinks",l:"Boissons",e:"🥤",f:function(o){return o.subcategory==="beverage";}},',
-  ' {k:"desserts",l:"Desserts",e:"🍪",f:function(o){return o.subcategory==="food"||/sugar|cookie|nutella|dessert|sucr/i.test((o.name||"")+" "+(o.composition||""));}}',
-  '];',
-  'function descOf(o){if(!o)return "";var c=o.composition||"";var g=(c===""||c==="À la pièce"||c==="Par heure"||c==="Bonbonne 5L"||c.charAt(0)==="+");if(g)return (o.tagline||c||"");return c;}',
-  'var PP_OPTS=(CFG.perPersOptions&&CFG.perPersOptions.length)?CFG.perPersOptions:[2,3,4];',
-  'var PERPERS=Number(CFG.perPersDefault)||3;',
-  'function pax(){var t=(document.getElementById("pax").textContent||"").replace(/[^0-9]/g,"");var n=parseInt(t,10);return n>0?n:1;}',
-  'function bumpPax(d){var el=document.getElementById("pax");el.textContent=String(Math.max(1,pax()+d));rescaleMinis();render();}',
-  'function findLine(id){for(var i=0;i<lines.length;i++){if(lines[i].id===id)return i;}return -1;}',
-  'function miniPiecesOf(o,q){if(o.category==="box_mini")return q*(Number(o.size_pers)||0);if(o.category==="live_mini")return q;return 0;}',
-  'function curMinis(){var m=0;for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(o)m+=miniPiecesOf(o,lines[i].qty);}return m;}',
-  'function rescaleMinis(){var target=pax()*PERPERS;var cur=curMinis();if(cur<=0||target<=0)return;var scale=target/cur;var bigId=null,bigSize=0;for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o||!isMini(o.category))continue;var sz=o.category==="box_mini"?(Number(o.size_pers)||1):1;if(sz>bigSize){bigSize=sz;bigId=lines[i].id;}lines[i].qty=Math.max(0,Math.round(lines[i].qty*scale));}for(var j=lines.length-1;j>=0;j--){var oo=MAP[lines[j].id];if(oo&&isMini(oo.category)&&lines[j].qty===0)lines.splice(j,1);}if(curMinis()===0&&bigId){var k=findLine(bigId);if(k>-1)lines[k].qty=1;else lines.push({id:bigId,qty:1});}}',
-  'function setPerPers(n){PERPERS=n;rescaleMinis();render();}',
-  'function renderPerPers(){var P=pax();var ach=P>0?(curMinis()/P):0;var C="";for(var i=0;i<PP_OPTS.length;i++){var n=PP_OPTS[i];C+=\'<button class="ppc\'+(n===PERPERS?" on":"")+\'" onclick="setPerPers(\'+n+\')">\'+n+\'</button>\';}document.getElementById("ppchips").innerHTML=C;document.getElementById("ppnote").textContent="\\u2248 "+ach.toFixed(1).replace(".",",")+" / pers r\\u00e9el";}',
-  'function addItem(id){var i=findLine(id);if(i>-1)lines[i].qty++;else lines.push({id:id,qty:1});render();}',
-  'function stepLine(i,d){lines[i].qty=Math.max(0,lines[i].qty+d);if(lines[i].qty===0)lines.splice(i,1);render();}',
-  'function rmLine(i){lines.splice(i,1);render();}',
-  'function compute(){var itemsHT=0,tvaItems=0,minis=0;for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o)continue;var q=lines[i].qty;var pu=Number(o.pv_ht)||0;var ht=r2(pu*q);itemsHT+=ht;tvaItems+=ht*tvaRatio(o.tva_pct);if(o.category==="box_mini")minis+=q*(Number(o.size_pers)||0);else if(o.category==="live_mini")minis+=q;}',
-  'var f=CFG.frais;var liv=f.livraison_offert?0:(Number(f.livraison)||0);var mep=f.mise_en_place_offert?0:(Number(f.mise_en_place)||0);var fraisHT=liv+mep;var tvaFrais=fraisHT*0.20;',
-  'var totalHT=itemsHT+fraisHT;var tva=tvaItems+tvaFrais;var ttc=totalHT+tva;',
-  'return {itemsHT:r2(itemsHT),fraisHT:r2(fraisHT),totalHT:r2(totalHT),tva:r2(tva),ttc:r2(ttc),minis:minis};}',
-  'function aggMinis(){var acc={};var order=[];for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o)continue;var q=Number(lines[i].qty)||0;if(q<=0)continue;if(o.category==="box_mini"&&o.composition){var segs=String(o.composition).split(/\\s*·\\s*/);for(var j=0;j<segs.length;j++){var m=segs[j].match(/^(\\d+)\\s+(.+)$/);if(!m)continue;var nm=m[2].replace(/^\\s+|\\s+$/g,"");if(acc[nm]==null){acc[nm]=0;order.push(nm);}acc[nm]+=parseInt(m[1],10)*q;}}else if(o.category==="live_mini"){var n2=o.name;if(acc[n2]==null){acc[n2]=0;order.push(n2);}acc[n2]+=q;}}var out=[];for(var k=0;k<order.length;k++)out.push({name:order[k],count:acc[order[k]]});return out;}',
-  'function renderMiniRecap(){var a=aggMinis();var card=document.getElementById("recapcard");if(!a.length){card.style.display="none";return;}card.style.display="block";var H="";for(var i=0;i<a.length;i++){H+=\'<div class="mr-row"><span class="mr-n">\'+a[i].name+\'</span><span class="mr-c">\'+a[i].count+\'</span></div>\';}var P=pax();var tot=curMinis();H+=\'<div class="mr-tot"><span>\'+tot+\' minis au total</span><span>\'+(P>0?(tot/P).toFixed(1).replace(".",","):"0")+\' / pers</span></div>\';document.getElementById("minirecap").innerHTML=H;}',
-  'function render(){',
-  ' var L="";for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o){continue;}var lt=(Number(o.pv_ht)||0)*lines[i].qty;',
-  '  var sub=descOf(o);var pcs="";if(o.category==="box_mini")pcs=(lines[i].qty*(Number(o.size_pers)||0))+" pièces";else if(o.category==="live_mini")pcs=lines[i].qty+" pièces";if(pcs)sub=sub?(sub+" · "+pcs):pcs;',
-  '  L+=\'<div class="line"><div class="line-main"><span class="line-n">\'+o.name+\'</span><span class="q"><b onclick="stepLine(\'+i+\',-1)">−</b><span>\'+lines[i].qty+\'</span><b onclick="stepLine(\'+i+\',1)">+</b></span><span class="line-t">\'+eur(lt)+\'</span><button class="rm" onclick="rmLine(\'+i+\')">✕</button></div>\'+(sub?\'<div class="line-sub">\'+sub+\'</div>\':\'\')+\'</div>\';}',
-  ' document.getElementById("lines").innerHTML=L||\'<div style="padding:10px;text-align:center;opacity:.5;font-size:12px">Votre panier est vide.</div>\';',
-  ' var groups=GROUPS.filter(function(g){return CFG.catalogue.some(function(o){return g.f(o);});});',
-  ' if(!addGroup||!groups.some(function(g){return g.k===addGroup;}))addGroup=groups.length?groups[0].k:null;',
-  ' var C="";for(var c=0;c<groups.length;c++){var g=groups[c];C+=\'<button class="chip\'+(g.k===addGroup?" on":"")+\'" onclick="setCat(\\\'\'+g.k+\'\\\')">\'+g.e+" "+g.l+\'</button>\';}',
-  ' document.getElementById("addcats").innerHTML=C;',
-  ' var curG=null;for(var gi=0;gi<groups.length;gi++){if(groups[gi].k===addGroup)curG=groups[gi];}',
-  ' var items=curG?CFG.catalogue.filter(function(o){return curG.f(o);}):[];var A="";for(var j=0;j<items.length;j++){var it=items[j];var dd=descOf(it);A+=\'<div class="addrow" onclick="addItem(\\\'\'+it.id+\'\\\')"><div class="addrow-top"><span style="font-size:12.5px;font-weight:700">\'+it.name+\'</span><span style="font-size:12px;font-weight:900;color:#FF82D7;white-space:nowrap">+ \'+eur(it.pv_ht)+\'</span></div>\'+(dd?\'<div class="addrow-sub">\'+dd+\'</div>\':\'\')+\'</div>\';}',
-  ' document.getElementById("addlist").innerHTML=A||\'<div style="opacity:.5;font-size:12px;padding:8px">Aucun article.</div>\';',
-  ' var liveLine=null;for(var k=0;k<lines.length;k++){var oo=MAP[lines[k].id];if(oo&&oo.category==="live_forfait"){liveLine=oo;break;}}',
-  ' var lc=document.getElementById("livecard");',
-  ' if(liveLine){lc.style.display="block";var inc=liveLine.composition||"Installation, prestation et chef Meshuga sur place · matériel et dressage minute inclus.";if(liveLine.tagline)inc+=" · "+liveLine.tagline;document.getElementById("liveincl").textContent=inc;',
-  '  var sfx=String(liveLine.id).replace("live_","");var extras=CFG.catalogue.filter(function(o){return o.subcategory==="live_extra"&&String(o.id).indexOf(sfx)>-1;});var X="";for(var e=0;e<extras.length;e++){var ex=extras[e];var li=findLine(ex.id);var qn=li>-1?lines[li].qty:0;X+=\'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px"><span style="font-size:12px;font-weight:700">\'+ex.name+\' <span style=\\\'color:#888\\\'>(+\'+eur(ex.pv_ht)+\' / h)</span></span><span class="q"><b onclick="decId(\\\'\'+ex.id+\'\\\')">−</b><span>\'+qn+\'</span><b onclick="addItem(\\\'\'+ex.id+\'\\\')">+</b></span></div>\';}',
-  '  document.getElementById("livextra").innerHTML=X;}else{lc.style.display="none";}',
-  ' var t=compute();var P=pax();',
-  ' document.getElementById("tht").textContent=eur(t.totalHT);',
-  ' var f3=CFG.frais;var fr="";',
-  ' if(f3.livraison_offert)fr+=\'<div class="frow"><span>Livraison</span><span class="off">Offerte ✓</span></div>\';else if((Number(f3.livraison)||0)>0)fr+=\'<div class="frow"><span>Livraison</span><span>\'+eur(f3.livraison)+\'</span></div>\';',
-  ' if(f3.mise_en_place_offert)fr+=\'<div class="frow"><span>Mise en place</span><span class="off">Offerte ✓</span></div>\';else if((Number(f3.mise_en_place)||0)>0)fr+=\'<div class="frow"><span>Mise en place</span><span>\'+eur(f3.mise_en_place)+\'</span></div>\';',
-  ' document.getElementById("fraisrows").innerHTML=fr;',
-  ' document.getElementById("ttva").textContent=eur(t.tva);',
-  ' document.getElementById("tttc").textContent=eur(t.ttc);',
-  ' document.getElementById("tpp").textContent="soit "+eur(P>0?t.ttc/P:0)+" / pers";',
-  ' var reco=Math.round(P*PERPERS);var perGuest=P>0?(t.minis/P):0;',
-  ' var pct=reco>0?Math.min(100,Math.round(t.minis/reco*100)):100;',
-  ' document.getElementById("covbar").style.width=pct+"%";',
-  ' document.getElementById("covtxt").textContent=t.minis+" minis";',
-  ' var hint=document.getElementById("covhint");hint.style.color="#191923";',
-  ' hint.innerHTML=\'<span style="background:#FFEB5A;border:1.5px solid #191923;border-radius:10px;padding:2px 9px">\'+perGuest.toFixed(1).replace(".",",")+\' minis / invité</span>\';',
-  ' renderPerPers();',
-  ' renderMiniRecap();',
-  ' var cta=document.getElementById("cta");var ch=document.getElementById("ctahint");',
-  ' if(lines.length>0&&t.minis>0){cta.disabled=false;cta.style.background="#FF82D7";cta.style.color="#fff";cta.style.cursor="pointer";cta.style.boxShadow="3px 3px 0 #191923";ch.textContent="PDF final + signature électronique";}',
-  ' else{cta.disabled=true;cta.style.background="#EBEBEB";cta.style.color="#999";cta.style.cursor="not-allowed";cta.style.boxShadow="none";ch.textContent="Ajoutez au moins un article";}',
-  '}',
-  'function setCat(c){addGroup=c;render();}',
-  'function decId(id){var i=findLine(id);if(i>-1)stepLine(i,-1);}',
-  'function valider(){var t=compute();var P=pax();if(lines.length===0||t.minis<=0)return;',
-  ' var btn=document.getElementById("cta");btn.disabled=true;document.getElementById("ov").style.display="flex";',
-  ' fetch("/api/catering/configure",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({devisId:CFG.devisId,variantKey:CFG.variantKey,pax:P,lines:lines})})',
-  ' .then(function(r){return r.json();}).then(function(d){if(d&&d.ok&&d.signUrl){window.location.href=d.signUrl;}else{document.getElementById("ov").style.display="none";btn.disabled=false;alert((d&&d.error)||"Une erreur est survenue. Merci de réessayer ou de nous écrire à events@meshuga.fr");}})',
-  ' .catch(function(){document.getElementById("ov").style.display="none";btn.disabled=false;alert("Connexion impossible, merci de réessayer.");});',
-  '}',
-  'document.getElementById("pax").addEventListener("input",render);',
-  'var _ap=pax()>0?Math.round(curMinis()/pax()):PERPERS;if(PP_OPTS.indexOf(_ap)>-1)PERPERS=_ap;render();'
-].join('\n')
+var CONFIG_RUNTIME = `
+var CFG=JSON.parse(document.getElementById("cfg").textContent);
+var MAP={};CFG.catalogue.forEach(function(o){MAP[o.id]=o;});
+var BOX_SIZE=40,BOX_MIN=35;
+// Les 4 minis à l'unité pour la box sur mesure (ordre d'affichage)
+var UNIT_IDS=["live_mini_daily","live_mini_tarama_sw","live_mini_signature","live_mini_lobster"];
+var UNIT=UNIT_IDS.filter(function(id){return MAP[id];}).map(function(id){return MAP[id];});
+function isPretBox(c){return c==="box_mini";}
+function tvaRatio(p){p=Number(p);if(!p||p<=0)return 0;return p>1?p/100:p;}
+function r2(n){return Math.round((Number(n)||0)*100)/100;}
+function eur(v){return (Number(v)||0).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";}
+function pax(){var t=(document.getElementById("pax").textContent||"").replace(/[^0-9]/g,"");var n=parseInt(t,10);return n>0?n:1;}
+function bumpPax(d){var el=document.getElementById("pax");el.textContent=String(Math.max(1,pax()+d));render();}
+// --- panier "box prêtes" + autres (live, boissons) ---
+var lines=CFG.startLines.map(function(l){return {id:l.offering_id,qty:Number(l.qty)||0};}).filter(function(l){return l.qty>0&&MAP[l.id];});
+// On retire de "lines" les minis à l'unité (live_mini) -> ils basculent dans la box sur mesure
+var custom={};
+(function(){
+  for(var i=lines.length-1;i>=0;i--){
+    var o=MAP[lines[i].id];
+    if(o&&o.category==="live_mini"&&UNIT_IDS.indexOf(lines[i].id)>-1){
+      custom[lines[i].id]=(custom[lines[i].id]||0)+lines[i].qty;
+      lines.splice(i,1);
+    }
+  }
+})();
+function findLine(id){for(var i=0;i<lines.length;i++){if(lines[i].id===id)return i;}return -1;}
+// --- box sur mesure ---
+function customPieces(){var m=0;for(var k in custom){if(custom.hasOwnProperty(k))m+=custom[k];}return m;}
+function customBoxCount(){var p=customPieces();return p>0?Math.ceil(p/BOX_SIZE):0;}
+function curBoxFill(){var p=customPieces();if(p<=0)return 0;var f=p%BOX_SIZE;return f===0?BOX_SIZE:f;}
+function addUnit(id){custom[id]=(custom[id]||0)+1;render();}
+function decUnit(id){if(!custom[id])return;custom[id]--;if(custom[id]<=0)delete custom[id];render();}
+// Validation stricte : toute box entamée doit avoir BOX_MIN..BOX_SIZE pièces.
+function customValid(){
+  var p=customPieces();
+  if(p===0)return true; // pas de box sur mesure = ok
+  var full=Math.floor(p/BOX_SIZE);
+  var rest=p-full*BOX_SIZE;
+  if(rest===0)return true; // multiples pleins
+  return rest>=BOX_MIN; // dernière box entamée doit avoir >=35
+}
+function customNeeded(){
+  // combien de minis manquent (ou en trop) pour valider la box en cours
+  var p=customPieces();if(p===0)return 0;
+  var rest=p%BOX_SIZE;
+  if(rest===0)return 0;
+  if(rest<BOX_MIN)return BOX_MIN-rest; // manque pour atteindre 35
+  return 0;
+}
+// --- pièces minis : box prêtes ---
+function pretMinis(){var m=0;for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(o&&o.category==="box_mini")m+=lines[i].qty*(Number(o.size_pers)||0);}return m;}
+function totalMinis(){return pretMinis()+customPieces();}
+// --- compute prix ---
+function compute(){
+  var itemsHT=0,tvaItems=0;
+  for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o)continue;var q=lines[i].qty;var pu=Number(o.pv_ht)||0;var ht=r2(pu*q);itemsHT+=ht;tvaItems+=ht*tvaRatio(o.tva_pct);}
+  for(var k in custom){if(!custom.hasOwnProperty(k))continue;var oc=MAP[k];if(!oc)continue;var hc=r2((Number(oc.pv_ht)||0)*custom[k]);itemsHT+=hc;tvaItems+=hc*tvaRatio(oc.tva_pct);}
+  var f=CFG.frais;var liv=f.livraison_offert?0:(Number(f.livraison)||0);var mep=f.mise_en_place_offert?0:(Number(f.mise_en_place)||0);var fraisHT=liv+mep;var tvaFrais=fraisHT*0.20;
+  var totalHT=itemsHT+fraisHT;var tva=tvaItems+tvaFrais;var ttc=totalHT+tva;
+  return {itemsHT:r2(itemsHT),fraisHT:r2(fraisHT),totalHT:r2(totalHT),tva:r2(tva),ttc:r2(ttc),minis:totalMinis()};
+}
+// --- récap minis (box prêtes + custom) ---
+function aggMinis(){
+  var acc={},order=[];
+  function add(nm,n){if(acc[nm]==null){acc[nm]=0;order.push(nm);}acc[nm]+=n;}
+  for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o)continue;var q=Number(lines[i].qty)||0;if(q<=0)continue;
+    if(o.category==="box_mini"&&o.composition){var segs=String(o.composition).split(/\\s*·\\s*/);for(var j=0;j<segs.length;j++){var m=segs[j].match(/^(\\d+)\\s+(.+)$/);if(!m)continue;add(m[2].replace(/^\\s+|\\s+$/g,""),parseInt(m[1],10)*q);}}}
+  for(var k in custom){if(!custom.hasOwnProperty(k))continue;var oc=MAP[k];if(!oc)continue;add(oc.name,custom[k]);}
+  var out=[];for(var z=0;z<order.length;z++)out.push({name:order[z],count:acc[order[z]]});return out;
+}
+// --- rendus ---
+function renderPret(){
+  var items=CFG.catalogue.filter(function(o){return o.category==="box_mini";});
+  var H="";for(var i=0;i<items.length;i++){var o=items[i];var li=findLine(o.id);var qn=li>-1?lines[li].qty:0;
+    var comp=o.composition||"";
+    H+='<div class="pbox"><div class="pbox-h"><div class="pbox-n">'+o.name+'</div><div class="pbox-p">'+eur(o.pv_ht)+'</div></div>'+
+       (comp?'<div class="pbox-c">'+comp+'</div>':'')+
+       '<div class="pbox-f"><span class="pbox-sz">'+(Number(o.size_pers)||0)+' pièces</span>'+
+       (qn>0?'<span class="q"><b onclick="decPret(\\''+o.id+'\\')">−</b><span>'+qn+'</span><b onclick="addPret(\\''+o.id+'\\')">+</b></span>':'<button class="pbox-add" onclick="addPret(\\''+o.id+'\\')">Ajouter</button>')+
+       '</div></div>';}
+  document.getElementById("pretlist").innerHTML=H||'<div style="opacity:.5;font-size:12px;padding:8px">Aucune box disponible.</div>';
+}
+function addPret(id){var i=findLine(id);if(i>-1)lines[i].qty++;else lines.push({id:id,qty:1});render();}
+function decPret(id){var i=findLine(id);if(i<0)return;lines[i].qty--;if(lines[i].qty<=0)lines.splice(i,1);render();}
+function renderCustom(){
+  // catalogue des 4 minis
+  var H="";for(var i=0;i<UNIT.length;i++){var o=UNIT[i];var qn=custom[o.id]||0;
+    H+='<div class="urow"><div class="urow-l"><div class="urow-n">'+o.name+'</div>'+(o.tagline?'<div class="urow-s">'+o.tagline+'</div>':'')+'</div>'+
+       '<div class="urow-r"><span class="urow-p">'+eur(o.pv_ht)+'</span><span class="q"><b onclick="decUnit(\\''+o.id+'\\')">−</b><span>'+qn+'</span><b onclick="addUnit(\\''+o.id+'\\')">+</b></span></div></div>';}
+  document.getElementById("unitlist").innerHTML=H;
+  // jauge multi-box
+  var p=customPieces();var nb=customBoxCount();var fill=curBoxFill();
+  var pct=Math.round(fill/BOX_SIZE*100);
+  var g=document.getElementById("cmbar");if(g)g.style.width=pct+"%";
+  var valid=customValid();var need=customNeeded();
+  var lbl="";
+  if(p===0){lbl='<span class="cm-empty">Ajoutez des minis pour composer votre première box (35 à 40 pièces).</span>';}
+  else{
+    var boxTxt='Box '+nb+' : '+fill+'/'+BOX_SIZE;
+    if(valid){lbl='<span class="cm-ok">'+boxTxt+' · '+p+' minis au total ✓</span>';}
+    else{lbl='<span class="cm-warn">'+boxTxt+' · il manque '+need+' mini'+(need>1?'s':'')+' pour finir cette box (min. '+BOX_MIN+')</span>';}
+  }
+  var lblEl=document.getElementById("cmlabel");if(lblEl)lblEl.innerHTML=lbl;
+  var barWrap=document.getElementById("cmbarwrap");if(barWrap){barWrap.style.borderColor=valid?"#191923":"#CC0066";}
+  var gbar=document.getElementById("cmbar");if(gbar)gbar.style.background=valid?"#FF82D7":"#CC0066";
+}
+function renderMiniRecap(){
+  var a=aggMinis();var card=document.getElementById("recapcard");
+  if(!a.length){card.style.display="none";return;}card.style.display="block";
+  var H="";for(var i=0;i<a.length;i++){H+='<div class="mr-row"><span class="mr-n">'+a[i].name+'</span><span class="mr-c">'+a[i].count+'</span></div>';}
+  var P=pax();var tot=totalMinis();
+  H+='<div class="mr-tot"><span>'+tot+' minis au total</span><span>'+(P>0?(tot/P).toFixed(1).replace(".",","):"0")+' / pers</span></div>';
+  document.getElementById("minirecap").innerHTML=H;
+}
+function renderLive(){
+  var liveLine=null;for(var k=0;k<lines.length;k++){var oo=MAP[lines[k].id];if(oo&&oo.category==="live_forfait"){liveLine=oo;break;}}
+  var lc=document.getElementById("livecard");
+  // liste des forfaits live dispo
+  var forfaits=CFG.catalogue.filter(function(o){return o.category==="live_forfait";});
+  var H="";for(var i=0;i<forfaits.length;i++){var o=forfaits[i];var on=findLine(o.id)>-1;
+    H+='<div class="lrow'+(on?" on":"")+'" onclick="toggleLive(\\''+o.id+'\\')"><div class="lrow-l"><div class="lrow-n">'+o.name+(on?' ✓':'')+'</div><div class="lrow-s">'+(o.composition||"")+'</div></div><div class="lrow-p">'+eur(o.pv_ht)+'</div></div>';}
+  document.getElementById("livelist").innerHTML=H||'<div style="opacity:.5;font-size:12px;padding:8px">Aucune animation disponible.</div>';
+  // bandeau "Formule Livraison" si aucun live choisi
+  var hasLive=!!liveLine;
+  var fl=document.getElementById("formlivr");
+  if(fl)fl.style.display=hasLive?"none":"block";
+}
+function toggleLive(id){var i=findLine(id);if(i>-1){lines.splice(i,1);}else{
+  // un seul forfait live à la fois
+  for(var j=lines.length-1;j>=0;j--){var o=MAP[lines[j].id];if(o&&o.category==="live_forfait")lines.splice(j,1);}
+  lines.push({id:id,qty:1});}render();}
+function scrollToLive(){var el=document.getElementById("livecard");if(el)el.scrollIntoView({behavior:"smooth",block:"start"});}
+function renderDrinks(){
+  var items=CFG.catalogue.filter(function(o){return o.subcategory==="beverage";});
+  var H="";for(var i=0;i<items.length;i++){var o=items[i];var li=findLine(o.id);var qn=li>-1?lines[li].qty:0;
+    H+='<div class="drow"><span class="drow-n">'+o.name+'</span><div class="drow-r"><span class="drow-p">'+eur(o.pv_ht)+'</span><span class="q"><b onclick="decPret(\\''+o.id+'\\')">−</b><span>'+qn+'</span><b onclick="addPret(\\''+o.id+'\\')">+</b></span></div></div>';}
+  document.getElementById("drinklist").innerHTML=H||'<div style="opacity:.5;font-size:12px;padding:8px">—</div>';
+}
+function renderCart(){
+  var L="";
+  // box prêtes + autres lignes
+  for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o)continue;var lt=(Number(o.pv_ht)||0)*lines[i].qty;
+    var sub="";if(o.category==="box_mini"){sub=(o.composition||"")+" · "+(lines[i].qty*(Number(o.size_pers)||0))+" pièces";}else if(o.category==="live_forfait"){sub="Animation live";}
+    L+='<div class="line"><div class="line-main"><span class="line-n">'+o.name+'</span><span class="q"><b onclick="decPret(\\''+o.id+'\\')">−</b><span>'+lines[i].qty+'</span><b onclick="addPret(\\''+o.id+'\\')">+</b></span><span class="line-t">'+eur(lt)+'</span></div>'+(sub?'<div class="line-sub">'+sub+'</div>':'')+'</div>';}
+  // box sur mesure (groupée)
+  var cp=customPieces();
+  if(cp>0){var ctot=0;var detail=[];for(var u=0;u<UNIT.length;u++){var ou=UNIT[u];var q=custom[ou.id]||0;if(q>0){ctot+=q*(Number(ou.pv_ht)||0);detail.push(q+" "+ou.name);}}
+    L+='<div class="line"><div class="line-main"><span class="line-n">🥪 Votre Box sur mesure ('+customBoxCount()+' box · '+cp+' minis)</span><span class="line-t">'+eur(ctot)+'</span></div><div class="line-sub">'+detail.join(" · ")+'</div></div>';}
+  document.getElementById("lines").innerHTML=L||'<div style="padding:10px;text-align:center;opacity:.5;font-size:12px">Votre panier est vide.</div>';
+}
+function render(){
+  renderPret();renderCustom();renderLive();renderDrinks();renderCart();renderMiniRecap();
+  var t=compute();var P=pax();
+  document.getElementById("tht").textContent=eur(t.totalHT);
+  var f3=CFG.frais;var fr="";
+  if(f3.livraison_offert)fr+='<div class="frow"><span>Livraison</span><span class="off">Offerte ✓</span></div>';else if((Number(f3.livraison)||0)>0)fr+='<div class="frow"><span>Livraison</span><span>'+eur(f3.livraison)+'</span></div>';
+  if(f3.mise_en_place_offert)fr+='<div class="frow"><span>Mise en place</span><span class="off">Offerte ✓</span></div>';else if((Number(f3.mise_en_place)||0)>0)fr+='<div class="frow"><span>Mise en place</span><span>'+eur(f3.mise_en_place)+'</span></div>';
+  document.getElementById("fraisrows").innerHTML=fr;
+  document.getElementById("ttva").textContent=eur(t.tva);
+  document.getElementById("tttc").textContent=eur(t.ttc);
+  document.getElementById("tpp").textContent="soit "+eur(P>0?t.ttc/P:0)+" / pers";
+  // jauge couverture globale
+  var reco=Math.round(P*(Number(CFG.perPersDefault)||3));var perGuest=P>0?(t.minis/P):0;
+  var pct=reco>0?Math.min(100,Math.round(t.minis/reco*100)):100;
+  document.getElementById("covbar").style.width=pct+"%";
+  document.getElementById("covtxt").textContent=t.minis+" minis";
+  document.getElementById("covhint").innerHTML='<span style="background:#FFEB5A;border:1.5px solid #191923;border-radius:10px;padding:2px 9px">'+perGuest.toFixed(1).replace(".",",")+' minis / invité</span>';
+  // CTA + validation box sur mesure
+  var cta=document.getElementById("cta");var ch=document.getElementById("ctahint");
+  var cv=customValid();
+  var hasItems=(lines.length>0||customPieces()>0)&&t.minis>0;
+  if(hasItems&&cv){cta.disabled=false;cta.style.background="#FF82D7";cta.style.color="#fff";cta.style.cursor="pointer";cta.style.boxShadow="3px 3px 0 #191923";ch.textContent="PDF final + signature électronique";}
+  else{cta.disabled=true;cta.style.background="#EBEBEB";cta.style.color="#999";cta.style.cursor="not-allowed";cta.style.boxShadow="none";
+    if(!cv){var need=customNeeded();ch.innerHTML='<span style="color:#CC0066;font-weight:900">Complétez votre box sur mesure : il manque '+need+' mini'+(need>1?'s':'')+' (min. '+BOX_MIN+'/box)</span>';}
+    else{ch.textContent="Ajoutez au moins un article";}}
+}
+function valider(){var t=compute();var P=pax();if((lines.length===0&&customPieces()===0)||t.minis<=0)return;if(!customValid())return;
+  // fusionner custom dans des lignes live_mini pour l'envoi
+  var outLines=lines.slice();
+  for(var k in custom){if(custom.hasOwnProperty(k)&&custom[k]>0)outLines.push({id:k,qty:custom[k]});}
+  var btn=document.getElementById("cta");btn.disabled=true;document.getElementById("ov").style.display="flex";
+  fetch("/api/catering/configure",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({devisId:CFG.devisId,variantKey:CFG.variantKey,pax:P,lines:outLines})})
+  .then(function(r){return r.json();}).then(function(d){if(d&&d.ok&&d.signUrl){window.location.href=d.signUrl;}else{document.getElementById("ov").style.display="none";btn.disabled=false;alert((d&&d.error)||"Une erreur est survenue. Merci de réessayer ou de nous écrire à events@meshuga.fr");}})
+  .catch(function(){document.getElementById("ov").style.display="none";btn.disabled=false;alert("Connexion impossible, merci de réessayer.");});
+}
+document.getElementById("pax").addEventListener("input",render);
+render();
+`
 
 export function buildDevisConfigHtml(payload: ConfigPayload): string {
   var ev = payload.event
@@ -349,6 +448,44 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
     '.mr-c{font-weight:900;color:#FF82D7;font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:10px}' +
     '.mr-tot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;background:#FFEB5A;border:2px solid #191923;border-radius:7px;padding:7px 11px;font-weight:900;font-size:13px;box-shadow:2px 2px 0 #191923}' +
     '.boxhint{background:#FFF5FB;border:1.5px solid #FF82D7;border-radius:8px;padding:8px 11px;font-size:12px;font-weight:600;color:#191923;line-height:1.5;margin-bottom:10px}' +
+    // Box prêtes
+    '.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:3px}' +
+    '.sec-t{font-family:Yellowtail,cursive;font-size:20px;line-height:1}' +
+    '.sec-d{font-size:11.5px;color:#888;margin-bottom:10px;line-height:1.4}' +
+    '.pbox{border:1.5px solid #191923;border-radius:8px;padding:10px 11px;margin-bottom:8px;background:#fff}' +
+    '.pbox-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}' +
+    '.pbox-n{font-size:13px;font-weight:900}' +
+    '.pbox-p{font-size:13px;font-weight:900;color:#FF82D7;white-space:nowrap}' +
+    '.pbox-c{font-size:11px;color:#8a8a92;line-height:1.4;margin:3px 0 8px}' +
+    '.pbox-f{display:flex;justify-content:space-between;align-items:center;gap:8px}' +
+    '.pbox-sz{font-size:11px;font-weight:700;color:#999;background:#F3EFE2;border-radius:10px;padding:2px 9px}' +
+    '.pbox-add{background:#FFEB5A;border:1.5px solid #191923;border-radius:7px;padding:5px 14px;font-size:12px;font-weight:900;cursor:pointer;box-shadow:2px 2px 0 #191923}' +
+    // Box sur mesure
+    '.cmbox{background:#FFF7FC;border:2px solid #FF82D7;border-radius:9px;padding:12px;margin-bottom:12px;box-shadow:3px 3px 0 #FF82D7}' +
+    '.cm-gauge-wrap{margin:10px 0 8px}' +
+    '.cmbarout{height:22px;background:#fff;border:2px solid #191923;border-radius:10px;overflow:hidden}' +
+    '.cmbarin{height:100%;width:0;background:#FF82D7;transition:width .15s,background .15s}' +
+    '.cmlabel{font-size:12.5px;font-weight:800;margin-top:7px;line-height:1.4}' +
+    '.cm-ok{color:#1a8a4a}.cm-warn{color:#CC0066}.cm-empty{color:#888;font-weight:600}' +
+    '.urow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed #EBD7E6}' +
+    '.urow:last-child{border-bottom:0}' +
+    '.urow-n{font-size:13px;font-weight:800}.urow-s{font-size:11px;color:#8a8a92;margin-top:2px;line-height:1.35}' +
+    '.urow-r{display:flex;align-items:center;gap:10px;flex-shrink:0}' +
+    '.urow-p{font-size:12.5px;font-weight:900;color:#FF82D7;white-space:nowrap}' +
+    // Formule livraison (rappel sobre)
+    '.formlivr{background:#fff;border:2px solid #191923;border-radius:9px;padding:12px 14px;margin-bottom:12px;box-shadow:3px 3px 0 #191923}' +
+    '.fl-t{font-size:13px;font-weight:900;letter-spacing:.3px;margin-bottom:3px}' +
+    '.fl-d{font-size:12px;color:#555;line-height:1.5;margin-bottom:9px}' +
+    '.fl-btn{background:#191923;color:#FFEB5A;border:none;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:900;cursor:pointer;letter-spacing:.3px}' +
+    // Live cooking
+    '.lrow{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:10px;border:1.5px solid #191923;border-radius:8px;margin-bottom:8px;cursor:pointer;background:#fff}' +
+    '.lrow.on{background:#FFF7FC;border-color:#FF82D7;box-shadow:2px 2px 0 #FF82D7}' +
+    '.lrow-n{font-size:13px;font-weight:900}.lrow-s{font-size:11px;color:#777;line-height:1.4;margin-top:3px}' +
+    '.lrow-p{font-size:13px;font-weight:900;color:#FF82D7;white-space:nowrap}' +
+    // Boissons
+    '.drow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed #eee}' +
+    '.drow:last-child{border-bottom:0}.drow-n{font-size:13px;font-weight:700}' +
+    '.drow-r{display:flex;align-items:center;gap:10px}.drow-p{font-size:12px;font-weight:900;color:#FF82D7}' +
     '.overlay{position:fixed;inset:0;background:rgba(255,253,245,.9);display:none;align-items:center;justify-content:center;font-size:18px;font-weight:900;z-index:99}' +
     '.foot{margin-top:30px;padding-top:14px;border-top:1px solid #EBEBEB;text-align:center;font-size:11px;color:#888;line-height:1.7}'
 
@@ -375,18 +512,44 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
           '</div>' +
         '</div>' +
         '<div id="covhint" style="font-size:13px;font-weight:900;margin-top:8px"></div>' +
-        '<div id="perpers" style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:12px;padding-top:11px;border-top:1px dashed #E6E0CF">' +
-          '<span style="font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:#7a7a82">Pièces / personne</span>' +
-          '<span id="ppchips" style="display:flex;gap:7px"></span>' +
-          '<span id="ppnote" style="font-size:11px;color:#888;font-weight:700"></span>' +
-        '</div>' +
       '</div>' +
       '<div class="gridmain">' +
         '<div>' +
           '<div class="card"><div class="yt" style="font-size:17px;margin-bottom:4px">Votre panier</div><div id="lines"></div></div>' +
+
+          // BLOC 1 — Nos box prêtes
+          '<div class="card">' +
+            '<div class="sec-h"><span class="sec-t">Nos box prêtes</span></div>' +
+            '<div class="sec-d">Nos assortiments signature, prêts à dévorer. Chaque box = 40 minis dressés par nos soins.</div>' +
+            '<div id="pretlist"></div>' +
+          '</div>' +
+
+          // BLOC 2 — Votre Box sur mesure
+          '<div class="cmbox">' +
+            '<div class="sec-h"><span class="sec-t">Votre Box sur mesure</span></div>' +
+            '<div class="sec-d">Composez votre propre box en mélangeant nos minis à l&#39;unité. Chaque box accueille de <b>35 à 40 minis</b> — au-delà, une nouvelle box démarre automatiquement.</div>' +
+            '<div id="unitlist"></div>' +
+            '<div class="cm-gauge-wrap">' +
+              '<div class="cmbarout" id="cmbarwrap"><div class="cmbarin" id="cmbar"></div></div>' +
+              '<div class="cmlabel" id="cmlabel"></div>' +
+            '</div>' +
+          '</div>' +
+
+          // Rappel "Formule Livraison" (si pas de live cooking)
+          '<div class="formlivr" id="formlivr" style="display:none">' +
+            '<div class="fl-t">Formule Livraison</div>' +
+            '<div class="fl-d">Vos box arrivent prêtes à servir, dressées par nos soins et livrées sur place. Envie d&#39;un chef qui cuisine vos minis en direct devant vos invités ? Découvrez le Live Cooking.</div>' +
+            '<button class="fl-btn" onclick="scrollToLive()">Ajouter le Live Cooking →</button>' +
+          '</div>' +
+
+          // BLOC 3 — Live cooking
+          '<div class="card" id="livecard"><div class="sec-h"><span class="sec-t">🔥 Live cooking</span></div><div class="sec-d">Un chef Meshuga prépare vos minis en direct, devant vos invités. En option.</div><div id="livelist"></div></div>' +
+
+          // BLOC 4 — Boissons
+          '<div class="card"><div class="sec-h"><span class="sec-t">🥤 Boissons</span></div><div class="sec-d">À ajouter selon vos envies.</div><div id="drinklist"></div></div>' +
+
+          // Récap minis
           '<div class="card" id="recapcard" style="display:none"><div class="yt" style="font-size:17px;margin-bottom:6px">Le détail de vos minis</div><div style="font-size:11px;color:#888;margin-bottom:8px">Le nombre total de chaque mini, toutes vos box réunies.</div><div id="minirecap"></div></div>' +
-          '<div class="card" id="livecard" style="display:none;background:#FFF7FC;border-color:#FF82D7"><div style="font-size:13px;font-weight:900;margin-bottom:4px">🔥 Live cooking — ce qui est inclus</div><div id="liveincl" style="font-size:11.5px;color:#555;line-height:1.6;margin-bottom:8px"></div><div id="livextra"></div></div>' +
-          '<div class="card"><div class="yt" style="font-size:17px;margin-bottom:8px">Ajouter à votre formule</div><div class="boxhint">🥪 Vous pouvez composer votre box sur mesure ! Mélangez les minis comme vous voulez — gardez simplement entre <b>35 et 40 minis par box</b> pour un dressage au top.</div><div id="addcats" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px"></div><div id="addlist" style="max-height:220px;overflow-y:auto"></div></div>' +
         '</div>' +
         '<div>' +
           '<div class="card" style="position:sticky;top:10px">' +
