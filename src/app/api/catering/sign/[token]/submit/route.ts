@@ -154,7 +154,9 @@ async function regenerateSignedPdf(
   signerName: string,
   verifiedPhone: string,
   ip: string,
-  documentHash: string
+  documentHash: string,
+  channel: string,
+  verifiedEmail: string
 ) {
   var cfg = d.config_data || {}
   var rawLines = Array.isArray(cfg.lines) ? cfg.lines : []
@@ -245,7 +247,9 @@ async function regenerateSignedPdf(
       client: {
         name: signerName,
         signed_at: signedAt,
-        phone: verifiedPhone,
+        channel: channel,
+        phone: channel === 'sms' ? verifiedPhone : '',
+        email: channel === 'email' ? verifiedEmail : '',
         ip: ip,
         document_sha256: documentHash,
         tz: clientMeta.tz || 'Europe/Paris'
@@ -310,6 +314,7 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
   var acceptedTerms = body.acceptedTerms === true
   var acceptedAccord = body.acceptedAccord === true
   var meta = body.meta && typeof body.meta === 'object' ? body.meta : {}
+  var wantUpdateContactEmail = body.updateContactEmail === true
 
   if (!acceptedTerms || !acceptedAccord) return bad('Vous devez accepter les conditions pour signer.')
   if (signerName.length < 2) return bad('Merci d\u2019indiquer le nom du signataire.')
@@ -321,7 +326,7 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
 
   var res = await supabase
     .from('devis')
-    .select('id, numero, statut, config_data, total_ttc, client_email, client_nom, client_contact, client_phone, event_date, event_lieu, event_format, item_format, livraison, livraison_offert, mise_en_place, mise_en_place_offert, notes, variant_chosen, nb_personnes, pdf_storage_path, signature_status, signed_at, signature_otp_hash, signature_otp_expires_at, signature_otp_phone, signature_otp_attempts')
+    .select('id, numero, statut, config_data, total_ttc, client_email, client_nom, client_contact, client_phone, event_date, event_lieu, event_format, item_format, livraison, livraison_offert, mise_en_place, mise_en_place_offert, notes, variant_chosen, nb_personnes, pdf_storage_path, signature_status, signed_at, signature_otp_hash, signature_otp_expires_at, signature_otp_phone, signature_otp_email, signature_otp_channel, signature_otp_attempts, prospect_id')
     .eq('signature_token', token)
     .single()
   if (res.error || !res.data) return bad('Lien invalide', 404)
@@ -346,14 +351,19 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
       .from('devis')
       .update({ signature_otp_attempts: (Number(d.signature_otp_attempts) || 0) + 1 })
       .eq('id', d.id)
-    return bad('Code incorrect. Vérifiez le SMS reçu.')
+    return bad('Code incorrect. Vérifiez le code reçu.')
   }
 
   // --- Code valide : on signe ---
   var signedAt = new Date().toISOString()
   var ip = clientIp(req)
   var ua = req.headers.get('user-agent') || ''
+  var channel = String(d.signature_otp_channel || 'sms').toLowerCase()
+  if (channel !== 'email') channel = 'sms'
   var verifiedPhone = d.signature_otp_phone || ''
+  var verifiedEmail = d.signature_otp_email || ''
+  // Destinataire vérifié (selon canal) — sert au hash + à l'affichage
+  var verifiedDest = channel === 'email' ? verifiedEmail : verifiedPhone
 
   var hashInput = JSON.stringify({
     devis_id: d.id,
@@ -361,21 +371,27 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
     config: d.config_data || null,
     signer_name: signerName,
     signature_typed: signatureTyped,
-    phone: verifiedPhone,
+    channel: channel,
+    dest: verifiedDest,
     signed_at: signedAt
   })
   var documentHash = createHash('sha256').update(hashInput).digest('hex')
 
+  var channelLabelLegal = channel === 'email'
+    ? 'Signature électronique vérifiée par code email et horodatée — articles 1366 et 1367 du Code civil (eIDAS).'
+    : 'Signature électronique vérifiée par code SMS et horodatée — articles 1366 et 1367 du Code civil (eIDAS).'
+
   var audit = {
-    method: 'signature_electronique_otp_sms',
+    method: channel === 'email' ? 'signature_electronique_otp_email' : 'signature_electronique_otp_sms',
     signer_name: signerName,
     signature_typed: signatureTyped,
     signed_at: signedAt,
     accepted_terms: acceptedTerms,
     accepted_accord: acceptedAccord,
     otp_verified: true,
-    otp_channel: 'sms',
-    verified_phone: verifiedPhone,
+    otp_channel: channel,
+    verified_phone: channel === 'sms' ? verifiedPhone : '',
+    verified_email: channel === 'email' ? verifiedEmail : '',
     ip: ip,
     user_agent: ua,
     client_meta: {
@@ -386,7 +402,7 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
       client_time: String(meta.clientTime || '')
     },
     document_sha256: documentHash,
-    legal: 'Signature électronique vérifiée par code SMS et horodatée — articles 1366 et 1367 du Code civil (eIDAS).'
+    legal: channelLabelLegal
   }
 
   var upd = await supabase
@@ -395,7 +411,7 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
       signature_status: 'signed',
       signed_at: signedAt,
       signer_name: signerName,
-      signer_phone: verifiedPhone,
+      signer_phone: channel === 'sms' ? verifiedPhone : null,
       signature_audit_data: audit,
       statut: 'accepte',
       signature_otp_hash: null,
@@ -406,10 +422,19 @@ export async function POST(req: NextRequest, ctx: { params: { token: string } })
     .eq('signature_status', d.signature_status)
   if (upd.error) return bad('Enregistrement impossible : ' + upd.error.message, 500)
 
+  // Mise à jour optionnelle de l'email de la fiche contact (si le client l'a demandé) — best-effort
+  if (channel === 'email' && wantUpdateContactEmail && verifiedEmail && d.prospect_id) {
+    try {
+      await supabase.from('prospects').update({ email: verifiedEmail }).eq('id', d.prospect_id)
+    } catch (e) {
+      console.error('[devis-sign] maj email contact échouée:', e)
+    }
+  }
+
   // Régénération du PDF signé (2 signatures + preuves) + ré-archivage — best-effort.
   // Doit tourner AVANT les notifications : l'email d'acompte renvoie vers l'archive.
   try {
-    await regenerateSignedPdf(supabase, d, audit, signedAt, signerName, verifiedPhone, ip, documentHash)
+    await regenerateSignedPdf(supabase, d, audit, signedAt, signerName, verifiedPhone, ip, documentHash, channel, verifiedEmail)
   } catch (e) {
     console.error('[devis-sign] régénération PDF signé échouée (signature conservée):', e)
   }
