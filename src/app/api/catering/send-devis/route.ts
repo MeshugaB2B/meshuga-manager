@@ -104,48 +104,60 @@ function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: 
   var ogBase = (origin || '').replace(/\/$/, '')
   var ctaLabel = 'Je découvre mon devis'
   var ctaImg = ogBase + '/api/og/yellowtail?text=' + encodeURIComponent(ctaLabel) + '&size=32&color=FFFFFF'
+  var heroImg = ogBase + '/api/og/yellowtail?text=' + encodeURIComponent('Votre devis est prêt !') + '&size=40&color=FF82D7'
 
   return (
-    '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<style>@media (max-width:620px){.cardw{width:100%!important}.px{padding-left:22px!important;padding-right:22px!important}}</style>' +
+    '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">' +
+    '<style>' +
+    ':root{color-scheme:light only;supported-color-schemes:light only}' +
+    '@media (max-width:620px){.cardw{width:100%!important}.px{padding-left:22px!important;padding-right:22px!important}}' +
+    // Neutralise la réécriture des couleurs en mode sombre (Apple Mail / Outlook)
+    '[data-ochsdarkmode] .cardw,[data-ochsdarkmode] .lightbg{background:#FFFFFF!important}' +
+    '[data-ochsdarkmode] .rosebg{background:#FF82D7!important}' +
+    '[data-ochsdarkmode] .yellowbg{background:#FFEB5A!important}' +
+    '[data-ochsdarkmode] .pagebg{background:#FFFDF5!important}' +
+    '[data-ochsdarkmode] .ink{color:#191923!important}' +
+    '[data-ochsdarkmode] .white{color:#FFFFFF!important}' +
+    '</style>' +
     '</head>' +
-    '<body style="margin:0;padding:0;background:#FFFDF5;font-family:Arial,Helvetica,sans-serif;color:#191923">' +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFFDF5"><tr><td align="center" style="padding:26px 12px">' +
-      '<table role="presentation" class="cardw" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#FFFFFF;border:3px solid #191923;border-radius:16px;box-shadow:7px 7px 0 #FF82D7">' +
+    '<body class="pagebg" bgcolor="#FFFDF5" style="margin:0;padding:0;background:#FFFDF5;font-family:Arial,Helvetica,sans-serif;color:#191923">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFDF5" class="pagebg" style="background:#FFFDF5"><tr><td align="center" style="padding:26px 12px">' +
+      '<table role="presentation" class="cardw lightbg" width="600" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="width:600px;max-width:600px;background:#FFFFFF;border:3px solid #191923;border-radius:16px;box-shadow:7px 7px 0 #FF82D7">' +
         // Bandeau rose
-        '<tr><td style="background:#FF82D7;border-bottom:3px solid #191923;border-radius:13px 13px 0 0;padding:15px 30px;text-align:center">' +
-          '<div style="color:#FFFFFF;font-size:11px;letter-spacing:3px;font-weight:900;text-transform:uppercase">Meshuga Events &middot; Traiteur Paris</div>' +
+        '<tr><td class="rosebg" bgcolor="#FF82D7" style="background:#FF82D7;border-bottom:3px solid #191923;border-radius:13px 13px 0 0;padding:15px 30px;text-align:center">' +
+          '<div class="white" style="color:#FFFFFF;font-size:11px;letter-spacing:3px;font-weight:900;text-transform:uppercase">Meshuga Events &middot; Traiteur Paris</div>' +
         '</td></tr>' +
         // Logo rose sur blanc
-        '<tr><td class="px" style="padding:26px 30px 0;text-align:center">' +
+        '<tr><td class="px lightbg" bgcolor="#FFFFFF" style="padding:26px 30px 4px;text-align:center;background:#FFFFFF">' +
           '<img src="' + LOGO_PINK + '" alt="Meshuga" height="48" style="height:48px;width:auto;display:inline-block;max-width:70%" />' +
         '</td></tr>' +
-        // Hero
-        '<tr><td class="px" style="padding:16px 30px 2px;text-align:center">' +
-          '<div style="font-size:24px;font-weight:900;line-height:1.2">Votre devis est prêt 🎉</div>' +
-          '<div style="font-size:12px;color:#999;margin-top:5px;letter-spacing:.5px">Devis ' + devisNumero + '</div>' +
+        // Hero — image Yellowtail rose (toujours lisible, jamais réécrit)
+        '<tr><td class="px lightbg" bgcolor="#FFFFFF" style="padding:14px 30px 2px;text-align:center;background:#FFFFFF">' +
+          '<img src="' + heroImg + '" alt="Votre devis est prêt !" height="40" style="height:40px;width:auto;display:inline-block;border:0" />' +
+          '<div class="ink" style="font-size:13px;color:#999;margin-top:8px;letter-spacing:.5px">Devis ' + devisNumero + ' 🎉</div>' +
         '</td></tr>' +
         // Corps du message
-        '<tr><td class="px" style="padding:16px 36px 2px">' + bodyHtml + '</td></tr>' +
+        '<tr><td class="px lightbg ink" bgcolor="#FFFFFF" style="padding:16px 36px 2px;background:#FFFFFF;color:#191923">' + bodyHtml + '</td></tr>' +
         // Bande des 3 étapes
-        '<tr><td class="px" style="padding:14px 30px 2px">' +
-          '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFEB5A;border:2px solid #191923;border-radius:11px;box-shadow:3px 3px 0 #191923"><tr>' +
-            '<td style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">1<br>Choisissez</td>' +
-            '<td style="padding:12px 4px;text-align:center;color:#191923;font-weight:900">&rarr;</td>' +
-            '<td style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">2<br>Personnalisez</td>' +
-            '<td style="padding:12px 4px;text-align:center;color:#191923;font-weight:900">&rarr;</td>' +
-            '<td style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">3<br>Signez</td>' +
+        '<tr><td class="px lightbg" bgcolor="#FFFFFF" style="padding:14px 30px 2px;background:#FFFFFF">' +
+          '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="yellowbg" bgcolor="#FFEB5A" style="background:#FFEB5A;border:2px solid #191923;border-radius:11px;box-shadow:3px 3px 0 #191923"><tr>' +
+            '<td class="ink" style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">1<br>Choisissez</td>' +
+            '<td class="ink" style="padding:12px 4px;text-align:center;color:#191923;font-weight:900">&rarr;</td>' +
+            '<td class="ink" style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">2<br>Personnalisez</td>' +
+            '<td class="ink" style="padding:12px 4px;text-align:center;color:#191923;font-weight:900">&rarr;</td>' +
+            '<td class="ink" style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">3<br>Signez</td>' +
           '</tr></table>' +
         '</td></tr>' +
         // CTA Yellowtail blanc
-        '<tr><td align="center" style="padding:22px 30px 26px">' +
-          '<a href="' + pdfPublicUrl + '" style="display:inline-block;background:#FF82D7;border:3px solid #191923;border-radius:13px;padding:13px 32px;text-decoration:none;box-shadow:5px 5px 0 #191923;color:#FFFFFF !important;font-weight:900;font-size:18px">' +
+        '<tr><td align="center" class="lightbg" bgcolor="#FFFFFF" style="padding:22px 30px 26px;background:#FFFFFF">' +
+          '<a href="' + pdfPublicUrl + '" class="rosebg" bgcolor="#FF82D7" style="display:inline-block;background:#FF82D7;border:3px solid #191923;border-radius:13px;padding:13px 32px;text-decoration:none;box-shadow:5px 5px 0 #191923;color:#FFFFFF !important;font-weight:900;font-size:18px">' +
             '<img src="' + ctaImg + '" alt="' + ctaLabel + ' →" height="32" style="height:32px;width:auto;display:inline-block;border:0;vertical-align:middle" />' +
           '</a>' +
           '<div style="font-size:11px;color:#999;margin-top:13px">En quelques minutes, en ligne. Le détail est aussi joint à ce mail.</div>' +
         '</td></tr>' +
         // Footer
-        '<tr><td style="background:#FFFDF5;border-top:1px solid #EEE;border-radius:0 0 13px 13px;padding:18px 30px;text-align:center;font-size:11px;color:#888;line-height:1.7">' +
+        '<tr><td class="pagebg" bgcolor="#FFFDF5" style="background:#FFFDF5;border-top:1px solid #EEE;border-radius:0 0 13px 13px;padding:18px 30px;text-align:center;font-size:11px;color:#888;line-height:1.7">' +
           'Une question ? Répondez simplement à ce mail, on revient vers vous.<br>' +
           '<strong style="color:#191923">SAS AEGIA FOOD</strong> (enseigne MESHUGA) &middot; 3 rue Vavin, 75006 Paris<br>' +
           '<a href="mailto:events@meshuga.fr" style="color:#FF82D7;text-decoration:none">events@meshuga.fr</a> &middot; meshuga.fr' +
