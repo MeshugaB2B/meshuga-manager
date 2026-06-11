@@ -61,26 +61,35 @@ export function buildAcompteEmailHtml(p: AcompteEmailPayload): string {
 
   return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">' +
-    '<style>:root{color-scheme:light only;supported-color-schemes:light only}@media (max-width:600px){.cardw{width:100%!important}.px{padding-left:22px!important;padding-right:22px!important}}</style>' +
+    '<style>' +
+    ':root{color-scheme:light only;supported-color-schemes:light only}' +
+    '@media (max-width:600px){.cardw{width:100%!important}.px{padding-left:22px!important;padding-right:22px!important}}' +
+    '[data-ochsdarkmode] .cardw,[data-ochsdarkmode] .lightbg{background:#FFFFFF!important}' +
+    '[data-ochsdarkmode] .rosebg{background:#FF82D7!important}' +
+    '[data-ochsdarkmode] .yellowbg{background:#FFEB5A!important}' +
+    '[data-ochsdarkmode] .pagebg{background:#FFFDF5!important}' +
+    '[data-ochsdarkmode] .ink{color:#191923!important}' +
+    '[data-ochsdarkmode] .white{color:#FFFFFF!important}' +
+    '</style>' +
     '</head>' +
-    '<body style="margin:0;padding:0;background:#FFFDF5;font-family:Arial,Helvetica,sans-serif;color:#191923">' +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFFDF5"><tr><td align="center" style="padding:26px 12px">' +
-    '<table role="presentation" class="cardw" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#FFFFFF;border:3px solid #191923;border-radius:16px;box-shadow:7px 7px 0 #FF82D7">' +
+    '<body class="pagebg" bgcolor="#FFFDF5" style="margin:0;padding:0;background:#FFFDF5;font-family:Arial,Helvetica,sans-serif;color:#191923">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFDF5" class="pagebg" style="background:#FFFDF5"><tr><td align="center" style="padding:26px 12px">' +
+    '<table role="presentation" class="cardw lightbg" width="600" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="width:600px;max-width:600px;background:#FFFFFF;border:3px solid #191923;border-radius:16px;box-shadow:7px 7px 0 #FF82D7">' +
     // Bandeau rose avec logotype blanc + Yellowtail
-    '<tr><td style="background:#FF82D7;border-bottom:3px solid #191923;border-radius:13px 13px 0 0;padding:24px 30px 20px;text-align:center">' +
+    '<tr><td class="rosebg" bgcolor="#FF82D7" style="background:#FF82D7;border-bottom:3px solid #191923;border-radius:13px 13px 0 0;padding:24px 30px 20px;text-align:center">' +
     '<img src="' + whiteLogo + '" alt="Meshuga" height="40" style="height:40px;width:auto;display:inline-block;max-width:65%" />' +
     '<div style="margin-top:10px"><img src="' + yt + '" alt="Merci, c&#39;est signé !" height="30" style="height:30px;width:auto;display:inline-block;border:0" /></div>' +
-    '<div style="color:#FFFFFF;font-size:11px;letter-spacing:2px;font-weight:900;text-transform:uppercase;margin-top:8px">Events &middot; Paris</div>' +
+    '<div class="white" style="color:#FFFFFF;font-size:11px;letter-spacing:2px;font-weight:900;text-transform:uppercase;margin-top:8px">Events &middot; Paris</div>' +
     '</td></tr>' +
     // Corps
-    '<tr><td class="px" style="padding:26px 34px 4px">' +
+    '<tr><td class="px lightbg ink" bgcolor="#FFFFFF" style="padding:26px 34px 4px;background:#FFFFFF;color:#191923">' +
     '<p style="font-size:17px;margin:0 0 12px;font-weight:700">Bonjour ' + escHtml(p.clientNom || '') + ',</p>' +
     '<p style="font-size:15px;line-height:1.65;margin:0 0 8px">Un grand merci pour votre confiance — votre devis <strong>N&deg; ' + escHtml(p.numero) + '</strong> est signé et votre commande est confirmée. 🎉</p>' +
     '<p style="font-size:15px;line-height:1.65;margin:0 0 16px">On a hâte de régaler vos invités ! Voici le récapitulatif et les modalités de règlement de l&#39;acompte.</p>' +
     (detailRows ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #EEE;border-bottom:1px solid #EEE;margin:0 0 16px">' + detailRows + '</table>' : '') +
     // Acompte
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FFEB5A;border:3px solid #191923;border-radius:12px;box-shadow:3px 3px 0 #191923;margin:0 0 16px">' +
-    '<tr><td style="padding:15px 18px">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="yellowbg" bgcolor="#FFEB5A" style="background:#FFEB5A;border:3px solid #191923;border-radius:12px;box-shadow:3px 3px 0 #191923;margin:0 0 16px">' +
+    '<tr><td class="ink" style="padding:15px 18px;color:#191923">' +
     '<div style="font-size:13px;color:#191923;font-weight:700">Acompte à régler (30 % du total TTC)</div>' +
     '<div style="font-size:28px;font-weight:900;margin-top:3px;color:#191923">' + eur(p.acompte) + '</div>' +
     '<div style="font-size:12px;color:#5a5a3a;margin-top:4px">Total TTC : ' + eur(p.totalTTC) + ' &middot; Solde : ' + eur(p.solde) + '</div>' +
@@ -89,12 +98,12 @@ export function buildAcompteEmailHtml(p: AcompteEmailPayload): string {
     '<p style="font-size:13px;color:#555;line-height:1.6;margin:16px 0 0">Le solde (' + eur(p.solde) + ') est à régler <strong>au plus tard 5 jours ouvrés avant l&#39;événement</strong>, sauf accord préalable écrit. La commande devient ferme à réception de l&#39;acompte.</p>' +
     '</td></tr>' +
     // CTA
-    '<tr><td align="center" style="padding:8px 30px 26px">' +
-    '<a href="' + escHtml(p.viewUrl) + '" style="display:inline-block;background:#FF82D7;border:3px solid #191923;border-radius:13px;padding:13px 30px;text-decoration:none;box-shadow:5px 5px 0 #191923;color:#FFFFFF !important;font-weight:900;font-size:16px">Voir mon devis signé &rarr;</a>' +
+    '<tr><td align="center" class="lightbg" bgcolor="#FFFFFF" style="padding:8px 30px 26px;background:#FFFFFF">' +
+    '<a href="' + escHtml(p.viewUrl) + '" class="rosebg" bgcolor="#FF82D7" style="display:inline-block;background:#FF82D7;border:3px solid #191923;border-radius:13px;padding:13px 30px;text-decoration:none;box-shadow:5px 5px 0 #191923;color:#FFFFFF !important;font-weight:900;font-size:16px">Voir mon devis signé &rarr;</a>' +
     '<div style="font-size:13px;color:#888;line-height:1.6;margin-top:18px">Une question ? Répondez simplement à ce mail.<br>À très vite — L&#39;équipe Meshuga Events</div>' +
     '</td></tr>' +
     // Footer
-    '<tr><td style="background:#FFFDF5;border-top:1px solid #EEE;border-radius:0 0 13px 13px;padding:16px 24px;font-size:11px;color:#999;line-height:1.5;text-align:center">SAS AEGIA FOOD (enseigne MESHUGA) &middot; 3 rue Vavin 75006 Paris &middot; <a href="mailto:events@meshuga.fr" style="color:#FF82D7;text-decoration:none">events@meshuga.fr</a><br>TVA FR31904639531 &middot; RCS Paris 904 639 531</td></tr>' +
+    '<tr><td class="pagebg" bgcolor="#FFFDF5" style="background:#FFFDF5;border-top:1px solid #EEE;border-radius:0 0 13px 13px;padding:16px 24px;font-size:11px;color:#999;line-height:1.5;text-align:center">SAS AEGIA FOOD (enseigne MESHUGA) &middot; 3 rue Vavin 75006 Paris &middot; <a href="mailto:events@meshuga.fr" style="color:#FF82D7;text-decoration:none">events@meshuga.fr</a><br>TVA FR31904639531 &middot; RCS Paris 904 639 531</td></tr>' +
     '</table></td></tr></table></body></html>'
 }
 
