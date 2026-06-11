@@ -21,6 +21,7 @@ export interface DevisSignPayload {
   perPersTTC: number
   logoUrl: string // logotype BLANC (sur bandeau rose)
   prefillPhone?: string
+  prefillEmail?: string
 }
 
 function esc(s: any): string {
@@ -66,6 +67,10 @@ function sharedHead(title: string): string {
     '.terms{font-size:13px;line-height:1.5;color:#333}' +
     '.chk{display:flex;align-items:flex-start;gap:10px;margin:12px 0;font-size:13.5px;line-height:1.45;cursor:pointer}' +
     '.chk input{width:22px;height:22px;flex:0 0 22px;margin-top:1px;accent-color:#FF82D7}' +
+    '.chk-sm{font-size:12px;margin:9px 0 0}.chk-sm input{width:18px;height:18px;flex:0 0 18px}' +
+    '.chantabs{display:flex;gap:8px;margin:6px 0 4px}' +
+    '.chantab{flex:1;border:2px solid #191923;border-radius:10px;background:#fff;padding:11px;font-size:14px;font-weight:900;cursor:pointer;font-family:inherit;color:#191923}' +
+    '.chantab.on{background:#FF82D7;color:#fff;box-shadow:2px 2px 0 #191923}' +
     '.lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#191923;margin:14px 0 6px}' +
     '.inp{width:100%;border:2px solid #191923;border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;background:#fff}' +
     '.sigprev{margin-top:8px;border:2px dashed #E3C7DA;border-radius:10px;background:#FFFCFE;min-height:70px;display:flex;align-items:center;justify-content:center;font-family:Yellowtail,cursive;font-size:38px;color:#FF82D7;padding:8px 12px;line-height:1.05;word-break:break-word;text-align:center}' +
@@ -134,15 +139,32 @@ export function buildDevisSignHtml(p: DevisSignPayload): string {
     '<input class="inp" id="signerName" placeholder="Ex : Camille Roux" autocomplete="name">' +
     '<div class="sigprev empty" id="sigprev">Votre signature apparaîtra ici</div>' +
 
-    '<div class="lbl">Téléphone mobile (pour recevoir votre code)</div>' +
-    '<input class="inp" id="signerPhone" type="tel" inputmode="tel" placeholder="06 12 34 56 78" autocomplete="tel" value="' + esc(p.prefillPhone || '') + '">' +
+    '<div class="lbl">Comment souhaitez-vous recevoir votre code de vérification ?</div>' +
+    '<div class="chantabs">' +
+      '<button type="button" class="chantab on" id="tabSms">📱 Par SMS</button>' +
+      '<button type="button" class="chantab" id="tabEmail">✉️ Par email</button>' +
+    '</div>' +
 
-    '<button class="cta" id="ctaSend" disabled>Recevoir mon code par SMS</button>' +
-    '<div class="hint" id="hint">Cochez les cases, signez et indiquez votre mobile.</div>' +
+    // Canal SMS
+    '<div id="smsBlock">' +
+      '<div class="lbl">Téléphone mobile (pour recevoir votre code)</div>' +
+      '<input class="inp" id="signerPhone" type="tel" inputmode="tel" placeholder="06 12 34 56 78" autocomplete="tel" value="' + esc(p.prefillPhone || '') + '">' +
+    '</div>' +
+
+    // Canal Email
+    '<div id="emailBlock" style="display:none">' +
+      '<div class="lbl">Adresse email (pour recevoir votre code)</div>' +
+      '<input class="inp" id="signerEmail" type="email" inputmode="email" placeholder="vous@entreprise.fr" autocomplete="email" value="' + esc(p.prefillEmail || '') + '">' +
+      '<label class="chk chk-sm" id="updEmailWrap" style="display:none"><input type="checkbox" id="ckUpdEmail">' +
+      '<span class="terms">Utiliser dorénavant cette adresse pour ce contact (met à jour votre fiche).</span></label>' +
+    '</div>' +
+
+    '<button class="cta" id="ctaSend" disabled>Recevoir mon code</button>' +
+    '<div class="hint" id="hint">Cochez les cases, signez et indiquez vos coordonnées.</div>' +
 
     // Étape 2 : OTP
     '<div class="otpsec" id="otpsec">' +
-    '<div class="otpmsg" id="otpmsg">Un code à 6 chiffres vient de vous être envoyé par SMS.</div>' +
+    '<div class="otpmsg" id="otpmsg">Un code à 6 chiffres vient de vous être envoyé.</div>' +
     '<input class="otpinp" id="otpInput" type="text" inputmode="numeric" maxlength="6" placeholder="······" autocomplete="one-time-code">' +
     '<button class="cta" id="ctaSign" disabled>Signer définitivement</button>' +
     '<button class="resend" id="resendBtn" type="button">Je n&#39;ai pas reçu le code — renvoyer</button>' +
@@ -155,38 +177,53 @@ export function buildDevisSignHtml(p: DevisSignPayload): string {
 
     '<div class="ov" id="ov"><div class="spin"></div><div style="font-weight:700" id="ovmsg">Traitement…</div></div>' +
 
-    '<script>' + buildSignScript(p.token) + '</script>' +
+    '<script>' + buildSignScript(p.token, p.prefillEmail || '') + '</script>' +
     '</body></html>'
 }
 
-function buildSignScript(token: string): string {
+function buildSignScript(token: string, origEmail: string): string {
   return [
     '(function(){',
     'var TOKEN=' + JSON.stringify(token) + ';',
+    'var ORIG_EMAIL=' + JSON.stringify(String(origEmail || '').toLowerCase()) + ';',
+    'var channel="sms";',
     'var ckT=document.getElementById("ckTerms");var ckA=document.getElementById("ckAccord");',
     'var nm=document.getElementById("signerName");var ph=document.getElementById("signerPhone");',
+    'var em=document.getElementById("signerEmail");',
+    'var tabSms=document.getElementById("tabSms");var tabEmail=document.getElementById("tabEmail");',
+    'var smsBlock=document.getElementById("smsBlock");var emailBlock=document.getElementById("emailBlock");',
+    'var updWrap=document.getElementById("updEmailWrap");var ckUpd=document.getElementById("ckUpdEmail");',
     'var prev=document.getElementById("sigprev");var hint=document.getElementById("hint");',
     'var ctaSend=document.getElementById("ctaSend");var otpsec=document.getElementById("otpsec");',
     'var otpInput=document.getElementById("otpInput");var ctaSign=document.getElementById("ctaSign");',
     'var ov=document.getElementById("ov");var ovmsg=document.getElementById("ovmsg");',
     'nm.addEventListener("input",function(){var v=nm.value.trim();if(v){prev.textContent=v;prev.className="sigprev";}else{prev.textContent="Votre signature apparaîtra ici";prev.className="sigprev empty";}refresh1();});',
     'function phoneOk(v){return (v||"").replace(/[^0-9]/g,"").length>=9;}',
-    'function valid1(){return ckT.checked&&ckA.checked&&nm.value.trim().length>1&&phoneOk(ph.value);}',
-    'function refresh1(){var ok=valid1();ctaSend.disabled=!ok;hint.textContent=ok?"Prêt. Recevez votre code pour signer.":"Cochez les cases, signez et indiquez votre mobile.";}',
-    'ckT.addEventListener("change",refresh1);ckA.addEventListener("change",refresh1);ph.addEventListener("input",refresh1);',
+    'function emailOk(v){return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test((v||"").trim());}',
+    'function setChannel(c){channel=c;if(c==="sms"){tabSms.className="chantab on";tabEmail.className="chantab";smsBlock.style.display="";emailBlock.style.display="none";}else{tabEmail.className="chantab on";tabSms.className="chantab";smsBlock.style.display="none";emailBlock.style.display="";}refresh1();}',
+    'tabSms.addEventListener("click",function(){setChannel("sms");});',
+    'tabEmail.addEventListener("click",function(){setChannel("email");});',
+    'function destOk(){return channel==="sms"?phoneOk(ph.value):emailOk(em.value);}',
+    'function valid1(){return ckT.checked&&ckA.checked&&nm.value.trim().length>1&&destOk();}',
+    'function refresh1(){var ok=valid1();ctaSend.disabled=!ok;ctaSend.textContent=channel==="sms"?"Recevoir mon code par SMS":"Recevoir mon code par email";hint.textContent=ok?"Prêt. Recevez votre code pour signer.":"Cochez les cases, signez et indiquez vos coordonnées.";if(channel==="email"){var changed=emailOk(em.value)&&em.value.trim().toLowerCase()!==ORIG_EMAIL&&ORIG_EMAIL!=="";updWrap.style.display=changed?"flex":"none";}}',
+    'ckT.addEventListener("change",refresh1);ckA.addEventListener("change",refresh1);ph.addEventListener("input",refresh1);em.addEventListener("input",refresh1);',
     'otpInput.addEventListener("input",function(){otpInput.value=otpInput.value.replace(/[^0-9]/g,"").slice(0,6);ctaSign.disabled=otpInput.value.length!==6;});',
     'function sendCode(isResend){if(!valid1())return;ov.style.display="flex";ovmsg.textContent=isResend?"Renvoi du code…":"Envoi du code…";',
-    ' fetch("/api/catering/sign/"+TOKEN+"/otp",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone:ph.value.trim(),signerName:nm.value.trim(),signatureTyped:nm.value.trim(),acceptedTerms:ckT.checked,acceptedAccord:ckA.checked})})',
+    ' var payload={channel:channel,signerName:nm.value.trim(),signatureTyped:nm.value.trim(),acceptedTerms:ckT.checked,acceptedAccord:ckA.checked};',
+    ' if(channel==="sms"){payload.phone=ph.value.trim();}else{payload.email=em.value.trim();}',
+    ' fetch("/api/catering/sign/"+TOKEN+"/otp",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})',
     '  .then(function(r){return r.json();}).then(function(d){ov.style.display="none";',
-    '   if(d&&d.ok){otpsec.style.display="block";ctaSend.style.display="none";document.getElementById("otpmsg").textContent="Un code à 6 chiffres vient d\\u2019être envoyé au "+(d.phoneMasked||"numéro indiqué")+".";otpInput.focus();}',
-    '   else{ctaSend.disabled=false;alert((d&&d.error)||"Envoi impossible. Vérifiez votre numéro et réessayez.");}',
+    '   if(d&&d.ok){otpsec.style.display="block";ctaSend.style.display="none";tabSms.disabled=true;tabEmail.disabled=true;var via=(d.channel==="email"?"par email à ":"par SMS au ")+(d.destMasked||"");document.getElementById("otpmsg").textContent="Un code à 6 chiffres vient d\\u2019être envoyé "+via+".";otpInput.focus();}',
+    '   else{ctaSend.disabled=false;alert((d&&d.error)||"Envoi impossible. Vérifiez vos coordonnées et réessayez.");}',
     '  }).catch(function(){ov.style.display="none";ctaSend.disabled=false;alert("Connexion impossible, merci de réessayer.");});',
     '}',
     'ctaSend.addEventListener("click",function(){ctaSend.disabled=true;sendCode(false);});',
     'document.getElementById("resendBtn").addEventListener("click",function(){sendCode(true);});',
     'ctaSign.addEventListener("click",function(){if(otpInput.value.length!==6)return;ctaSign.disabled=true;ov.style.display="flex";ovmsg.textContent="Enregistrement de votre signature…";',
     ' var meta={ua:navigator.userAgent,tz:(Intl&&Intl.DateTimeFormat?Intl.DateTimeFormat().resolvedOptions().timeZone:""),screen:(screen.width+"x"+screen.height),lang:navigator.language,clientTime:new Date().toISOString()};',
-    ' fetch("/api/catering/sign/"+TOKEN+"/submit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({signerName:nm.value.trim(),signatureTyped:nm.value.trim(),phone:ph.value.trim(),otp:otpInput.value,acceptedTerms:ckT.checked,acceptedAccord:ckA.checked,meta:meta})})',
+    ' var sp={signerName:nm.value.trim(),signatureTyped:nm.value.trim(),otp:otpInput.value,acceptedTerms:ckT.checked,acceptedAccord:ckA.checked,channel:channel,meta:meta};',
+    ' if(channel==="sms"){sp.phone=ph.value.trim();}else{sp.email=em.value.trim();sp.updateContactEmail=(ckUpd&&ckUpd.checked)===true;}',
+    ' fetch("/api/catering/sign/"+TOKEN+"/submit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sp)})',
     '  .then(function(r){return r.json();}).then(function(d){',
     '    if(d&&d.ok){document.querySelector(".wrap").innerHTML=' + JSON.stringify(doneInner()) + ';ov.style.display="none";window.scrollTo(0,0);}',
     '    else{ov.style.display="none";ctaSign.disabled=false;alert((d&&d.error)||"Code incorrect ou expiré. Réessayez.");}',
