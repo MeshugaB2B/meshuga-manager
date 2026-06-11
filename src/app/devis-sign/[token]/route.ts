@@ -45,7 +45,7 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
 
   var res = await supabase
     .from('devis')
-    .select('id, numero, statut, client_nom, client_phone, event_date, event_lieu, event_format, item_format, nb_personnes, config_data, variant_chosen, variants, signature_status, signed_at')
+    .select('id, numero, statut, client_nom, client_phone, client_email, event_date, event_lieu, event_format, item_format, nb_personnes, config_data, variant_chosen, variants, signature_status, signed_at')
     .eq('signature_token', token)
     .single()
 
@@ -113,7 +113,8 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     totalTTC: Number(totals.total_ttc) || 0,
     perPersTTC: Number(totals.per_pers_ttc) || 0,
     logoUrl: '/MESHUGA_Logotype_white.png',
-    prefillPhone: d.client_phone || ''
+    prefillPhone: d.client_phone || '',
+    prefillEmail: d.client_email || ''
   }
 
   // Marque comme "vu" (audit léger) sans écraser un état plus avancé
