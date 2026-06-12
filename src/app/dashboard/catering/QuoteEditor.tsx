@@ -126,7 +126,9 @@ var parseVariants = function(d) {
 // ---------- CSS ----------
 
 var QE_CSS =
-  '.qe-root{font-family:"Arial Narrow",Arial,sans-serif;color:#191923}' +
+  '.qe-root{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;max-width:100%}' +
+  '.qe-root *{box-sizing:border-box}' +
+  '.qe-root img,.qe-root input,.qe-root textarea,.qe-root select{max-width:100%}' +
   '.qe-header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:12px}' +
   '.qe-num{font-size:18px;font-weight:900;letter-spacing:.5px}' +
   '.qe-num-sub{font-size:11px;opacity:.6;margin-bottom:4px}' +
@@ -224,7 +226,17 @@ var QE_CSS =
   '.qe-cmbar-in{height:100%;width:0;background:#FF82D7;transition:width .15s,background .15s}' +
   '.qe-cmlabel{font-size:11.5px;font-weight:800;margin-top:6px;line-height:1.35}' +
   '.qe-cm-ok{color:#1a8a4a}.qe-cm-warn{color:#CC0066}.qe-cm-empty{color:#888;font-weight:600}' +
-  '@media(max-width:640px){.qe-picks{grid-template-columns:1fr}.qe-recap-tot{font-size:12px}}'
+  '@media(max-width:640px){' +
+    '.qe-root{overflow-x:hidden}' +
+    '.qe-picks{grid-template-columns:1fr}' +
+    '.qe-fg2{grid-template-columns:1fr}' +
+    '.qe-recap-tot{font-size:12px}' +
+    '.qe-card,.qe-cmbox,.qe-pbox,.qe-modal{max-width:100%}' +
+    '.qe-tab-f{min-width:0}' +
+    '.qe-urow{flex-wrap:wrap}' +
+    '.qe-urow-r{margin-left:auto}' +
+    '.qe-inp{font-size:16px}' +
+  '}'
 
 // ============================================================
 // COMPOSANT
