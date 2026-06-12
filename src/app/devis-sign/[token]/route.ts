@@ -114,7 +114,8 @@ export async function GET(req: NextRequest, ctx: { params: { token: string } }) 
     perPersTTC: Number(totals.per_pers_ttc) || 0,
     logoUrl: '/MESHUGA_Logotype_white.png',
     prefillPhone: d.client_phone || '',
-    prefillEmail: d.client_email || ''
+    prefillEmail: d.client_email || '',
+    devisId: d.id
   }
 
   // Marque comme "vu" (audit léger) sans écraser un état plus avancé
