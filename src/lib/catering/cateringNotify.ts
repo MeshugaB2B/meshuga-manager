@@ -79,23 +79,22 @@ export function buildAcompteEmailHtml(p: AcompteEmailPayload): string {
     '<tr><td class="rosebg" bgcolor="#FF82D7" style="background:#FF82D7;border-bottom:3px solid #191923;border-radius:13px 13px 0 0;padding:24px 30px 20px;text-align:center">' +
     '<img src="' + whiteLogo + '" alt="Meshuga" height="40" style="height:40px;width:auto;display:inline-block;max-width:65%" />' +
     '<div style="margin-top:10px"><img src="' + yt + '" alt="Merci, c&#39;est signé !" height="30" style="height:30px;width:auto;display:inline-block;border:0" /></div>' +
-    '<div class="white" style="color:#FFFFFF;font-size:11px;letter-spacing:2px;font-weight:900;text-transform:uppercase;margin-top:8px">Events &middot; Paris</div>' +
     '</td></tr>' +
     // Corps
     '<tr><td class="px lightbg ink" bgcolor="#FFFFFF" style="padding:26px 34px 4px;background:#FFFFFF;color:#191923">' +
     '<p style="font-size:17px;margin:0 0 12px;font-weight:700">Bonjour ' + escHtml(p.clientNom || '') + ',</p>' +
     '<p style="font-size:15px;line-height:1.65;margin:0 0 8px">Un grand merci pour votre confiance — votre devis <strong>N&deg; ' + escHtml(p.numero) + '</strong> est signé et votre commande est confirmée. 🎉</p>' +
-    '<p style="font-size:15px;line-height:1.65;margin:0 0 16px">On a hâte de régaler vos invités ! Voici le récapitulatif et les modalités de règlement de l&#39;acompte.</p>' +
+    '<p style="font-size:15px;line-height:1.65;margin:0 0 16px">Nous avons hâte de régaler vos invités ! Voici le récapitulatif et les modalités de règlement de l&#39;acompte.</p>' +
     (detailRows ? '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #EEE;border-bottom:1px solid #EEE;margin:0 0 16px">' + detailRows + '</table>' : '') +
     // Acompte
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="yellowbg" bgcolor="#FFEB5A" style="background:#FFEB5A;border:3px solid #191923;border-radius:12px;box-shadow:3px 3px 0 #191923;margin:0 0 16px">' +
     '<tr><td class="ink" style="padding:15px 18px;color:#191923">' +
-    '<div style="font-size:13px;color:#191923;font-weight:700">Acompte à régler (30 % du total TTC)</div>' +
+    '<div style="font-size:13px;color:#191923;font-weight:700">Acompte à régler pour valider votre commande (30 % du total TTC)</div>' +
     '<div style="font-size:28px;font-weight:900;margin-top:3px;color:#191923">' + eur(p.acompte) + '</div>' +
     '<div style="font-size:12px;color:#5a5a3a;margin-top:4px">Total TTC : ' + eur(p.totalTTC) + ' &middot; Solde : ' + eur(p.solde) + '</div>' +
     '</td></tr></table>' +
     ribBlock +
-    '<p style="font-size:13px;color:#555;line-height:1.6;margin:16px 0 0">Le solde (' + eur(p.solde) + ') est à régler <strong>au plus tard 5 jours ouvrés avant l&#39;événement</strong>, sauf accord préalable écrit. La commande devient ferme à réception de l&#39;acompte.</p>' +
+    '<p style="font-size:13px;color:#555;line-height:1.6;margin:16px 0 0"><strong>Votre commande sera définitivement prise en compte dès réception de l&#39;acompte</strong> par virement sur le compte ci-dessus' + (p.eventDateLabel ? ', et au plus tard le <strong>' + escHtml(p.eventDateLabel) + '</strong>' : '') + '. Le solde (' + eur(p.solde) + ') est ensuite à régler <strong>au plus tard 5 jours ouvrés avant l&#39;événement</strong>, sauf accord préalable écrit.</p>' +
     '</td></tr>' +
     // CTA
     '<tr><td align="center" class="lightbg" bgcolor="#FFFFFF" style="padding:8px 30px 26px;background:#FFFFFF">' +
