@@ -16,6 +16,7 @@
 
 import { fmtEur } from './cateringCore'
 import type { LineComputed, VariantTotals, Coverage, OfferingMap, CateringOffering } from './cateringCore'
+import { MESHUGA_LOGO_PINK_DATA_URI } from '@/lib/meshugaLogo'
 
 export interface DevisPdfClient {
   nom: string
@@ -149,8 +150,9 @@ function buildSignatureBlock(sig: DevisSignatureInfo): string {
   var empSigVisual = ''
   if (e) {
     if (e.svg && e.svg.indexOf('<svg') > -1) {
-      // La signature stockée est en rose (#FF82D7) ; on l'harmonise en noir comme celle du client.
-      var empSvg = String(e.svg).replace(/fill\s*=\s*"#?[Ff][Ff]82[Dd]7"/g, 'fill="#191923"').replace(/fill\s*:\s*#?[Ff][Ff]82[Dd]7/g, 'fill:#191923')
+      // Signature prestataire en ROSE charte (#FF82D7). Si la version stockée a été
+      // figée en noir, on la repasse en rose pour rester cohérent avec la charte.
+      var empSvg = String(e.svg).replace(/fill\s*=\s*"#?191923"/gi, 'fill="#FF82D7"').replace(/fill\s*:\s*#?191923/gi, 'fill:#FF82D7')
       empSigVisual = '<div class="sgn-visual">' + empSvg + '</div>'
     } else if (e.png) {
       empSigVisual = '<div class="sgn-visual"><img src="' + escapeHtml(e.png) + '" alt="Signature" /></div>'
@@ -316,12 +318,14 @@ export function buildDevisHtml(payload: DevisPdfPayload, assets?: DevisPdfAssets
     if (covParts.length > 0) {
       var perPersonNote = ''
       if (nbPers > 0 && totals.total_ttc > 0) {
-        perPersonNote = '<br><span class="cov-pp">soit ' + fmtEur(totals.total_ttc / nbPers) + ' TTC / personne</span>'
+        perPersonNote = '<div class="cov-pp">soit ' + fmtEur(totals.total_ttc / nbPers) + ' TTC / personne</div>'
       }
       coverageHtml =
-        '<div class="cov">' + covParts.join(' &middot; ') +
-        ' <span class="cov-pers">pour ' + nbPers + ' personnes</span>' +
-        perPersonNote +
+        '<div class="cov">' +
+          '<div class="cov-main">' + covParts.join(' &middot; ') +
+            ' <span class="cov-pers">pour ' + nbPers + ' personnes</span>' +
+          '</div>' +
+          perPersonNote +
         '</div>'
     }
   }
@@ -343,16 +347,14 @@ export function buildDevisHtml(payload: DevisPdfPayload, assets?: DevisPdfAssets
   }
 
   // ---- Logos ----
+  // Charte : fond blanc → LOGOTYPE ROSE (jamais le stamp, jamais un rendu Yellowtail).
+  // On utilise l'asset rose embarqué par défaut ; l'appelant peut surcharger via assets.logotypeUrl.
+  var logoSrc = a.logotypeUrl || MESHUGA_LOGO_PINK_DATA_URI
   var stampHtml = a.stampUrl
     ? '<img src="' + a.stampUrl + '" alt="meshuga"/>'
-    : '<div class="logo-text-fb">meshuga</div>'
-  // En-tête : logotype rose (charte : fond blanc → logotype rose, jamais le stamp)
-  var headerLogoHtml = a.logotypeUrl
-    ? '<img src="' + a.logotypeUrl + '" alt="meshuga" class="header-logo-img"/>'
-    : '<div class="logo-text-fb" style="font-size:28px">meshuga</div>'
-  var logotypeHtml = a.logotypeUrl
-    ? '<img src="' + a.logotypeUrl + '" alt="meshuga" class="footer-logo-img"/>'
-    : '<div class="logo-text-fb" style="font-size:28px">meshuga</div>'
+    : '<img src="' + logoSrc + '" alt="meshuga" class="header-logo-img"/>'
+  var headerLogoHtml = '<img src="' + logoSrc + '" alt="meshuga" class="header-logo-img"/>'
+  var logotypeHtml = '<img src="' + logoSrc + '" alt="meshuga" class="footer-logo-img"/>'
 
   // ---- Label formule (contexte multi-formules) ----
   var formuleLine = payload.formuleLabel
@@ -455,7 +457,7 @@ export function buildDevisHtml(payload: DevisPdfPayload, assets?: DevisPdfAssets
         '<div class="cgv">' +
           '<div class="cgv-header">' +
             '<div class="cgv-title">Conditions G&eacute;n&eacute;rales de Vente</div>' +
-            '<div class="cgv-sub">SAS AEGIA FOOD (enseigne MESHUGA) &middot; Applicables &agrave; toute commande de prestation traiteur &eacute;v&eacute;nementiel</div>' +
+            '<div class="cgv-sub">SAS AEGIA FOOD (enseigne MESHUGA) &middot; Applicables &agrave; toute commande de prestation de restauration &eacute;v&eacute;nementielle</div>' +
           '</div>' +
           '<div class="cgv-cols">' +
             '<div class="cgv-col">' + buildCgvCol1() + '</div>' +
@@ -493,7 +495,7 @@ function buildCss(): string {
   return '*{margin:0;padding:0;box-sizing:border-box}' +
     'body{font-family:"Arial Narrow",Arial,sans-serif;color:#191923;font-size:11px;background:#FFFFFF}' +
     '@page{size:A4;margin:10mm 16mm 18mm 16mm}' +
-    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.tc-grid,.breakdown,.notes-block,.footer,.footer-brand,.sig,.rib{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title,.sig-title{page-break-after:avoid;break-after:avoid}.rib-grid,.sig-grid,.sig-box{page-break-inside:avoid;break-inside:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px !important;padding-top:12px}p,.legal{orphans:3;widows:3}.cgv-footer{position:fixed;left:0;right:0;bottom:0;margin:0 !important;background:#FFFFFF;padding:8px 0 0;border-top:1px solid #EBEBEB}}' +
+    '@media print{html{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}.no-print{display:none !important}.page{padding:0;width:auto;min-height:auto;page-break-inside:auto;display:block}.content{flex:none;display:block}.party,.parties,.cov,.t-final,.tc-grid,.breakdown,.notes-block,.footer,.footer-brand,.sig,.rib{page-break-inside:avoid;break-inside:avoid}.cond-title,.rib-title,.notes-title,.breakdown-title,.sig-title{page-break-after:avoid;break-after:avoid}.rib-grid,.sig-grid,.sig-box{page-break-inside:avoid;break-inside:avoid}table.items tr{page-break-inside:avoid;break-inside:avoid}table.items thead{display:table-header-group}.footer{margin-top:18px !important;padding-top:12px}p,.legal{orphans:3;widows:3}.cgv{padding-bottom:0}.cgv-footer{position:static;left:auto;right:auto;bottom:auto;margin:18px 0 0 !important;background:#FFFFFF;padding:12px 0 0;border-top:1px solid #EBEBEB}}' +
     '.page{width:210mm;min-height:297mm;padding:14mm 16mm 0;background:#FFFFFF}' +
     '.content{}' +
     '.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:11px;border-bottom:3px solid #FF82D7;margin-bottom:14px}' +
@@ -515,10 +517,11 @@ function buildCss(): string {
     '.party-name{font-size:13px;font-weight:900;margin-bottom:3px}' +
     '.party-detail{font-size:9.5px;color:#555;margin-top:1px;line-height:1.5}' +
     '.event-detail{margin-top:6px;font-size:10px;color:#191923;line-height:1.5}' +
-    '.cov{background:#FFEB5A;border:2px solid #191923;border-radius:5px;padding:7px 14px;margin-bottom:11px;font-size:11px;text-align:center;letter-spacing:.3px;box-shadow:2px 2px 0 #191923}' +
-    '.cov strong{font-weight:900;font-size:12px}' +
-    '.cov-pers{font-style:italic;color:#191923;opacity:.7;margin-left:4px}' +
-    '.cov-pp{font-size:10px;font-weight:700;font-style:italic;color:#191923;opacity:.85;letter-spacing:.2px}' +
+    '.cov{background:#FFEB5A;border:2px solid #191923;border-radius:5px;padding:9px 14px;margin-bottom:11px;text-align:center;box-shadow:2px 2px 0 #191923}' +
+    '.cov-main{font-family:"Arial Narrow",Arial,sans-serif;font-size:13px;font-weight:400;color:#191923;letter-spacing:.3px;line-height:1.3}' +
+    '.cov-main strong{font-weight:900;color:#191923}' +
+    '.cov-pers{color:#191923;font-weight:400}' +
+    '.cov-pp{font-family:"Arial Narrow",Arial,sans-serif;font-size:11px;font-weight:700;color:#191923;letter-spacing:.3px;line-height:1.25;margin-top:3px}' +
     'table.items{width:100%;border-collapse:collapse;margin-bottom:8px}' +
     'table.items thead th{padding:8px 10px;font-size:8.5px;text-transform:uppercase;letter-spacing:1.2px;font-weight:900;color:#191923;border-top:2px solid #191923;border-bottom:2px solid #191923;text-align:left;background:#FFFFFF}' +
     'table.items thead th.w-qty{text-align:center;width:9%}' +
@@ -571,33 +574,34 @@ function buildCss(): string {
     '.sig-line{height:16px;border-bottom:1.2px solid #191923}' +
     '.sig-box{border:1.5px dashed #191923;border-radius:4px;height:90px;padding:5px 9px;position:relative}' +
     '.sig-box label{display:block;font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:900}' +
-    '.sig-signed{box-shadow:3px 3px 0 #1a8a4a}' +
+    '.sig-signed{box-shadow:3px 3px 0 #FF82D7}' +
     '.sgn-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:4px}' +
     '.sgn-grid-1{grid-template-columns:1fr}' +
-    '.sgn-col{border:1.5px solid #191923;border-radius:6px;padding:9px 11px 10px;background:#FFFFFF;position:relative;display:flex;flex-direction:column}' +
-    '.sgn-role{font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#888;font-weight:900;margin-bottom:1px}' +
+    '.sgn-col{border:1.5px solid #191923;border-top:4px solid #FF82D7;border-radius:6px;padding:9px 11px 10px;background:#FFFFFF;position:relative;display:flex;flex-direction:column}' +
+    '.sgn-role{font-size:7.5px;text-transform:uppercase;letter-spacing:1px;color:#FF82D7;font-weight:900;margin-bottom:1px}' +
     '.sgn-who{font-size:9px;font-weight:700;color:#555;margin-bottom:3px}' +
     '.sgn-visual{height:46px;display:flex;align-items:center;margin:2px 0 1px}' +
     '.sgn-visual svg{height:44px;width:auto;max-width:100%}' +
     '.sgn-visual img{height:44px;width:auto;max-width:100%}' +
-    '.sgn-yt{font-family:Yellowtail,cursive;font-size:26px;color:#191923;line-height:1.05;word-break:break-word}' +
-    '.sgn-name{font-family:Yellowtail,cursive;font-size:26px;color:#191923}' +
+    '.sgn-yt{font-family:Yellowtail,cursive;font-size:26px;color:#FF82D7;line-height:1.05;word-break:break-word}' +
+    '.sgn-name{font-family:Yellowtail,cursive;font-size:26px;color:#FF82D7}' +
     '.sgn-accord{font-size:8px;color:#555;font-style:italic;margin-bottom:5px}' +
-    '.sgn-stamp{position:absolute;top:8px;right:9px;transform:rotate(-7deg);border:1.5px solid #1a8a4a;color:#1a8a4a;border-radius:5px;padding:1.5px 7px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.5px}' +
+    '.sgn-stamp{position:absolute;top:8px;right:9px;transform:rotate(-7deg);border:1.5px solid #FF82D7;color:#FF82D7;border-radius:5px;padding:1.5px 7px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.5px}' +
     '.sgn-proofs{border-top:1px dotted #ccc;padding-top:5px;margin-top:auto}' +
     '.sgn-prow{display:flex;justify-content:space-between;gap:7px;font-size:7.8px;padding:1.5px 0;line-height:1.35}' +
     '.sgn-prow .k{color:#888}.sgn-prow .v{font-weight:700;text-align:right;word-break:break-all}' +
     '.sgn-plegal{font-size:6.5px;color:#999;line-height:1.45;margin-top:5px;font-style:italic}' +
     '.cgv-pagebreak{height:0}' +
-    '.cgv{page-break-before:always;break-before:page;padding-top:4mm;padding-bottom:32mm;display:flex;flex-direction:column;min-height:100vh;box-sizing:border-box}' +
-    '.cgv-header{padding-bottom:13px;border-bottom:3px solid #FF82D7;margin-bottom:22px;page-break-inside:avoid;break-inside:avoid;page-break-after:avoid;break-after:avoid}' +
-    '.cgv-title{font-family:Yellowtail,cursive;font-size:38px;color:#191923;line-height:1}' +
+    '.cgv{page-break-before:always;break-before:page;padding-top:3mm;box-sizing:border-box}' +
+    '.cgv-header{padding-bottom:10px;border-bottom:3px solid #FF82D7;margin-bottom:16px;page-break-inside:avoid;break-inside:avoid;page-break-after:avoid;break-after:avoid}' +
+    '.cgv-title{font-family:Yellowtail,cursive;font-size:34px;color:#191923;line-height:1}' +
     '.cgv-sub{font-family:"Arial Narrow",Arial,sans-serif;font-size:11px;color:#777;letter-spacing:.4px;margin-top:4px}' +
-    '.cgv-cols{display:flex;gap:34px;flex:1;min-height:0}' +
-    '.cgv-col{flex:1;display:flex;flex-direction:column;justify-content:space-between}' +
-    '.cgv-art{margin-bottom:0;page-break-inside:avoid;break-inside:avoid}' +
-    '.cgv-art h4{font-family:"Arial Narrow",Arial,sans-serif;font-size:10px;margin-bottom:3px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#FF82D7;line-height:1.2}' +
-    '.cgv-art p{font-size:9.5px;color:#2a2a2a;line-height:1.45;text-align:justify;margin:0}' +
+    '.cgv-cols{display:flex;gap:34px;align-items:flex-start}' +
+    '.cgv-col{flex:1;min-width:0}' +
+    '.cgv-art{margin-bottom:9px;page-break-inside:avoid;break-inside:avoid}' +
+    '.cgv-art:last-child{margin-bottom:0}' +
+    '.cgv-art h4{font-family:"Arial Narrow",Arial,sans-serif;font-size:10px;margin-bottom:2px;font-weight:900;text-transform:uppercase;letter-spacing:.6px;color:#FF82D7;line-height:1.2}' +
+    '.cgv-art p{font-size:9.5px;color:#2a2a2a;line-height:1.4;text-align:justify;margin:0}' +
     '.footer{padding:10px 0 0;border-top:1px solid #EBEBEB;margin-top:18px}' +
     '.footer-brand{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:8px;padding-bottom:8px}' +
     '.footer-logo-img{height:34px;width:auto;display:block;image-rendering:high-quality}' +
@@ -611,7 +615,7 @@ function buildCss(): string {
 }
 
 function buildCgvCol1(): string {
-  return '<div class="cgv-art"><h4>1. Champ d&#39;application</h4><p>Les pr&eacute;sentes Conditions G&eacute;n&eacute;rales de Vente (ci-apr&egrave;s "CGV") r&eacute;gissent l&#39;ensemble des prestations de traiteur &eacute;v&eacute;nementiel B2B fournies par la soci&eacute;t&eacute; SAS AEGIA FOOD (ci-apr&egrave;s "AEGIA FOOD"), exer&ccedil;ant sous l&#39;enseigne MESHUGA, &agrave; ses clients professionnels. Toute commande emporte adh&eacute;sion sans r&eacute;serve aux pr&eacute;sentes CGV, qui pr&eacute;valent sur tout autre document du client.</p></div>' +
+  return '<div class="cgv-art"><h4>1. Champ d&#39;application</h4><p>Les pr&eacute;sentes Conditions G&eacute;n&eacute;rales de Vente (ci-apr&egrave;s "CGV") r&eacute;gissent l&#39;ensemble des prestations de restauration &eacute;v&eacute;nementielle B2B fournies par la soci&eacute;t&eacute; SAS AEGIA FOOD (ci-apr&egrave;s "AEGIA FOOD"), exer&ccedil;ant sous l&#39;enseigne MESHUGA, &agrave; ses clients professionnels. Toute commande emporte adh&eacute;sion sans r&eacute;serve aux pr&eacute;sentes CGV, qui pr&eacute;valent sur tout autre document du client.</p></div>' +
     '<div class="cgv-art"><h4>2. Devis et commande</h4><p>Tout devis est valable 30 jours &agrave; compter de sa date d&#39;&eacute;mission. La commande est ferme et d&eacute;finitive d&egrave;s r&eacute;ception du devis sign&eacute; portant la mention manuscrite "Bon pour accord", accompagn&eacute; du r&egrave;glement de l&#39;acompte. La signature peut &ecirc;tre olographe ou &eacute;lectronique conform&eacute;ment aux articles 1366 et 1367 du Code civil.</p></div>' +
     '<div class="cgv-art"><h4>3. Confirmation des effectifs</h4><p>Le nombre d&eacute;finitif de convives doit &ecirc;tre confirm&eacute; au plus tard 7 jours avant la date de l&#39;&eacute;v&eacute;nement. &Agrave; d&eacute;faut, le nombre figurant sur le devis est r&eacute;put&eacute; d&eacute;finitif. Toute majoration ult&eacute;rieure est sous r&eacute;serve de disponibilit&eacute; et entra&icirc;ne une facturation compl&eacute;mentaire au tarif unitaire indiqu&eacute;. Aucune minoration n&#39;est accept&eacute;e en de&ccedil;&agrave; de 7 jours.</p></div>' +
     '<div class="cgv-art"><h4>4. Prix et facturation</h4><p>Les prix sont indiqu&eacute;s en euros, hors taxes (HT) et toutes taxes comprises (TTC). La TVA applicable est de 10 % sur les denr&eacute;es alimentaires et 20 % sur les prestations de service (animation live, mise en place, livraison). Toute prestation suppl&eacute;mentaire non pr&eacute;vue au devis fait l&#39;objet d&#39;un avenant ou d&#39;une facture compl&eacute;mentaire.</p></div>' +
