@@ -200,9 +200,10 @@ var CONFIG_RUNTIME = `
 var CFG=JSON.parse(document.getElementById("cfg").textContent);
 var MAP={};CFG.catalogue.forEach(function(o){MAP[o.id]=o;});
 var BOX_SIZE=40,BOX_MIN=35;
-// Les 4 minis à l'unité pour la box sur mesure (ordre d'affichage)
-var UNIT_IDS=["live_mini_daily","live_mini_tarama_sw","live_mini_signature","live_mini_lobster"];
+// Minis à l'unité pour la box sur mesure — chaque sandwich séparé, trié par prix croissant
+var UNIT_IDS=["live_mini_hot_dog","live_mini_egg","live_mini_pbn","live_mini_melt","live_mini_tarama_sw","live_mini_spicy_tuna","live_mini_caesar","live_mini_reuben","live_mini_lox","live_mini_lobster"];
 var UNIT=UNIT_IDS.filter(function(id){return MAP[id];}).map(function(id){return MAP[id];});
+UNIT.sort(function(a,b){return (Number(a.pv_ht)||0)-(Number(b.pv_ht)||0);});
 function isPretBox(c){return c==="box_mini";}
 function tvaRatio(p){p=Number(p);if(!p||p<=0)return 0;return p>1?p/100:p;}
 function r2(n){return Math.round((Number(n)||0)*100)/100;}
@@ -216,7 +217,7 @@ var custom={};
 (function(){
   for(var i=lines.length-1;i>=0;i--){
     var o=MAP[lines[i].id];
-    if(o&&o.category==="live_mini"&&UNIT_IDS.indexOf(lines[i].id)>-1){
+    if(o&&o.category==="live_mini"){
       custom[lines[i].id]=(custom[lines[i].id]||0)+lines[i].qty;
       lines.splice(i,1);
     }
@@ -282,8 +283,10 @@ function renderPret(){
 function addPret(id){var i=findLine(id);if(i>-1)lines[i].qty++;else lines.push({id:id,qty:1});render();}
 function decPret(id){var i=findLine(id);if(i<0)return;lines[i].qty--;if(lines[i].qty<=0)lines.splice(i,1);render();}
 function renderCustom(){
-  // catalogue des 4 minis
-  var H="";for(var i=0;i<UNIT.length;i++){var o=UNIT[i];var qn=custom[o.id]||0;
+  // catalogue des minis individuels (+ tout mini hérité présent dans la sélection)
+  var disp=UNIT.slice();
+  for(var ck in custom){if(!custom.hasOwnProperty(ck))continue;if(UNIT_IDS.indexOf(ck)>-1)continue;var co=MAP[ck];if(co)disp.push(co);}
+  var H="";for(var i=0;i<disp.length;i++){var o=disp[i];var qn=custom[o.id]||0;
     H+='<div class="urow"><div class="urow-l"><div class="urow-n">'+o.name+'</div>'+(o.tagline?'<div class="urow-s">'+o.tagline+'</div>':'')+'</div>'+
        '<div class="urow-r"><span class="urow-p">'+eur(o.pv_ht)+'</span><span class="q"><b onclick="decUnit(\\''+o.id+'\\')">−</b><span>'+qn+'</span><b onclick="addUnit(\\''+o.id+'\\')">+</b></span></div></div>';}
   document.getElementById("unitlist").innerHTML=H;
