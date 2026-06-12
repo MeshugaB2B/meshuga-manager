@@ -1,6 +1,7 @@
 // Générateur HTML de la page de signature client d'un devis (flux ISOLÉ du système RH).
 // v2 : signature TAPÉE (rendu manuscrit, marche desktop + mobile) + vérification par code SMS (OTP).
 // Pur HTML + JS inline (servi par un route handler, donc les <script> s'exécutent).
+import { MESHUGA_LOGO_PINK_DATA_URI } from '@/lib/meshugaLogo'
 
 export interface SignItem {
   name: string
@@ -22,6 +23,8 @@ export interface DevisSignPayload {
   logoUrl: string // logotype BLANC (sur bandeau rose)
   prefillPhone?: string
   prefillEmail?: string
+  devisId?: number // pour le lien "voir le devis signé" sur la page de confirmation
+  logoPinkUrl?: string // logotype ROSE (sur fond clair, page de confirmation)
 }
 
 function esc(s: any): string {
@@ -76,6 +79,7 @@ function sharedHead(title: string): string {
     '.sigprev{margin-top:8px;border:2px dashed #E3C7DA;border-radius:10px;background:#FFFCFE;min-height:70px;display:flex;align-items:center;justify-content:center;font-family:Yellowtail,cursive;font-size:38px;color:#FF82D7;padding:8px 12px;line-height:1.05;word-break:break-word;text-align:center}' +
     '.sigprev.empty{color:#CDB9C6;font-size:15px;font-family:inherit}' +
     '.cta{width:100%;margin-top:18px;border:2px solid #191923;border-radius:12px;padding:15px;font-size:16px;font-weight:900;cursor:pointer;background:#FF82D7;color:#fff;box-shadow:3px 3px 0 #191923}' +
+    '.cta-yt{font-family:Yellowtail,cursive;font-weight:400;font-size:26px;line-height:1;letter-spacing:.5px}' +
     '.cta:disabled{background:#EBEBEB;color:#999;box-shadow:none;cursor:not-allowed}' +
     '.hint{text-align:center;font-size:12px;color:#888;margin-top:8px}' +
     '.otpsec{display:none;margin-top:6px;border-top:1px solid #F0E0EC;padding-top:16px}' +
@@ -166,7 +170,7 @@ export function buildDevisSignHtml(p: DevisSignPayload): string {
     '<div class="otpsec" id="otpsec">' +
     '<div class="otpmsg" id="otpmsg">Un code à 6 chiffres vient de vous être envoyé.</div>' +
     '<input class="otpinp" id="otpInput" type="text" inputmode="numeric" maxlength="6" placeholder="······" autocomplete="one-time-code">' +
-    '<button class="cta" id="ctaSign" disabled>Signer définitivement</button>' +
+    '<button class="cta cta-yt" id="ctaSign" disabled>Signer définitivement</button>' +
     '<button class="resend" id="resendBtn" type="button">Je n&#39;ai pas reçu le code — renvoyer</button>' +
     '</div>' +
 
@@ -177,11 +181,11 @@ export function buildDevisSignHtml(p: DevisSignPayload): string {
 
     '<div class="ov" id="ov"><div class="spin"></div><div style="font-weight:700" id="ovmsg">Traitement…</div></div>' +
 
-    '<script>' + buildSignScript(p.token, p.prefillEmail || '') + '</script>' +
+    '<script>' + buildSignScript(p.token, p.prefillEmail || '', doneInner(p.numero, p.devisId ? '/api/catering/view-devis/' + p.devisId : '', p.logoPinkUrl || '')) + '</script>' +
     '</body></html>'
 }
 
-function buildSignScript(token: string, origEmail: string): string {
+function buildSignScript(token: string, origEmail: string, doneHtml: string): string {
   return [
     '(function(){',
     'var TOKEN=' + JSON.stringify(token) + ';',
@@ -225,7 +229,7 @@ function buildSignScript(token: string, origEmail: string): string {
     ' if(channel==="sms"){sp.phone=ph.value.trim();}else{sp.email=em.value.trim();sp.updateContactEmail=(ckUpd&&ckUpd.checked)===true;}',
     ' fetch("/api/catering/sign/"+TOKEN+"/submit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sp)})',
     '  .then(function(r){return r.json();}).then(function(d){',
-    '    if(d&&d.ok){document.querySelector(".wrap").innerHTML=' + JSON.stringify(doneInner()) + ';ov.style.display="none";window.scrollTo(0,0);}',
+    '    if(d&&d.ok){document.querySelector(".wrap").innerHTML=' + JSON.stringify(doneHtml) + ';ov.style.display="none";window.scrollTo(0,0);}',
     '    else{ov.style.display="none";ctaSign.disabled=false;alert((d&&d.error)||"Code incorrect ou expiré. Réessayez.");}',
     '  }).catch(function(){ov.style.display="none";ctaSign.disabled=false;alert("Connexion impossible, merci de réessayer.");});',
     '});',
@@ -234,12 +238,15 @@ function buildSignScript(token: string, origEmail: string): string {
   ].join('\n')
 }
 
-function doneInner(): string {
-  return bandHeader() +
+function doneInner(numero: string, signedUrl: string, logoPinkUrl: string): string {
+  var pink = logoPinkUrl || MESHUGA_LOGO_PINK_DATA_URI
+  return '<div style="text-align:center;padding:26px 20px 6px"><img src="' + esc(pink) + '" alt="Meshuga" style="height:40px;width:auto;display:inline-block"></div>' +
     '<div class="card" style="text-align:center">' +
     '<div class="done-ico">🎉</div>' +
     '<div class="h">Merci, c&#39;est signé !</div>' +
-    '<div class="sub" style="margin-bottom:0">C&#39;est officiel, votre commande est confirmée — et on a déjà hâte de régaler vos invités&nbsp;! Vous allez recevoir un email récapitulatif avec les modalités de règlement de l&#39;acompte. Notre équipe revient vers vous très vite.</div>' +
+    '<div class="sub">C&#39;est officiel : votre devis <strong>N&deg; ' + esc(numero) + '</strong> est signé. Pour que votre commande soit définitivement validée, il vous reste à régler l&#39;acompte — toutes les modalités vous arrivent par email dans la foulée.</div>' +
+    (signedUrl ? '<a href="' + esc(signedUrl) + '" target="_blank" rel="noopener" class="cta cta-yt" style="display:inline-block;text-decoration:none;width:auto;padding:13px 30px;margin-top:6px">Voir mon devis signé</a>' : '') +
+    '<div class="sub" style="margin:16px 0 0;font-size:13px;color:#888">Notre équipe revient vers vous très vite.</div>' +
     '</div>' +
     '<div class="foot">SAS AEGIA FOOD (enseigne MESHUGA) &middot; events@meshuga.fr</div>'
 }
