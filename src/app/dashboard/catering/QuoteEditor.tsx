@@ -40,9 +40,12 @@ var CATEGORY_TABS = [
   { id: 'addon', label: 'Add-ons', emoji: '➕' }
 ]
 
-// Box sur mesure : les 4 mini sandwichs composables, ORDONNÉS PAR MARGE HT décroissante
-// (Lobster > Signature > Tarama > Daily) — on met en avant le plus margé.
-var CUSTOM_MINI_IDS = ['live_mini_lobster', 'live_mini_signature', 'live_mini_tarama_sw', 'live_mini_daily']
+// Box sur mesure : chaque mini sandwich séparé, à l'unité. Affichage TRIÉ PAR PRIX CROISSANT
+// (cf. customMinis). Prix/food cost lus depuis les fiches recettes (sync auto).
+var CUSTOM_MINI_IDS = ['live_mini_hot_dog', 'live_mini_egg', 'live_mini_pbn', 'live_mini_melt', 'live_mini_tarama_sw', 'live_mini_spicy_tuna', 'live_mini_caesar', 'live_mini_reuben', 'live_mini_lox', 'live_mini_lobster']
+// Anciens minis composites remplacés par les minis individuels : masqués de l'éditeur,
+// conservés en base pour que les devis déjà émis se résolvent toujours.
+var DEPRECATED_MINI_IDS = ['live_mini_daily', 'live_mini_signature']
 
 // Onglets « autres options » (tout sauf box minis et les 4 minis sur mesure)
 var OTHER_TABS = [
@@ -57,9 +60,9 @@ var CUSTOM_BOX_SIZE = 40
 var CUSTOM_BOX_MIN = 35
 
 var SUBCAT_LABELS = {
-  daily: 'Daily', classic: 'Classic', signature: 'Signature', premium_lobster: 'Premium Lobster',
+  daily: 'Incontournables', classic: 'Classic', signature: 'Signature', premium_lobster: 'Premium Lobster',
   canapes_desserts: 'Canapés & desserts', lobster: 'Lobster', standard: 'Standard', volume: 'Volume (30+)',
-  animation: 'Forfaits animation', premium: 'Premium', tarama: 'Tarama', verrine: 'Verrines',
+  animation: 'Forfaits animation', premium: 'Premium', tarama: 'Tarama', verrine: 'Verrines', incontournables: 'Incontournables',
   beverage: 'Boissons', food: 'Food', live_extra: 'Heures sup live', lunch: 'Upgrades lunch'
 }
 
@@ -390,13 +393,14 @@ export default function QuoteEditor(props) {
     return arr
   }, [offerings])
 
-  // Les 4 minis "sur mesure", dans l'ordre de marge défini par CUSTOM_MINI_IDS
+  // Minis "sur mesure" : un par sandwich, triés par PRIX CROISSANT
   var customMinis = useMemo(function() {
     var out = []
     CUSTOM_MINI_IDS.forEach(function(id) {
       var o = offeringsById[id]
       if (o) out.push(o)
     })
+    out.sort(function(a, b) { return (Number(a.pv_ht) || 0) - (Number(b.pv_ht) || 0) })
     return out
   }, [offeringsById])
 
@@ -443,8 +447,10 @@ export default function QuoteEditor(props) {
     var map = {}
     offerings.forEach(function(o) {
       if (o.category !== activeCategory) return
-      // Les 4 minis sur mesure ont déjà leur bloc dédié → on les retire de l'onglet "Autres minis"
+      // Les minis sur mesure ont déjà leur bloc dédié → on les retire de l'onglet "Autres minis"
       if (CUSTOM_MINI_IDS.indexOf(o.id) > -1) return
+      // On masque aussi les anciens composites dépréciés
+      if (DEPRECATED_MINI_IDS.indexOf(o.id) > -1) return
       var sub = o.subcategory || 'autre'
       if (!map[sub]) { map[sub] = []; order.push(sub) }
       map[sub].push(o)
