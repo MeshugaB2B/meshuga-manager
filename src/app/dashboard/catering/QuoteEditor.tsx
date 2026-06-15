@@ -228,13 +228,21 @@ var QE_CSS =
   '.qe-cm-ok{color:#1a8a4a}.qe-cm-warn{color:#CC0066}.qe-cm-empty{color:#888;font-weight:600}' +
   '@media(max-width:640px){' +
     '.qe-root{overflow-x:hidden}' +
+    '.qe-grid{grid-template-columns:minmax(0,1fr)}' +
+    '.qe-grid>div{min-width:0}' +
     '.qe-picks{grid-template-columns:1fr}' +
-    '.qe-fg2{grid-template-columns:1fr}' +
+    '.qe-fg2{grid-template-columns:minmax(0,1fr)}' +
+    '.qe-cov-wrap{flex-direction:column;align-items:stretch}' +
+    '.qe-cov-wrap>div{width:100%;min-width:0}' +
+    '.qe-tabs-f>*{min-width:0}' +
     '.qe-recap-tot{font-size:12px}' +
+    '.qe-recap-tot,.qe-pbox-h,.qe-pbox-f{min-width:0}' +
     '.qe-card,.qe-cmbox,.qe-pbox,.qe-modal{max-width:100%}' +
     '.qe-tab-f{min-width:0}' +
+    '.qe-btn{white-space:normal}' +
     '.qe-urow{flex-wrap:wrap}' +
     '.qe-urow-r{margin-left:auto}' +
+    '.qe-urow-n,.qe-pbox-n,.qe-pbox-c,.qe-sec-d,.qe-recap-chip{overflow-wrap:anywhere}' +
     '.qe-inp{font-size:16px}' +
   '}'
 
