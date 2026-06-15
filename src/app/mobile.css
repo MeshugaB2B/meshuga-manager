@@ -266,4 +266,19 @@
     margin-bottom: 14px !important;
   }
 
+  /* ─── 10. CONTENU DASHBOARD EN STYLES INLINE ─────────────── */
+  /* Beaucoup d'écrans (devis, food cost, etc.) sont en style={{}} inline.
+     On neutralise le débordement horizontal et on force les grilles inline en 1 colonne. */
+  .main { overflow-x: hidden !important; }
+
+  .main [style*="1fr 1fr"],
+  .main [style*="repeat(2"],
+  .main [style*="repeat(3"],
+  .main [style*="repeat(4"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .main img { max-width: 100% !important; height: auto !important; }
+  .main pre, .main code { white-space: pre-wrap !important; word-break: break-word !important; }
+
 }
