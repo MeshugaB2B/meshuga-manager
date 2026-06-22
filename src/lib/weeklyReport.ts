@@ -100,7 +100,7 @@ export function weekFromMonday(mondayStr) { return buildWeekObj(parseYmd(mondayS
 // ============================================================
 // PLAN DE LA SEMAINE A VENIR (meteo, vacances, evenements, conseils, taches)
 // ============================================================
-var JOURS_FR = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+var JOURS_FR_LUN = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
 var PARIS_LAT = 48.8566
 var PARIS_LON = 2.3522
 
@@ -161,7 +161,7 @@ async function getForecast(week) {
       var wl = weatherLabel(data.daily.weathercode[i])
       out.push({
         date: data.daily.time[i],
-        jour: JOURS_FR[(dt.getUTCDay() + 6) % 7],
+        jour: JOURS_FR_LUN[(dt.getUTCDay() + 6) % 7],
         tmax: Math.round(data.daily.temperature_2m_max[i]),
         tmin: Math.round(data.daily.temperature_2m_min[i]),
         precip: data.daily.precipitation_sum[i],
