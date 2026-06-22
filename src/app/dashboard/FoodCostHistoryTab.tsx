@@ -239,6 +239,17 @@ export default function FoodCostHistoryTab(props) {
     })
   }
 
+  // Ouvre la facture d'origine : priorité au Storage (invoice_path), sinon
+  // on récupère le PDF archivé dans pending_invoices via le nom de fichier.
+  function openInvoiceSource(invoicePath, invoiceFilename) {
+    if (invoicePath) { openInvoiceFromPath(invoicePath); return }
+    if (invoiceFilename) {
+      window.open('/api/invoices/pdf?filename=' + encodeURIComponent(invoiceFilename), '_blank')
+      return
+    }
+    props.toast && props.toast('Aucune facture source liée à cette ligne')
+  }
+
   function startEditAnomaly(anomaly) {
     setEditingAnomalyId(anomaly.id)
     setAnomalyDraft({
@@ -471,9 +482,14 @@ export default function FoodCostHistoryTab(props) {
                       {inv.filename && <span> · {inv.filename}</span>}
                     </div>
                   </div>
-                  <div style={{textAlign:'right'}}>
-                    {inv.total > 0 && <div style={{fontSize:13,fontWeight:900,color:'#005FFF'}}>{fmt(inv.total)}€</div>}
-                    <div style={{fontSize:11,opacity:.5}}>{expanded ? '▲' : '▼'}</div>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    {inv.filename && (
+                      <button onClick={function(e){e.stopPropagation();openInvoiceSource(inv.invoice_path, inv.filename)}} style={{padding:'5px 10px',fontSize:11,fontWeight:900,borderRadius:6,border:'1.5px solid #191923',background:'#fff',cursor:'pointer',whiteSpace:'nowrap'}}>📄 Voir</button>
+                    )}
+                    <div style={{textAlign:'right'}}>
+                      {inv.total > 0 && <div style={{fontSize:13,fontWeight:900,color:'#005FFF'}}>{fmt(inv.total)}€</div>}
+                      <div style={{fontSize:11,opacity:.5}}>{expanded ? '▲' : '▼'}</div>
+                    </div>
                   </div>
                 </div>
 
@@ -725,8 +741,8 @@ export default function FoodCostHistoryTab(props) {
 
                     {!editing && (
                       <div style={{display:'flex',gap:6,marginTop:10,flexWrap:'wrap'}}>
-                        {a.invoice_path && (
-                          <button onClick={function(){openInvoiceFromPath(a.invoice_path)}} style={{padding:'6px 12px',fontSize:11,fontWeight:900,borderRadius:6,border:'1.5px solid #191923',background:'#fff',cursor:'pointer'}}>📄 Voir la facture</button>
+                        {(a.invoice_path || a.invoice_filename) && (
+                          <button onClick={function(){openInvoiceSource(a.invoice_path, a.invoice_filename)}} style={{padding:'6px 12px',fontSize:11,fontWeight:900,borderRadius:6,border:'1.5px solid #191923',background:'#fff',cursor:'pointer'}}>📄 Voir la facture</button>
                         )}
                         <button onClick={function(){startEditAnomaly(a)}} style={{padding:'6px 12px',fontSize:11,fontWeight:900,borderRadius:6,border:'1.5px solid #FF82D7',background:'#FF82D7',color:'#fff',cursor:'pointer'}}>✏️ Corriger</button>
                         <button onClick={function(){deleteAnomaly(a)}} disabled={anomalySaving} style={{padding:'6px 12px',fontSize:11,fontWeight:900,borderRadius:6,border:'1.5px solid #CC0066',background:'#fff',color:'#CC0066',cursor:anomalySaving?'not-allowed':'pointer'}}>🗑 Supprimer cette ligne</button>
