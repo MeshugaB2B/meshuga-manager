@@ -34,7 +34,7 @@ export async function POST(req: Request) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 4000,
         messages: [{
           role: 'user',
@@ -142,10 +142,64 @@ NOTE : Si tu vois "mini" dans un intitulé Monarque → c'est un Pain mini disti
       })
     })
 
-    var data = await res.json()
-    var text = data.content?.[0]?.text?.trim() || ''
+    // ── Lecture résiliente de la réponse OCR ──
+    // Si l'API renvoie une erreur OU un texte vide/illisible, on NE PERD PAS
+    // la facture : on la met en file (status pending) avec le PDF complet et
+    // une anomalie explicite, on notifie Edward, et on répond proprement (200)
+    // pour ne pas déclencher d'alerte Zapier cryptique.
+    var data: any = null
+    try { data = await res.json() } catch (_je) { data = null }
+
+    var text = (data && data.content && data.content[0] && data.content[0].text) ? String(data.content[0].text).trim() : ''
     text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    var parsed = JSON.parse(text)
+
+    var parsed: any = null
+    var ocrError: string | null = null
+    if (!res.ok || (data && data.error)) {
+      ocrError = (data && data.error && data.error.message) ? data.error.message : ('OCR HTTP ' + res.status)
+    } else if (!text) {
+      ocrError = 'Réponse OCR vide'
+    } else {
+      try {
+        parsed = JSON.parse(text)
+      } catch (_pe: any) {
+        ocrError = 'JSON illisible: ' + (_pe && _pe.message ? _pe.message : 'parse error')
+      }
+    }
+
+    if (ocrError || !parsed) {
+      var supabaseFail = getSupabase()
+      var failRow = await supabaseFail.from('pending_invoices').insert({
+        source: source || 'zapier',
+        file_name: fileName || 'invoice.pdf',
+        pdf_base64: pdfBase64,
+        extracted_data: { lignes: [], matched: [], suggestions: [], unmatched: [], ocr_error: ocrError, raw_text: text ? text.substring(0, 2000) : null },
+        fournisseur_extracted: null,
+        invoice_date: new Date().toISOString().split('T')[0],
+        nb_lines: 0,
+        has_anomaly: true,
+        anomaly_reasons: ['⚠️ OCR à refaire — extraction automatique échouée : ' + ocrError],
+        status: 'pending'
+      }).select('id').single()
+
+      fetch('https://ldfxpizsebizzrexghqz.supabase.co/functions/v1/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: '⚠️ Facture reçue — à vérifier',
+          body: 'Lecture auto échouée (' + (fileName || 'PDF') + '). PDF gardé, à valider manuellement.',
+          target: 'all'
+        })
+      }).catch(function(){})
+
+      return NextResponse.json({
+        ok: true,
+        mode: 'ocr_failed',
+        pending_id: failRow && failRow.data ? failRow.data.id : null,
+        message: 'Facture reçue et mise en file pour vérification manuelle (OCR échoué).',
+        ocr_error: ocrError
+      }, { status: 200 })
+    }
 
     var supabase = getSupabase()
     var matched: any[] = []
