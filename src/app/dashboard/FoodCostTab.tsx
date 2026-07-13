@@ -125,8 +125,17 @@ export default function FoodCostTab(props) {
       }
       var tvaRatio = tvaToRatio(r.tva)
       if (tvaRatio === 0) tvaRatio = 0.055
-      var prixTTC = Number(r.prix_vente_ttc || 0)
-      var prixHT = prixTTC / (1 + tvaRatio)
+      var prixTTC = 0
+      var prixHT = 0
+      if (r.categorie === 'mini') {
+        // Minis catering : prix piloté en HT. C'est la source des devis
+        // (recopié vers catering_offerings.pv_ht par le trigger sync_catering_from_recipe).
+        prixHT = Number(r.prix_vente_ht || 0)
+        prixTTC = Math.round(prixHT * (1 + tvaRatio) * 100) / 100
+      } else {
+        prixTTC = Number(r.prix_vente_ttc || 0)
+        prixHT = prixTTC / (1 + tvaRatio)
+      }
       var fcPct = prixHT > 0 ? Math.round(totalCost / prixHT * 1000) / 10 : 0
       var marge = Math.round((prixHT - totalCost) * 100) / 100
 
@@ -561,9 +570,21 @@ export default function FoodCostTab(props) {
     }
   }
 
-  function saveRecipePriceTTC(recipeId, newPrix) {
-    sb().from('recipes').update({ prix_vente_ttc: newPrix, updated_at: new Date().toISOString() })
-      .eq('id', recipeId)
+  function saveRecipePrice(v, newPrix) {
+    var payload
+    if (v && v.categorie === 'mini') {
+      // Saisie en HT pour les minis (prix catering / devis). On stocke aussi le TTC
+      // dérivé pour rester cohérent. Le trigger recopie prix_vente_ht -> offering.pv_ht.
+      var ratio = Number(v.tva_ratio) || 0.10
+      payload = {
+        prix_vente_ht: newPrix,
+        prix_vente_ttc: Math.round(newPrix * (1 + ratio) * 100) / 100,
+        updated_at: new Date().toISOString()
+      }
+    } else {
+      payload = { prix_vente_ttc: newPrix, updated_at: new Date().toISOString() }
+    }
+    sb().from('recipes').update(payload).eq('id', v.id)
       .then(function(res){
         if (res.error) { toast('Erreur : ' + res.error.message); return }
         toast('✅ Prix mis à jour')
@@ -955,6 +976,7 @@ export default function FoodCostTab(props) {
         var v = pickVariant(parent, fcSelectedVariant)
         if (!v) return <div>Erreur variant</div>
         var isPrep = isPrepCat(v.categorie)
+        var isMini = v.categorie === 'mini'
         var tvaRatio = v.tva_ratio
         var conseilX4TTC = Math.round(v.food_cost_ht * 4 * (1 + tvaRatio) * 100) / 100
         var conseilX5TTC = Math.round(v.food_cost_ht * 5 * (1 + tvaRatio) * 100) / 100
@@ -1104,17 +1126,17 @@ export default function FoodCostTab(props) {
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:18}}>
               {!isPrep && (
                 <div style={{background:'#FFFFFF',borderRadius:14,padding:'12px 14px',border:'2px solid #191923',boxShadow:'3px 3px 0 #191923'}}>
-                  <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>Prix de vente TTC</div>
+                  <div style={{fontSize:9,fontWeight:900,opacity:.55,textTransform:'uppercase',letterSpacing:.5}}>{isMini ? 'Prix de vente HT' : 'Prix de vente TTC'}</div>
                   {editingPrixTTC === null && (
-                    <div onClick={function(){setEditingPrixTTC(v.prix_vente_ttc)}} style={{cursor:'pointer',marginTop:4}}>
-                      <div style={{fontSize:26,fontWeight:900,lineHeight:1}}>{fmt(v.prix_vente_ttc)}<span style={{fontSize:14}}>€</span></div>
-                      <div style={{fontSize:9,opacity:.5,marginTop:3,fontWeight:700}}>HT {fmt(v.prix_vente_ht)}€ · ✏️ clic pour modifier</div>
+                    <div onClick={function(){setEditingPrixTTC(isMini ? v.prix_vente_ht : v.prix_vente_ttc)}} style={{cursor:'pointer',marginTop:4}}>
+                      <div style={{fontSize:26,fontWeight:900,lineHeight:1}}>{fmt(isMini ? v.prix_vente_ht : v.prix_vente_ttc)}<span style={{fontSize:14}}>€</span></div>
+                      <div style={{fontSize:9,opacity:.5,marginTop:3,fontWeight:700}}>{isMini ? ('TTC ' + fmt(v.prix_vente_ttc)) : ('HT ' + fmt(v.prix_vente_ht))}€ · ✏️ clic pour modifier</div>
                     </div>
                   )}
                   {editingPrixTTC !== null && (
                     <div style={{display:'flex',gap:4,alignItems:'center',marginTop:5,flexWrap:'wrap'}}>
                       <input type="number" step="0.1" value={editingPrixTTC} onChange={function(e){setEditingPrixTTC(parseFloat(e.target.value)||0)}} style={{width:74,padding:'4px 6px',fontSize:16,fontWeight:900,border:'2px solid #005FFF',borderRadius:6}} autoFocus />
-                      <button className="btn btn-sm btn-y" style={{fontSize:10,padding:'4px 6px',fontWeight:900}} onClick={function(){saveRecipePriceTTC(v.id, editingPrixTTC)}}>✓</button>
+                      <button className="btn btn-sm btn-y" style={{fontSize:10,padding:'4px 6px',fontWeight:900}} onClick={function(){saveRecipePrice(v, editingPrixTTC)}}>✓</button>
                       <button className="btn btn-sm" style={{fontSize:10,padding:'4px 6px'}} onClick={function(){setEditingPrixTTC(null)}}>✕</button>
                     </div>
                   )}
