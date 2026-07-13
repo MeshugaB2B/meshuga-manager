@@ -42,7 +42,7 @@ var CATEGORY_TABS = [
 
 // Box sur mesure : chaque mini sandwich séparé, à l'unité. Affichage TRIÉ PAR PRIX CROISSANT
 // (cf. customMinis). Prix/food cost lus depuis les fiches recettes (sync auto).
-var CUSTOM_MINI_IDS = ['live_mini_hot_dog', 'live_mini_egg', 'live_mini_pbn', 'live_mini_melt', 'live_mini_tarama_sw', 'live_mini_spicy_tuna', 'live_mini_caesar', 'live_mini_reuben', 'live_mini_lox', 'live_mini_lobster']
+var CUSTOM_MINI_IDS = ['live_mini_hot_dog', 'live_mini_egg', 'live_mini_pbn', 'live_mini_melt', 'live_mini_tarama_sw', 'live_mini_spicy_tuna', 'live_mini_the_catch', 'live_mini_caesar', 'live_mini_reuben', 'live_mini_lox', 'live_mini_lobster']
 // Anciens minis composites remplacés par les minis individuels : masqués de l'éditeur,
 // conservés en base pour que les devis déjà émis se résolvent toujours.
 var DEPRECATED_MINI_IDS = ['live_mini_daily', 'live_mini_signature']
