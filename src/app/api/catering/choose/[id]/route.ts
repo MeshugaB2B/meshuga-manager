@@ -46,7 +46,7 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } }) {
 
   var dRes = await supabase
     .from('devis')
-    .select('id, numero, date_validite, client_nom, client_contact, event_format, nb_personnes, event_date, event_lieu, variants, livraison, livraison_offert, mise_en_place, mise_en_place_offert, signature_status, meal_mode')
+    .select('id, numero, date_validite, client_nom, client_contact, event_format, nb_personnes, event_date, event_lieu, variants, livraison, livraison_offert, mise_en_place, mise_en_place_offert, signature_status, meal_mode, send_mode, remise_total_pct, variant_chosen')
     .eq('id', devisId)
     .single()
   if (dRes.error || !dRes.data) return infoPage('Oups…', 'Ce devis n\u2019existe pas ou a été supprimé.', 404)
@@ -69,17 +69,25 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } }) {
   var map = buildOfferingMap(catalog as any)
 
   var pax = Number(d.nb_personnes) || 0
-  // Frais repris du devis. Côté client : aucune remise (prix catalogue).
+
+  // Mode d'envoi :
+  //  - « single » (1 option sur mesure) → on conserve la remise commerciale du devis.
+  //  - « choice » (3 formules)          → aucune remise (prix catalogue).
+  var isSingle = d.send_mode === 'single'
+  var remiseGlobalePct = isSingle ? (Number(d.remise_total_pct) || 0) : 0
   var frais = {
     livraison: Number(d.livraison) || 0,
     livraison_offert: d.livraison_offert === true,
     mise_en_place: Number(d.mise_en_place) || 0,
     mise_en_place_offert: d.mise_en_place_offert === true,
-    remise_globale_pct: 0
+    remise_globale_pct: remiseGlobalePct
   }
 
   var url = new URL(req.url)
   var formule = url.searchParams.get('formule')
+
+  // En mode « single » sans paramètre explicite : on route direct vers l'unique option retenue.
+  if (!formule && isSingle && d.variant_chosen) formule = String(d.variant_chosen)
 
   // Cible "pièces / personne" par défaut selon le mode (complément vs repas).
   var mealMode = d.meal_mode || 'complement'
