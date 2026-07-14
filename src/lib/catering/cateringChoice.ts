@@ -379,12 +379,12 @@ function render(){
   var cta=document.getElementById("cta");var ch=document.getElementById("ctahint");
   var cv=customValid();
   var hasItems=(lines.length>0||customPieces()>0)&&t.minis>0;
-  if(hasItems&&cv){cta.disabled=false;cta.style.background="#FF82D7";cta.style.color="#fff";cta.style.cursor="pointer";cta.style.boxShadow="3px 3px 0 #191923";ch.textContent="PDF final + signature électronique";}
-  else{cta.disabled=true;cta.style.background="#EBEBEB";cta.style.color="#999";cta.style.cursor="not-allowed";cta.style.boxShadow="none";
-    if(!cv){var need=customNeeded();ch.innerHTML='<span style="color:#CC0066;font-weight:900">Complétez votre box sur mesure : il manque '+need+' mini'+(need>1?'s':'')+' (min. '+BOX_MIN+'/box)</span>';}
-    else{ch.textContent="Ajoutez au moins un article";}}
+  if(hasItems){cta.disabled=false;cta.style.background="#FF82D7";cta.style.color="#fff";cta.style.cursor="pointer";cta.style.boxShadow="3px 3px 0 #191923";
+    if(cv){ch.textContent="PDF final + signature électronique";}
+    else{var need=customNeeded();ch.innerHTML='<span style="color:#B8860B;font-weight:900">Box sur mesure incomplète (il manque '+need+' mini'+(need>1?'s':'')+') — vous pouvez tout de même valider et signer.</span>';}}
+  else{cta.disabled=true;cta.style.background="#EBEBEB";cta.style.color="#999";cta.style.cursor="not-allowed";cta.style.boxShadow="none";ch.textContent="Ajoutez au moins un article";}
 }
-function valider(){var t=compute();var P=pax();if((lines.length===0&&customPieces()===0)||t.minis<=0)return;if(!customValid())return;
+function valider(){var t=compute();var P=pax();if((lines.length===0&&customPieces()===0)||t.minis<=0)return;
   // fusionner custom dans des lignes live_mini pour l'envoi
   var outLines=lines.slice();
   for(var k in custom){if(custom.hasOwnProperty(k)&&custom[k]>0)outLines.push({id:k,qty:custom[k]});}
@@ -479,6 +479,7 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
     '.cmbarin{height:100%;width:0;background:#FF82D7;transition:width .15s,background .15s}' +
     '.cmlabel{font-size:12.5px;font-weight:800;margin-top:7px;line-height:1.4}' +
     '.cm-ok{color:#1a8a4a}.cm-warn{color:#CC0066}.cm-empty{color:#888;font-weight:600}' +
+    '.boxinfo{background:#FFF7C2;border:2px solid #191923;border-radius:9px;box-shadow:2px 2px 0 #191923;padding:8px 11px;font-size:12.5px;line-height:1.45;margin:2px 0 10px}' +
     '.urow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed #EBD7E6}' +
     '.urow:last-child{border-bottom:0}' +
     '.urow-n{font-size:13px;font-weight:800}.urow-s{font-size:11px;color:#8a8a92;margin-top:2px;line-height:1.35}' +
@@ -532,7 +533,8 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
           // BLOC 1 — Votre Box sur mesure (remontée : c'est le cœur de la personnalisation)
           '<div class="cmbox">' +
             '<div class="sec-h"><span class="sec-t">Votre Box sur mesure</span></div>' +
-            '<div class="sec-d">Composez votre propre box en mélangeant nos minis à l&#39;unité. Chaque box accueille de <b>35 à 40 minis</b> — au-delà, une nouvelle box démarre automatiquement.</div>' +
+            '<div class="sec-d">Composez votre propre box en mélangeant nos minis à l&#39;unité. Au-delà de 40 minis, une nouvelle box démarre automatiquement.</div>' +
+            '<div class="boxinfo">💡 Nos box catering contiennent <b>40 minis</b>. Pour une présentation optimale, commandez de préférence par <b>multiples de 40</b> (40, 80, 120…).</div>' +
             '<div id="unitlist"></div>' +
             '<div class="cm-gauge-wrap">' +
               '<div class="cmbarout" id="cmbarwrap"><div class="cmbarin" id="cmbar"></div></div>' +
