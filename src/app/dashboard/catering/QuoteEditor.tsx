@@ -309,6 +309,7 @@ export default function QuoteEditor(props) {
   var [sendError, setSendError] = useState('')
   var [emailTo, setEmailTo] = useState('')
   var [emailCc, setEmailCc] = useState('')
+  var [sendMode, setSendMode] = useState('choice')
   var [emailSubject, setEmailSubject] = useState('')
   var [emailMessage, setEmailMessage] = useState('')
 
@@ -812,23 +813,39 @@ export default function QuoteEditor(props) {
   }
 
   // ---- Envoi ----
+  var buildDefaultMessage = function(mode) {
+    var contactFirst = (clientContact || '').split(' ')[0]
+    var hello = contactFirst ? ('Bonjour ' + contactFirst + ',') : 'Bonjour,'
+    if (mode === 'single') {
+      return hello + '\n\n' +
+        'Un grand merci d\'avoir pensé à Meshuga pour votre événement, et de nous accorder votre confiance — on a hâte de régaler vos invités !\n\n' +
+        'Voici votre proposition sur mesure pour ' + (nbPersonnes) + ' personnes. En un clic, vous pourrez :\n' +
+        '• Vérifier le détail et ajuster les quantités si besoin\n' +
+        '• Valider et signer votre devis en ligne, en quelques minutes\n\n' +
+        'À très vite,\nL\'équipe Meshuga Events'
+    }
+    return hello + '\n\n' +
+      'Un grand merci d\'avoir pensé à Meshuga pour votre événement, et de nous accorder votre confiance — on a hâte de régaler vos invités !\n\n' +
+      'Nous vous avons préparé trois propositions sur mesure pour ' + (nbPersonnes) + ' personnes. En un clic, vous pourrez :\n' +
+      '• Découvrir et comparer nos 3 formules\n' +
+      '• Les personnaliser librement — quantités, pièces, boissons…\n' +
+      '• Valider et signer votre devis en ligne, en quelques minutes\n\n' +
+      'À très vite,\nL\'équipe Meshuga Events'
+  }
+
+  // Change de mode : remplace le message par défaut seulement s'il n'a pas été édité à la main.
+  var applyMode = function(m) {
+    if (emailMessage === buildDefaultMessage(sendMode)) setEmailMessage(buildDefaultMessage(m))
+    setSendMode(m)
+  }
+
   var handleOpenSend = function() {
     persist(function(saved) {
       if (!saved) return
       setEmailTo(clientEmail || '')
       setEmailCc('')
       setEmailSubject('Votre devis Meshuga Events — ' + numero)
-      var contactFirst = (clientContact || '').split(' ')[0]
-      var hello = contactFirst ? ('Bonjour ' + contactFirst + ',') : 'Bonjour,'
-      setEmailMessage(
-        hello + '\n\n' +
-        'Un grand merci d\'avoir pensé à Meshuga pour votre événement, et de nous accorder votre confiance — on a hâte de régaler vos invités !\n\n' +
-        'Nous vous avons préparé trois propositions sur mesure pour ' + (nbPersonnes) + ' personnes. En un clic, vous pourrez :\n' +
-        '• Découvrir et comparer nos 3 formules\n' +
-        '• Les personnaliser librement — quantités, pièces, boissons…\n' +
-        '• Valider et signer votre devis en ligne, en quelques minutes\n\n' +
-        'À très vite,\nL\'équipe Meshuga Events'
-      )
+      setEmailMessage(buildDefaultMessage(sendMode))
       setSendError('')
       setSendOpen(true)
     })
@@ -839,13 +856,16 @@ export default function QuoteEditor(props) {
     setSending(true)
     setSendError('')
     var pdfHtml = buildDevisHtml(makePayload(activeIdx), { stampUrl: STAMP_PINK, logotypeUrl: LOGO_PINK })
+    var vKey = (variants[activeIdx] && variants[activeIdx].key) ? variants[activeIdx].key : ('formule_' + (activeIdx + 1))
     var body = {
       devisId: String(curId),
       to: emailTo,
       cc: emailCc,
       subject: emailSubject,
       message: emailMessage,
-      pdfHtml: pdfHtml
+      pdfHtml: pdfHtml,
+      mode: sendMode,
+      variantKey: vKey
     }
     fetch('/api/catering/send-devis', {
       method: 'POST',
@@ -1383,8 +1403,20 @@ export default function QuoteEditor(props) {
           <div className="qe-modal" onClick={function(e) { e.stopPropagation() }}>
             <h3>Envoyer le devis</h3>
             <div style={{ fontSize: 12, color: '#555', marginBottom: 10 }}>
-              {numero} → {clientNom || 'Client'} · formule {variantLabel(activeVariant, activeIdx)}.<br />
+              {numero} → {clientNom || 'Client'}<br />
               events@meshuga.fr est mis en copie cachée pour archive.
+            </div>
+            <div className="qe-fg">
+              <label className="qe-lbl">Que reçoit le client ?</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="qe-btn" style={{ flex: 1, fontWeight: 900, background: sendMode === 'choice' ? '#FF82D7' : '#fff', color: sendMode === 'choice' ? '#fff' : '#191923' }} onClick={function() { if (!sending) applyMode('choice') }} disabled={sending}>Les 3 formules</button>
+                <button className="qe-btn" style={{ flex: 1, fontWeight: 900, background: sendMode === 'single' ? '#FF82D7' : '#fff', color: sendMode === 'single' ? '#fff' : '#191923' }} onClick={function() { if (!sending) applyMode('single') }} disabled={sending}>1 option sur mesure</button>
+              </div>
+              {sendMode === 'single' ? (
+                <div style={{ fontSize: 12, color: '#555', marginTop: 6 }}>Option envoyée : <b>{variantLabel(activeVariant, activeIdx)}</b>. Le client ajuste les quantités puis signe — ta remise est conservée.</div>
+              ) : (
+                <div style={{ fontSize: 12, color: '#555', marginTop: 6 }}>Le client compare les 3 formules, personnalise, puis signe.</div>
+              )}
             </div>
             {sendError ? <div className="qe-warn">⚠ {sendError}</div> : null}
             <div className="qe-fg">
