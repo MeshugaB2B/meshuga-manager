@@ -10,7 +10,9 @@
 //   bcc?: string,         // bcc archive (events@meshuga.fr par défaut)
 //   subject: string,
 //   message: string,      // corps du mail (texte simple, on le wrappe en HTML)
-//   pdfHtml: string       // le HTML complet du devis (généré côté client par generateCateringPdfHtml)
+//   pdfHtml: string,      // le HTML complet du devis (généré côté client par generateCateringPdfHtml)
+//   mode?: 'choice' | 'single',   // 'choice' = page 3 formules (défaut) ; 'single' = 1 option sur mesure
+//   variantKey?: string            // requis si mode='single' : clé de l'option envoyée
 // }
 //
 // Réponse :
@@ -55,9 +57,31 @@ function isValidEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
 }
 
+// Frise des étapes : 3 étapes en mode « choice », 2 étapes en mode « single ».
+function buildStepsBand(single: boolean): string {
+  if (single) {
+    return (
+      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="yellowbg" bgcolor="#FFEB5A" style="background:#FFEB5A;border:2px solid #191923;border-radius:11px;box-shadow:3px 3px 0 #191923"><tr>' +
+        '<td class="ink" style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">1<br>Personnalisez</td>' +
+        '<td class="ink" style="padding:12px 4px;text-align:center;color:#191923;font-weight:900">&rarr;</td>' +
+        '<td class="ink" style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">2<br>Signez</td>' +
+      '</tr></table>'
+    )
+  }
+  return (
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="yellowbg" bgcolor="#FFEB5A" style="background:#FFEB5A;border:2px solid #191923;border-radius:11px;box-shadow:3px 3px 0 #191923"><tr>' +
+      '<td class="ink" style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">1<br>Choisissez</td>' +
+      '<td class="ink" style="padding:12px 4px;text-align:center;color:#191923;font-weight:900">&rarr;</td>' +
+      '<td class="ink" style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">2<br>Personnalisez</td>' +
+      '<td class="ink" style="padding:12px 4px;text-align:center;color:#191923;font-weight:900">&rarr;</td>' +
+      '<td class="ink" style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">3<br>Signez</td>' +
+    '</tr></table>'
+  )
+}
+
 // Wrappe un message texte simple en HTML stylé Meshuga (pour le corps du mail uniquement)
 // Met en forme intelligemment : titre "Récapitulatif :", lignes "•", montants en gras.
-function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: string, origin: string): string {
+function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: string, origin: string, single: boolean): string {
   // Étape 1 : escape HTML (sécurité)
   var safe = (messageText || '')
     .replace(/&/g, '&amp;')
@@ -102,9 +126,10 @@ function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: 
   var bodyHtml = rendered.join('')
 
   var ogBase = (origin || '').replace(/\/$/, '')
-  var ctaLabel = 'Je découvre mon devis'
+  var ctaLabel = single ? 'Je valide mon devis' : 'Je découvre mon devis'
   var ctaImg = ogBase + '/api/og/yellowtail?text=' + encodeURIComponent(ctaLabel) + '&size=32&color=FFFFFF'
   var heroImg = ogBase + '/api/og/yellowtail?text=' + encodeURIComponent('Votre devis est prêt !') + '&size=40&color=FF82D7'
+  var stepsBand = buildStepsBand(single)
 
   return (
     '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
@@ -135,15 +160,9 @@ function buildEmailHtml(messageText: string, devisNumero: string, pdfPublicUrl: 
         '</td></tr>' +
         // Corps du message
         '<tr><td class="px lightbg ink" bgcolor="#FFFFFF" style="padding:16px 36px 2px;background:#FFFFFF;color:#191923">' + bodyHtml + '</td></tr>' +
-        // Bande des 3 étapes
+        // Bande des étapes (2 ou 3 selon le mode)
         '<tr><td class="px lightbg" bgcolor="#FFFFFF" style="padding:14px 30px 2px;background:#FFFFFF">' +
-          '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="yellowbg" bgcolor="#FFEB5A" style="background:#FFEB5A;border:2px solid #191923;border-radius:11px;box-shadow:3px 3px 0 #191923"><tr>' +
-            '<td class="ink" style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">1<br>Choisissez</td>' +
-            '<td class="ink" style="padding:12px 4px;text-align:center;color:#191923;font-weight:900">&rarr;</td>' +
-            '<td class="ink" style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">2<br>Personnalisez</td>' +
-            '<td class="ink" style="padding:12px 4px;text-align:center;color:#191923;font-weight:900">&rarr;</td>' +
-            '<td class="ink" style="padding:12px 6px;text-align:center;font-size:12px;font-weight:900;color:#191923">3<br>Signez</td>' +
-          '</tr></table>' +
+          stepsBand +
         '</td></tr>' +
         // CTA Yellowtail blanc
         '<tr><td align="center" class="lightbg" bgcolor="#FFFFFF" style="padding:22px 30px 26px;background:#FFFFFF">' +
@@ -191,12 +210,18 @@ export async function POST(req: NextRequest) {
   var message = body && body.message ? String(body.message) : ''
   var pdfHtml = body && body.pdfHtml ? String(body.pdfHtml) : ''
 
+  // Mode d'envoi : 'single' (1 option sur mesure) ou 'choice' (3 formules, défaut).
+  var mode = (body && String(body.mode || '').toLowerCase() === 'single') ? 'single' : 'choice'
+  var isSingle = mode === 'single'
+  var variantKey = body && body.variantKey ? String(body.variantKey).trim() : ''
+
   if (!devisId) return badRequest('devisId required')
   if (!isValidEmail(to)) return badRequest('Valid `to` email required')
   if (cc && !isValidEmail(cc)) return badRequest('Invalid `cc` email')
   if (bccUser && !isValidEmail(bccUser)) return badRequest('Invalid `bcc` email')
   if (!subject) return badRequest('subject required')
   if (!pdfHtml || pdfHtml.length < 200) return badRequest('pdfHtml required')
+  if (isSingle && !variantKey) return badRequest('variantKey required en mode single')
 
   // BCC archive automatic
   var bccList: string[] = []
@@ -214,7 +239,7 @@ export async function POST(req: NextRequest) {
   // 4. Charger le devis pour récupérer le numero (sécu : on ne fait pas confiance au front)
   var devisRes = await supabase
     .from('devis')
-    .select('id, numero, sent_count')
+    .select('id, numero, sent_count, variants')
     .eq('id', devisId)
     .single()
 
@@ -223,6 +248,16 @@ export async function POST(req: NextRequest) {
   }
   var devisNumero = devisRes.data.numero || ('DEV-' + devisId.slice(0, 8))
   var prevSentCount = Number(devisRes.data.sent_count) || 0
+
+  // En mode single : vérifier que la clé d'option existe bien dans le devis.
+  if (isSingle) {
+    var vlist = Array.isArray(devisRes.data.variants) ? devisRes.data.variants : []
+    var found = false
+    for (var vi = 0; vi < vlist.length; vi++) {
+      if (vlist[vi] && vlist[vi].key === variantKey) { found = true; break }
+    }
+    if (!found) return badRequest('Option introuvable dans le devis (variantKey)')
+  }
 
   // 5. Archive HTML in Supabase Storage
   var year = new Date().getFullYear()
@@ -259,11 +294,17 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_APP_URL ||
     req.headers.get('origin') ||
     'https://meshuga-manager.vercel.app'
-  var publicUrl = origin.replace(/\/$/, '') + '/api/catering/view-devis/' + devisId
-  var chooseUrl = origin.replace(/\/$/, '') + '/api/catering/choose/' + devisId
+  var base = origin.replace(/\/$/, '')
+  var publicUrl = base + '/api/catering/view-devis/' + devisId
+
+  // CTA du mail :
+  //  - single → configurateur d'une seule option : /api/catering/choose/{id}?formule={clé}
+  //  - choice → page 3 formules : /api/catering/choose/{id}
+  var chooseUrl = base + '/api/catering/choose/' + devisId
+  if (isSingle) chooseUrl = chooseUrl + '?formule=' + encodeURIComponent(variantKey)
 
   // 7. Build email body HTML
-  var emailHtml = buildEmailHtml(message, devisNumero, chooseUrl, origin)
+  var emailHtml = buildEmailHtml(message, devisNumero, chooseUrl, origin, isSingle)
 
   // 8. Build PDF attachment (HTML for now, see comment in QuoteEditor)
   // Resend supports HTML attachments - mais pour mieux ouvrir, on attache aussi en HTML.
@@ -301,24 +342,28 @@ export async function POST(req: NextRequest) {
 
   var emailId = sendRes && sendRes.data && sendRes.data.id ? sendRes.data.id : null
 
-  // 10. Update devis row : sent_at, statut, pdf paths, email tracking
+  // 10. Update devis row : sent_at, statut, pdf paths, email tracking, send_mode
   var sentAtIso = new Date().toISOString()
   var newStatut = 'envoye' // si le devis était brouillon, il passe envoyé
+  var updatePayload: any = {
+    sent_at: sentAtIso,
+    statut: newStatut,
+    pdf_storage_path: storagePath,
+    pdf_url: publicUrl,
+    pdf_signed_url: supabaseSignedUrl,
+    email_to: to,
+    email_cc: cc || null,
+    email_bcc: bccList.join(', ') || null,
+    email_subject: subject,
+    email_message: message,
+    sent_count: prevSentCount + 1,
+    send_mode: mode
+  }
+  if (isSingle) updatePayload.variant_chosen = variantKey
+
   var updateRes = await supabase
     .from('devis')
-    .update({
-      sent_at: sentAtIso,
-      statut: newStatut,
-      pdf_storage_path: storagePath,
-      pdf_url: publicUrl,
-      pdf_signed_url: supabaseSignedUrl,
-      email_to: to,
-      email_cc: cc || null,
-      email_bcc: bccList.join(', ') || null,
-      email_subject: subject,
-      email_message: message,
-      sent_count: prevSentCount + 1
-    })
+    .update(updatePayload)
     .eq('id', devisId)
 
   if (updateRes.error) {
