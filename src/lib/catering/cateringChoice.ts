@@ -68,6 +68,7 @@ export interface ConfigPayload {
     livraison_offert?: boolean
     mise_en_place?: number
     mise_en_place_offert?: boolean
+    remise_globale_pct?: number
   }
 }
 
@@ -253,11 +254,17 @@ function totalMinis(){return pretMinis()+customPieces();}
 // --- compute prix ---
 function compute(){
   var itemsHT=0,tvaItems=0;
-  for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o)continue;var q=lines[i].qty;var pu=Number(o.pv_ht)||0;var ht=r2(pu*q);itemsHT+=ht;tvaItems+=ht*tvaRatio(o.tva_pct);}
-  for(var k in custom){if(!custom.hasOwnProperty(k))continue;var oc=MAP[k];if(!oc)continue;var hc=r2((Number(oc.pv_ht)||0)*custom[k]);itemsHT+=hc;tvaItems+=hc*tvaRatio(oc.tva_pct);}
-  var f=CFG.frais;var liv=f.livraison_offert?0:(Number(f.livraison)||0);var mep=f.mise_en_place_offert?0:(Number(f.mise_en_place)||0);var fraisHT=liv+mep;var tvaFrais=fraisHT*0.20;
-  var totalHT=itemsHT+fraisHT;var tva=tvaItems+tvaFrais;var ttc=totalHT+tva;
-  return {itemsHT:r2(itemsHT),fraisHT:r2(fraisHT),totalHT:r2(totalHT),tva:r2(tva),ttc:r2(ttc),minis:totalMinis()};
+  for(var i=0;i<lines.length;i++){var o=MAP[lines[i].id];if(!o)continue;var q=lines[i].qty;var pu=Number(o.pv_ht)||0;var ht=r2(pu*q);itemsHT+=ht;tvaItems+=r2(ht*tvaRatio(o.tva_pct));}
+  for(var k in custom){if(!custom.hasOwnProperty(k))continue;var oc=MAP[k];if(!oc)continue;var hc=r2((Number(oc.pv_ht)||0)*custom[k]);itemsHT+=hc;tvaItems+=r2(hc*tvaRatio(oc.tva_pct));}
+  var f=CFG.frais;
+  var rg=Number(f.remise_globale_pct)||0;
+  var remiseMontant=r2(itemsHT*rg/100);
+  var itemsNetHT=r2(itemsHT-remiseMontant);
+  var scale=itemsHT>0?itemsNetHT/itemsHT:1;
+  var tvaItemsNet=tvaItems*scale;
+  var liv=f.livraison_offert?0:(Number(f.livraison)||0);var mep=f.mise_en_place_offert?0:(Number(f.mise_en_place)||0);var fraisHT=liv+mep;var tvaFrais=fraisHT*0.20;
+  var totalHT=itemsNetHT+fraisHT;var tva=tvaItemsNet+tvaFrais;var ttc=totalHT+tva;
+  return {itemsHT:r2(itemsHT),remisePct:rg,remiseMontant:remiseMontant,itemsNetHT:itemsNetHT,fraisHT:r2(fraisHT),totalHT:r2(totalHT),tva:r2(tva),ttc:r2(ttc),minis:totalMinis()};
 }
 // --- récap minis (box prêtes + custom) ---
 function aggMinis(){
@@ -353,8 +360,9 @@ function renderCart(){
 function render(){
   renderPret();renderCustom();renderLive();renderDrinks();renderCart();renderMiniRecap();
   var t=compute();var P=pax();
-  document.getElementById("tht").textContent=eur(t.totalHT);
+  document.getElementById("tht").textContent=eur(t.itemsHT);
   var f3=CFG.frais;var fr="";
+  if(t.remiseMontant>0)fr+='<div class="frow"><span>Remise (-'+t.remisePct+'\u00A0%)</span><span class="off">-'+eur(t.remiseMontant)+'</span></div>';
   if(f3.livraison_offert)fr+='<div class="frow"><span>Livraison</span><span class="off">Offerte ✓</span></div>';else if((Number(f3.livraison)||0)>0)fr+='<div class="frow"><span>Livraison</span><span>'+eur(f3.livraison)+'</span></div>';
   if(f3.mise_en_place_offert)fr+='<div class="frow"><span>Mise en place</span><span class="off">Offerte ✓</span></div>';else if((Number(f3.mise_en_place)||0)>0)fr+='<div class="frow"><span>Mise en place</span><span>'+eur(f3.mise_en_place)+'</span></div>';
   document.getElementById("fraisrows").innerHTML=fr;
@@ -407,7 +415,8 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
       livraison: Number(frais.livraison) || 0,
       livraison_offert: !!frais.livraison_offert,
       mise_en_place: Number(frais.mise_en_place) || 0,
-      mise_en_place_offert: !!frais.mise_en_place_offert
+      mise_en_place_offert: !!frais.mise_en_place_offert,
+      remise_globale_pct: Number(frais.remise_globale_pct) || 0
     }
   }
 
@@ -556,7 +565,7 @@ export function buildDevisConfigHtml(payload: ConfigPayload): string {
         '</div>' +
         '<div>' +
           '<div class="card" style="position:sticky;top:10px">' +
-            '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:#7a7a82">Total HT</span><b id="tht"></b></div>' +
+            '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:#7a7a82">Sous-total HT</span><b id="tht"></b></div>' +
             '<div id="fraisrows"></div>' +
             '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#888"><span>TVA</span><span id="ttva"></span></div>' +
             '<div class="ttc-box"><div><div class="yt" style="font-size:18px;line-height:1">Total TTC</div><div id="tpp" style="font-size:10px;color:#191923;opacity:.7"></div></div><span id="tttc" style="font-size:17px;font-weight:900"></span></div>' +
