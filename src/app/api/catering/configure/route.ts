@@ -17,8 +17,10 @@ function bad(msg: string, code?: number) {
 }
 
 // Reçoit { devisId, variantKey, pax, lines:[{id,qty}] } depuis le configurateur client.
-// Recalcule TOUT côté serveur à partir du catalogue (prix catalogue, aucune remise client),
-// revérifie la couverture, fige la config retenue et crée le token de signature.
+// Recalcule TOUT côté serveur à partir du catalogue (prix catalogue).
+// Mode « choice » (3 formules) : aucune remise client → remise globale = 0.
+// Mode « single » (1 option sur mesure) : la remise commerciale du devis (remise_total_pct)
+// est conservée, même si le client ajuste les quantités.
 export async function POST(req: NextRequest) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return bad('Configuration serveur manquante', 500)
 
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
   // 1. Charger le devis
   var devisRes = await supabase
     .from('devis')
-    .select('id, statut, event_format, item_format, livraison, livraison_offert, mise_en_place, mise_en_place_offert, signature_token, signature_status')
+    .select('id, statut, event_format, item_format, livraison, livraison_offert, mise_en_place, mise_en_place_offert, signature_token, signature_status, send_mode, remise_total_pct')
     .eq('id', devisId)
     .single()
   if (devisRes.error || !devisRes.data) return bad('Devis introuvable', 404)
@@ -76,13 +78,17 @@ export async function POST(req: NextRequest) {
   }
   if (variantLines.length === 0) return bad('Aucun article valide')
 
-  // 4. Frais : repris du devis. Le client ne peut PAS appliquer de remise → 0.
+  // 4. Frais : repris du devis.
+  //    Mode « single » → on conserve la remise commerciale du devis.
+  //    Mode « choice »  → aucune remise (prix catalogue).
+  var isSingle = devis.send_mode === 'single'
+  var remiseGlobalePct = isSingle ? (Number(devis.remise_total_pct) || 0) : 0
   var frais = {
     livraison: Number(devis.livraison) || 0,
     livraison_offert: devis.livraison_offert === true,
     mise_en_place: Number(devis.mise_en_place) || 0,
     mise_en_place_offert: devis.mise_en_place_offert === true,
-    remise_globale_pct: 0
+    remise_globale_pct: remiseGlobalePct
   }
 
   // 5. Recalcul serveur (source de vérité)
