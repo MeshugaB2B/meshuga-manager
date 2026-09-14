@@ -50,6 +50,7 @@ function daysSince(iso) {
 export default function CrmTab(ctx) {
   var prospects = ctx.prospects || []
   var setProspects = ctx.setProspects || function(){}
+  var patchProspect = ctx.patchProspect || null
   var devisList = ctx.devisList || []
   var commissionObjectif = ctx.commissionObjectif || 0
   var setCommissionObjectif = ctx.setCommissionObjectif || function(){}
@@ -128,7 +129,8 @@ export default function CrmTab(ctx) {
 
   // ---- Actions ----
   function updateProspect(id, patch) {
-    setProspects(function(prev){ return prev.map(function(x){ return x.id === id ? Object.assign({}, x, patch) : x }) })
+    if (patchProspect) { patchProspect(id, patch); return }
+    setProspects(function(prev){ return prev.map(function(x){ return String(x.id) === String(id) ? Object.assign({}, x, patch) : x }) })
   }
   function setStatus(p, st) {
     updateProspect(p.id, { status: st })
@@ -153,7 +155,7 @@ export default function CrmTab(ctx) {
     e.preventDefault()
     var id = dragId || (e.dataTransfer ? e.dataTransfer.getData('text/plain') : null)
     if (id) {
-      var p = prospects.filter(function(x){ return x.id === id })[0]
+      var p = prospects.filter(function(x){ return String(x.id) === String(id) })[0]
       if (p && p.status !== colId) setStatus(p, colId)
     }
     setDragId(null); setDragOverCol(null)
@@ -431,7 +433,8 @@ function ProspectCard(props) {
           <div style={{fontWeight:900,fontSize:13,lineHeight:1.2,cursor:'pointer',flex:1,minWidth:0}} onClick={props.onOpen}>{p.name}</div>
           {p.score && <span style={{background:p.score>=8?VERT:p.score>=6?JAUNE:ROSE,color:p.score>=6&&p.score<8?NOIR:'#FFFFFF',borderRadius:10,padding:'1px 6px',fontSize:9,fontWeight:900,flexShrink:0}}>{p.score}</span>}
         </div>
-        <div style={{fontSize:10,opacity:0.55,marginTop:2,fontWeight:600}}>{p.category || '—'}</div>
+        <div style={{fontSize:10,opacity:0.55,marginTop:2,fontWeight:600}}>{p.category || '—'}{p.city?' · '+p.city:''}</div>
+        {p.contactName && <div style={{fontSize:10,marginTop:3,fontWeight:700}}>👤 {p.contactName}{p.contactRole?<span style={{opacity:0.6,fontWeight:600}}> · {p.contactRole}</span>:null}</div>}
         {potValue > 0 && <div style={{fontSize:10,fontWeight:900,color:VERT,marginTop:4}}>{potValue.toLocaleString('fr-FR')} €/mois</div>}
         {late && <div style={{fontSize:9,color:ROUGE,fontWeight:900,marginTop:4}}>⚠️ Relance en retard</div>}
         {!late && p.nextDate && <div style={{fontSize:9,opacity:0.6,marginTop:4,fontWeight:700}}>📅 {p.nextDate}</div>}
@@ -454,7 +457,8 @@ function ProspectCard(props) {
             <span style={{fontSize:9,padding:'2px 8px',borderRadius:10,border:'2px solid '+(STATUS_COLORS[p.status]||'#888'),color:STATUS_COLORS[p.status]||'#888',fontWeight:900,textTransform:'uppercase'}}>{STATUS_LABELS[p.status]||p.status}</span>
             {p.temperature && <span style={{fontSize:11,fontWeight:900,color:tempColor}}>{TEMP_LABELS[p.temperature]||''}</span>}
           </div>
-          <div style={{fontSize:12,opacity:0.7,fontWeight:600}}>{p.category||'—'}{p.email?' · '+p.email:''}</div>
+          <div style={{fontSize:12,opacity:0.7,fontWeight:600}}>{p.category||'—'}{p.city?' · '+p.city:''}{p.email?' · '+p.email:''}</div>
+          {p.contactName && <div style={{fontSize:12,fontWeight:700,marginTop:2}}>👤 {p.contactName}{p.contactRole?<span style={{opacity:0.6,fontWeight:600}}> · {p.contactRole}</span>:null}{p.contactEmail?<span style={{opacity:0.7,fontWeight:600}}> · {p.contactEmail}</span>:null}{p.contactPhone?<span style={{opacity:0.7,fontWeight:600}}> · {p.contactPhone}</span>:null}</div>}
           {potValue > 0 && <div style={{fontSize:11,fontWeight:900,color:VERT,marginTop:3}}>💶 {potValue.toLocaleString('fr-FR')} €/mois potentiel</div>}
           {freshness !== null && freshness > 14 && <div style={{fontSize:10,opacity:0.5,marginTop:2,fontWeight:700}}>🕐 Pas contacté depuis {freshness} j</div>}
         </div>
