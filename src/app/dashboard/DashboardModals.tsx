@@ -26,6 +26,7 @@ export default function DashboardModals(props) {
   var nav = props.nav
   var setProspects = props.setProspects
   var saveProspect = props.saveProspect
+  var deleteProspect = props.deleteProspect
   var logActivity = props.logActivity
   var loadContacts = props.loadContacts
   var sb = props.sb
@@ -79,10 +80,27 @@ export default function DashboardModals(props) {
                 </div>
                 {!form.id && <div style={{fontSize:10,color:'#888',marginTop:3}}>Tape le nom et clique ✨ IA pour pré-remplir automatiquement</div>}
               </div>
+              <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',letterSpacing:0.5,opacity:0.5,margin:'6px 0 4px'}}>Entreprise</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                <div className="fg"><label className="lbl">Email</label><input className="inp" value={form.email||''} onChange={function(e){setForm(Object.assign({},form,{email:e.target.value}))}} /></div>
-                <div className="fg"><label className="lbl">Téléphone</label><input className="inp" value={form.phone||''} onChange={function(e){setForm(Object.assign({},form,{phone:e.target.value}))}} /></div>
+                <div className="fg"><label className="lbl">Email générique</label><input className="inp" value={form.email||''} onChange={function(e){setForm(Object.assign({},form,{email:e.target.value}))}} placeholder="contact@entreprise.fr" /></div>
+                <div className="fg"><label className="lbl">Standard</label><input className="inp" value={form.phone||''} onChange={function(e){setForm(Object.assign({},form,{phone:e.target.value}))}} placeholder="01 xx xx xx xx" /></div>
               </div>
+              <div className="fg"><label className="lbl">Adresse</label><input className="inp" value={form.address||''} onChange={function(e){setForm(Object.assign({},form,{address:e.target.value}))}} placeholder="12 rue de Rivoli" /></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:8}}>
+                <div className="fg"><label className="lbl">Code postal</label><input className="inp" value={form.postalCode||''} onChange={function(e){setForm(Object.assign({},form,{postalCode:e.target.value}))}} placeholder="75001" /></div>
+                <div className="fg"><label className="lbl">Ville</label><input className="inp" value={form.city||''} onChange={function(e){setForm(Object.assign({},form,{city:e.target.value}))}} placeholder="Paris" /></div>
+              </div>
+              <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',letterSpacing:0.5,opacity:0.5,margin:'10px 0 4px'}}>Contact direct</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div className="fg"><label className="lbl">Prénom</label><input className="inp" value={form.contactFirstName||''} onChange={function(e){setForm(Object.assign({},form,{contactFirstName:e.target.value}))}} /></div>
+                <div className="fg"><label className="lbl">Nom</label><input className="inp" value={form.contactLastName||''} onChange={function(e){setForm(Object.assign({},form,{contactLastName:e.target.value}))}} /></div>
+              </div>
+              <div className="fg"><label className="lbl">Fonction / rôle</label><input className="inp" value={form.contactRole||''} onChange={function(e){setForm(Object.assign({},form,{contactRole:e.target.value}))}} placeholder="Ex: Office manager, DRH, Responsable événementiel" /></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div className="fg"><label className="lbl">Email direct</label><input className="inp" value={form.contactEmail||''} onChange={function(e){setForm(Object.assign({},form,{contactEmail:e.target.value}))}} placeholder="prenom.nom@entreprise.fr" /></div>
+                <div className="fg"><label className="lbl">Mobile direct</label><input className="inp" value={form.contactPhone||''} onChange={function(e){setForm(Object.assign({},form,{contactPhone:e.target.value}))}} placeholder="06 xx xx xx xx" /></div>
+              </div>
+              <div style={{fontSize:10,fontWeight:900,textTransform:'uppercase',letterSpacing:0.5,opacity:0.5,margin:'10px 0 4px'}}>Qualification</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                 <div className="fg"><label className="lbl">Catégorie</label>
                   <select className="inp" value={form.category||'Autre'} onChange={function(e){setForm(Object.assign({},form,{category:e.target.value}))}}>
@@ -120,7 +138,7 @@ export default function DashboardModals(props) {
             </div>
             <div className="mf">
               <button className="btn" onClick={closeModal}>Annuler</button>
-              {form.id && <button className="btn btn-red" onClick={function(){setProspects(function(prev){return prev.filter(function(x){return x.id!==form.id})});closeModal()}}>Supprimer</button>}
+              {form.id && <button className="btn btn-red" onClick={function(){ if(window.confirm('Supprimer ce prospect ?')){ deleteProspect(form.id); closeModal() } }}>Supprimer</button>}
               <button className="btn btn-y" onClick={saveProspect}>{form.id?'Modifier':'Créer'}</button>
             </div>
           </div>
