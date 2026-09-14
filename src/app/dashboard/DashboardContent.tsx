@@ -48,7 +48,7 @@ function DashboardImpl() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [tasks, setTasks] = useState([])
-  const [prospects, setProspects] = useState(INIT_PROSPECTS)
+  const [prospects, setProspects] = useState([])
   const [contacts, setContacts] = useState([])
   const [annCat, setAnnCat] = useState('all')
   const [priceAlerts, setPriceAlerts] = useState([])
@@ -209,6 +209,7 @@ function DashboardImpl() {
   useEffect(function() {
     if (!profile) return
     loadContacts()
+    loadProspects()
     loadMessages()
     loadCalEvents()
     // Check push subscription status
@@ -451,11 +452,9 @@ function DashboardImpl() {
     .then(function(r){ return r.json() })
     .then(function(d) {
       if (d.scores) {
-        setProspects(function(prev) {
-          return prev.map(function(p) {
-            var found = d.scores.find(function(s) { return s.id === p.id })
-            return found ? Object.assign({}, p, { score: found.score, scoreReason: found.reason }) : p
-          })
+        d.scores.forEach(function(sc) {
+          var target = prospects.find(function(p) { return String(p.id) === String(sc.id) })
+          if (target) patchProspect(target.id, { score: sc.score, scoreReason: sc.reason || '' })
         })
         toast('🎯 Scoring mis à jour !')
       }
@@ -615,6 +614,114 @@ function DashboardImpl() {
     })
   }
 
+  // ===== CRM Prospects — persistance Supabase (table prospects) =====
+  function prospectFromRow(r) {
+    var fn = r.contact_first_name || ''
+    var ln = r.contact_last_name || ''
+    return {
+      id: r.id,
+      name: r.company_name || '',
+      email: r.email || '',
+      phone: r.phone || '',
+      contactFirstName: fn,
+      contactLastName: ln,
+      contactName: (fn + ' ' + ln).trim() || r.contact_name || '',
+      contactRole: r.contact_title || '',
+      contactEmail: r.contact_email || '',
+      contactPhone: r.contact_phone || '',
+      address: r.address || '',
+      postalCode: r.postal_code || '',
+      city: r.city || '',
+      size: r.company_size || '',
+      category: r.category || r.sector || 'Autre',
+      status: r.status || 'to_contact',
+      temperature: r.temperature || 'tiede',
+      nextAction: r.next_action || '',
+      nextDate: r.next_action_date || '',
+      notes: r.notes || '',
+      ca: Number(r.ca_signed) || 0,
+      estimated_monthly_revenue: Number(r.estimated_monthly_revenue) || 0,
+      score: r.score || null,
+      scoreReason: r.score_reason || '',
+      files: Array.isArray(r.files) ? r.files : [],
+      chasseId: r.chasse_id || null,
+      source: r.source || '',
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+      last_contacted_at: r.last_contacted_at
+    }
+  }
+  function prospectToRow(p) {
+    var fn = (p.contactFirstName || '').trim()
+    var ln = (p.contactLastName || '').trim()
+    return {
+      company_name: p.name || '',
+      email: p.email || null,
+      phone: p.phone || null,
+      contact_first_name: fn || null,
+      contact_last_name: ln || null,
+      contact_name: (fn + ' ' + ln).trim() || p.contactName || null,
+      contact_title: p.contactRole || null,
+      contact_email: p.contactEmail || null,
+      contact_phone: p.contactPhone || null,
+      address: p.address || null,
+      postal_code: p.postalCode || null,
+      city: p.city || null,
+      company_size: p.size ? String(p.size) : null,
+      category: p.category || 'Autre',
+      sector: p.category || null,
+      status: p.status || 'to_contact',
+      temperature: p.temperature || 'tiede',
+      next_action: p.nextAction || null,
+      next_action_date: p.nextDate || null,
+      notes: p.notes || null,
+      ca_signed: Number(p.ca) || 0,
+      estimated_monthly_revenue: Number(p.estimated_monthly_revenue) || null,
+      score: p.score ? parseInt(p.score) : null,
+      score_reason: p.scoreReason || null,
+      files: Array.isArray(p.files) ? p.files : [],
+      chasse_id: p.chasseId ? String(p.chasseId) : null,
+      source: p.source || null,
+      updated_at: new Date().toISOString()
+    }
+  }
+  var PATCH_MAP = {name:'company_name',email:'email',phone:'phone',contactFirstName:'contact_first_name',contactLastName:'contact_last_name',contactRole:'contact_title',contactEmail:'contact_email',contactPhone:'contact_phone',address:'address',postalCode:'postal_code',city:'city',size:'company_size',category:'category',status:'status',temperature:'temperature',nextAction:'next_action',nextDate:'next_action_date',notes:'notes',ca:'ca_signed',estimated_monthly_revenue:'estimated_monthly_revenue',score:'score',scoreReason:'score_reason',files:'files',last_contacted_at:'last_contacted_at'}
+  function loadProspects() {
+    sb().from('prospects').select('*').order('created_at', {ascending: false}).then(function(r) {
+      if (r.error) { console.warn('[CRM] loadProspects:', r.error.message); return }
+      setProspects((r.data || []).map(prospectFromRow))
+    })
+  }
+  function insertProspect(p, cb) {
+    var row = prospectToRow(p)
+    sb().from('prospects').insert(row).select().then(function(r) {
+      if (r.error) { toast('Erreur CRM: ' + r.error.message); return }
+      var np = r.data && r.data[0] ? prospectFromRow(r.data[0]) : null
+      if (np) setProspects(function(prev) { return [np].concat(prev.filter(function(x) { return String(x.id) !== String(np.id) })) })
+      if (cb) cb(np)
+    })
+  }
+  function patchProspect(id, patch) {
+    setProspects(function(prev) { return prev.map(function(x) { return String(x.id) === String(id) ? Object.assign({}, x, patch) : x }) })
+    var row = {}
+    Object.keys(patch).forEach(function(k) {
+      if (PATCH_MAP[k]) row[PATCH_MAP[k]] = patch[k] === '' ? null : patch[k]
+    })
+    if (patch.status === 'contacted' || patch.status === 'nego') row.last_contacted_at = new Date().toISOString()
+    row.updated_at = new Date().toISOString()
+    sb().from('prospects').update(row).eq('id', id).then(function(r) {
+      if (r.error) toast('Erreur CRM: ' + r.error.message)
+    })
+  }
+  function deleteProspect(id) {
+    if (!id) return
+    sb().from('prospects').delete().eq('id', id).then(function(r) {
+      if (r.error) { toast('Erreur CRM: ' + r.error.message); return }
+      setProspects(function(prev) { return prev.filter(function(x) { return String(x.id) !== String(id) }) })
+      toast('Prospect supprimé')
+    })
+  }
+
     function loadContacts() {
     sb().from('contacts').select('*').order('name',{ascending:true}).then(function(r){if(r.data)setContacts(r.data)})
   }
@@ -637,11 +744,8 @@ function DashboardImpl() {
       if(dv && dv.prospect_id) {
         var ts = new Date().toLocaleDateString('fr-FR')
         var devisNote = '['+ts+'] Devis '+dv.numero+' statut : '+statut+(statut==='accepte'?' ✅ SIGNÉ':statut==='facture'?' 🧾 Facturé':statut==='paye'?' 💰 Soldé':'')
-        setProspects(function(prev){return prev.map(function(p){
-          if(String(p.id)!==String(dv.prospect_id)) return p
-          var newN = (p.notes ? p.notes+'\n' : '') + devisNote
-          return Object.assign({},p,{notes:newN})
-        })})
+        var target = prospects.find(function(p){return String(p.id)===String(dv.prospect_id)})
+        if(target) patchProspect(target.id, {notes: (target.notes ? target.notes+'\n' : '') + devisNote})
       }
     })
   }
@@ -676,13 +780,13 @@ function DashboardImpl() {
     var relStr = rel.toISOString().split('T')[0]
     var alreadyInCrm = prospects.find(function(p) { return p.name === pros.name })
     if (alreadyInCrm) {
-      setProspects(function(prev) { return prev.map(function(p) { return p.name === pros.name ? Object.assign({}, p, {status: 'nego', temperature: 'chaud'}) : p }) })
+      patchProspect(alreadyInCrm.id, {status: 'nego', temperature: 'chaud'})
       toast('Déjà dans le CRM — passé en négo')
       return
     }
     var newProspect = {
-      id: 'crm-' + pros.id + '-' + Date.now(),
       name: pros.name,
+      source: 'chasse',
       email: pros.contact_email && pros.contact_email !== '—' ? pros.contact_email : '',
       phone: pros.contact_phone && pros.contact_phone !== '—' ? pros.contact_phone : '',
       size: pros.taille || '',
@@ -699,8 +803,7 @@ function DashboardImpl() {
       chasseId: pros.id,
       contactedDate: today,
     }
-    setProspects(function(prev) { return prev.concat([newProspect]) })
-    logActivity('prospect_contacte', 'Lead envoyé au CRM : ' + pros.name, pros.name, null)
+    insertProspect(newProspect, function(){ logActivity('prospect_contacte', 'Lead envoyé au CRM : ' + pros.name, pros.name, null) })
   }
 
   function contactProspect(id) {
@@ -715,8 +818,8 @@ function DashboardImpl() {
       var alreadyInCrm = prospects.find(function(p) { return p.name === pros.name })
       if (!alreadyInCrm) {
         var newProspect = {
-          id: 'crm-' + id + '-' + Date.now(),
           name: pros.name,
+          source: 'chasse',
           email: pros.email || '',
           phone: pros.phone || '',
           size: pros.taille || '',
@@ -732,10 +835,10 @@ function DashboardImpl() {
           chasseId: id,
           contactedDate: today,
         }
-        setProspects(function(prev) { return prev.concat([newProspect]) })
+        insertProspect(newProspect, null)
         toast('Contacté ! Ajouté au CRM — Relance dans 3 jours')
       } else {
-        setProspects(function(prev) { return prev.map(function(p) { return p.name === pros.name ? Object.assign({}, p, {status: 'contacted', nextDate: relDateStr, nextAction: 'Relance J+3'}) : p }) })
+        patchProspect(alreadyInCrm.id, {status: 'contacted', nextDate: relDateStr, nextAction: 'Relance J+3'})
         toast('Contacté ! Pipeline CRM mis à jour')
       }
     }
@@ -846,10 +949,20 @@ function DashboardImpl() {
   }
 
   function saveProspect() {
-    if (!form.name) { toast('Nom requis !'); return }
-    const p = Object.assign({}, form, {files: form.files || []})
-    if (form.id) { setProspects(function(prev) { return prev.map(function(x) { return x.id === form.id ? p : x }) }) }
-    else { setProspects(function(prev) { return prev.concat([Object.assign({}, p, {id: Date.now(), status: 'to_contact', ca: 0})]) }) }
+    if (!form.name || !String(form.name).trim()) { toast('Nom requis !'); return }
+    var p = Object.assign({}, form, {files: form.files || []})
+    if (form.id) {
+      var row = prospectToRow(p)
+      sb().from('prospects').update(row).eq('id', form.id).then(function(r) {
+        if (r.error) { toast('Erreur CRM: ' + r.error.message); return }
+        setProspects(function(prev) { return prev.map(function(x) { return String(x.id) === String(form.id) ? Object.assign({}, x, p, {contactName: ((p.contactFirstName||'')+' '+(p.contactLastName||'')).trim()}) : x }) })
+        toast('Prospect modifié ✓')
+      })
+    } else {
+      insertProspect(Object.assign({}, p, {status: p.status || 'to_contact', ca: 0, source: 'manuel'}), function(np) {
+        if (np) { toast('Prospect créé ✓'); logActivity('prospect_cree', 'Nouveau prospect : ' + np.name, np.name, null) }
+      })
+    }
     closeModal()
   }
 
@@ -1001,6 +1114,7 @@ function DashboardImpl() {
             <CrmTab
               prospects={prospects}
               setProspects={setProspects}
+              patchProspect={patchProspect}
               devisList={devisList}
               commissionObjectif={commissionObjectif}
               setCommissionObjectif={setCommissionObjectif}
@@ -1484,10 +1598,10 @@ function DashboardImpl() {
                         <div className="fg"><label className="lbl">Lieu</label><input className="inp" value={devisClient.lieu} onChange={function(e){setDevisClient(Object.assign({},devisClient,{lieu:e.target.value}))}} /></div>
                       </div>
                       {!devisClient.prospectId&&devisClient.nom&&<button className="btn btn-y btn-sm" style={{marginTop:4}} onClick={function(){
-                        var np={id:Date.now(),name:devisClient.nom,email:devisClient.email,phone:'',size:'',category:'Evénementiel',status:'contacted',nextAction:'Devis envoyé',nextDate:'',notes:'',ca:0,score:7,files:[]}
-                        setProspects(function(prev){return prev.concat([np])})
-                        setDevisClient(Object.assign({},devisClient,{prospectId:np.id}))
-                        toast('Prospect ajouté au CRM !')
+                        var np={name:devisClient.nom,email:devisClient.email,phone:'',size:'',category:'Evénementiel',status:'contacted',nextAction:'Devis envoyé',nextDate:'',notes:'',ca:0,score:7,files:[],source:'devis'}
+                        insertProspect(np, function(created){
+                          if(created){ setDevisClient(Object.assign({},devisClient,{prospectId:created.id})); toast('Prospect ajouté au CRM !') }
+                        })
                       }}>+ Ajouter au CRM</button>}
                       <div className="fg" style={{marginTop:8}}><label className="lbl">N° Devis</label><input className="inp" value={devisNumero} onChange={function(e){setDevisNumero(e.target.value)}} /></div>
                     </div>
@@ -1677,6 +1791,11 @@ function DashboardImpl() {
         closeModal={closeModal}
         saveTask={saveTask}
         saveContact={saveContact}
+        saveProspect={saveProspect}
+        deleteProspect={deleteProspect}
+        setProspects={setProspects}
+        logActivity={logActivity}
+        loadContacts={loadContacts}
         saveVault={saveVault}
         saveCalEvent={saveCalEvent}
         deleteCalEvent={deleteCalEvent}
