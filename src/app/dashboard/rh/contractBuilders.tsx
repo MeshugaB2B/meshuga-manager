@@ -296,6 +296,36 @@ export function buildSharedHeader(opts) {
 // ============================================================
 // Bloc signatures — wrappé dans .signature-page pour @page signature
 // ============================================================
+// ============================================================
+// Clause de mobilité — prestations événementielles B2B (Île-de-France)
+// Rendue dans l'article "Lieu de travail" de chaque type de contrat.
+// Acceptation expresse rappelée dans le bloc signatures (buildSharedSignatures).
+// ============================================================
+export function hasMobilite(c) {
+  return c.clause_mobilite !== false && c.clause_mobilite !== null && c.clause_mobilite !== undefined ? !!c.clause_mobilite : false
+}
+
+export function buildMobiliteArticle(c, emp, artNum) {
+  var civilite = emp.civilite || "Madame"
+  var feminin = (civilite === "Madame" || civilite === "Mademoiselle")
+  var zone = c.clause_mobilite_zone || "région Île-de-France (Paris et départements 77, 78, 91, 92, 93, 94, 95)"
+  var titre = 'Lieu de travail' + (hasMobilite(c) ? ' et clause de mobilité' : '')
+  var html = ''
+    + '<div class="art"><span class="art-num">Article ' + artNum + '.</span><span class="art-title">' + titre + '</span></div>'
+    + '<div class="body">'
+    + '<p class="sub-clause"><span class="clause-label">' + artNum + '.1 — Lieu de travail principal.</span> Le/la Salarié(e) exerce ses fonctions au sein de l\'établissement <strong>MESHUGA, 3 rue Vavin, 75006 Paris</strong>.</p>'
+  if (hasMobilite(c)) {
+    html += ''
+      + '<p class="sub-clause"><span class="clause-label">' + artNum + '.2 — Clause de mobilité géographique.</span> Compte tenu de la nature de l\'activité de l\'entreprise, qui comprend une activité de traiteur et de prestations événementielles pour une clientèle professionnelle (petits-déjeuners, déjeuners d\'affaires, cocktails, soirées, salons et réceptions dites « B2B ») réalisées dans les locaux des clients ou sur les lieux qu\'ils désignent, le/la Salarié(e) accepte expressément d\'exécuter ses fonctions, à titre ponctuel ou récurrent, sur tout lieu de prestation situé dans la <strong>' + esc(zone) + '</strong>.</p>'
+      + '<p class="sub-clause"><span class="clause-label">' + artNum + '.3 — Conditions de mise en œuvre.</span> Cette mobilité est mise en œuvre dans l\'intérêt de l\'entreprise et de bonne foi. Sauf urgence ou circonstance exceptionnelle, le/la Salarié(e) est informé(e) du lieu, de la date et des horaires de la prestation avec un délai de prévenance minimum de <strong>quarante-huit (48) heures</strong>, par tout moyen écrit (planning, messagerie professionnelle, SMS). Ces prestations s\'inscrivent dans la durée du travail contractuelle et sont rémunérées dans les conditions prévues au présent contrat ; les heures effectuées au-delà sont traitées conformément aux dispositions légales et conventionnelles applicables aux heures supplémentaires ou complémentaires.</p>'
+      + '<p class="sub-clause"><span class="clause-label">' + artNum + '.4 — Temps et frais de déplacement.</span> Le temps de trajet entre l\'établissement (ou le domicile, si le/la Salarié(e) se rend directement sur site à la demande de l\'employeur) et le lieu de prestation qui excède le temps normal de trajet domicile–établissement fait l\'objet d\'une contrepartie conformément à l\'article L.3121-4 du Code du travail. Les frais de transport exposés à la demande de l\'employeur pour se rendre sur le lieu de prestation sont pris en charge ou remboursés sur justificatifs, selon la politique interne de notes de frais.</p>'
+      + '<p class="sub-clause"><span class="clause-label">' + artNum + '.5 — Portée.</span> Les Parties conviennent que l\'exécution de prestations sur les lieux visés au présent article ne constitue pas une modification du contrat de travail mais un simple changement des conditions de travail, relevant du pouvoir de direction de l\'employeur, et ne nécessite donc pas la conclusion d\'un avenant. Tout refus injustifié du/de la Salarié(e) d\'exécuter une prestation dans les conditions ci-dessus pourra constituer un manquement à ses obligations contractuelles. La présente clause ne peut en aucun cas conduire à un changement du lieu de travail principal ni à une mobilité hors de la zone géographique définie sans accord écrit du/de la Salarié(e).</p>'
+      + '<p class="sub-clause"><span class="clause-label">' + artNum + '.6 — Acceptation expresse.</span> Le/la Salarié(e) déclare avoir pris connaissance de la présente clause de mobilité, en comprendre la portée et l\'<strong>accepter expressément</strong>. Cette acceptation est matérialisée par la signature du présent contrat et par la mention spécifique figurant au bloc « Signatures ».</p>'
+  }
+  html += '</div>'
+  return genderize(html, feminin)
+}
+
 export function buildSharedSignatures(c, emp, salarieRole) {
   var civilite = emp.civilite || "Madame"
   var feminin = (civilite === "Madame" || civilite === "Mademoiselle")
@@ -321,7 +351,8 @@ export function buildSharedSignatures(c, emp, salarieRole) {
     + '<div class="sig-block">'
     + '<div class="sig-head">' + (feminin ? "La Salariée" : "Le Salarié") + '</div>'
     + '<div class="sig-id"><div class="name">' + esc(emp.prenom || "") + ' ' + esc((emp.nom || "").toUpperCase()) + '</div><div class="role">' + esc(salarieRole || "&nbsp;") + '</div></div>'
-    + '<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé »</div>'
+    + (hasMobilite(c) ? '<div class="sig-mob" style="font-size:10.5px;line-height:1.45;border:1.5px solid #191923;border-left:5px solid #FF82D7;padding:6px 9px;margin:6px 0;background:#FFF7FC"><strong>Clause de mobilité (Île-de-France — prestations événementielles B2B) :</strong> ' + (feminin ? 'la Salariée' : 'le Salarié') + ' déclare l\'avoir lue et l\'<strong>accepter expressément</strong>. Mention manuscrite : « Lu et approuvé — clause de mobilité acceptée ».</div>' : '')
+    + '<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé' + (hasMobilite(c) ? ' — clause de mobilité acceptée' : '') + ' »</div>'
     + '<div class="sig-foot">Date : __ / __ / ____</div>'
     + '</div>'
     + '</div></section>'
@@ -415,8 +446,7 @@ export function buildExtraContract(c, emp, vacs, logoUri) {
     + '<li>Toute tâche connexe relevant strictement de sa qualification, dans le respect des règles d\'hygiène (HACCP).</li></ul>'
     + '</div>'
 
-    + '<div class="art"><span class="art-num">Article 5.</span><span class="art-title">Lieu de travail</span></div>'
-    + '<div class="body"><p>Établissement MESHUGA, <strong>3 rue Vavin, 75006 Paris</strong>.</p></div>'
+    + buildMobiliteArticle(c, emp, 5)
 
     + '<div class="art"><span class="art-num">Article 6.</span><span class="art-title">Rémunération et avantages</span></div>'
     + '<div class="body">'
@@ -514,8 +544,6 @@ export function buildCdiCadreContract(c, emp, logoUri) {
   var peRenouv = c.periode_essai_renouvelable !== false
   var peTotal = peRenouv ? pe * 2 : pe
 
-  var mobZone = c.clause_mobilite_zone || "région Île-de-France"
-
   var intActive = !!c.interessement_active
   var intTaux = c.interessement_taux_pct ? parseFloat(c.interessement_taux_pct) : 10
   var intAssiette = c.interessement_assiette || "chiffre d'affaires HT B2B encaissé"
@@ -556,11 +584,7 @@ export function buildCdiCadreContract(c, emp, logoUri) {
         : '<p>Non renouvelable.</p>')
     + '</div>'
 
-    + '<div class="art"><span class="art-num">Article 5.</span><span class="art-title">Lieu de travail' + (c.clause_mobilite ? ' et clause de mobilité' : '') + '</span></div>'
-    + '<div class="body">'
-    + '<p><strong>MESHUGA, 3 rue Vavin, 75006 Paris</strong>.</p>'
-    + (c.clause_mobilite ? '<p>Mobilité dans la <strong>' + esc(mobZone) + '</strong>.</p>' : '')
-    + '</div>'
+    + buildMobiliteArticle(c, emp, 5)
 
     + '<div class="art"><span class="art-num">Article 6.</span><span class="art-title">Durée du travail et organisation</span></div>'
     + '<div class="body">'
@@ -573,7 +597,7 @@ export function buildCdiCadreContract(c, emp, logoUri) {
 
     + '<div class="art"><span class="art-num">Article 7.</span><span class="art-title">Rémunération fixe</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">7.1 — Salaire mensuel brut.</span> <strong>' + formatEuros(salaire) + ' (' + esc(salaireLettres) + ' euros)</strong>, sur 12 mois.</p>'
+    + '<p class="sub-clause"><span class="clause-label">7.1 — Salaire mensuel brut.</span> <strong>' + formatEuros(salaire) + ' (' + esc(salaireLettres) + ' euros)</strong>, sur 12 mois' + (c.taux_horaire_brut ? ', soit un taux horaire brut de <strong>' + String(parseFloat(c.taux_horaire_brut).toFixed(2)).replace(".", ",") + ' €</strong>' + (c.taux_horaire_lettres ? ' (' + esc(c.taux_horaire_lettres) + ' euros)' : '') + ' pour les heures normales, majoré de 25 % pour les heures supplémentaires structurelles' : '') + '.</p>'
     + '<p class="sub-clause"><span class="clause-label">7.2 — Repas.</span> URSSAF 4,25 €.</p>'
     + '<p class="sub-clause"><span class="clause-label">7.3 — Dimanche et 1<sup>er</sup> mai.</span> Pas de majoration dominicale. 1<sup>er</sup> mai majoré 100%.</p>'
     + '</div>'
@@ -760,8 +784,7 @@ function buildCdiSimpleContract(c, emp, logoUri, profil) {
     + (peRenouv ? '<p>Renouvelable une fois.</p>' : '<p>Non renouvelable.</p>')
     + '</div>'
 
-    + '<div class="art"><span class="art-num">Article 5.</span><span class="art-title">Lieu de travail</span></div>'
-    + '<div class="body"><p><strong>MESHUGA, 3 rue Vavin, 75006 Paris</strong>.</p></div>'
+    + buildMobiliteArticle(c, emp, 5)
 
     + '<div class="art"><span class="art-num">Article 6.</span><span class="art-title">Durée du travail</span></div>'
     + '<div class="body">'
@@ -772,7 +795,7 @@ function buildCdiSimpleContract(c, emp, logoUri, profil) {
 
     + '<div class="art"><span class="art-num">Article 7.</span><span class="art-title">Rémunération</span></div>'
     + '<div class="body">'
-    + '<p class="sub-clause"><span class="clause-label">7.1 — Salaire mensuel brut.</span> <strong>' + formatEuros(salaire) + ' (' + esc(salaireLettres) + ' euros)</strong>, sur 12 mois.</p>'
+    + '<p class="sub-clause"><span class="clause-label">7.1 — Salaire mensuel brut.</span> <strong>' + formatEuros(salaire) + ' (' + esc(salaireLettres) + ' euros)</strong>, sur 12 mois' + (c.taux_horaire_brut ? ', soit un taux horaire brut de <strong>' + String(parseFloat(c.taux_horaire_brut).toFixed(2)).replace(".", ",") + ' €</strong>' + (c.taux_horaire_lettres ? ' (' + esc(c.taux_horaire_lettres) + ' euros)' : '') + ' pour les heures normales, majoré de 25 % pour les heures supplémentaires structurelles' : '') + '.</p>'
     + '<p class="sub-clause"><span class="clause-label">7.2 — Repas.</span> URSSAF 4,25 €.</p>'
     + '<p class="sub-clause"><span class="clause-label">7.3 — Dimanche et 1<sup>er</sup> mai.</span> Pas de majoration dominicale. 1<sup>er</sup> mai 100%.</p>'
     + '</div>'
