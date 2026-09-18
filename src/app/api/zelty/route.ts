@@ -1,4 +1,11 @@
 import { NextResponse } from 'next/server'
+
+// Route dynamique : ne JAMAIS être pré-générée au build (elle appelle l'API Zelty
+// sur toute l'année → timeout 60 s du worker Vercel). Toujours exécutée à la demande.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const maxDuration = 60
+
 const BASE = 'https://api.zelty.fr/2.10'
 const KEY = process.env.ZELTY_API_KEY || ''
 
