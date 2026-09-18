@@ -1691,6 +1691,29 @@ export default function EmployeeDetail(props) {
                               onClick={function () { if (props.onContractEdit) props.onContractEdit(c) }}
                             >✏️ Éditer</button>
                           ) : null}
+                          {/* 🔥 Envoi du CONTRAT pour signature électronique (email + SMS) — même modal que les avenants */}
+                          {(function () {
+                            var cSig = c.signature_status || "unsent"
+                            var cSigned = !!(c.signed_at || c.signature_signed_at || cSig === "signed" || c.status === "signed" || hasContratSigne)
+                            if (cSigned) return null
+                            var cLabel = (getContractTypeMeta(c.type || "extra") ? getContractTypeMeta(c.type || "extra").label : "Contrat") + (c.fonction ? " — " + c.fonction : "")
+                            var pending = (cSig === "sent" || cSig === "viewed")
+                            return (
+                              <span style={{ display: "inline-flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+                                {pending ? (
+                                  <span style={{ background: cSig === "viewed" ? "#FF82D7" : "#FFEB5A", color: "#191923", border: "1.5px solid #191923", borderRadius: 9, padding: "3px 8px", fontWeight: 900, fontSize: 10, textTransform: "uppercase" }}>
+                                    {cSig === "viewed" ? "👀 Consulté" : "📧 Envoyé"}{c.signature_sent_at ? " le " + new Date(c.signature_sent_at).toLocaleDateString("fr-FR") : ""}
+                                  </span>
+                                ) : null}
+                                <button
+                                  className="btn btn-sm"
+                                  style={{ background: "#FF82D7", color: "#FFFFFF", border: "1.5px solid #FF82D7", fontWeight: 700 }}
+                                  onClick={function () { setSendSignaturePayload({ documentType: "contract", documentId: c.id, documentLabel: cLabel }) }}
+                                  title={pending ? "Renvoyer le lien de signature (relance email / SMS)" : "Envoyer ce contrat au salarié pour signature électronique (email / SMS)"}
+                                >{pending ? "🔁 Relancer" : "📧 Envoyer pour signature"}</button>
+                              </span>
+                            )
+                          })()}
                           {!hasContratSigne ? (
                             <button
                               className="btn btn-sm"
