@@ -100,6 +100,8 @@ function emptyContract() {
     date_fin: "",
     classification: "",
     taux_horaire_brut: "17",
+    taux_horaire_saisie_mode: "brut",
+    taux_horaire_saisi: "17",
     taux_horaire_lettres: "dix-sept",
     // CDI
     date_embauche: "",
@@ -114,8 +116,8 @@ function emptyContract() {
     heures_sup_structurelles: "",
     periode_essai_mois: "2",
     periode_essai_renouvelable: true,
-    clause_mobilite: false,
-    clause_mobilite_zone: "région Île-de-France",
+    clause_mobilite: true,
+    clause_mobilite_zone: "région Île-de-France (Paris et départements 77, 78, 91, 92, 93, 94, 95)",
     interessement_active: false,
     interessement_taux_pct: "10",
     interessement_assiette: "le chiffre d'affaires HT B2B encaissé",
@@ -134,6 +136,121 @@ function emptyContract() {
 // ============================================================
 // COMPOSANT PRINCIPAL
 // ============================================================
+// ===== Paie simplifiée : taux horaire (brut ou net) + heures/semaine → tout le reste =====
+// Règles : 151,67 h/mois au taux normal ; heures sup structurelles majorées 25 %
+// (36e à 43e h) puis 50 % (au-delà de 43 h) — art. L.3121-36 C. trav. / CCN 1501.
+// Cotisations : taux moyens 2026 restauration rapide (< 50 salariés), à titre INDICATIF.
+// Le bulletin de paie établi par le cabinet fait foi.
+
+// Part salariale (sur brut) — non-cadre ≈ 22 %, cadre ≈ 25 %
+var COTIS_SALARIE = { "non-cadre": 0.22, "cadre": 0.25 }
+// Heures sup : exonérées des cotisations salariales vieillesse + retraite (≈ 11,31 %) → seule CSG/CRDS reste (≈ 9,7 %)
+var COTIS_SALARIE_HS = 0.097
+
+// Part patronale — barème 2026 hors réduction générale (dégressive jusqu'à 1,6 SMIC)
+var CHARGES_PATRONALES = [
+  { label: "Maladie-maternité (taux réduit < 2,5 SMIC)", nc: 0.07, cadre: 0.07 },
+  { label: "Vieillesse plafonnée + déplafonnée", nc: 0.1057, cadre: 0.1057 },
+  { label: "Allocations familiales (taux réduit < 3,5 SMIC)", nc: 0.0345, cadre: 0.0345 },
+  { label: "Accidents du travail (restauration rapide)", nc: 0.015, cadre: 0.015 },
+  { label: "Assurance chômage + AGS", nc: 0.0425, cadre: 0.0425 },
+  { label: "Retraite complémentaire AGIRC-ARRCO T1 + CEG", nc: 0.0601, cadre: 0.0601 },
+  { label: "FNAL + CSA + dialogue social", nc: 0.0042, cadre: 0.0042 },
+  { label: "Formation pro + taxe d'apprentissage", nc: 0.0123, cadre: 0.0123 },
+  { label: "Prévoyance (Gan) / APEC cadre", nc: 0.005, cadre: 0.0154 },
+  { label: "Forfait social / transport (IDF versement mobilité < 11 sal. : 0)", nc: 0.0, cadre: 0.0 }
+]
+var MUTUELLE_PART_EMPLOYEUR_MOIS = 25 // € — part employeur mutuelle (forfait indicatif)
+
+// Réduction générale des cotisations patronales (ex-Fillon) — coefficient max 2026 ≈ 0,3194 (< 50 salariés)
+function reductionGenerale(brutMensuel, heuresMensuelles) {
+  var smicMensuel = SMIC_2026.horaire * heuresMensuelles
+  if (brutMensuel <= 0 || smicMensuel <= 0) return 0
+  var ratio = brutMensuel / smicMensuel
+  if (ratio >= 1.6) return 0
+  var coef = (0.3194 / 0.6) * (1.6 * smicMensuel / brutMensuel - 1)
+  coef = Math.min(0.3194, Math.max(0, coef))
+  return brutMensuel * coef
+}
+
+function calcPaieFromTaux(tauxHoraire, heuresHebdo, statutCadre, saisieMode) {
+  var t = parseFloat(tauxHoraire)
+  var h = parseFloat(heuresHebdo)
+  if (isNaN(t) || isNaN(h) || t <= 0 || h <= 0) return null
+  var isCadre = statutCadre === "cadre"
+  var salRate = isCadre ? COTIS_SALARIE["cadre"] : COTIS_SALARIE["non-cadre"]
+  // Si saisie en NET → on remonte au brut horaire (heures normales)
+  var tBrut = saisieMode === "net" ? t / (1 - salRate) : t
+  var tNet = tBrut * (1 - salRate)
+
+  var hMens = h * 52 / 12
+  var hNorm = Math.min(hMens, 151.67)
+  var hSup = Math.max(0, hMens - 151.67)
+  var hSup25 = Math.min(hSup, 8 * 52 / 12)
+  var hSup50 = Math.max(0, hSup - hSup25)
+  var base = tBrut * hNorm
+  var sup25 = tBrut * 1.25 * hSup25
+  var sup50 = tBrut * 1.5 * hSup50
+  var brutSup = sup25 + sup50
+  var brut = base + brutSup
+
+  // Net : cotisations pleines sur heures normales, allégées sur heures sup
+  var netBase = base * (1 - salRate)
+  var netSup = brutSup * (1 - COTIS_SALARIE_HS)
+  var net = netBase + netSup
+
+  // Charges patronales détaillées
+  var lignes = []
+  var totalCharges = 0
+  for (var k = 0; k < CHARGES_PATRONALES.length; k++) {
+    var l = CHARGES_PATRONALES[k]
+    var taux = isCadre ? l.cadre : l.nc
+    if (taux <= 0) continue
+    var montant = brut * taux
+    totalCharges += montant
+    lignes.push({ label: l.label, taux: taux, montant: Math.round(montant * 100) / 100 })
+  }
+  lignes.push({ label: "Mutuelle — part employeur (forfait)", taux: null, montant: MUTUELLE_PART_EMPLOYEUR_MOIS })
+  totalCharges += MUTUELLE_PART_EMPLOYEUR_MOIS
+  var reduc = reductionGenerale(brut, hMens)
+  if (reduc > 0) {
+    lignes.push({ label: "Réduction générale de cotisations (ex-Fillon)", taux: null, montant: -Math.round(reduc * 100) / 100 })
+    totalCharges -= reduc
+  }
+  var coutTotal = brut + totalCharges
+  var r2 = function (x) { return Math.round(x * 100) / 100 }
+
+  return {
+    saisie_mode: saisieMode === "net" ? "net" : "brut",
+    taux_brut: r2(tBrut),
+    taux_net: r2(tNet),
+    taux_brut_sup25: r2(tBrut * 1.25),
+    taux_brut_sup50: r2(tBrut * 1.5),
+    heures_hebdo: h,
+    heures_mensuelles: r2(hMens),
+    heures_normales: r2(hNorm),
+    heures_sup: r2(hSup),
+    heures_sup25: r2(hSup25),
+    heures_sup50: r2(hSup50),
+    brut_base: r2(base),
+    brut_sup25: r2(sup25),
+    brut_sup50: r2(sup50),
+    brut_mensuel: r2(brut),
+    brut_annuel: r2(brut * 12),
+    net_mensuel: r2(net),
+    net_annuel: r2(net * 12),
+    cotis_salariales: r2(brut - net),
+    charges_lignes: lignes,
+    charges_patronales: r2(totalCharges),
+    reduction_generale: r2(reduc),
+    taux_charges_effectif: brut > 0 ? Math.round(totalCharges / brut * 1000) / 10 : 0,
+    cout_employeur: r2(coutTotal),
+    cout_employeur_annuel: r2(coutTotal * 12),
+    cout_horaire_reel: hMens > 0 ? r2(coutTotal / hMens) : 0,
+    depasse_max: h > 48
+  }
+}
+
 export default function RhWizard(props) {
   var existing = props.existing
   var [step, setStep] = useState(existing ? 1 : 0)
@@ -195,8 +312,13 @@ export default function RhWizard(props) {
     }
     c.type = existing.type || "extra"
     // Convertir nombres en string pour les inputs
+    if (existing.clause_mobilite === false || existing.clause_mobilite === true) {
+      c.clause_mobilite = existing.clause_mobilite
+    }
     if (existing.taux_horaire_brut !== null && existing.taux_horaire_brut !== undefined) {
       c.taux_horaire_brut = String(existing.taux_horaire_brut)
+      c.taux_horaire_saisi = String(existing.taux_horaire_brut)
+      c.taux_horaire_saisie_mode = "brut"
     }
     if (existing.salaire_brut_mensuel !== null && existing.salaire_brut_mensuel !== undefined) {
       c.salaire_brut_mensuel = String(existing.salaire_brut_mensuel)
@@ -240,23 +362,27 @@ export default function RhWizard(props) {
   // ===== Auto-update salaire en lettres + heures mensuelles =====
   useEffect(function () {
     if (contract.type === "extra") return
-    var s = parseFloat(contract.salaire_brut_mensuel)
-    var h = parseFloat(contract.heures_hebdo)
-    if (isNaN(s) || isNaN(h)) return
-    var hMens = h * 52 / 12
-    var hSup = Math.max(0, hMens - 151.67)
+    var pay = calcPaieFromTaux(contract.taux_horaire_saisi || contract.taux_horaire_brut, contract.heures_hebdo, contract.statut_cadre, contract.taux_horaire_saisie_mode)
+    if (!pay) return
+    var brutH = pay.taux_brut.toFixed(2)
     var newC = Object.assign({}, contract, {
-      salaire_lettres: numToFrenchWords(s),
-      heures_mensuelles: hMens.toFixed(2),
-      heures_sup_structurelles: hSup.toFixed(2)
+      taux_horaire_brut: brutH,
+      taux_horaire_lettres: numToFrenchWords(brutH),
+      salaire_brut_mensuel: pay.brut_mensuel.toFixed(2),
+      salaire_lettres: numToFrenchWords(pay.brut_mensuel.toFixed(2)),
+      heures_mensuelles: pay.heures_mensuelles.toFixed(2),
+      heures_sup_structurelles: pay.heures_sup.toFixed(2)
     })
     // Évite boucle infinie
-    if (newC.salaire_lettres !== contract.salaire_lettres
+    if (newC.taux_horaire_brut !== contract.taux_horaire_brut
+      || newC.salaire_brut_mensuel !== contract.salaire_brut_mensuel
+      || newC.salaire_lettres !== contract.salaire_lettres
+      || newC.taux_horaire_lettres !== contract.taux_horaire_lettres
       || newC.heures_mensuelles !== contract.heures_mensuelles
       || newC.heures_sup_structurelles !== contract.heures_sup_structurelles) {
       setContract(newC)
     }
-  }, [contract.salaire_brut_mensuel, contract.heures_hebdo, contract.type])
+  }, [contract.taux_horaire_saisi, contract.taux_horaire_saisie_mode, contract.taux_horaire_brut, contract.heures_hebdo, contract.statut_cadre, contract.type])
 
   // ===== Auto-cap période d'essai selon niveau CCN =====
   useEffect(function () {
@@ -351,8 +477,11 @@ export default function RhWizard(props) {
   var calc = (contract.type !== "extra")
     ? calcTauxHoraireBase(contract.salaire_brut_mensuel, contract.heures_hebdo)
     : null
-  var smicCheck = (calc && calc.taux_base) ? checkSmic(calc.taux_base) : { ok: true }
-  var ccnCheck = (calc && calc.taux_base && niveauKey) ? checkCcnMinimum(calc.taux_base, niveauKey) : { ok: true }
+  var tauxRef = (contract.type !== "extra" && contract.taux_horaire_brut && parseFloat(contract.taux_horaire_brut) > 0)
+    ? parseFloat(contract.taux_horaire_brut)
+    : (calc && calc.taux_base ? calc.taux_base : null)
+  var smicCheck = tauxRef ? checkSmic(tauxRef) : { ok: true }
+  var ccnCheck = (tauxRef && niveauKey) ? checkCcnMinimum(tauxRef, niveauKey) : { ok: true }
   var peCheck = (contract.type !== "extra")
     ? checkPeriodeEssai(contract.periode_essai_mois, contract.periode_essai_renouvelable, niveauKey)
     : { ok: true }
@@ -454,6 +583,8 @@ export default function RhWizard(props) {
         contractData.classification = contract.classification
         contractData.taux_horaire_brut = contract.taux_horaire_brut ? parseFloat(contract.taux_horaire_brut) : null
         contractData.taux_horaire_lettres = contract.taux_horaire_lettres
+        contractData.clause_mobilite = contract.clause_mobilite
+        contractData.clause_mobilite_zone = contract.clause_mobilite_zone || null
       } else {
         // CDI
         contractData.date_embauche = contract.date_embauche || null
@@ -462,6 +593,8 @@ export default function RhWizard(props) {
         contractData.niveau_ccn = contract.niveau_ccn || null
         contractData.echelon_ccn = contract.echelon_ccn || null
         contractData.statut_cadre = contract.statut_cadre || "non-cadre"
+        contractData.taux_horaire_brut = contract.taux_horaire_brut ? parseFloat(contract.taux_horaire_brut) : null
+        contractData.taux_horaire_lettres = contract.taux_horaire_lettres
         contractData.salaire_brut_mensuel = contract.salaire_brut_mensuel ? parseFloat(contract.salaire_brut_mensuel) : null
         contractData.salaire_lettres = contract.salaire_lettres
         contractData.heures_hebdo = contract.heures_hebdo ? parseFloat(contract.heures_hebdo) : null
@@ -1125,6 +1258,8 @@ function Step2ExtraMission(props) {
         </div>
       </div>
 
+      <MobiliteBlock contract={contract} setContract={setContract} />
+
       <div className="ct" style={{ marginTop: 16 }}>Protection sociale</div>
       <div style={{ background: "#FFF8E1", borderLeft: "3px solid #FF82D7", padding: "10px 14px", marginBottom: 10, fontSize: 11.5, lineHeight: 1.6 }}>
         ✓ <b>Médecine du travail :</b> Efficience — Centre Vaugirard, 64 rue de Vaugirard, 75006 Paris<br />
@@ -1265,19 +1400,7 @@ function Step2CdiPosition(props) {
         </div>
       )}
 
-      <div className="ct" style={{ marginTop: 16 }}>Lieu de travail</div>
-      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 8 }}>
-        <input type="checkbox" checked={contract.clause_mobilite}
-          onChange={function (e) { setContract(Object.assign({}, contract, { clause_mobilite: e.target.checked })) }} />
-        <span>Ajouter une clause de mobilité</span>
-      </label>
-      {contract.clause_mobilite && (
-        <div className="fg">
-          <label className="lbl">Zone de mobilité</label>
-          <input className="inp" value={contract.clause_mobilite_zone}
-            onChange={function (e) { setContract(Object.assign({}, contract, { clause_mobilite_zone: e.target.value })) }} />
-        </div>
-      )}
+      <MobiliteBlock contract={contract} setContract={setContract} />
     </div>
   )
 }
@@ -1315,6 +1438,36 @@ function Step3ExtraPlanning(props) {
 }
 
 // ============================================================
+// Bloc Lieu de travail / clause de mobilité (partagé Extra + CDI)
+// ============================================================
+function MobiliteBlock(props) {
+  var contract = props.contract
+  var setContract = props.setContract
+  return (
+    <div>
+      <div className="ct" style={{ marginTop: 16 }}>Lieu de travail &amp; mobilité B2B</div>
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", marginBottom: 8 }}>
+        <input type="checkbox" checked={!!contract.clause_mobilite} style={{ marginTop: 3 }}
+          onChange={function (e) { setContract(Object.assign({}, contract, { clause_mobilite: e.target.checked })) }} />
+        <span>
+          <b>Clause de mobilité — prestations événementielles B2B</b> (activée par défaut)
+          <div style={{ fontSize: 10.5, opacity: 0.65, marginTop: 2, lineHeight: 1.4 }}>
+            Interventions chez les clients en Île-de-France, prévenance 48 h, temps de trajet et frais pris en charge. Acceptation expresse rappelée dans le bloc signatures du contrat.
+          </div>
+        </span>
+      </label>
+      {contract.clause_mobilite && (
+        <div className="fg">
+          <label className="lbl">Zone géographique (telle qu&apos;écrite dans le contrat)</label>
+          <input className="inp" value={contract.clause_mobilite_zone}
+            onChange={function (e) { setContract(Object.assign({}, contract, { clause_mobilite_zone: e.target.value })) }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
 // STEP 3 (CDI) : Rémunération
 // ============================================================
 function Step3CdiSalary(props) {
@@ -1324,51 +1477,112 @@ function Step3CdiSalary(props) {
   var smicCheck = props.smicCheck
   var ccnCheck = props.ccnCheck
   var niveauKey = props.niveauKey
+  var mode = contract.taux_horaire_saisie_mode === "net" ? "net" : "brut"
+  var pay = calcPaieFromTaux(contract.taux_horaire_saisi || contract.taux_horaire_brut, contract.heures_hebdo, contract.statut_cadre, mode)
+  var fr = function (x) { return (Math.round(x * 100) / 100).toFixed(2).replace(".", ",") }
 
   return (
     <div>
       <div className="ct">Rémunération</div>
+      <div style={{ fontSize: 11, opacity: 0.65, marginBottom: 8 }}>Deux champs à remplir. Brut, net, heures sup, montants en lettres et coût employeur sont calculés automatiquement.</div>
 
       <div className="fg2">
         <div className="fg">
-          <label className="lbl">Salaire brut mensuel (€)</label>
-          <input type="number" step="0.01" className="inp"
-            value={contract.salaire_brut_mensuel}
-            onChange={function (e) { setContract(Object.assign({}, contract, { salaire_brut_mensuel: e.target.value })) }}
-            placeholder="3006.00" />
+          <label className="lbl">Taux horaire saisi en</label>
+          <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+            {["brut", "net"].map(function (m) {
+              return <button key={m} type="button" className="btn btn-sm"
+                style={{ flex: 1, fontSize: 11, padding: "4px 8px", fontWeight: 900, background: mode === m ? "#FF82D7" : "#FFFFFF" }}
+                onClick={function () { setContract(Object.assign({}, contract, { taux_horaire_saisie_mode: m })) }}>{m === "brut" ? "BRUT" : "NET"}</button>
+            })}
+          </div>
+          <input type="number" step="0.01" className="inp" min="0"
+            value={contract.taux_horaire_saisi !== undefined && contract.taux_horaire_saisi !== null ? contract.taux_horaire_saisi : contract.taux_horaire_brut}
+            onChange={function (e) { setContract(Object.assign({}, contract, { taux_horaire_saisi: e.target.value })) }}
+            placeholder={mode === "net" ? "10.50" : "13.50"} />
+          <div style={{ fontSize: 10, opacity: 0.6, marginTop: 4 }}>
+            €/h {mode === "net" ? "net avant impôt" : "brut"}
+            {niveauKey && CCN_GRILLE[niveauKey] && <span> · Minimum CCN {niveauKey} : <b>{CCN_GRILLE[niveauKey].taux_horaire} €/h brut</b></span>}
+            <span> · SMIC 2026 : <b>{SMIC_2026.horaire} €/h brut</b></span>
+          </div>
         </div>
         <div className="fg">
-          <label className="lbl">En lettres (auto)</label>
-          <input className="inp"
-            value={contract.salaire_lettres}
-            onChange={function (e) { setContract(Object.assign({}, contract, { salaire_lettres: e.target.value })) }}
-            style={{ background: "#FAFAFA", fontStyle: "italic", color: "#666" }} />
-        </div>
-      </div>
-
-      <div className="fg2">
-        <div className="fg">
-          <label className="lbl">Heures hebdomadaires</label>
-          <input type="number" step="0.5" className="inp" min="0" max="48"
+          <label className="lbl">Heures par semaine</label>
+          <input type="number" step="0.5" className="inp" min="1" max="48"
             value={contract.heures_hebdo}
             onChange={function (e) { setContract(Object.assign({}, contract, { heures_hebdo: e.target.value })) }}
             placeholder="35" />
-        </div>
-        <div className="fg">
-          <label className="lbl">Heures mensuelles (auto)</label>
-          <input className="inp"
-            value={contract.heures_mensuelles}
-            readOnly
-            style={{ background: "#FAFAFA", fontStyle: "italic", color: "#666" }} />
+          <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+            {["24", "30", "35", "39"].map(function (h) {
+              return <button key={h} type="button" className="btn btn-sm" style={{ fontSize: 10, padding: "2px 8px", background: contract.heures_hebdo === h ? "#FFEB5A" : "#FFFFFF" }} onClick={function () { setContract(Object.assign({}, contract, { heures_hebdo: h })) }}>{h} h</button>
+            })}
+          </div>
         </div>
       </div>
 
-      {calc && calc.taux_base > 0 && (
-        <div className="note" style={{ background: "#FFF8E1", borderLeft: "3px solid #FF82D7", padding: "8px 12px", margin: "8px 0", fontSize: 11.5 }}>
-          <b>Décomposition automatique :</b><br />
-          • Taux horaire de base : <b>{calc.taux_base.toFixed(2)} €/h</b><br />
-          • {calc.heures_normales} h au taux normal<br />
-          {calc.heures_sup > 0 && <span>• {calc.heures_sup} h supplémentaires majorées 25 %<br /></span>}
+      {pay && (
+        <div style={{ border: "2px solid #191923", borderRadius: 8, boxShadow: "2px 2px 0 #191923", background: "#FFFFFF", marginTop: 8, overflow: "hidden" }}>
+          <div style={{ background: "#FF82D7", padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontFamily: "Yellowtail, cursive", fontSize: 18 }}>Salaire calculé</span>
+            <span style={{ fontSize: 10, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.5 }}>{pay.heures_mensuelles.toFixed(2).replace(".", ",")} h/mois · {contract.statut_cadre === "cadre" ? "cadre" : "non-cadre"}</span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", borderBottom: "2px solid #191923" }}>
+            <div style={{ padding: "8px 10px", borderRight: "1px solid #EBEBEB" }}>
+              <div style={{ fontSize: 9.5, fontWeight: 900, textTransform: "uppercase", opacity: 0.55 }}>Brut horaire</div>
+              <div style={{ fontSize: 16, fontWeight: 900 }}>{fr(pay.taux_brut)} €</div>
+            </div>
+            <div style={{ padding: "8px 10px", borderRight: "1px solid #EBEBEB" }}>
+              <div style={{ fontSize: 9.5, fontWeight: 900, textTransform: "uppercase", opacity: 0.55 }}>Net horaire</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: "#2E7D32" }}>{fr(pay.taux_net)} €</div>
+            </div>
+            <div style={{ padding: "8px 10px", borderRight: "1px solid #EBEBEB", background: "#FFF7FC" }}>
+              <div style={{ fontSize: 9.5, fontWeight: 900, textTransform: "uppercase", opacity: 0.55 }}>Brut mensuel</div>
+              <div style={{ fontSize: 16, fontWeight: 900 }}>{formatEuros(pay.brut_mensuel)}</div>
+            </div>
+            <div style={{ padding: "8px 10px", background: "#FFF7FC" }}>
+              <div style={{ fontSize: 9.5, fontWeight: 900, textTransform: "uppercase", opacity: 0.55 }}>Net mensuel</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: "#2E7D32" }}>≈ {formatEuros(pay.net_mensuel)}</div>
+            </div>
+          </div>
+
+          <div style={{ padding: "10px 12px", fontSize: 11.5, lineHeight: 1.7 }}>
+            <div style={{ fontSize: 9.5, fontWeight: 900, textTransform: "uppercase", opacity: 0.55 }}>Détail du brut</div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}><span>{fr(pay.heures_normales)} h × {fr(pay.taux_brut)} €</span><b>{formatEuros(pay.brut_base)}</b></div>
+            {pay.heures_sup25 > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span>{fr(pay.heures_sup25)} h sup × {fr(pay.taux_brut_sup25)} € (125 %)</span><b>{formatEuros(pay.brut_sup25)}</b></div>}
+            {pay.heures_sup50 > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span>{fr(pay.heures_sup50)} h sup × {fr(pay.taux_brut_sup50)} € (150 %)</span><b>{formatEuros(pay.brut_sup50)}</b></div>}
+            <div style={{ display: "flex", justifyContent: "space-between", opacity: 0.75 }}><span>Cotisations salariales (≈ {contract.statut_cadre === "cadre" ? "25" : "22"} %{pay.heures_sup > 0 ? ", allégées sur les heures sup" : ""})</span><b>− {formatEuros(pay.cotis_salariales)}</b></div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}><span>Brut annuel / net annuel (12 mois)</span><b>{formatEuros(pay.brut_annuel)} / ≈ {formatEuros(pay.net_annuel)}</b></div>
+          </div>
+
+          <div style={{ borderTop: "2px solid #191923", background: "#FFFDE7", padding: "10px 12px", fontSize: 11.5, lineHeight: 1.65 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 9.5, fontWeight: 900, textTransform: "uppercase", opacity: 0.55 }}>Charges patronales — estimation informative</div>
+              <div style={{ fontSize: 10, fontWeight: 900 }}>≈ {pay.taux_charges_effectif.toString().replace(".", ",")} % du brut</div>
+            </div>
+            {pay.charges_lignes.map(function (l, idx) {
+              return (
+                <div key={idx} style={{ display: "flex", justifyContent: "space-between", opacity: l.montant < 0 ? 1 : 0.8, color: l.montant < 0 ? "#2E7D32" : "#191923" }}>
+                  <span>{l.label}{l.taux !== null ? " (" + (Math.round(l.taux * 10000) / 100).toString().replace(".", ",") + " %)" : ""}</span>
+                  <b>{l.montant < 0 ? "− " : ""}{formatEuros(Math.abs(l.montant))}</b>
+                </div>
+              )
+            })}
+            <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #191923", marginTop: 6, paddingTop: 6 }}><span><b>Total charges patronales</b></span><b>{formatEuros(pay.charges_patronales)}</b></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, background: "#FFEB5A", margin: "6px -12px -10px", padding: "8px 12px", border: "0" }}>
+              <span><b>Coût réel employeur</b> <span style={{ fontSize: 10, opacity: 0.7 }}>({fr(pay.cout_horaire_reel)} €/h travaillée)</span></span>
+              <b>{formatEuros(pay.cout_employeur)} / mois · {formatEuros(pay.cout_employeur_annuel)} / an</b>
+            </div>
+          </div>
+
+          <div style={{ padding: "6px 12px 8px", fontSize: 10, opacity: 0.55, lineHeight: 1.4 }}>
+            Net et charges patronales = estimation sur taux moyens 2026 (restauration rapide, effectif &lt; 50, réduction générale incluse sous 1,6 SMIC). Le bulletin de paie fait foi. Le contrat mentionne uniquement le <b>brut</b> : {fr(pay.taux_brut)} €/h et {formatEuros(pay.brut_mensuel)} (« {contract.salaire_lettres} euros »).
+          </div>
+        </div>
+      )}
+      {pay && pay.depasse_max && (
+        <div style={{ background: "#FFEBEE", border: "2px solid #C2185B", padding: "8px 12px", marginTop: 8, fontSize: 11.5, color: "#C2185B", fontWeight: 700 }}>
+          🚫 Durée maximale légale dépassée (48 h/semaine).
         </div>
       )}
 
