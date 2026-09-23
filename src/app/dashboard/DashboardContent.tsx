@@ -874,59 +874,14 @@ function DashboardImpl() {
       toast('OK, prospect archive.')
     }
   }
-  async function generateEmail(p, emailType) {
-    setEmailProspect(p)
-    setGeneratingEmail(true)
-    setGeneratedEmail('')
+  // Pitch IA : la génération, l'édition et l'envoi sont gérés par ProspectEmailModal
+  function generateEmail(p, emailType) {
+    setEmailProspect(Object.assign({}, p, {
+      __emailType: emailType || 'first',
+      __sender: isEmy ? 'emy' : 'edward',
+      __nonce: Date.now()
+    }))
     openModal('email', p)
-    const senderName = isEmy ? 'Emy, B2B Manager' : 'Edward, patron'
-    const senderSig = isEmy ? 'Emy' : 'Edward'
-    const isRelance = emailType === 'relance'
-    const isDevisRelance = emailType === 'devis_relance'
-    const pressLinks = [
-      {name: 'Paris Première', url: 'https://www.facebook.com/watch/?v=648051137321383'},
-      {name: 'Telerama', url: 'https://www.telerama.fr/restos-loisirs/meshuga-de-la-street-food-de-haut-niveau-pres-du-jardin-du-luxembourg_cri-7043251.php'},
-      {name: 'Konbini', url: 'https://www.konbini.com/food/on-a-teste-meshuga-le-deli-aux-sandwiches-les-plus-confort-du-moment/'},
-      {name: 'Les Echos', url: 'https://www.lesechos.fr/weekend/gastronomie-vins/ou-manger-les-meilleurs-grilled-cheese-1873791'},
-      {name: 'Do It In Paris', url: 'https://www.doitinparis.com/fr/street-food-usa-paris-26393'},
-      {name: 'Grazia', url: 'https://www.grazia.fr/cuisine/surprenantes-regressives-ou-rafraichissantes-les-meilleures-adresses-ou-deguster-de-bonnes-glaces-cet-ete-a-paris-773498.html'},
-      {name: 'Magazine Acumen', url: 'https://magazine-acumen.com/gastronomie/meshuga-la-nouvelle-adresse-qui-fait-bouger-la-rive-gauche-parisienne/'}
-    ]
-    const pick3 = pressLinks.sort(function(){return Math.random()-0.5}).slice(0,3)
-    const pressNames = pick3.map(function(l){return l.name}).join(', ')
-    var baseContext = 'Tu es ' + senderName + ' de Meshuga Crazy Deli (3 rue Vavin Paris 6e). Deli new-yorkais premium, NY-style, Paris 6e, connu par '+pressNames+'.\n\n'
-    var prospectInfo = 'Prospect : '+p.name+' ('+p.category+')'+( p.size?' — '+p.size+' personnes':'')+'\n'
-    var relanceContext = ''
-    if (isRelance) {
-      relanceContext = 'TU ECRIS UN EMAIL DE RELANCE DOUX (2ème contact). Tu as déjà contacté ce prospect. Le ton doit être chaleureux, jamais insistant. Propose une des options suivantes selon le contexte : (1) demander si des questions ou des précisions sur votre offre, (2) proposer de venir déjeuner gratuitement pour découvrir, (3) proposer un appel de 10min pour adapter loffre. Réfère-toi subtilement au premier contact. Mentionne 1 lien presse parmi ceux fournis pour rappeler la crédibilité. Objet : court et engageant. Max 100 mots. Ton : humain, léger, bienveillant.\n' + 'Liens presse disponibles : '+pick3.map(function(l){return l.name+' ('+l.url+')'}).join(', ')+'\n'
-    } else if (isDevisRelance) {
-      relanceContext = 'TU ECRIS UN EMAIL DE SUIVI DEVIS (très doux). Tu as envoyé un devis. Demande si tout est clair, si besoin précisions. Propose un appel de 5min ou une visite déjeuner offerte pour en discuter. Mentionne 1 lien presse pour rappeler la qualité. Jamais pressant. Max 90 mots.\n' + 'Liens presse : '+pick3.map(function(l){return l.name+' ('+l.url+')'}).join(', ')+'\n'
-    } else {
-      relanceContext = 'TU ECRIS UN PREMIER EMAIL DE PROSPECTION. Ton : chaleureux, humain, jamais commercial. Montre que tu connais leur univers. Propose un déjeuner découverte offert ou un plateau pour leur équipe. Court (120 mots max). Intègre naturellement 1 lien presse parmi ceux fournis.\n' + 'Liens presse : '+pick3.map(function(l){return l.name+' ('+l.url+')'}).join(', ')+'\n'
-    }
-    var signatureLine = "Reponds UNIQUEMENT avec le corps de l'email en francais. Commence par l'objet sur la 1ere ligne (Objet : ...) puis le corps."
-    const prompt = baseContext + prospectInfo + relanceContext + "Signature : " + senderSig + ". " + signatureLine
-    try {
-      const res = await fetch('/api/generate-email', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({prompt: prompt, type: emailType || 'first'})
-      })
-      if (!res.ok) {
-        setGeneratedEmail('Erreur serveur (' + res.status + '). Réessaie.')
-        setGeneratingEmail(false)
-        return
-      }
-      const data = await res.json()
-      const text = data.text || data.email || data.content || ''
-      setGeneratedEmail(text || 'Réponse vide. Réessaie.')
-      if (text) {
-        logActivity('email_genere', 'Email IA généré pour ' + p.name + ' (par ' + (isEmy?'Emy':'Edward') + ')', p.name, null)
-      }
-    } catch(e) {
-      setGeneratedEmail('Erreur : ' + String(e.message || e))
-    }
-    setGeneratingEmail(false)
   }
 
   function saveTask() {
