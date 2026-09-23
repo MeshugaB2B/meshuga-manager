@@ -181,7 +181,7 @@ export function buildProspectEmailHtml(opts: any): string {
   if (showTv) {
     tvHtml =
       '<tr><td class="px" style="padding:18px 30px 6px">' +
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFEB5A" class="yellowbg" style="background:#FFEB5A;border:2px solid #191923;border-radius:12px;box-shadow:4px 4px 0 #191923">' +
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FF82D7" class="rosebg" style="background:#FF82D7;border:2px solid #191923;border-radius:12px;box-shadow:4px 4px 0 #191923">' +
           '<tr><td style="padding:18px 20px;text-align:center">' +
             '<img src="' + tvTitle + '" alt="Vu à la télé !" height="34" style="height:34px;width:auto;display:inline-block;border:0" />' +
             '<div class="ink" style="font-size:14px;line-height:1.5;color:#191923;margin:6px 0 14px">L’équipe de <strong>Très Très Bon</strong> est passée chez nous — le reportage diffusé sur <strong>Paris Première</strong>.</div>' +
@@ -224,7 +224,7 @@ export function buildProspectEmailHtml(opts: any): string {
 
   var cta =
     '<tr><td align="center" style="padding:22px 30px 26px">' +
-      '<a target="_blank" rel="noopener" href="mailto:' + REPLY_TO_EMAIL + '?subject=' + encodeURIComponent('Re: ' + (opts.subject || 'Meshuga Events')) + '" class="rosebg" style="display:inline-block;background:#FF82D7;color:#FFFFFF;text-decoration:none;font-weight:900;font-size:15px;padding:13px 28px;border-radius:11px;border:2.5px solid #191923;box-shadow:4px 4px 0 #191923">Organiser une dégustation</a>' +
+      '<a target="_blank" rel="noopener" href="mailto:' + REPLY_TO_EMAIL + '?subject=' + encodeURIComponent('Re: ' + (opts.subject || 'Meshuga Events')) + '" class="yellowbg ink" style="display:inline-block;background:#FFEB5A;color:#191923;text-decoration:none;font-weight:900;font-size:15px;padding:13px 28px;border-radius:11px;border:2.5px solid #191923;box-shadow:4px 4px 0 #191923">Organiser une dégustation</a>' +
       '<div style="font-size:12px;color:#8A8A92;margin-top:12px">Ou répondez simplement à ce mail.</div>' +
     '</td></tr>'
 
