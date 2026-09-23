@@ -1,5 +1,7 @@
 'use client'
 
+import ProspectEmailModal from './ProspectEmailModal'
+
 export default function DashboardModals(props) {
   var modal = props.modal
   var form = props.form
@@ -145,36 +147,15 @@ export default function DashboardModals(props) {
         </div>
       )}
 
-      {modal === 'email' && (
-        <div className="overlay" onClick={closeModal}>
-          <div className="modal" style={{maxWidth:640}} onClick={function(e){e.stopPropagation()}}>
-            <div className="mh">
-              <div className="mt">✉️ Email IA — {emailProspect&&emailProspect.name}</div>
-            </div>
-            <div className="mb">
-              {generatingEmail&&(
-                <div style={{textAlign:'center',padding:30,opacity:.5}}>
-                  <div style={{fontSize:28,marginBottom:8}}>✉️</div>
-                  <div style={{fontWeight:900,fontSize:12}}>Génération en cours...</div>
-                </div>
-              )}
-              {!generatingEmail&&(
-                <textarea className="inp" value={generatedEmail} onChange={function(e){setGeneratedEmail(e.target.value)}} rows={14} style={{width:'100%',fontSize:13,lineHeight:1.7,fontFamily:'Arial Narrow, Arial, sans-serif'}} />
-              )}
-            </div>
-            <div className="mf">
-              <button className="btn" onClick={closeModal}>Fermer</button>
-              {!generatingEmail&&generatedEmail&&(
-                <button className="btn btn-y" onClick={function(){
-                  navigator.clipboard.writeText(generatedEmail).then(function(){
-                    logActivity('email_copie','Email copié pour '+((emailProspect&&emailProspect.name)||''), (emailProspect&&emailProspect.name)||'',generatedEmail)
-                    toast('Email copié !')
-                  })
-                }}>📋 Copier</button>
-              )}
-            </div>
-          </div>
-        </div>
+      {modal === 'email' && emailProspect && (
+        <ProspectEmailModal
+          key={String(emailProspect.id || '') + '_' + String(emailProspect.__nonce || '')}
+          prospect={emailProspect}
+          onClose={closeModal}
+          toast={toast}
+          logActivity={logActivity}
+          setProspects={setProspects}
+        />
       )}
 
       {modal === 'contact' && (
