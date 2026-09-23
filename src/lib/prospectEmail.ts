@@ -16,16 +16,14 @@ export var PRESS_TV = {
   name: 'Paris Première',
   show: 'Très Très Bon',
   label: 'Le reportage de Très Très Bon sur Paris Première',
-  url: 'https://www.facebook.com/TresTresBon/videos/street-food-meshuga/648051137321383/'
+  url: 'https://fb.watch/v/2jmoFRxCD/'
 }
 
 export var PRESS_LINKS = [
-  { key: 'telerama', name: 'Télérama', label: 'De la street food de haut niveau près du Luxembourg', url: 'https://www.telerama.fr/restos-loisirs/meshuga-de-la-street-food-de-haut-niveau-pres-du-jardin-du-luxembourg_cri-7043251.php', fit: 'corporate' },
   { key: 'lesechos', name: 'Les Echos', label: 'Parmi les meilleurs grilled cheese de Paris', url: 'https://www.lesechos.fr/weekend/gastronomie-vins/ou-manger-les-meilleurs-grilled-cheese-1873791', fit: 'corporate' },
-  { key: 'konbini', name: 'Konbini', label: 'Le deli aux sandwichs les plus réconfortants du moment', url: 'https://www.konbini.com/food/on-a-teste-meshuga-le-deli-aux-sandwiches-les-plus-confort-du-moment/', fit: 'creative' },
-  { key: 'doitinparis', name: 'Do It In Paris', label: 'La street food US à Paris', url: 'https://www.doitinparis.com/fr/street-food-usa-paris-26393', fit: 'creative' },
-  { key: 'grazia', name: 'Grazia', label: 'Nos sundaes dans la sélection de l’été', url: 'https://www.grazia.fr/cuisine/surprenantes-regressives-ou-rafraichissantes-les-meilleures-adresses-ou-deguster-de-bonnes-glaces-cet-ete-a-paris-773498.html', fit: 'luxury' },
-  { key: 'acumen', name: 'Magazine Acumen', label: 'La nouvelle adresse qui fait bouger la Rive Gauche', url: 'https://magazine-acumen.com/gastronomie/meshuga-la-nouvelle-adresse-qui-fait-bouger-la-rive-gauche-parisienne/', fit: 'local' }
+  { key: 'telerama', name: 'Télérama', label: 'De la street food de haut niveau près du Luxembourg', url: 'https://www.telerama.fr/restos-loisirs/meshuga-de-la-street-food-de-haut-niveau-pres-du-jardin-du-luxembourg_cri-7043251.php', fit: 'corporate' },
+  { key: 'lebonbon', name: 'Le Bonbon', label: 'Le meilleur sandwich au pastrami de Paris', url: 'https://www.lebonbon.fr/paris/les-tops-food-et-drink/street-food-paris/', fit: 'creative' },
+  { key: 'konbini', name: 'Konbini', label: 'Le deli aux sandwichs les plus réconfortants du moment', url: 'https://www.konbini.com/food/on-a-teste-meshuga-le-deli-aux-sandwiches-les-plus-confort-du-moment/', fit: 'creative' }
 ]
 
 // ---------- Références pros ----------
@@ -77,11 +75,9 @@ export function isValidEmail(s: string): boolean {
 // Choix par défaut des pastilles presse selon la catégorie du prospect.
 export function defaultPressKeys(category: any): string[] {
   var c = String(category || '').toLowerCase()
-  if (/luxe|mode|fashion|beaut|cosm|joaill|hôtel|hotel|lifestyle/.test(c)) return ['grazia', 'telerama']
-  if (/agence|créa|crea|startup|start-up|tech|média|media|music|musique|label|studio|prod|event|évén/.test(c)) return ['konbini', 'doitinparis']
-  if (/avocat|cabinet|banque|finance|conseil|assur|corporate|rh|immobil|notaire|audit/.test(c)) return ['lesechos', 'telerama']
-  if (/école|ecole|université|universite|galerie|librairie|6e|rive gauche/.test(c)) return ['acumen', 'telerama']
-  return ['telerama', 'konbini']
+  if (/agence|créa|crea|startup|start-up|tech|média|media|music|musique|label|studio|prod|event|évén|mode|fashion|lifestyle/.test(c)) return ['konbini', 'lebonbon']
+  if (/avocat|cabinet|banque|finance|conseil|assur|corporate|rh|immobil|notaire|audit|luxe|hôtel|hotel/.test(c)) return ['lesechos', 'telerama']
+  return ['telerama', 'lebonbon']
 }
 
 export function sanitizePressKeys(keys: any): string[] {
@@ -116,7 +112,7 @@ function textToHtml(text: string): string {
     for (var j = 0; j < lines.length; j++) {
       var line = esc(lines[j])
       line = line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      line = line.replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" style="color:#191923;text-decoration:underline;text-decoration-color:#FF82D7">$1</a>')
+      line = line.replace(/(https?:\/\/[^\s<)]+)/g, '<a target="_blank" rel="noopener" href="$1" style="color:#191923;text-decoration:underline;text-decoration-color:#FF82D7">$1</a>')
       if (/^[-•▸]\s+/.test(lines[j].trim())) {
         rendered.push('<div style="padding-left:14px;text-indent:-14px">▸&nbsp;' + line.replace(/^\s*[-•▸]\s+/, '') + '</div>')
       } else {
@@ -189,7 +185,7 @@ export function buildProspectEmailHtml(opts: any): string {
           '<tr><td style="padding:18px 20px;text-align:center">' +
             '<img src="' + tvTitle + '" alt="Vu à la télé !" height="34" style="height:34px;width:auto;display:inline-block;border:0" />' +
             '<div class="ink" style="font-size:14px;line-height:1.5;color:#191923;margin:6px 0 14px">L’équipe de <strong>Très Très Bon</strong> est passée chez nous — le reportage diffusé sur <strong>Paris Première</strong>.</div>' +
-            '<a href="' + esc(PRESS_TV.url) + '" style="display:inline-block;background:#191923;color:#FFEB5A;text-decoration:none;font-weight:900;font-size:14px;letter-spacing:.5px;padding:11px 22px;border-radius:9px">&#9654;&nbsp; Regarder le reportage</a>' +
+            '<a target="_blank" rel="noopener" href="' + esc(PRESS_TV.url) + '" style="display:inline-block;background:#191923;color:#FFEB5A;text-decoration:none;font-weight:900;font-size:14px;letter-spacing:.5px;padding:11px 22px;border-radius:9px">&#9654;&nbsp; Regarder le reportage</a>' +
           '</td></tr>' +
         '</table>' +
       '</td></tr>'
@@ -200,7 +196,7 @@ export function buildProspectEmailHtml(opts: any): string {
     var items = PRESS_LINKS.filter(function (p) { return keys.indexOf(p.key) >= 0 }).map(function (p) {
       return (
         '<tr><td style="padding:6px 0">' +
-          '<a href="' + esc(p.url) + '" style="text-decoration:none;color:#191923;font-size:14px;line-height:1.4">' +
+          '<a target="_blank" rel="noopener" href="' + esc(p.url) + '" style="text-decoration:none;color:#191923;font-size:14px;line-height:1.4">' +
             '<span style="display:inline-block;background:#FF82D7;color:#FFFFFF;font-weight:900;font-size:12px;padding:3px 9px;border-radius:6px;border:1.5px solid #191923;margin-right:8px">' + esc(p.name) + '</span>' +
             '<span style="text-decoration:underline;text-decoration-color:#FF82D7">' + esc(p.label) + ' &rarr;</span>' +
           '</a>' +
@@ -220,15 +216,15 @@ export function buildProspectEmailHtml(opts: any): string {
         '<td style="border-left:4px solid #FF82D7;padding:2px 0 2px 12px;font-size:14px;line-height:1.5;color:#191923">' +
           '<strong>' + esc(sender.name) + '</strong><br>' +
           '<span style="color:#6B6B73">' + esc(sender.role) + ' · Meshuga Events</span><br>' +
-          '<a href="mailto:' + REPLY_TO_EMAIL + '" style="color:#191923;text-decoration:none">' + REPLY_TO_EMAIL + '</a>' +
-          (sender.phone ? ' · <a href="tel:' + esc(sender.phone.replace(/\s/g, '')) + '" style="color:#191923;text-decoration:none">' + esc(sender.phone) + '</a>' : '') +
+          '<a target="_blank" rel="noopener" href="mailto:' + REPLY_TO_EMAIL + '" style="color:#191923;text-decoration:none">' + REPLY_TO_EMAIL + '</a>' +
+          (sender.phone ? ' · <a target="_blank" rel="noopener" href="tel:' + esc(sender.phone.replace(/\s/g, '')) + '" style="color:#191923;text-decoration:none">' + esc(sender.phone) + '</a>' : '') +
         '</td>' +
       '</tr></table>' +
     '</td></tr>'
 
   var cta =
     '<tr><td align="center" style="padding:22px 30px 26px">' +
-      '<a href="mailto:' + REPLY_TO_EMAIL + '?subject=' + encodeURIComponent('Re: ' + (opts.subject || 'Meshuga Events')) + '" class="rosebg" style="display:inline-block;background:#FF82D7;color:#FFFFFF;text-decoration:none;font-weight:900;font-size:15px;padding:13px 28px;border-radius:11px;border:2.5px solid #191923;box-shadow:4px 4px 0 #191923">Organiser une dégustation</a>' +
+      '<a target="_blank" rel="noopener" href="mailto:' + REPLY_TO_EMAIL + '?subject=' + encodeURIComponent('Re: ' + (opts.subject || 'Meshuga Events')) + '" class="rosebg" style="display:inline-block;background:#FF82D7;color:#FFFFFF;text-decoration:none;font-weight:900;font-size:15px;padding:13px 28px;border-radius:11px;border:2.5px solid #191923;box-shadow:4px 4px 0 #191923">Organiser une dégustation</a>' +
       '<div style="font-size:12px;color:#8A8A92;margin-top:12px">Ou répondez simplement à ce mail.</div>' +
     '</td></tr>'
 
@@ -253,7 +249,7 @@ export function buildProspectEmailHtml(opts: any): string {
         pressHtml +
         cta +
         '<tr><td bgcolor="#FFFDF5" style="background:#FFFDF5;border-top:1px solid #EEE;border-radius:0 0 13px 13px;padding:16px 30px;text-align:center;font-size:11px;color:#8A8A92;line-height:1.7">' +
-          '<strong style="color:#191923">Meshuga Events</strong> · 3 rue Vavin, 75006 Paris · <a href="https://meshuga.fr" style="color:#FF82D7;text-decoration:none">meshuga.fr</a><br>' +
+          '<strong style="color:#191923">Meshuga Events</strong> · 3 rue Vavin, 75006 Paris · <a target="_blank" rel="noopener" href="https://meshuga.fr" style="color:#FF82D7;text-decoration:none">meshuga.fr</a><br>' +
           'SAS AEGIA FOOD — Vous ne souhaitez plus recevoir nos messages ? Répondez « stop », on vous retire aussitôt.' +
         '</td></tr>' +
       '</table>' +
