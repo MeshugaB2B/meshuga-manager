@@ -54,7 +54,7 @@ function buildSystem(senderKey: string) {
     '',
     'PRESSE : un encart vidéo « Très Très Bon / Paris Première » et 2-3 liens presse sont ajoutés automatiquement sous ton texte. Tu choisis les 2 articles les plus pertinents pour ce prospect parmi :',
     pressList,
-    'Logique : lesechos/telerama → corporate, RH, cabinets ; konbini/doitinparis → créatif, agences, startups, musique ; grazia → luxe, mode, beauté, lifestyle ; acumen → acteurs Rive Gauche / Paris 6e.',
+    'Logique : lesechos/telerama → corporate, RH, cabinets, luxe ; konbini/lebonbon → créatif, agences, startups, musique, mode.',
     '',
     'STYLE :',
     '- Français impeccable, vouvoiement, registre pro mais vivant — on est un deli new-yorkais, pas une banque. Zéro formule creuse (« je me permets », « n’hésitez pas », « solution sur mesure »).',
