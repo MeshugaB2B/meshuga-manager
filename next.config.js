@@ -12,6 +12,7 @@ const nextConfig = {
       "/api/sign/[token]/submit": ["./node_modules/@sparticuz/chromium/**"],
       "/api/hr/hygiene-guide/preview": ["./node_modules/@sparticuz/chromium/**"],
       "/api/sign-attestation/[token]/submit": ["./node_modules/@sparticuz/chromium/**"],
+      "/api/catering/send-facture": ["./node_modules/@sparticuz/chromium/**"],
     },
   },
 }
