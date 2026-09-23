@@ -343,6 +343,14 @@ export default function QuoteEditor(props) {
   var [soldeOpen, setSoldeOpen] = useState(false)
   var [payBusy, setPayBusy] = useState(false)
   var [payError, setPayError] = useState('')
+  var [facSendOpen, setFacSendOpen] = useState(false)
+  var [facSending, setFacSending] = useState(false)
+  var [facSendError, setFacSendError] = useState('')
+  var [facTo, setFacTo] = useState('')
+  var [facCc, setFacCc] = useState('')
+  var [facSubject, setFacSubject] = useState('')
+  var [facMessage, setFacMessage] = useState('')
+  var [facSentAt, setFacSentAt] = useState('')
 
   // ---- Chargement du catalogue ----
   useEffect(function() {
@@ -411,6 +419,7 @@ export default function QuoteEditor(props) {
           setSoldeMontant(d.solde_montant != null ? Number(d.solde_montant) : 0)
           setSoldeDate(d.solde_date || '')
           setSoldeMode(d.solde_mode || 'virement')
+          setFacSentAt(d.facture_sent_at || '')
           setActiveIdx(0)
         }
       } catch (e) {
@@ -1123,10 +1132,9 @@ export default function QuoteEditor(props) {
     run()
   }
 
-  var handleOpenFacture = function() {
-    if (!factureNumero) return
+  var buildFactureDoc = function() {
     var payload = makePayload(payIdx)
-    var html = buildFactureHtml(payload, {
+    return buildFactureHtml(payload, {
       numero: factureNumero,
       date: factureDate,
       devisNumero: numero,
@@ -1139,8 +1147,74 @@ export default function QuoteEditor(props) {
       soldeDate: soldeDate,
       soldeMode: soldeMode
     }, { logotypeUrl: LOGO_PINK })
+  }
+
+  var handleOpenFacture = function() {
+    if (!factureNumero) return
+    var html = buildFactureDoc()
     var w = window.open('', '_blank')
     if (w) { w.document.open(); w.document.write(html); w.document.close() }
+  }
+
+  var handleOpenFactureSend = function() {
+    if (!factureNumero) return
+    var first = (clientContact || '').split(' ')[0]
+    var hello = first ? ('Bonjour ' + first + ',') : 'Bonjour,'
+    var subj = soldeRecu
+      ? ('Facture acquittée ' + factureNumero + ' — Meshuga Events')
+      : ('Facture ' + factureNumero + ' — Meshuga Events')
+    var msg = soldeRecu
+      ? (hello + '\n\n' +
+        'Merci pour votre règlement ! Vous trouverez ci-joint la facture ' + factureNumero + ' acquittée, correspondant à votre événement' +
+        (eventDate ? ' du ' + frDateShort(eventDate) : '') + '.\n\n' +
+        'Montant total : ' + fmtEur(payTtc) + ' TTC — intégralement réglé, solde 0,00 €.\n\n' +
+        'Ce fut un plaisir de régaler vos équipes, on espère vous retrouver très vite.\n\n' +
+        'À bientôt,\nL\'équipe Meshuga Events')
+      : (hello + '\n\n' +
+        'Vous trouverez ci-joint la facture ' + factureNumero + ' correspondant à votre événement' +
+        (eventDate ? ' du ' + frDateShort(eventDate) : '') + '.\n\n' +
+        'Montant total : ' + fmtEur(payTtc) + ' TTC' +
+        (payAcompteVal > 0 ? ' — acompte reçu : ' + fmtEur(payAcompteVal) + ', reste à régler : ' + fmtEur(paySoldeAEncaisser) : '') + '.\n\n' +
+        'Les coordonnées bancaires figurent sur la facture.\n\n' +
+        'Merci et à bientôt,\nL\'équipe Meshuga Events')
+    setFacTo(clientEmail || '')
+    setFacCc('')
+    setFacSubject(subj)
+    setFacMessage(msg)
+    setFacSendError('')
+    setFacSendOpen(true)
+  }
+
+  var handleSendFacture = function() {
+    if (!curId || !factureNumero) return
+    if (!facTo.trim()) { setFacSendError('Destinataire requis.'); return }
+    setFacSending(true)
+    setFacSendError('')
+    var run = async function() {
+      try {
+        var r = await fetch('/api/catering/send-facture', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            devisId: curId,
+            to: facTo.trim(),
+            cc: facCc.trim(),
+            subject: facSubject.trim(),
+            message: facMessage,
+            factureHtml: buildFactureDoc()
+          })
+        })
+        var j = await r.json()
+        if (!r.ok || !j || !j.ok) throw new Error((j && j.error) || ('Erreur ' + r.status))
+        setFacSentAt(j.sentAt || new Date().toISOString())
+        setFacSendOpen(false)
+        toast('Facture ' + factureNumero + ' envoyée à ' + facTo.trim() + ' ✓')
+      } catch (e) {
+        setFacSendError(e && e.message ? e.message : 'Envoi impossible')
+      }
+      setFacSending(false)
+    }
+    run()
   }
 
   // ---- Rendu ----
@@ -1701,6 +1775,12 @@ export default function QuoteEditor(props) {
                 {factureNumero ? (
                   <button className="qe-btn p" style={{ width: '100%', marginTop: 8, justifyContent: 'center' }} onClick={handleOpenFacture} disabled={payBusy}>📄 {soldeRecu ? 'Facture acquittée (PDF)' : 'Facture (PDF)'}</button>
                 ) : null}
+                {factureNumero ? (
+                  <button className="qe-btn g" style={{ width: '100%', marginTop: 6, justifyContent: 'center' }} onClick={handleOpenFactureSend} disabled={payBusy}>📧 {soldeRecu ? 'Envoyer la facture acquittée' : 'Envoyer la facture'}</button>
+                ) : null}
+                {facSentAt ? (
+                  <div style={{ fontSize: 11, color: '#555', marginTop: 5, textAlign: 'center' }}>Dernier envoi : {new Date(facSentAt).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                ) : null}
                 {soldeRecu ? (
                   <button className="qe-btn" style={{ width: '100%', marginTop: 6, fontSize: 10, boxShadow: 'none' }} onClick={handleCancelSolde} disabled={payBusy}>↩ Annuler le solde</button>
                 ) : null}
@@ -1762,6 +1842,43 @@ export default function QuoteEditor(props) {
               <button className="qe-btn" onClick={function() { if (!sending) setSendOpen(false) }} disabled={sending}>Annuler</button>
               <button className="qe-btn g" onClick={handleSend} disabled={sending || !emailTo.trim() || !emailSubject.trim()}>
                 {sending ? '⏳ Envoi…' : '📤 Envoyer maintenant'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Modal envoi facture */}
+      {facSendOpen ? (
+        <div className="qe-ov" onClick={function() { if (!facSending) setFacSendOpen(false) }}>
+          <div className="qe-modal" onClick={function(e) { e.stopPropagation() }}>
+            <h3>{soldeRecu ? 'Envoyer la facture acquittée' : 'Envoyer la facture'}</h3>
+            <div style={{ fontSize: 12, color: '#555', marginBottom: 10 }}>
+              {factureNumero} → {clientNom || 'Client'} · PDF en pièce jointe<br />
+              events@meshuga.fr est mis en copie cachée pour archive.
+            </div>
+            {facSendError ? <div className="qe-warn">⚠ {facSendError}</div> : null}
+            <div className="qe-fg">
+              <label className="qe-lbl">Destinataire *</label>
+              <input type="email" className="qe-inp" value={facTo} onChange={function(e) { setFacTo(e.target.value) }} placeholder="compta@client.fr" disabled={facSending} />
+            </div>
+            <div className="qe-fg">
+              <label className="qe-lbl">Copie (CC)</label>
+              <input type="email" className="qe-inp" value={facCc} onChange={function(e) { setFacCc(e.target.value) }} placeholder="optionnel (ex : service compta)" disabled={facSending} />
+            </div>
+            <div className="qe-fg">
+              <label className="qe-lbl">Sujet *</label>
+              <input type="text" className="qe-inp" value={facSubject} onChange={function(e) { setFacSubject(e.target.value) }} disabled={facSending} />
+            </div>
+            <div className="qe-fg">
+              <label className="qe-lbl">Message</label>
+              <textarea className="qe-inp qe-textarea" style={{ minHeight: 150 }} value={facMessage} onChange={function(e) { setFacMessage(e.target.value) }} disabled={facSending} />
+            </div>
+            <div className="qe-modal-actions">
+              <button className="qe-btn" onClick={handleOpenFacture} disabled={facSending}>👁 Voir la facture</button>
+              <button className="qe-btn" onClick={function() { if (!facSending) setFacSendOpen(false) }} disabled={facSending}>Annuler</button>
+              <button className="qe-btn g" onClick={handleSendFacture} disabled={facSending || !facTo.trim() || !facSubject.trim()}>
+                {facSending ? '⏳ Génération PDF + envoi…' : '📧 Envoyer maintenant'}
               </button>
             </div>
           </div>
