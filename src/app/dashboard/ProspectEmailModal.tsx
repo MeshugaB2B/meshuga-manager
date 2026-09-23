@@ -189,7 +189,7 @@ export default function ProspectEmailModal(props) {
 
             <div className="pem-prev" style={{display: view === 'preview' ? 'block' : 'none'}}>
               <div className="lbl" style={{marginBottom:6}}>Aperçu du mail envoyé</div>
-              <iframe title="apercu-email" srcDoc={previewHtml} sandbox="allow-popups allow-popups-to-escape-sandbox" />
+              <iframe title="apercu-email" srcDoc={previewHtml} sandbox="allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" />
             </div>
           </div>
         </div>
