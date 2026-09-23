@@ -15,6 +15,7 @@ import {
   fmtEur
 } from '@/lib/catering/cateringCore'
 import { buildDevisHtml } from '@/lib/catering/cateringPdf'
+import { buildFactureHtml, PAIEMENT_MODES } from '@/lib/catering/cateringFacture'
 
 // ============================================================
 // QuoteEditor.tsx — Éditeur de devis Meshuga Events (multi-formules)
@@ -187,6 +188,15 @@ var QE_CSS =
   '.qe-final .l{font-size:12px;font-weight:900}.qe-final .a{font-size:17px;font-weight:900}' +
   '.qe-int{border:1.5px dashed #FF82D7;border-radius:6px;padding:8px 10px;margin-top:9px;background:#FFF5FB}' +
   '.qe-int-title{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:#993556;margin-bottom:4px}' +
+  '.qe-pay{border:2px solid #191923;border-radius:8px;padding:10px 11px;margin-top:12px;background:#fff;box-shadow:3px 3px 0 #FF82D7}' +
+  '.qe-pay-title{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}' +
+  '.qe-pay-chk{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:900;margin:8px 0 4px;cursor:pointer}' +
+  '.qe-pay-chk input{width:17px;height:17px;accent-color:#FF82D7}' +
+  '.qe-pay-box{background:#FFFDF0;border:1.5px dashed #191923;border-radius:6px;padding:8px}' +
+  '.qe-pay-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}' +
+  '.qe-pay-solde{display:flex;justify-content:space-between;align-items:center;background:#FFEB5A;border:1.5px solid #191923;border-radius:6px;padding:7px 10px;margin-top:9px;font-size:13px;font-weight:900}' +
+  '.qe-pay-fac{font-size:12px;margin-top:8px;padding:6px 8px;background:#FAFAFA;border-radius:6px}' +
+  '.qe-pay-paid{margin-top:8px;padding:8px 10px;border-radius:6px;background:#FF82D7;color:#191923;border:2px solid #191923;font-weight:900;font-size:13px;text-align:center}' +
   '.qe-check{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;margin-top:5px;cursor:pointer}' +
   '.qe-ov{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(25,25,35,.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:18px}' +
   '.qe-modal{background:#fff;border:3px solid #191923;border-radius:10px;box-shadow:6px 6px 0 #FF82D7;max-width:480px;width:100%;padding:20px;max-height:92vh;overflow-y:auto}' +
@@ -317,6 +327,23 @@ export default function QuoteEditor(props) {
   var [deleting, setDeleting] = useState(false)
   var [delError, setDelError] = useState('')
 
+  // ---- Paiements & facture ----
+  var [variantChosen, setVariantChosen] = useState('')
+  var [clientAdresse, setClientAdresse] = useState('')
+  var [acompteRecu, setAcompteRecu] = useState(false)
+  var [acompteMontant, setAcompteMontant] = useState('')
+  var [acompteDate, setAcompteDate] = useState('')
+  var [acompteMode, setAcompteMode] = useState('virement')
+  var [factureNumero, setFactureNumero] = useState('')
+  var [factureDate, setFactureDate] = useState('')
+  var [soldeRecu, setSoldeRecu] = useState(false)
+  var [soldeMontant, setSoldeMontant] = useState(0)
+  var [soldeDate, setSoldeDate] = useState('')
+  var [soldeMode, setSoldeMode] = useState('virement')
+  var [soldeOpen, setSoldeOpen] = useState(false)
+  var [payBusy, setPayBusy] = useState(false)
+  var [payError, setPayError] = useState('')
+
   // ---- Chargement du catalogue ----
   useEffect(function() {
     if (!supabase) { setLoading(false); return }
@@ -372,6 +399,18 @@ export default function QuoteEditor(props) {
           setNotes(d.notes || '')
           setNotesInternes(d.notes_internes || '')
           setVariants(parseVariants(d))
+          setVariantChosen(d.variant_chosen || '')
+          setClientAdresse(d.client_adresse || '')
+          setAcompteRecu(!!d.acompte_recu)
+          setAcompteMontant(d.acompte_montant != null ? String(d.acompte_montant) : '')
+          setAcompteDate(d.acompte_date || '')
+          setAcompteMode(d.acompte_mode || 'virement')
+          setFactureNumero(d.facture_numero || '')
+          setFactureDate(d.facture_date || '')
+          setSoldeRecu(!!d.solde_recu)
+          setSoldeMontant(d.solde_montant != null ? Number(d.solde_montant) : 0)
+          setSoldeDate(d.solde_date || '')
+          setSoldeMode(d.solde_mode || 'virement')
           setActiveIdx(0)
         }
       } catch (e) {
@@ -617,6 +656,7 @@ export default function QuoteEditor(props) {
     setClientContact(p.contact_name || p.contact || '')
     setClientEmail(p.email || '')
     setClientPhone(p.phone || '')
+    if (p.address && !clientAdresse) setClientAdresse(p.address)
   }
 
   // ---- Construction du payload PDF pour une formule ----
@@ -745,7 +785,7 @@ export default function QuoteEditor(props) {
     if (profile && (profile.full_name === 'Emy' || profile.role === 'emy')) responsablePrenom = 'Emy'
     return {
       numero: numero,
-      statut: statut,
+      statut: statut === 'solde' ? 'paye' : statut,
       date_validite: validite || null,
       prospect_id: clientSelector || null,
       client_nom: clientNom || '',
@@ -774,7 +814,12 @@ export default function QuoteEditor(props) {
       notes: notes || '',
       notes_internes: notesInternes || '',
       responsable_email: (profile && profile.email) || '',
-      responsable_prenom: responsablePrenom
+      responsable_prenom: responsablePrenom,
+      client_adresse: clientAdresse || null,
+      acompte_recu: !!acompteRecu,
+      acompte_montant: acompteRecu && acompteMontant !== '' ? Number(String(acompteMontant).replace(',', '.')) || 0 : null,
+      acompte_date: acompteRecu ? (acompteDate || null) : null,
+      acompte_mode: acompteRecu ? (acompteMode || null) : null
     }
   }
 
@@ -907,6 +952,195 @@ export default function QuoteEditor(props) {
       }
     }
     run()
+  }
+
+  // ---- Paiements & facture ----
+  var chosenIdx = function() {
+    var i
+    if (variantChosen) {
+      for (i = 0; i < variants.length; i++) {
+        if (variants[i] && variants[i].key === variantChosen) return i
+      }
+    }
+    return recommendedIdx()
+  }
+
+  var parseMontant = function(s) {
+    var n = Number(String(s == null ? '' : s).replace(/\s/g, '').replace(',', '.'))
+    if (isNaN(n)) return 0
+    return Math.round(n * 100) / 100
+  }
+
+  var frDateShort = function(iso) {
+    if (!iso) return ''
+    var d = new Date(iso + 'T12:00:00')
+    if (isNaN(d.getTime())) return iso
+    return d.toLocaleDateString('fr-FR')
+  }
+
+  var payIdx = chosenIdx()
+  var payVariant = variants[payIdx] || { lines: [] }
+  var payTotals = computeVariant(payVariant, offeringsById, {
+    livraison: livraison, livraison_offert: livraisonOffert,
+    mise_en_place: miseEnPlace, mise_en_place_offert: miseEnPlaceOffert,
+    remise_globale_pct: remiseGlobalePct
+  }, nbPersonnes)
+  var payTtc = payTotals.total_ttc
+  var payAcompte30 = Math.round(payTtc * 0.3 * 100) / 100
+  var payAcompteVal = acompteRecu ? parseMontant(acompteMontant) : 0
+  var paySoldeAEncaisser = Math.max(0, Math.round((payTtc - payAcompteVal) * 100) / 100)
+  var showPay = !!curId && (statut === 'accepte' || statut === 'acompte' || statut === 'facture' || statut === 'solde' || !!variantChosen)
+
+  var payUpdate = async function(fields) {
+    var res = await supabase.from('devis').update(fields).eq('id', curId).select().single()
+    if (res.error) throw new Error(res.error.message || 'Mise à jour impossible')
+    return res.data
+  }
+
+  var ensureFactureNumero = async function() {
+    if (factureNumero) return { numero: factureNumero, date: factureDate || todayIso() }
+    var r = await supabase.rpc('next_facture_numero')
+    if (r.error || !r.data) throw new Error('Numérotation facture : ' + (r.error ? r.error.message : 'réponse vide'))
+    return { numero: String(r.data), date: todayIso() }
+  }
+
+  var acompteFields = function() {
+    return {
+      acompte_recu: !!acompteRecu,
+      acompte_montant: acompteRecu && acompteMontant !== '' ? parseMontant(acompteMontant) : null,
+      acompte_date: acompteRecu ? (acompteDate || todayIso()) : null,
+      acompte_mode: acompteRecu ? (acompteMode || null) : null
+    }
+  }
+
+  var handleSaveAcompte = function() {
+    if (!supabase || !curId) return
+    if (acompteRecu && acompteMontant === '') { setPayError('Renseigne le montant de l\'acompte.'); return }
+    if (acompteRecu && payAcompteVal > payTtc) { setPayError('L\'acompte dépasse le total TTC.'); return }
+    setPayBusy(true)
+    setPayError('')
+    var run = async function() {
+      try {
+        var nextStatut = statut
+        if (acompteRecu && (statut === 'brouillon' || statut === 'envoye' || statut === 'accepte')) nextStatut = 'acompte'
+        await payUpdate(Object.assign({}, acompteFields(), {
+          client_adresse: clientAdresse || null,
+          statut: nextStatut === 'solde' ? 'paye' : nextStatut
+        }))
+        if (!acompteDate && acompteRecu) setAcompteDate(todayIso())
+        setStatut(nextStatut)
+        toast('Acompte enregistré ✓')
+      } catch (e) {
+        setPayError(e && e.message ? e.message : 'Erreur')
+      }
+      setPayBusy(false)
+    }
+    run()
+  }
+
+  var handleEmitFacture = function() {
+    if (!supabase || !curId || factureNumero) return
+    setPayBusy(true)
+    setPayError('')
+    var run = async function() {
+      try {
+        var fn = await ensureFactureNumero()
+        await payUpdate(Object.assign({}, acompteFields(), {
+          facture_numero: fn.numero,
+          facture_date: fn.date,
+          client_adresse: clientAdresse || null,
+          statut: statut === 'solde' ? 'paye' : 'facture'
+        }))
+        setFactureNumero(fn.numero)
+        setFactureDate(fn.date)
+        if (statut !== 'solde') setStatut('facture')
+        toast('Facture ' + fn.numero + ' émise ✓')
+      } catch (e) {
+        setPayError(e && e.message ? e.message : 'Erreur')
+      }
+      setPayBusy(false)
+    }
+    run()
+  }
+
+  var handleConfirmSolde = function() {
+    if (!supabase || !curId) return
+    if (acompteRecu && acompteMontant === '') { setPayError('Renseigne d\'abord le montant de l\'acompte reçu.'); return }
+    if (payAcompteVal > payTtc) { setPayError('L\'acompte dépasse le total TTC.'); return }
+    if (!clientAdresse.trim()) { setPayError('Renseigne l\'adresse de facturation du client.'); return }
+    setPayBusy(true)
+    setPayError('')
+    var run = async function() {
+      try {
+        var fn = await ensureFactureNumero()
+        var sDate = soldeDate || todayIso()
+        var sVal = paySoldeAEncaisser
+        await payUpdate(Object.assign({}, acompteFields(), {
+          facture_numero: fn.numero,
+          facture_date: fn.date,
+          client_adresse: clientAdresse || null,
+          solde_recu: true,
+          solde_date: sDate,
+          solde_mode: soldeMode || null,
+          solde_montant: sVal,
+          paiement_statut: 'paye',
+          statut: 'paye'
+        }))
+        setFactureNumero(fn.numero)
+        setFactureDate(fn.date)
+        setSoldeRecu(true)
+        setSoldeDate(sDate)
+        setSoldeMontant(sVal)
+        setStatut('solde')
+        setSoldeOpen(false)
+        toast('Facture ' + fn.numero + ' soldée ✓')
+      } catch (e) {
+        setPayError(e && e.message ? e.message : 'Erreur')
+      }
+      setPayBusy(false)
+    }
+    run()
+  }
+
+  var handleCancelSolde = function() {
+    if (!supabase || !curId) return
+    setPayBusy(true)
+    setPayError('')
+    var back = factureNumero ? 'facture' : (acompteRecu ? 'acompte' : 'accepte')
+    var run = async function() {
+      try {
+        await payUpdate({ solde_recu: false, solde_date: null, solde_mode: null, solde_montant: null, paiement_statut: 'non_paye', statut: back })
+        setSoldeRecu(false)
+        setSoldeDate('')
+        setSoldeMontant(0)
+        setStatut(back)
+        toast('Solde annulé')
+      } catch (e) {
+        setPayError(e && e.message ? e.message : 'Erreur')
+      }
+      setPayBusy(false)
+    }
+    run()
+  }
+
+  var handleOpenFacture = function() {
+    if (!factureNumero) return
+    var payload = makePayload(payIdx)
+    var html = buildFactureHtml(payload, {
+      numero: factureNumero,
+      date: factureDate,
+      devisNumero: numero,
+      clientAdresse: clientAdresse,
+      acompteMontant: payAcompteVal,
+      acompteDate: acompteDate,
+      acompteMode: acompteMode,
+      soldeRecu: soldeRecu,
+      soldeMontant: soldeRecu ? (soldeMontant || paySoldeAEncaisser) : 0,
+      soldeDate: soldeDate,
+      soldeMode: soldeMode
+    }, { logotypeUrl: LOGO_PINK })
+    var w = window.open('', '_blank')
+    if (w) { w.document.open(); w.document.write(html); w.document.close() }
   }
 
   // ---- Rendu ----
@@ -1384,6 +1618,95 @@ export default function QuoteEditor(props) {
             ) : (
               <button className="qe-btn" style={{ width: '100%', marginTop: 10 }} onClick={function() { setShowInternes(true) }}>🔒 Afficher les internes</button>
             )}
+
+            {showPay ? (
+              <div className="qe-pay">
+                <div className="qe-pay-title">💶 Paiements &amp; facture</div>
+                <div className="qe-rrow"><span>Formule facturée</span><strong>{variantLabel(payVariant, payIdx)}</strong></div>
+                <div className="qe-rrow"><span>Total TTC</span><strong>{fmtEur(payTtc)}</strong></div>
+
+                <div className="qe-fg" style={{ marginTop: 8 }}>
+                  <label className="qe-lbl">Adresse de facturation</label>
+                  <input type="text" className="qe-inp" value={clientAdresse} onChange={function(e) { setClientAdresse(e.target.value) }} placeholder="N°, rue, CP, ville" disabled={payBusy || soldeRecu} />
+                </div>
+
+                <label className="qe-pay-chk">
+                  <input type="checkbox" checked={acompteRecu} disabled={payBusy || soldeRecu} onChange={function(e) { setAcompteRecu(e.target.checked); if (e.target.checked && !acompteDate) setAcompteDate(todayIso()) }} />
+                  <span>Acompte reçu</span>
+                </label>
+                {acompteRecu ? (
+                  <div className="qe-pay-box">
+                    <div className="qe-pay-grid">
+                      <div>
+                        <label className="qe-lbl">Montant TTC (€)</label>
+                        <input type="text" inputMode="decimal" className="qe-inp" value={acompteMontant} onChange={function(e) { setAcompteMontant(e.target.value) }} placeholder={'30 % = ' + fmtEur(payAcompte30)} disabled={payBusy || soldeRecu} />
+                      </div>
+                      <div>
+                        <label className="qe-lbl">Reçu le</label>
+                        <input type="date" className="qe-inp" value={acompteDate} onChange={function(e) { setAcompteDate(e.target.value) }} disabled={payBusy || soldeRecu} />
+                      </div>
+                    </div>
+                    <label className="qe-lbl" style={{ marginTop: 6 }}>Mode</label>
+                    <select className="qe-inp" value={acompteMode} onChange={function(e) { setAcompteMode(e.target.value) }} disabled={payBusy || soldeRecu}>
+                      {Object.keys(PAIEMENT_MODES).map(function(k) { return <option key={k} value={k}>{PAIEMENT_MODES[k]}</option> })}
+                    </select>
+                    {!soldeRecu ? (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 7 }}>
+                        <button className="qe-btn" style={{ flex: 1, fontSize: 11 }} onClick={function() { setAcompteMontant(String(payAcompte30).replace('.', ',')) }} disabled={payBusy}>30 %</button>
+                        <button className="qe-btn y" style={{ flex: 2, fontSize: 11 }} onClick={handleSaveAcompte} disabled={payBusy}>💾 Enregistrer l&apos;acompte</button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div className="qe-pay-solde">
+                  <span>Solde à encaisser</span>
+                  <strong>{soldeRecu ? '0,00 €' : fmtEur(paySoldeAEncaisser)}</strong>
+                </div>
+
+                {factureNumero ? (
+                  <div className="qe-pay-fac">🧾 Facture <strong>{factureNumero}</strong>{factureDate ? ' · émise le ' + frDateShort(factureDate) : ''}</div>
+                ) : (
+                  <button className="qe-btn" style={{ width: '100%', marginTop: 8 }} onClick={handleEmitFacture} disabled={payBusy}>🧾 Émettre la facture</button>
+                )}
+
+                {soldeRecu ? (
+                  <div className="qe-pay-paid">✅ Soldée{soldeDate ? ' le ' + frDateShort(soldeDate) : ''} · reste 0,00 €</div>
+                ) : soldeOpen ? (
+                  <div className="qe-pay-box" style={{ marginTop: 8 }}>
+                    <div className="qe-pay-grid">
+                      <div>
+                        <label className="qe-lbl">Encaissé le</label>
+                        <input type="date" className="qe-inp" value={soldeDate || todayIso()} onChange={function(e) { setSoldeDate(e.target.value) }} disabled={payBusy} />
+                      </div>
+                      <div>
+                        <label className="qe-lbl">Mode</label>
+                        <select className="qe-inp" value={soldeMode} onChange={function(e) { setSoldeMode(e.target.value) }} disabled={payBusy}>
+                          {Object.keys(PAIEMENT_MODES).map(function(k) { return <option key={k} value={k}>{PAIEMENT_MODES[k]}</option> })}
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11, margin: '7px 0', lineHeight: 1.4 }}>
+                      Solde de <strong>{fmtEur(paySoldeAEncaisser)}</strong> encaissé → facture {factureNumero || '(nouveau n°)'} passée en <strong>acquittée</strong>, net à payer 0,00 €.
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="qe-btn" style={{ flex: 1 }} onClick={function() { setSoldeOpen(false) }} disabled={payBusy}>Annuler</button>
+                      <button className="qe-btn g" style={{ flex: 2 }} onClick={handleConfirmSolde} disabled={payBusy}>{payBusy ? '⏳…' : '✅ Confirmer'}</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="qe-btn g" style={{ width: '100%', marginTop: 8, justifyContent: 'center' }} onClick={function() { setPayError(''); setSoldeOpen(true) }} disabled={payBusy}>✅ Soldée</button>
+                )}
+
+                {factureNumero ? (
+                  <button className="qe-btn p" style={{ width: '100%', marginTop: 8, justifyContent: 'center' }} onClick={handleOpenFacture} disabled={payBusy}>📄 {soldeRecu ? 'Facture acquittée (PDF)' : 'Facture (PDF)'}</button>
+                ) : null}
+                {soldeRecu ? (
+                  <button className="qe-btn" style={{ width: '100%', marginTop: 6, fontSize: 10, boxShadow: 'none' }} onClick={handleCancelSolde} disabled={payBusy}>↩ Annuler le solde</button>
+                ) : null}
+                {payError ? <div className="qe-warn">⚠ {payError}</div> : null}
+              </div>
+            ) : null}
 
             <div style={{ display: 'flex', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
               <button className="qe-btn y" style={{ flex: '1 1 100%', justifyContent: 'center' }} onClick={handleSave} disabled={saving}>
