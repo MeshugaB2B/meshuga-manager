@@ -81,10 +81,19 @@ export function isBusinessDay(d: Date) {
   return frenchHolidays(d.getFullYear()).indexOf(iso) === -1
 }
 
+// Date du jour à Paris (les serveurs Vercel tournent en UTC)
+export function parisToday() {
+  var iso = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+  var p = iso.split('-')
+  return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10))
+}
+
 // Première date de livraison possible : aujourd'hui + N jours ouvrés pleins.
 // Commande passée lundi -> livrable au plus tôt mercredi.
 export function earliestDeliveryDate(now?: Date) {
-  var ref = now ? now : new Date()
+  var ref = now ? now : parisToday()
   var d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate())
   var count = 0
   while (count < EVENTS_CONFIG.leadBusinessDays) {
