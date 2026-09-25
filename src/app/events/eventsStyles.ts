@@ -47,6 +47,9 @@ export var EVENTS_CSS = `
 .mev-under{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px}
 .mev-ttc{font-size:14px;opacity:.7}
 
+.mev-minis{list-style:none;margin:10px 0 0;padding:10px 12px;border-left:3px solid var(--r);background:rgba(255,235,90,.35);border-radius:0 8px 8px 0}
+.mev-minis li{font-size:14px;line-height:1.35;padding:2px 0}
+.mev-minis b{font-weight:700;text-transform:uppercase;letter-spacing:.2px}
 .mev-allerg{font-size:13px;margin:6px 0 0;opacity:.8}
 .mev-allerg-note{margin:0 22px 20px;padding:12px 14px;border:2px solid var(--n);border-radius:10px;font-size:14px;line-height:1.4;background:var(--j)}
 .mev-cgv-check{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4;cursor:pointer}
