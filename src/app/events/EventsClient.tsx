@@ -3,6 +3,7 @@
 // Meshuga Events — catalogue des box, panier et commande (paiement SumUp)
 
 import { useEffect, useState } from 'react'
+import { boxAllergens } from '@/lib/events/allergens'
 
 var eur = function (n) {
   var v = Math.round(Number(n || 0) * 100) / 100
@@ -27,6 +28,7 @@ export default function EventsClient() {
   var [form, setForm] = useState({ date: '', hour: '12:00', company: '', name: '', email: '', phone: '', street: '', cp: '', notes: '' })
   var [error, setError] = useState('')
   var [paying, setPaying] = useState(false)
+  var [cgvOk, setCgvOk] = useState(false)
 
   useEffect(function () {
     fetch('/api/events/catalogue')
@@ -87,6 +89,7 @@ export default function EventsClient() {
       setError('Il manque une information de livraison ou de contact.')
       return
     }
+    if (!cgvOk) { setError('Merci d\'accepter les conditions générales de vente.'); return }
     setPaying(true)
     setError('')
     fetch('/api/events/checkout', {
@@ -163,6 +166,7 @@ export default function EventsClient() {
                     </div>
                     <p className="mev-comp">{b.composition}</p>
                     {b.tagline ? <p className="mev-tag">{b.tagline}</p> : null}
+                    <p className="mev-allerg">Allergènes : {boxAllergens(b.composition) ? boxAllergens(b.composition).join(', ') : 'nous consulter'}</p>
                     <div className="mev-under">
                       <span className="mev-ttc">{eur(b.priceTtc)} TTC · {b.pieces} pièces</span>
                       {q === 0 ? (
@@ -181,6 +185,10 @@ export default function EventsClient() {
                 )
               })}
             </ul>
+            <p className="mev-allerg-note">
+              Tous nos minis sont servis dans un pain brioché (gluten, œufs, lait). Ils sont préparés dans une cuisine
+              qui manipule les 14 allergènes majeurs : des traces sont possibles. Une allergie sévère ? Appelez-nous avant de commander.
+            </p>
           </section>
 
           <aside className="mev-ticket" id="mev-ticket" aria-label="Votre commande">
@@ -275,6 +283,11 @@ export default function EventsClient() {
                   onChange={function (e) { setField('notes', e.target.value) }} />
               </div>
 
+              <label className="mev-cgv-check">
+                <input type="checkbox" checked={cgvOk} onChange={function (e) { setCgvOk(e.target.checked); setError('') }} />
+                <span>J&apos;accepte les <a href="/events/cgv" target="_blank" rel="noopener">conditions générales de vente</a>, notamment l&apos;absence de droit de rétractation sur les produits frais.</span>
+              </label>
+
               {error ? <div className="mev-err" role="alert">{error}</div> : null}
 
               <button type="button" className="mev-pay" disabled={paying || nbBox === 0} onClick={pay}>
@@ -295,7 +308,7 @@ export default function EventsClient() {
 
         <footer className="mev-foot">
           Meshuga · 3 rue Vavin, 75006 Paris · {contact.email || 'events@meshuga.fr'}<br />
-          SAS AEGIA FOOD, SIREN 904 639 531. Produits frais préparés pour une date donnée : pas de droit de rétractation (art. L221-28 du Code de la consommation).
+          SAS AEGIA FOOD, SIREN 904 639 531 · <a href="/events/cgv" style={{ color: 'inherit' }}>Conditions générales de vente</a>
         </footer>
       </div>
 
