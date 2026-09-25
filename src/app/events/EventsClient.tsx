@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { boxAllergens } from '@/lib/events/allergens'
+import { boxLines } from '@/lib/events/minis'
 
 var eur = function (n) {
   var v = Math.round(Number(n || 0) * 100) / 100
@@ -164,8 +165,17 @@ export default function EventsClient() {
                       <span className="mev-lead" aria-hidden="true"></span>
                       <span className="mev-price">{b.priceHt}.</span>
                     </div>
-                    <p className="mev-comp">{b.composition}</p>
                     {b.tagline ? <p className="mev-tag">{b.tagline}</p> : null}
+                    <ul className="mev-minis">
+                      {boxLines(b.composition).map(function (l) {
+                        return (
+                          <li key={l.name}>
+                            <b>{l.qty} × {l.name}</b>
+                            {l.desc ? <span> — {l.desc}</span> : null}
+                          </li>
+                        )
+                      })}
+                    </ul>
                     <p className="mev-allerg">Allergènes : {boxAllergens(b.composition) ? boxAllergens(b.composition).join(', ') : 'nous consulter'}</p>
                     <div className="mev-under">
                       <span className="mev-ttc">{eur(b.priceTtc)} TTC · {b.pieces} pièces</span>
