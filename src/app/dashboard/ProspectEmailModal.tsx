@@ -1,204 +1,270 @@
-'use client'
-
 // ============================================================
-// ProspectEmailModal — pitch IA prospect : génération, édition,
-// aperçu fidèle (même builder que l'envoi) et envoi en 1 clic.
+// src/lib/prospectEmail.ts
+// ============================================================
+// Pitch emails prospects B2B — données partagées + builder HTML.
+// Utilisé côté client (aperçu live dans ProspectEmailModal) ET côté
+// serveur (/api/prospect-email/send) → l'aperçu = exactement le mail envoyé.
+//
+// Pour modifier une référence, un lien presse ou une signature :
+// c'est ICI, et uniquement ici.
 // ============================================================
 
-import { useState, useEffect } from 'react'
-import { PRESS_LINKS, PRESS_TV, REFERENCES, EMAIL_TYPES, FROM_EMAIL, REPLY_TO_EMAIL, buildProspectEmailHtml, cleanEmail, isValidEmail, getSender } from '@/lib/prospectEmail'
+// ---------- Presse ----------
+// "tv" = mise en avant vidéo (bloc dédié), les autres = pastilles cliquables.
+export var PRESS_TV = {
+  key: 'paris_premiere',
+  name: 'Paris Première',
+  show: 'Très Très Bon',
+  label: 'Le reportage de Très Très Bon sur Paris Première',
+  url: 'https://fb.watch/v/2jmoFRxCD/'
+}
 
-export default function ProspectEmailModal(props) {
-  var prospect = props.prospect || {}
-  var onClose = props.onClose
-  var toast = props.toast || function(){}
-  var logActivity = props.logActivity || function(){}
-  var setProspects = props.setProspects
+export var PRESS_LINKS = [
+  { key: 'lesechos', name: 'Les Echos', label: 'Parmi les meilleurs grilled cheese de Paris', url: 'https://www.lesechos.fr/weekend/gastronomie-vins/ou-manger-les-meilleurs-grilled-cheese-1873791', fit: 'corporate' },
+  { key: 'telerama', name: 'Télérama', label: 'De la street food de haut niveau près du Luxembourg', url: 'https://www.telerama.fr/restos-loisirs/meshuga-de-la-street-food-de-haut-niveau-pres-du-jardin-du-luxembourg_cri-7043251.php', fit: 'corporate' },
+  { key: 'lebonbon', name: 'Le Bonbon', label: 'Le meilleur sandwich au pastrami de Paris', url: 'https://www.lebonbon.fr/paris/les-tops-food-et-drink/street-food-paris/', fit: 'creative' },
+  { key: 'konbini', name: 'Konbini', label: 'Le deli aux sandwichs les plus réconfortants du moment', url: 'https://www.konbini.com/food/on-a-teste-meshuga-le-deli-aux-sandwiches-les-plus-confort-du-moment/', fit: 'creative' }
+]
 
-  var initialTo = cleanEmail(prospect.contactEmail) || cleanEmail(prospect.contact_email) || cleanEmail(prospect.email)
-  var isCrm = prospect.cat === 'crm' && prospect.id
+// ---------- Références pros ----------
+export var REFERENCES = [
+  { key: 'mk2', title: 'mk2 Cinéma Paradiso Louvre', detail: 'Festival de cinéma en plein air dans la Cour Carrée du Louvre' },
+  { key: 'labels', title: 'Soirées de lancement de labels musicaux', detail: 'Food NY-style pour artistes, équipes et invités' },
+  { key: 'fromfuture', title: 'From Future', detail: 'Événements privés sur mesure' }
+]
 
-  var [emailType, setEmailType] = useState(prospect.__emailType || 'first')
-  var [senderKey, setSenderKey] = useState(prospect.__sender === 'emy' ? 'emy' : 'edward')
-  var [loading, setLoading] = useState(true)
-  var [err, setErr] = useState('')
-  var [to, setTo] = useState(initialTo)
-  var [cc, setCc] = useState('')
-  var [subject, setSubject] = useState('')
-  var [body, setBody] = useState('')
-  var [pressKeys, setPressKeys] = useState([] as any)
-  var [showRefs, setShowRefs] = useState(true)
-  var [showTv, setShowTv] = useState(true)
-  var [view, setView] = useState('edit')
-  var [sending, setSending] = useState(false)
+// ---------- Offre (contexte IA) ----------
+export var OFFER_SUMMARY = [
+  'Meshuga Events = l’offre B2B & événementielle de Meshuga, deli new-yorkais du 3 rue Vavin (Paris 6e). Tout est préparé sur place, à la minute.',
+  '4 gammes :',
+  '- Boxes Minis : boxes de 40 mini-sandwichs ou desserts (de 135 à 255 € HT — ex. Coney Island, Lower East Side, Tribeca, The Plaza au lobster roll, Sugar Hill aux cheesecakes), ou box sur mesure.',
+  '- Lunch Boxes individuelles (sandwich grand format + side + boisson), de 13 à 28 € HT, tarif volume dès 30.',
+  '- Live cooking : nos chefs préparent les sandwichs en direct — The Stand, The Counter, The Diner (installation, matériel et équipe inclus).',
+  '- Stand événementiel brandé Meshuga : on arrive, on installe, on assure, zéro logistique.',
+  'Créations : The Reuben, The Lobster, The Lox, Spicy Tuna, Tarama, The Melt, Chicken Caesar, hot-dog premium ; cheesecake, PBN (peanut butter & Nutella), Pink Lemonade maison.',
+  'Livraison Paris & Grand Paris (offerte dès 500 € HT), commande 48h à l’avance.',
+  'Track record : mk2 Cinéma Paradiso au Louvre, dancefloor du Rex Club, tournages de films, soirées Fashion Week, From Future.'
+].join('\n')
 
-  var generate = function(type, sKey) {
-    setLoading(true)
-    setErr('')
-    fetch('/api/generate-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prospect: prospect, emailType: type, senderKey: sKey })
-    }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d } }) })
-      .then(function(res) {
-        if (!res.ok || res.d.error) { setErr(res.d.error || 'Erreur de génération'); setLoading(false); return }
-        setSubject(res.d.subject || '')
-        setBody(res.d.body || '')
-        setPressKeys(Array.isArray(res.d.pressKeys) ? res.d.pressKeys : [])
-        setLoading(false)
-        logActivity('email_genere', 'Email IA généré pour ' + (prospect.name || ''), prospect.name || '', null)
-      })
-      .catch(function(e) { setErr(String((e && e.message) || e)); setLoading(false) })
-  }
+// ---------- Plaquette PDF (fichier dans /public) ----------
+export var PLAQUETTE = { filename: 'Plaquette_Meshuga.pdf', path: '/Plaquette_Meshuga.pdf' }
 
-  useEffect(function() {
-    generate(prospect.__emailType || 'first', prospect.__sender === 'emy' ? 'emy' : 'edward')
-  }, [])
+// ---------- Adresses d'envoi / réponse ----------
+// Tous les pitchs partent de FROM_EMAIL ; toutes les réponses arrivent sur REPLY_TO_EMAIL.
+export var FROM_EMAIL = 'events@meshuga.fr'
+export var REPLY_TO_EMAIL = 'hello@meshuga.fr'
 
-  var togglePress = function(k) {
-    setPressKeys(function(prev) {
-      if (prev.indexOf(k) >= 0) return prev.filter(function(x) { return x !== k })
-      if (prev.length >= 3) { toast('3 articles max'); return prev }
-      return prev.concat([k])
-    })
-  }
+// ---------- Expéditeurs ----------
+export var SENDERS = {
+  edward: { key: 'edward', name: 'Edward Touret', firstName: 'Edward', role: 'Fondateur', email: 'edward@meshuga.fr', phone: '06 58 58 58 01' },
+  emy: { key: 'emy', name: 'Emy Soulabaille', firstName: 'Emy', role: 'Responsable B2B & événements', email: 'emy@meshuga.fr', phone: '' }
+}
 
-  var baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://dashboard.meshuga.fr'
-  var previewHtml = buildProspectEmailHtml({
-    baseUrl: baseUrl, senderKey: senderKey, subject: subject, body: body,
-    pressKeys: pressKeys, showReferences: showRefs, showTv: showTv
-  })
+export var EMAIL_TYPES = [
+  { key: 'first', label: 'Premier contact' },
+  { key: 'relance', label: 'Relance' },
+  { key: 'devis_relance', label: 'Suivi devis' }
+]
 
-  var send = function() {
-    var dest = String(to || '').trim()
-    if (!isValidEmail(dest)) { toast('Adresse email invalide'); return }
-    if (!subject.trim()) { toast('Objet manquant'); return }
-    if (body.trim().length < 20) { toast('Le message est trop court'); return }
-    if (!window.confirm('Envoyer ce mail à ' + dest + ' ?')) return
-    setSending(true)
-    fetch('/api/prospect-email/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: dest, cc: cc.trim(), subject: subject.trim(), body: body,
-        senderKey: senderKey, pressKeys: pressKeys, showReferences: showRefs, showTv: showTv,
-        prospectId: isCrm ? prospect.id : null, prospectName: prospect.name || ''
-      })
-    }).then(function(r) { return r.json() })
-      .then(function(d) {
-        setSending(false)
-        if (!d || !d.ok) { toast('Échec envoi : ' + ((d && d.error) || 'erreur')); return }
-        logActivity('email_envoye', 'Email envoyé à ' + (prospect.name || dest) + ' (' + dest + ')', prospect.name || '', subject)
-        if (isCrm && setProspects) {
-          setProspects(function(prev) {
-            return prev.map(function(x) {
-              if (String(x.id) !== String(prospect.id)) return x
-              return Object.assign({}, x, { last_contacted_at: d.sentAt }, d.newStatus ? { status: d.newStatus } : {})
-            })
-          })
-        }
-        toast('Email envoyé ✓')
-        onClose()
-      })
-      .catch(function(e) { setSending(false); toast('Erreur : ' + String((e && e.message) || e)) })
-  }
+// ---------- Helpers ----------
+export function getSender(key: any) {
+  return key === 'emy' ? SENDERS.emy : SENDERS.edward
+}
 
-  var copy = function() {
-    navigator.clipboard.writeText('Objet : ' + subject + '\n\n' + body).then(function() {
-      logActivity('email_copie', 'Email copié pour ' + (prospect.name || ''), prospect.name || '', body)
-      toast('Email copié !')
-    })
-  }
+export function cleanEmail(s: any): string {
+  if (!s || typeof s !== 'string') return ''
+  var t = s.trim()
+  if (t === '—' || t === '-') return ''
+  return t
+}
 
-  var sender = getSender(senderKey)
-  var chip = function(active) {
-    return {
-      padding: '4px 9px', borderRadius: 6, border: '2px solid #191923', cursor: 'pointer',
-      fontSize: 11, fontWeight: 900, fontFamily: 'Arial Narrow, Arial, sans-serif',
-      background: active ? '#FF82D7' : '#FFFFFF', color: active ? '#FFFFFF' : '#191923',
-      boxShadow: active ? '2px 2px 0 #191923' : 'none'
+export function isValidEmail(s: string): boolean {
+  return /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(s || '')
+}
+
+// Choix par défaut des pastilles presse selon la catégorie du prospect.
+export function defaultPressKeys(category: any): string[] {
+  var c = String(category || '').toLowerCase()
+  if (/agence|créa|crea|startup|start-up|tech|média|media|music|musique|label|studio|prod|event|évén|mode|fashion|lifestyle/.test(c)) return ['konbini', 'lebonbon']
+  if (/avocat|cabinet|banque|finance|conseil|assur|corporate|rh|immobil|notaire|audit|luxe|hôtel|hotel/.test(c)) return ['lesechos', 'telerama']
+  return ['telerama', 'lebonbon']
+}
+
+export function sanitizePressKeys(keys: any): string[] {
+  var valid = PRESS_LINKS.map(function (p) { return p.key })
+  var out: string[] = []
+  if (Array.isArray(keys)) {
+    for (var i = 0; i < keys.length; i++) {
+      var k = String(keys[i] || '')
+      if (valid.indexOf(k) >= 0 && out.indexOf(k) < 0) out.push(k)
     }
   }
+  return out.slice(0, 3)
+}
+
+function esc(s: any): string {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+// Texte → HTML : paragraphes, **gras**, URLs cliquables, lignes "- " en puces.
+function textToHtml(text: string): string {
+  var blocks = String(text || '').replace(/\r/g, '').split(/\n{2,}/)
+  var html: string[] = []
+  for (var i = 0; i < blocks.length; i++) {
+    var b = blocks[i].trim()
+    if (!b) continue
+    var lines = b.split('\n')
+    var rendered: string[] = []
+    for (var j = 0; j < lines.length; j++) {
+      var line = esc(lines[j])
+      line = line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      line = line.replace(/(https?:\/\/[^\s<)]+)/g, '<a target="_blank" rel="noopener" href="$1" style="color:#191923;text-decoration:underline;text-decoration-color:#FF82D7">$1</a>')
+      if (/^[-•▸]\s+/.test(lines[j].trim())) {
+        rendered.push('<div style="padding-left:14px;text-indent:-14px">▸&nbsp;' + line.replace(/^\s*[-•▸]\s+/, '') + '</div>')
+      } else {
+        rendered.push(line)
+      }
+    }
+    html.push('<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#191923">' + rendered.join('<br>') + '</p>')
+  }
+  return html.join('')
+}
+
+// Version texte brut (multipart) — meilleure délivrabilité.
+export function buildProspectEmailText(opts: any): string {
+  var sender = getSender(opts.senderKey)
+  var keys = sanitizePressKeys(opts.pressKeys)
+  var out: string[] = []
+  out.push(String(opts.body || '').trim())
+  out.push('')
+  out.push(sender.name + ' — ' + sender.role + ', Meshuga Events')
+  out.push(REPLY_TO_EMAIL + (sender.phone ? ' · ' + sender.phone : ''))
+  out.push('')
+  if (opts.showTv !== false) {
+    out.push('Vu à la télé — ' + PRESS_TV.label + ' : ' + PRESS_TV.url)
+  }
+  if (opts.showReferences !== false) {
+    out.push('Ils nous ont fait confiance : ' + REFERENCES.map(function (r) { return r.title }).join(' · '))
+  }
+  if (keys.length) {
+    out.push('Ils parlent de nous :')
+    PRESS_LINKS.forEach(function (p) { if (keys.indexOf(p.key) >= 0) out.push('- ' + p.name + ' : ' + p.url) })
+  }
+  out.push('')
+  if (opts.attachPlaquette) out.push('Plaquette jointe — aussi en ligne : ' + String(opts.baseUrl || 'https://dashboard.meshuga.fr').replace(/\/$/, '') + PLAQUETTE.path)
+  out.push('Meshuga — 3 rue Vavin, 75006 Paris — meshuga.fr')
+  return out.join('\n')
+}
+
+// Email HTML complet (tables + styles inline, compatible Gmail / Outlook / Apple Mail).
+export function buildProspectEmailHtml(opts: any): string {
+  var base = String(opts.baseUrl || 'https://dashboard.meshuga.fr').replace(/\/$/, '')
+  var sender = getSender(opts.senderKey)
+  var keys = sanitizePressKeys(opts.pressKeys)
+  var showRefs = opts.showReferences !== false
+  var showTv = opts.showTv !== false
+
+  var logo = base + '/MESHUGA_Logotypepink.jpg'
+  var tvTitle = base + '/api/og/yellowtail?text=' + encodeURIComponent('Vu à la télé !') + '&size=34&color=191923'
+
+  var refsHtml = ''
+  if (showRefs) {
+    var rows = REFERENCES.map(function (r) {
+      return (
+        '<tr><td style="padding:9px 0;border-bottom:1px dashed #E3E3E3;font-size:14px;line-height:1.45;color:#191923">' +
+          '<span style="color:#FF82D7;font-weight:900">&#9679;</span>&nbsp; <strong>' + esc(r.title) + '</strong>' +
+          '<br><span style="color:#6B6B73;font-size:13px;padding-left:18px;display:inline-block">' + esc(r.detail) + '</span>' +
+        '</td></tr>'
+      )
+    }).join('')
+    refsHtml =
+      '<tr><td class="px" style="padding:20px 36px 4px">' +
+        '<div style="font-size:12px;font-weight:900;letter-spacing:1.5px;color:#191923;margin:0 0 4px">ILS NOUS ONT FAIT CONFIANCE</div>' +
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + rows + '</table>' +
+      '</td></tr>'
+  }
+
+  var tvHtml = ''
+  if (showTv) {
+    tvHtml =
+      '<tr><td class="px" style="padding:18px 30px 6px">' +
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FF82D7" class="rosebg" style="background:#FF82D7;border:2px solid #191923;border-radius:12px;box-shadow:4px 4px 0 #191923">' +
+          '<tr><td style="padding:18px 20px;text-align:center">' +
+            '<img src="' + tvTitle + '" alt="Vu à la télé !" height="34" style="height:34px;width:auto;display:inline-block;border:0" />' +
+            '<div class="ink" style="font-size:14px;line-height:1.5;color:#191923;margin:6px 0 14px">L’équipe de <strong>Très Très Bon</strong> est passée chez nous — le reportage diffusé sur <strong>Paris Première</strong>.</div>' +
+            '<a target="_blank" rel="noopener" href="' + esc(PRESS_TV.url) + '" style="display:inline-block;background:#191923;color:#FFEB5A;text-decoration:none;font-weight:900;font-size:14px;letter-spacing:.5px;padding:11px 22px;border-radius:9px">&#9654;&nbsp; Regarder le reportage</a>' +
+          '</td></tr>' +
+        '</table>' +
+      '</td></tr>'
+  }
+
+  var pressHtml = ''
+  if (keys.length) {
+    var items = PRESS_LINKS.filter(function (p) { return keys.indexOf(p.key) >= 0 }).map(function (p) {
+      return (
+        '<tr><td style="padding:6px 0">' +
+          '<a target="_blank" rel="noopener" href="' + esc(p.url) + '" style="text-decoration:none;color:#191923;font-size:14px;line-height:1.4">' +
+            '<span style="display:inline-block;background:#FF82D7;color:#FFFFFF;font-weight:900;font-size:12px;padding:3px 9px;border-radius:6px;border:1.5px solid #191923;margin-right:8px">' + esc(p.name) + '</span>' +
+            '<span style="text-decoration:underline;text-decoration-color:#FF82D7">' + esc(p.label) + ' &rarr;</span>' +
+          '</a>' +
+        '</td></tr>'
+      )
+    }).join('')
+    pressHtml =
+      '<tr><td class="px" style="padding:16px 36px 4px">' +
+        '<div style="font-size:12px;font-weight:900;letter-spacing:1.5px;color:#191923;margin:0 0 4px">ILS PARLENT DE NOUS</div>' +
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' + items + '</table>' +
+      '</td></tr>'
+  }
+
+  var signature =
+    '<tr><td class="px" style="padding:0 36px 8px">' +
+      '<table role="presentation" cellpadding="0" cellspacing="0"><tr>' +
+        '<td style="border-left:4px solid #FF82D7;padding:2px 0 2px 12px;font-size:14px;line-height:1.5;color:#191923">' +
+          '<strong>' + esc(sender.name) + '</strong><br>' +
+          '<span style="color:#6B6B73">' + esc(sender.role) + ' · Meshuga Events</span><br>' +
+          '<a target="_blank" rel="noopener" href="mailto:' + REPLY_TO_EMAIL + '" style="color:#191923;text-decoration:none">' + REPLY_TO_EMAIL + '</a>' +
+          (sender.phone ? ' · <a target="_blank" rel="noopener" href="tel:' + esc(sender.phone.replace(/\s/g, '')) + '" style="color:#191923;text-decoration:none">' + esc(sender.phone) + '</a>' : '') +
+        '</td>' +
+      '</tr></table>' +
+    '</td></tr>'
+
+  var cta =
+    '<tr><td align="center" style="padding:22px 30px 26px">' +
+      '<a target="_blank" rel="noopener" href="mailto:' + REPLY_TO_EMAIL + '?subject=' + encodeURIComponent('Re: ' + (opts.subject || 'Meshuga Events')) + '" class="yellowbg ink" style="display:inline-block;background:#FFEB5A;color:#191923;text-decoration:none;font-weight:900;font-size:15px;padding:13px 28px;border-radius:11px;border:2.5px solid #191923;box-shadow:4px 4px 0 #191923">Organiser une dégustation</a>' +
+      '<div style="font-size:12px;color:#8A8A92;margin-top:12px">Ou répondez simplement à ce mail.</div>' +
+      (opts.attachPlaquette ? '<div style="font-size:12px;color:#8A8A92;margin-top:6px">&#128206; Notre plaquette est jointe à ce mail — <a target="_blank" rel="noopener" href="' + base + PLAQUETTE.path + '" style="color:#FF82D7">consultable aussi en ligne</a>.</div>' : '') +
+    '</td></tr>'
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <style>{'.pem{max-width:1100px!important}.pem-grid{display:grid;grid-template-columns:1fr;gap:16px}.pem-prev iframe{width:100%;height:760px;border:2px solid #191923;border-radius:8px;background:#FFFDF5}.pem-tabs{display:flex;gap:6px;margin-bottom:10px}@media(min-width:1000px){.pem-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.pem-tabs{display:none}.pem-edit,.pem-prev{display:block!important}}'}</style>
-      <div className="modal pem" onClick={function(e){ e.stopPropagation() }}>
-        <div className="mh">
-          <div className="mt">✉️ Pitch — {prospect.name || ''}</div>
-        </div>
-        <div className="mb">
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginBottom:12}}>
-            {EMAIL_TYPES.map(function(t) {
-              return <button key={t.key} type="button" style={chip(emailType === t.key)} onClick={function(){ setEmailType(t.key) }}>{t.label}</button>
-            })}
-            <select className="inp" value={senderKey} onChange={function(e){ setSenderKey(e.target.value) }} style={{width:'auto',minHeight:0,padding:'4px 8px',fontSize:11}}>
-              <option value="edward">De : Edward</option>
-              <option value="emy">De : Emy</option>
-            </select>
-            <button type="button" className="btn btn-sm" disabled={loading} onClick={function(){ generate(emailType, senderKey) }}>{loading ? '⏳ Génération…' : '↻ Régénérer'}</button>
-          </div>
-
-          <div className="pem-tabs">
-            <button type="button" style={chip(view === 'edit')} onClick={function(){ setView('edit') }}>Édition</button>
-            <button type="button" style={chip(view === 'preview')} onClick={function(){ setView('preview') }}>Aperçu</button>
-          </div>
-
-          <div className="pem-grid">
-            <div className="pem-edit" style={{display: view === 'edit' ? 'block' : 'none'}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                <div className="fg"><label className="lbl">À</label><input className="inp" style={{minHeight:0}} value={to} onChange={function(e){ setTo(e.target.value) }} placeholder="contact@entreprise.fr" /></div>
-                <div className="fg"><label className="lbl">Cc (optionnel)</label><input className="inp" style={{minHeight:0}} value={cc} onChange={function(e){ setCc(e.target.value) }} /></div>
-              </div>
-              {!to && <div style={{fontSize:11,color:'#CC0066',fontWeight:900,margin:'-4px 0 8px'}}>Pas d&apos;email sur la fiche — saisis-le pour pouvoir envoyer.</div>}
-              <div className="fg"><label className="lbl">Objet</label><input className="inp" style={{minHeight:0}} value={subject} onChange={function(e){ setSubject(e.target.value) }} disabled={loading} /></div>
-
-              {loading && (
-                <div style={{textAlign:'center',padding:40,opacity:.55,border:'2px dashed #DDD',borderRadius:8}}>
-                  <div style={{fontSize:28,marginBottom:6}}>✉️</div>
-                  <div style={{fontWeight:900,fontSize:12}}>Rédaction du pitch…</div>
-                </div>
-              )}
-              {!loading && err && (
-                <div style={{padding:12,border:'2px solid #CC0066',borderRadius:8,color:'#CC0066',fontWeight:900,fontSize:12,marginBottom:10}}>{err}</div>
-              )}
-              {!loading && (
-                <div className="fg">
-                  <label className="lbl">Message (la signature et les encarts sont ajoutés automatiquement)</label>
-                  <textarea className="inp" value={body} onChange={function(e){ setBody(e.target.value) }} rows={13} style={{width:'100%',fontSize:13,lineHeight:1.65,fontFamily:'Arial, sans-serif'}} />
-                </div>
-              )}
-
-              <div className="fg">
-                <label className="lbl">Encarts</label>
-                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                  <button type="button" style={chip(showTv)} onClick={function(){ setShowTv(!showTv) }}>▶ {PRESS_TV.show} · {PRESS_TV.name}</button>
-                  <button type="button" style={chip(showRefs)} onClick={function(){ setShowRefs(!showRefs) }}>Références ({REFERENCES.length})</button>
-                </div>
-              </div>
-              <div className="fg">
-                <label className="lbl">Articles presse (3 max)</label>
-                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                  {PRESS_LINKS.map(function(p) {
-                    return <button key={p.key} type="button" style={chip(pressKeys.indexOf(p.key) >= 0)} onClick={function(){ togglePress(p.key) }}>{p.name}</button>
-                  })}
-                </div>
-              </div>
-              <div style={{fontSize:11,color:'#8A8A92',marginTop:4}}>Envoyé depuis {FROM_EMAIL} au nom de {sender.firstName} — les réponses arrivent sur {REPLY_TO_EMAIL}.</div>
-            </div>
-
-            <div className="pem-prev" style={{display: view === 'preview' ? 'block' : 'none'}}>
-              <div className="lbl" style={{marginBottom:6}}>Aperçu du mail envoyé</div>
-              <iframe title="apercu-email" srcDoc={previewHtml} sandbox="allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" />
-            </div>
-          </div>
-        </div>
-        <div className="mf">
-          <button className="btn" onClick={onClose}>Fermer</button>
-          <button className="btn" disabled={loading || !body} onClick={copy}>📋 Copier</button>
-          <button className="btn btn-p" disabled={loading || sending || !body} onClick={send}>{sending ? '⏳ Envoi…' : '🚀 Envoyer'}</button>
-        </div>
-      </div>
-    </div>
+    '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">' +
+    '<title>' + esc(opts.subject || 'Meshuga Events') + '</title>' +
+    '<style>' +
+      ':root{color-scheme:light only}' +
+      '@media (max-width:620px){.cardw{width:100%!important}.px{padding-left:20px!important;padding-right:20px!important}}' +
+      '[data-ochsdarkmode] .cardw{background:#FFFFFF!important}[data-ochsdarkmode] .yellowbg{background:#FFEB5A!important}' +
+      '[data-ochsdarkmode] .rosebg{background:#FF82D7!important}[data-ochsdarkmode] .ink{color:#191923!important}' +
+    '</style></head>' +
+    '<body bgcolor="#FFFDF5" style="margin:0;padding:0;background:#FFFDF5;font-family:Arial,Helvetica,sans-serif;color:#191923">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFFDF5" style="background:#FFFDF5"><tr><td align="center" style="padding:24px 10px">' +
+      '<table role="presentation" class="cardw" width="600" cellpadding="0" cellspacing="0" bgcolor="#FFFFFF" style="width:600px;max-width:600px;background:#FFFFFF;border:3px solid #191923;border-radius:16px;box-shadow:7px 7px 0 #FF82D7">' +
+        '<tr><td style="padding:26px 30px 8px;text-align:center"><img src="' + logo + '" alt="Meshuga" height="44" style="height:44px;width:auto;display:inline-block;max-width:70%;border:0" /></td></tr>' +
+        '<tr><td class="px" style="padding:16px 36px 4px">' + textToHtml(opts.body || '') + '</td></tr>' +
+        signature +
+        tvHtml +
+        refsHtml +
+        pressHtml +
+        cta +
+        '<tr><td bgcolor="#FFFDF5" style="background:#FFFDF5;border-top:1px solid #EEE;border-radius:0 0 13px 13px;padding:16px 30px;text-align:center;font-size:11px;color:#8A8A92;line-height:1.7">' +
+          '<strong style="color:#191923">Meshuga Events</strong> · 3 rue Vavin, 75006 Paris · <a target="_blank" rel="noopener" href="https://meshuga.fr" style="color:#FF82D7;text-decoration:none">meshuga.fr</a><br>' +
+          'SAS AEGIA FOOD — Vous ne souhaitez plus recevoir nos messages ? Répondez « stop », on vous retire aussitôt.' +
+        '</td></tr>' +
+      '</table>' +
+    '</td></tr></table></body></html>'
   )
 }
