@@ -3,7 +3,7 @@
 // ============================================================
 // Envoie un pitch prospect via Resend (même template que l'aperçu).
 // Body : { to, cc?, subject, body, senderKey, pressKeys, showReferences,
-//          showTv, prospectId?, prospectName? }
+//          showTv, attachPlaquette, prospectId?, prospectName? }
 // From : "<Prénom> · Meshuga Events <events@meshuga.fr>"
 // Reply-To : hello@meshuga.fr ; copie cachée hello@meshuga.fr (le mail envoyé
 // et les réponses se retrouvent dans la même boîte)
@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-import { buildProspectEmailHtml, buildProspectEmailText, getSender, isValidEmail, sanitizePressKeys, FROM_EMAIL, REPLY_TO_EMAIL } from '@/lib/prospectEmail'
+import { buildProspectEmailHtml, buildProspectEmailText, getSender, isValidEmail, sanitizePressKeys, FROM_EMAIL, REPLY_TO_EMAIL, PLAQUETTE } from '@/lib/prospectEmail'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
     body: bodyText,
     pressKeys: sanitizePressKeys(b.pressKeys),
     showReferences: b.showReferences !== false,
-    showTv: b.showTv !== false
+    showTv: b.showTv !== false,
+    attachPlaquette: b.attachPlaquette !== false
   }
 
   var payload: any = {
@@ -63,6 +64,11 @@ export async function POST(req: NextRequest) {
     reply_to: REPLY_TO_EMAIL
   }
   if (cc) payload.cc = [cc]
+  // Plaquette : Resend va chercher le PDF sur notre domaine (dossier /public)
+  if (opts.attachPlaquette) {
+    var fileBase = (process.env.NEXT_PUBLIC_APP_URL || 'https://meshuga-manager.vercel.app').replace(/\/$/, '')
+    payload.attachments = [{ filename: PLAQUETTE.filename, path: fileBase + PLAQUETTE.path }]
+  }
   if (to !== BCC_ARCHIVE && cc !== BCC_ARCHIVE) payload.bcc = [BCC_ARCHIVE]
 
   var resend = new Resend(process.env.RESEND_API_KEY)
