@@ -34,10 +34,20 @@ export var REFERENCES = [
 ]
 
 // ---------- Offre (contexte IA) ----------
-export var OFFER_SUMMARY =
-  'Meshuga Events = le traiteur de Meshuga, deli new-yorkais du 3 rue Vavin (Paris 6e). ' +
-  'Pour les pros : boxes de mini-sandwichs NY-style (lobster roll, Reuben, grilled cheese…) et mini cheesecakes pour réunions et déjeuners d’équipe, ' +
-  'cocktails, lancements de produits ou de labels, soirées privées, show cooking / mise en place sur site, livraison Paris & Île-de-France.'
+export var OFFER_SUMMARY = [
+  'Meshuga Events = l’offre B2B & événementielle de Meshuga, deli new-yorkais du 3 rue Vavin (Paris 6e). Tout est préparé sur place, à la minute.',
+  '4 gammes :',
+  '- Boxes Minis : boxes de 40 mini-sandwichs ou desserts (de 135 à 255 € HT — ex. Coney Island, Lower East Side, Tribeca, The Plaza au lobster roll, Sugar Hill aux cheesecakes), ou box sur mesure.',
+  '- Lunch Boxes individuelles (sandwich grand format + side + boisson), de 13 à 28 € HT, tarif volume dès 30.',
+  '- Live cooking : nos chefs préparent les sandwichs en direct — The Stand, The Counter, The Diner (installation, matériel et équipe inclus).',
+  '- Stand événementiel brandé Meshuga : on arrive, on installe, on assure, zéro logistique.',
+  'Créations : The Reuben, The Lobster, The Lox, Spicy Tuna, Tarama, The Melt, Chicken Caesar, hot-dog premium ; cheesecake, PBN (peanut butter & Nutella), Pink Lemonade maison.',
+  'Livraison Paris & Grand Paris (offerte dès 500 € HT), commande 48h à l’avance.',
+  'Track record : mk2 Cinéma Paradiso au Louvre, dancefloor du Rex Club, tournages de films, soirées Fashion Week, From Future.'
+].join('\n')
+
+// ---------- Plaquette PDF (fichier dans /public) ----------
+export var PLAQUETTE = { filename: 'Plaquette_Meshuga.pdf', path: '/Plaquette_Meshuga.pdf' }
 
 // ---------- Adresses d'envoi / réponse ----------
 // Tous les pitchs partent de FROM_EMAIL ; toutes les réponses arrivent sur REPLY_TO_EMAIL.
@@ -145,6 +155,7 @@ export function buildProspectEmailText(opts: any): string {
     PRESS_LINKS.forEach(function (p) { if (keys.indexOf(p.key) >= 0) out.push('- ' + p.name + ' : ' + p.url) })
   }
   out.push('')
+  if (opts.attachPlaquette) out.push('Plaquette jointe — aussi en ligne : ' + String(opts.baseUrl || 'https://dashboard.meshuga.fr').replace(/\/$/, '') + PLAQUETTE.path)
   out.push('Meshuga — 3 rue Vavin, 75006 Paris — meshuga.fr')
   return out.join('\n')
 }
@@ -226,6 +237,7 @@ export function buildProspectEmailHtml(opts: any): string {
     '<tr><td align="center" style="padding:22px 30px 26px">' +
       '<a target="_blank" rel="noopener" href="mailto:' + REPLY_TO_EMAIL + '?subject=' + encodeURIComponent('Re: ' + (opts.subject || 'Meshuga Events')) + '" class="yellowbg ink" style="display:inline-block;background:#FFEB5A;color:#191923;text-decoration:none;font-weight:900;font-size:15px;padding:13px 28px;border-radius:11px;border:2.5px solid #191923;box-shadow:4px 4px 0 #191923">Organiser une dégustation</a>' +
       '<div style="font-size:12px;color:#8A8A92;margin-top:12px">Ou répondez simplement à ce mail.</div>' +
+      (opts.attachPlaquette ? '<div style="font-size:12px;color:#8A8A92;margin-top:6px">&#128206; Notre plaquette est jointe à ce mail — <a target="_blank" rel="noopener" href="' + base + PLAQUETTE.path + '" style="color:#FF82D7">consultable aussi en ligne</a>.</div>' : '') +
     '</td></tr>'
 
   return (
