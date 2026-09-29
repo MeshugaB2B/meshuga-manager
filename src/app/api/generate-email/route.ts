@@ -39,7 +39,7 @@ async function callClaude(system: string, prompt: string, maxTokens: number) {
   return text
 }
 
-function buildSystem(senderKey: string) {
+function buildSystem(senderKey: string, attachPlaquette: boolean) {
   var s = getSender(senderKey)
   var pressList = PRESS_LINKS.map(function (p) { return '- ' + p.key + ' : ' + p.name + ' (' + p.label + ')' }).join('\n')
   var refs = REFERENCES.map(function (r) { return '- ' + r.title + ' — ' + r.detail }).join('\n')
@@ -63,6 +63,9 @@ function buildSystem(senderKey: string) {
     '- Ne mets AUCUNE URL dans le texte (les liens sont dans les encarts). Pas de markdown sauf **gras** avec parcimonie.',
     '- Termine par une proposition concrète et facile à accepter (dégustation offerte pour 2-3 personnes de l’équipe, box découverte, appel de 10 min), puis une formule de politesse courte. NE SIGNE PAS : la signature est ajoutée automatiquement.',
     '- Salutation : « Bonjour <Prénom>, » si le prénom est connu, sinon « Bonjour, ».',
+    (attachPlaquette
+      ? '- Notre plaquette PDF (formules, créations, tarifs, conditions) est jointe au mail : mentionne-la UNE fois, naturellement, juste avant la proposition finale (ex. « Vous trouverez ci-joint notre plaquette avec nos formules et nos tarifs. »). Ne détaille pas les prix dans le texte : la plaquette est là pour ça.'
+      : '- Aucune pièce jointe : ne parle PAS de plaquette ni de pièce jointe. Ne cite pas de prix précis.'),
     '- N’invente aucun chiffre, prix, client ou fait non fourni. La marque s’écrit « Meshuga » (jamais « Crazy Deli »).',
     '',
     'FORMAT DE SORTIE : UNIQUEMENT un objet JSON valide, sans texte autour ni balises de code :',
@@ -121,7 +124,7 @@ export async function POST(request: Request) {
       var p = payload.prospect
       var emailType = String(payload.emailType || 'first')
       var senderKey = payload.senderKey === 'emy' ? 'emy' : 'edward'
-      var raw = await callClaude(buildSystem(senderKey), buildPrompt(p, emailType), 1200)
+      var raw = await callClaude(buildSystem(senderKey, payload.attachPlaquette !== false), buildPrompt(p, emailType), 1200)
       var out = parseJson(raw)
       var pressKeys = sanitizePressKeys(out.pressKeys)
       if (pressKeys.length === 0) pressKeys = defaultPressKeys(p.category || p.type)
