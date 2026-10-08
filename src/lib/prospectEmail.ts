@@ -82,6 +82,85 @@ export function isValidEmail(s: string): boolean {
   return /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(s || '')
 }
 
+// ---------- Destinataires multiples & personnalisation ----------
+// Chaque destinataire reçoit SON propre mail (pas de CC groupé) avec une
+// salutation personnalisée. Règle :
+//   prénom connu            → « Bonjour Marie, »
+//   civilité + nom connus   → « Bonjour Madame Dupont, »
+//   sinon                   → « Bonjour, »
+// La 1re ligne du message si elle ressemble à une salutation (« Bonjour … , »)
+// est remplacée. Les jetons {prenom} / {nom} / {civilite} sont aussi remplacés
+// partout dans le texte (et dans l'objet).
+
+function capWord(w: string): string {
+  return String(w || '').split('-').map(function (x) {
+    return x ? x.charAt(0).toUpperCase() + x.slice(1).toLowerCase() : x
+  }).join('-')
+}
+
+// Devine prénom/nom depuis l'adresse : marie.dupont@ → Marie / Dupont
+export function guessNameFromEmail(email: any): { firstName: string, lastName: string } {
+  var local = String(email || '').split('@')[0] || ''
+  var generic = /^(contact|hello|bonjour|info|infos|team|equipe|rh|hr|admin|office|accueil|events?|direction|compta|commercial|sales|marketing|communication|com|noreply|no-reply|support|presse|press|jobs|recrutement)$/i
+  if (!local || generic.test(local)) return { firstName: '', lastName: '' }
+  var parts = local.split(/[._]+/).filter(function (x) { return x && !/\d/.test(x) })
+  if (parts.length >= 2 && parts[0].length > 1) {
+    return { firstName: capWord(parts[0]), lastName: capWord(parts.slice(1).join(' ')) }
+  }
+  return { firstName: '', lastName: '' }
+}
+
+export function buildGreeting(r: any): string {
+  var first = String((r && r.firstName) || '').trim()
+  var last = String((r && r.lastName) || '').trim()
+  var civ = r && r.civility === 'mme' ? 'Madame' : (r && r.civility === 'm' ? 'Monsieur' : '')
+  if (first) return 'Bonjour ' + first + ','
+  if (last && civ) return 'Bonjour ' + civ + ' ' + last + ','
+  if (civ) return 'Bonjour ' + civ + ','
+  return 'Bonjour,'
+}
+
+var GREETING_RE = /^(bonjour|bonsoir|hello|salut|cher|ch[èe]re)\b[^\n]{0,50},?\s*$/i
+
+export function personalizeText(text: any, r: any): string {
+  var first = String((r && r.firstName) || '').trim()
+  var last = String((r && r.lastName) || '').trim()
+  var civ = r && r.civility === 'mme' ? 'Madame' : (r && r.civility === 'm' ? 'Monsieur' : '')
+  return String(text || '')
+    .replace(/\{\s*pr[ée]nom\s*\}/gi, first)
+    .replace(/\{\s*nom\s*\}/gi, last)
+    .replace(/\{\s*civilit[ée]\s*\}/gi, civ)
+}
+
+export function personalizeBody(body: any, r: any): string {
+  var lines = String(body || '').replace(/\r/g, '').split('\n')
+  for (var i = 0; i < lines.length; i++) {
+    if (!lines[i].trim()) continue
+    if (GREETING_RE.test(lines[i].trim())) lines[i] = buildGreeting(r)
+    break
+  }
+  return personalizeText(lines.join('\n'), r)
+}
+
+export function sanitizeRecipients(list: any): any[] {
+  var out: any[] = []
+  var seen: string[] = []
+  if (!Array.isArray(list)) return out
+  for (var i = 0; i < list.length; i++) {
+    var x = list[i] || {}
+    var email = String(x.email || '').trim().toLowerCase()
+    if (!email || seen.indexOf(email) >= 0) continue
+    seen.push(email)
+    out.push({
+      email: email,
+      firstName: String(x.firstName || '').trim().slice(0, 60),
+      lastName: String(x.lastName || '').trim().slice(0, 60),
+      civility: x.civility === 'mme' || x.civility === 'm' ? x.civility : ''
+    })
+  }
+  return out
+}
+
 // Choix par défaut des pastilles presse selon la catégorie du prospect.
 export function defaultPressKeys(category: any): string[] {
   var c = String(category || '').toLowerCase()

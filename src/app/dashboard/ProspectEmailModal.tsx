@@ -3,10 +3,12 @@
 // ============================================================
 // ProspectEmailModal — pitch IA prospect : génération, édition,
 // aperçu fidèle (même builder que l'envoi) et envoi en 1 clic.
+// Multi-destinataires : bouton « + » sous le À → chaque contact reçoit
+// SON mail, salutation personnalisée (prénom, sinon civilité + nom).
 // ============================================================
 
 import { useState, useEffect } from 'react'
-import { PRESS_LINKS, PRESS_TV, REFERENCES, EMAIL_TYPES, FROM_EMAIL, REPLY_TO_EMAIL, buildProspectEmailHtml, cleanEmail, isValidEmail, getSender } from '@/lib/prospectEmail'
+import { PRESS_LINKS, PRESS_TV, REFERENCES, EMAIL_TYPES, FROM_EMAIL, REPLY_TO_EMAIL, buildProspectEmailHtml, cleanEmail, isValidEmail, getSender, guessNameFromEmail, personalizeBody, personalizeText, buildGreeting } from '@/lib/prospectEmail'
 
 export default function ProspectEmailModal(props) {
   var prospect = props.prospect || {}
@@ -22,7 +24,13 @@ export default function ProspectEmailModal(props) {
   var [senderKey, setSenderKey] = useState(prospect.__sender === 'emy' ? 'emy' : 'edward')
   var [loading, setLoading] = useState(true)
   var [err, setErr] = useState('')
-  var [to, setTo] = useState(initialTo)
+  var [recipients, setRecipients] = useState([{
+    email: initialTo,
+    firstName: String(prospect.contactFirstName || '').trim(),
+    lastName: String(prospect.contactLastName || '').trim(),
+    civility: ''
+  }] as any)
+  var [previewIdx, setPreviewIdx] = useState(0)
   var [cc, setCc] = useState('')
   var [subject, setSubject] = useState('')
   var [body, setBody] = useState('')
@@ -64,24 +72,59 @@ export default function ProspectEmailModal(props) {
     })
   }
 
+  var updateRecipient = function(idx, patch) {
+    setRecipients(function(prev) {
+      return prev.map(function(r, i) { return i === idx ? Object.assign({}, r, patch) : r })
+    })
+  }
+  var addRecipient = function() {
+    setRecipients(function(prev) { return prev.concat([{ email: '', firstName: '', lastName: '', civility: '' }]) })
+  }
+  var removeRecipient = function(idx) {
+    setRecipients(function(prev) { return prev.length <= 1 ? prev : prev.filter(function(r, i) { return i !== idx }) })
+    setPreviewIdx(0)
+  }
+  // À la sortie du champ email : on devine prénom/nom si rien n'est saisi (marie.dupont@ → Marie Dupont)
+  var onEmailBlur = function(idx) {
+    var r = recipients[idx]
+    if (!r || r.firstName || r.lastName) return
+    var g = guessNameFromEmail(String(r.email || '').trim())
+    if (g.firstName || g.lastName) updateRecipient(idx, { firstName: g.firstName, lastName: g.lastName })
+  }
+
+  var safeIdx = previewIdx < recipients.length ? previewIdx : 0
+  var previewR = recipients[safeIdx] || {}
   var baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://dashboard.meshuga.fr'
+  var previewSubject = personalizeText(subject, previewR)
   var previewHtml = buildProspectEmailHtml({
-    baseUrl: baseUrl, senderKey: senderKey, subject: subject, body: body,
+    baseUrl: baseUrl, senderKey: senderKey, subject: previewSubject, body: personalizeBody(body, previewR),
     pressKeys: pressKeys, showReferences: showRefs, showTv: showTv, attachPlaquette: attachPlaquette
   })
+  var filledRecipients = recipients.filter(function(r) { return String(r.email || '').trim() })
 
   var send = function() {
-    var dest = String(to || '').trim()
-    if (!isValidEmail(dest)) { toast('Adresse email invalide'); return }
+    var list = recipients.map(function(r) {
+      return { email: String(r.email || '').trim(), firstName: String(r.firstName || '').trim(), lastName: String(r.lastName || '').trim(), civility: r.civility || '' }
+    }).filter(function(r) { return r.email })
+    if (!list.length) { toast('Ajoute au moins une adresse'); return }
+    var bad = list.filter(function(r) { return !isValidEmail(r.email) })
+    if (bad.length) { toast('Adresse invalide : ' + bad[0].email); return }
+    var emails = list.map(function(r) { return r.email.toLowerCase() })
+    var dup = emails.filter(function(e, i) { return emails.indexOf(e) !== i })
+    if (dup.length) { toast('Adresse en double : ' + dup[0]); return }
     if (!subject.trim()) { toast('Objet manquant'); return }
     if (body.trim().length < 20) { toast('Le message est trop court'); return }
-    if (!window.confirm('Envoyer ce mail à ' + dest + ' ?')) return
+    var recap = list.map(function(r) { return '• ' + r.email + '  →  « ' + buildGreeting(r) + ' »' }).join('\n')
+    var question = list.length > 1
+      ? 'Envoyer ' + list.length + ' mails individuels ?\n\n' + recap + (cc.trim() ? '\n\nCc ' + cc.trim() + ' (sur le 1er mail uniquement)' : '')
+      : 'Envoyer ce mail à ' + list[0].email + ' ?\n\n' + recap
+    if (!window.confirm(question)) return
     setSending(true)
     fetch('/api/prospect-email/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        to: dest, cc: cc.trim(), subject: subject.trim(), body: body,
+        recipients: list, cc: cc.trim(), subject: subject.trim(), body: body,
         senderKey: senderKey, pressKeys: pressKeys, showReferences: showRefs, showTv: showTv, attachPlaquette: attachPlaquette,
         prospectId: isCrm ? prospect.id : null, prospectName: prospect.name || ''
       })
@@ -89,7 +132,9 @@ export default function ProspectEmailModal(props) {
       .then(function(d) {
         setSending(false)
         if (!d || !d.ok) { toast('Échec envoi : ' + ((d && d.error) || 'erreur')); return }
-        logActivity('email_envoye', 'Email envoyé à ' + (prospect.name || dest) + ' (' + dest + ')', prospect.name || '', subject)
+        var sentEmails = Array.isArray(d.sent) ? d.sent.map(function(x) { return x.email }) : [list[0].email]
+        var failed = Array.isArray(d.failed) ? d.failed : []
+        logActivity('email_envoye', 'Email envoyé à ' + (prospect.name || sentEmails[0]) + ' (' + sentEmails.join(', ') + ')', prospect.name || '', subject)
         if (isCrm && setProspects) {
           setProspects(function(prev) {
             return prev.map(function(x) {
@@ -98,7 +143,18 @@ export default function ProspectEmailModal(props) {
             })
           })
         }
-        toast('Email envoyé ✓')
+        if (failed.length) {
+          // On garde le modal ouvert avec uniquement les adresses en échec
+          var failedEmails = failed.map(function(f) { return String(f.email || '').toLowerCase() })
+          setRecipients(function(prev) {
+            var keep = prev.filter(function(r) { return failedEmails.indexOf(String(r.email || '').trim().toLowerCase()) >= 0 })
+            return keep.length ? keep : prev
+          })
+          setPreviewIdx(0)
+          toast(sentEmails.length + ' envoyé(s) ✓ — ' + failed.length + ' échec(s) : ' + failed.map(function(f) { return f.email }).join(', '))
+          return
+        }
+        toast(sentEmails.length > 1 ? sentEmails.length + ' emails envoyés ✓' : 'Email envoyé ✓')
         onClose()
       })
       .catch(function(e) { setSending(false); toast('Erreur : ' + String((e && e.message) || e)) })
@@ -147,11 +203,34 @@ export default function ProspectEmailModal(props) {
 
           <div className="pem-grid">
             <div className="pem-edit" style={{display: view === 'edit' ? 'block' : 'none'}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                <div className="fg"><label className="lbl">À</label><input className="inp" style={{minHeight:0}} value={to} onChange={function(e){ setTo(e.target.value) }} placeholder="contact@entreprise.fr" /></div>
-                <div className="fg"><label className="lbl">Cc (optionnel)</label><input className="inp" style={{minHeight:0}} value={cc} onChange={function(e){ setCc(e.target.value) }} /></div>
+              <div className="fg">
+                <label className="lbl">À {recipients.length > 1 ? '(' + recipients.length + ' destinataires — 1 mail perso chacun)' : ''}</label>
+                {recipients.map(function(r, idx) {
+                  return (
+                    <div key={idx} style={{border:'2px solid #191923',borderRadius:8,padding:6,marginBottom:6,background: recipients.length > 1 && idx === safeIdx ? '#FFF7FC' : '#FFFFFF'}}>
+                      <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                        <input className="inp" style={{minHeight:0,flex:1,marginBottom:0}} value={r.email} onChange={function(e){ updateRecipient(idx, { email: e.target.value }) }} onBlur={function(){ onEmailBlur(idx) }} placeholder="contact@entreprise.fr" />
+                        {recipients.length > 1 && (
+                          <button type="button" title="Retirer" onClick={function(){ removeRecipient(idx) }} style={{width:28,height:28,flex:'0 0 28px',borderRadius:6,border:'2px solid #191923',background:'#FFFFFF',cursor:'pointer',fontWeight:900,fontSize:13,lineHeight:1}}>✕</button>
+                        )}
+                      </div>
+                      <div style={{display:'grid',gridTemplateColumns:'74px minmax(0,1fr) minmax(0,1fr)',gap:6,marginTop:6}}>
+                        <select className="inp" value={r.civility} onChange={function(e){ updateRecipient(idx, { civility: e.target.value }) }} style={{minHeight:0,padding:'4px 6px',fontSize:11,marginBottom:0}}>
+                          <option value="">Civ.</option>
+                          <option value="mme">Mme</option>
+                          <option value="m">M.</option>
+                        </select>
+                        <input className="inp" style={{minHeight:0,fontSize:12,marginBottom:0}} value={r.firstName} onChange={function(e){ updateRecipient(idx, { firstName: e.target.value }) }} placeholder="Prénom" />
+                        <input className="inp" style={{minHeight:0,fontSize:12,marginBottom:0}} value={r.lastName} onChange={function(e){ updateRecipient(idx, { lastName: e.target.value }) }} placeholder="Nom" />
+                      </div>
+                      <div style={{fontSize:10,color:'#8A8A92',marginTop:4}}>Salutation : <strong style={{color:'#191923'}}>{buildGreeting(r)}</strong></div>
+                    </div>
+                  )
+                })}
+                <button type="button" onClick={addRecipient} style={{padding:'4px 12px',borderRadius:6,border:'2px dashed #191923',background:'#FFEB5A',cursor:'pointer',fontWeight:900,fontSize:12,fontFamily:'Arial Narrow, Arial, sans-serif'}}>＋ Ajouter un destinataire</button>
               </div>
-              {!to && <div style={{fontSize:11,color:'#CC0066',fontWeight:900,margin:'-4px 0 8px'}}>Pas d&apos;email sur la fiche — saisis-le pour pouvoir envoyer.</div>}
+              {!filledRecipients.length && <div style={{fontSize:11,color:'#CC0066',fontWeight:900,margin:'-4px 0 8px'}}>Pas d&apos;email sur la fiche — saisis-le pour pouvoir envoyer.</div>}
+              <div className="fg"><label className="lbl">Cc (optionnel{recipients.length > 1 ? ' — mis sur le 1er mail seulement' : ''})</label><input className="inp" style={{minHeight:0}} value={cc} onChange={function(e){ setCc(e.target.value) }} /></div>
               <div className="fg"><label className="lbl">Objet</label><input className="inp" style={{minHeight:0}} value={subject} onChange={function(e){ setSubject(e.target.value) }} disabled={loading} /></div>
 
               {loading && (
@@ -166,6 +245,7 @@ export default function ProspectEmailModal(props) {
               {!loading && (
                 <div className="fg">
                   <label className="lbl">Message (la signature et les encarts sont ajoutés automatiquement)</label>
+                  <div style={{fontSize:10,color:'#8A8A92',margin:'-2px 0 4px'}}>La 1re ligne « Bonjour … , » est réécrite pour chaque destinataire. Jetons possibles : {'{prenom}'} {'{nom}'} {'{civilite}'}</div>
                   <textarea className="inp" value={body} onChange={function(e){ setBody(e.target.value) }} rows={13} style={{width:'100%',fontSize:13,lineHeight:1.65,fontFamily:'Arial, sans-serif'}} />
                 </div>
               )}
@@ -193,7 +273,16 @@ export default function ProspectEmailModal(props) {
             </div>
 
             <div className="pem-prev" style={{display: view === 'preview' ? 'block' : 'none'}}>
-              <div className="lbl" style={{marginBottom:6}}>Aperçu du mail envoyé</div>
+              <div className="lbl" style={{marginBottom:6}}>Aperçu du mail envoyé{recipients.length > 1 ? ' — pour :' : ''}</div>
+              {recipients.length > 1 && (
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:8}}>
+                  {recipients.map(function(r, idx) {
+                    var label = [r.firstName, r.lastName].filter(Boolean).join(' ') || r.email || ('Destinataire ' + (idx + 1))
+                    return <button key={idx} type="button" style={chip(idx === safeIdx)} onClick={function(){ setPreviewIdx(idx) }}>{label}</button>
+                  })}
+                </div>
+              )}
+              {previewSubject && <div style={{fontSize:12,marginBottom:6}}><strong>Objet :</strong> {previewSubject}</div>}
               <iframe title="apercu-email" srcDoc={previewHtml} sandbox="allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation" />
             </div>
           </div>
@@ -201,7 +290,7 @@ export default function ProspectEmailModal(props) {
         <div className="mf">
           <button className="btn" onClick={onClose}>Fermer</button>
           <button className="btn" disabled={loading || !body} onClick={copy}>📋 Copier</button>
-          <button className="btn btn-p" disabled={loading || sending || !body} onClick={send}>{sending ? '⏳ Envoi…' : '🚀 Envoyer'}</button>
+          <button className="btn btn-p" disabled={loading || sending || !body} onClick={send}>{sending ? '⏳ Envoi…' : (filledRecipients.length > 1 ? '🚀 Envoyer (' + filledRecipients.length + ')' : '🚀 Envoyer')}</button>
         </div>
       </div>
     </div>

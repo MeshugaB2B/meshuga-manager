@@ -2,8 +2,12 @@
 // src/app/api/prospect-email/send/route.ts
 // ============================================================
 // Envoie un pitch prospect via Resend (même template que l'aperçu).
-// Body : { to, cc?, subject, body, senderKey, pressKeys, showReferences,
+// Body : { recipients: [{ email, firstName?, lastName?, civility? }] (ou `to` legacy),
+//          cc?, subject, body, senderKey, pressKeys, showReferences,
 //          showTv, attachPlaquette, prospectId?, prospectName? }
+// Multi-destinataires : 1 mail individuel par destinataire, salutation
+// personnalisée (prénom, sinon civilité + nom). Le Cc n'est mis que sur le
+// 1er envoi (sinon il recevrait N fois le mail).
 // From : "<Prénom> · Meshuga Events <events@meshuga.fr>"
 // Reply-To : hello@meshuga.fr ; copie cachée hello@meshuga.fr (le mail envoyé
 // et les réponses se retrouvent dans la même boîte)
@@ -13,13 +17,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-import { buildProspectEmailHtml, buildProspectEmailText, getSender, isValidEmail, sanitizePressKeys, FROM_EMAIL, REPLY_TO_EMAIL, PLAQUETTE } from '@/lib/prospectEmail'
+import { buildProspectEmailHtml, buildProspectEmailText, getSender, isValidEmail, sanitizePressKeys, sanitizeRecipients, personalizeBody, personalizeText, FROM_EMAIL, REPLY_TO_EMAIL, PLAQUETTE } from '@/lib/prospectEmail'
 
 export const runtime = 'nodejs'
-export const maxDuration = 30
+export const maxDuration = 60
 
 var FROM_ADDRESS = FROM_EMAIL
 var BCC_ARCHIVE = REPLY_TO_EMAIL
+
+var MAX_RECIPIENTS = 40
+
+function sleep(ms: number) {
+  return new Promise(function (resolve) { setTimeout(resolve, ms) })
+}
 
 function bad(msg: string, status?: number) {
   return NextResponse.json({ ok: false, error: msg }, { status: status || 400 })
@@ -31,54 +41,75 @@ export async function POST(req: NextRequest) {
   var b: any
   try { b = await req.json() } catch (e) { return bad('JSON invalide') }
 
-  var to = String((b && b.to) || '').trim().toLowerCase()
+  var recipients = sanitizeRecipients(b && b.recipients)
+  if (!recipients.length && b && b.to) recipients = sanitizeRecipients([{ email: b.to }])
   var cc = String((b && b.cc) || '').trim().toLowerCase()
   var subject = String((b && b.subject) || '').trim()
   var bodyText = String((b && b.body) || '').trim()
   var senderKey = b && b.senderKey === 'emy' ? 'emy' : 'edward'
   var sender = getSender(senderKey)
 
-  if (!isValidEmail(to)) return bad('Adresse destinataire invalide')
+  if (!recipients.length) return bad('Aucun destinataire')
+  if (recipients.length > MAX_RECIPIENTS) return bad('Trop de destinataires (max ' + MAX_RECIPIENTS + ')')
+  for (var i = 0; i < recipients.length; i++) {
+    if (!isValidEmail(recipients[i].email)) return bad('Adresse destinataire invalide : ' + recipients[i].email)
+  }
   if (cc && !isValidEmail(cc)) return bad('Adresse en copie invalide')
   if (!subject) return bad('Objet requis')
   if (bodyText.length < 20) return bad('Corps du mail trop court')
 
   var origin = process.env.NEXT_PUBLIC_APP_URL || req.headers.get('origin') || 'https://dashboard.meshuga.fr'
-  var opts = {
+  var common = {
     baseUrl: origin,
     senderKey: senderKey,
-    subject: subject,
-    body: bodyText,
     pressKeys: sanitizePressKeys(b.pressKeys),
     showReferences: b.showReferences !== false,
     showTv: b.showTv !== false,
     attachPlaquette: b.attachPlaquette !== false
   }
-
-  var payload: any = {
-    from: sender.firstName + ' · Meshuga Events <' + FROM_ADDRESS + '>',
-    to: [to],
-    subject: subject,
-    html: buildProspectEmailHtml(opts),
-    text: buildProspectEmailText(opts),
-    reply_to: REPLY_TO_EMAIL
-  }
-  if (cc) payload.cc = [cc]
-  // Plaquette : Resend va chercher le PDF sur notre domaine (dossier /public)
-  if (opts.attachPlaquette) {
-    var fileBase = (process.env.NEXT_PUBLIC_APP_URL || 'https://meshuga-manager.vercel.app').replace(/\/$/, '')
-    payload.attachments = [{ filename: PLAQUETTE.filename, path: fileBase + PLAQUETTE.path }]
-  }
-  if (to !== BCC_ARCHIVE && cc !== BCC_ARCHIVE) payload.bcc = [BCC_ARCHIVE]
+  var fileBase = (process.env.NEXT_PUBLIC_APP_URL || 'https://meshuga-manager.vercel.app').replace(/\/$/, '')
 
   var resend = new Resend(process.env.RESEND_API_KEY)
-  var sent: any
-  try {
-    sent = await resend.emails.send(payload)
-  } catch (e: any) {
-    return bad('Erreur Resend : ' + (e && e.message ? e.message : 'inconnue'), 500)
+  var sentList: any[] = []
+  var failed: any[] = []
+
+  for (var k = 0; k < recipients.length; k++) {
+    var r = recipients[k]
+    var subj = personalizeText(subject, r).trim() || subject
+    var opts = Object.assign({}, common, { subject: subj, body: personalizeBody(bodyText, r) })
+    var payload: any = {
+      from: sender.firstName + ' · Meshuga Events <' + FROM_ADDRESS + '>',
+      to: [r.email],
+      subject: subj,
+      html: buildProspectEmailHtml(opts),
+      text: buildProspectEmailText(opts),
+      reply_to: REPLY_TO_EMAIL
+    }
+    var withCc = k === 0 && cc && cc !== r.email
+    if (withCc) payload.cc = [cc]
+    // Plaquette : Resend va chercher le PDF sur notre domaine (dossier /public)
+    if (opts.attachPlaquette) {
+      payload.attachments = [{ filename: PLAQUETTE.filename, path: fileBase + PLAQUETTE.path }]
+    }
+    if (r.email !== BCC_ARCHIVE && !(withCc && cc === BCC_ARCHIVE)) payload.bcc = [BCC_ARCHIVE]
+
+    // Resend limite à ~2 req/s → petite pause entre deux envois
+    if (k > 0) await sleep(600)
+    try {
+      var sent: any = await resend.emails.send(payload)
+      if (sent && sent.error) {
+        failed.push({ email: r.email, error: sent.error.message || JSON.stringify(sent.error) })
+      } else {
+        sentList.push({ email: r.email, id: sent && sent.data ? sent.data.id : null })
+      }
+    } catch (e: any) {
+      failed.push({ email: r.email, error: e && e.message ? e.message : 'inconnue' })
+    }
   }
-  if (sent && sent.error) return bad('Resend a refusé : ' + (sent.error.message || JSON.stringify(sent.error)), 500)
+
+  if (!sentList.length) {
+    return bad('Aucun mail envoyé — ' + failed.map(function (f) { return f.email + ' : ' + f.error }).join(' | '), 500)
+  }
 
   var sentAt = new Date().toISOString()
   var newStatus: any = null
@@ -104,7 +135,9 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    emailId: sent && sent.data ? sent.data.id : null,
+    emailId: sentList[0] ? sentList[0].id : null,
+    sent: sentList,
+    failed: failed,
     sentAt: sentAt,
     newStatus: newStatus
   })
