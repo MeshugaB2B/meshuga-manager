@@ -101,7 +101,7 @@ export function eventTypeToStatus(type: string): string {
   if (t === 'delivery_delayed') return 'delivery_delayed'
   if (t === 'opened') return 'opened'
   if (t === 'clicked') return 'clicked'
-  if (t === 'bounced') return 'bounced'
+  if (t === 'bounced' || t === 'suppressed') return 'bounced'
   if (t === 'complained') return 'complained'
   if (t === 'failed' || t === 'canceled' || t === 'cancelled') return 'failed'
   return ''

@@ -6,8 +6,8 @@
 //
 // Config Resend (Dashboard → Webhooks → Add endpoint) :
 //   URL    : https://<dashboard>/api/resend/webhook
-//   Events : email.sent, email.delivered, email.delivery_delayed,
-//            email.bounced, email.complained, email.opened, email.clicked, email.failed
+//   Events : email.sent, email.delivered, email.delivery_delayed, email.bounced,
+//            email.complained, email.opened, email.clicked, email.failed, email.suppressed
 //   Copier le « Signing secret » (whsec_…) dans Vercel : RESEND_WEBHOOK_SECRET
 //
 // Signature Svix : HMAC-SHA256( base64decode(secret sans whsec_),
@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
   var bounce = data.bounce || {}
   var detail = ''
   if (status === 'bounced') detail = [bounce.type, bounce.subType].filter(Boolean).join(' / ') + (bounce.message ? ' — ' + bounce.message : '')
+  if (evt.type === 'email.suppressed') detail = 'Adresse bloquée par Resend (déjà rejetée ou signalée auparavant) — mail non envoyé'
   if (status === 'failed') detail = (data.failed && data.failed.reason) || data.reason || 'Échec d’envoi'
   if (status === 'complained') detail = 'Le destinataire a signalé le mail comme spam'
 
