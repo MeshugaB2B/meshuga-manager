@@ -19,6 +19,8 @@ export default function ProspectEmailModal(props) {
 
   var initialTo = cleanEmail(prospect.contactEmail) || cleanEmail(prospect.contact_email) || cleanEmail(prospect.email)
   var isCrm = prospect.cat === 'crm' && prospect.id
+  // Suivi CRM : CRM (table prospects) ou lead Prospection (chasse_prospects)
+  var crmKind = isCrm ? 'crm' : (prospect.id && prospect.cat && prospect.cat !== 'crm' ? 'chasse' : '')
 
   var [emailType, setEmailType] = useState(prospect.__emailType || 'first')
   var [senderKey, setSenderKey] = useState(prospect.__sender === 'emy' ? 'emy' : 'edward')
@@ -126,6 +128,8 @@ export default function ProspectEmailModal(props) {
       body: JSON.stringify({
         recipients: list, cc: cc.trim(), subject: subject.trim(), body: body,
         senderKey: senderKey, pressKeys: pressKeys, showReferences: showRefs, showTv: showTv, attachPlaquette: attachPlaquette,
+        emailType: emailType,
+        prospectKind: crmKind || null, prospectRef: crmKind ? String(prospect.id) : null,
         prospectId: isCrm ? prospect.id : null, prospectName: prospect.name || ''
       })
     }).then(function(r) { return r.json() })
@@ -139,7 +143,7 @@ export default function ProspectEmailModal(props) {
           setProspects(function(prev) {
             return prev.map(function(x) {
               if (String(x.id) !== String(prospect.id)) return x
-              return Object.assign({}, x, { last_contacted_at: d.sentAt }, d.newStatus ? { status: d.newStatus } : {})
+              return Object.assign({}, x, { last_contacted_at: d.sentAt }, d.newStatus ? { status: d.newStatus } : {}, d.nextFollowup ? { nextDate: d.nextFollowup.due_date, nextAction: d.nextFollowup.channel === 'phone' ? 'Appeler (après relances email)' : (d.nextFollowup.mode === 'auto' ? 'Relance email auto' : 'Relance email') + ' n°' + d.nextFollowup.step } : {})
             })
           })
         }
@@ -154,7 +158,9 @@ export default function ProspectEmailModal(props) {
           toast(sentEmails.length + ' envoyé(s) ✓ — ' + failed.length + ' échec(s) : ' + failed.map(function(f) { return f.email }).join(', '))
           return
         }
-        toast(sentEmails.length > 1 ? sentEmails.length + ' emails envoyés ✓' : 'Email envoyé ✓')
+        var nf = d.nextFollowup
+        var nfTxt = nf ? ' — prochaine relance le ' + String(nf.due_date).split('-').reverse().slice(0, 2).join('/') + (nf.mode === 'auto' ? ' (auto)' : '') : ''
+        toast((sentEmails.length > 1 ? sentEmails.length + ' emails envoyés ✓' : 'Email envoyé ✓') + nfTxt)
         onClose()
       })
       .catch(function(e) { setSending(false); toast('Erreur : ' + String((e && e.message) || e)) })

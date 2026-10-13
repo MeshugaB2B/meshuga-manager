@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import ProspectCrmPanel from './ProspectCrmPanel'
 
 function sb() {
   return createClient(
@@ -95,6 +96,12 @@ export default function ProspectionTab(props) {
     sb().from('chasse_prospects').select('*').order('score', { ascending: false }).then(function(r){
       setLeads(r.data || [])
       setLoading(false)
+    })
+  }
+  // Rechargement discret (après une action du suivi CRM : envoi, relance, réponse…)
+  function refreshLeads() {
+    sb().from('chasse_prospects').select('*').order('score', { ascending: false }).then(function(r){
+      if (r.data) setLeads(r.data)
     })
   }
 
@@ -303,6 +310,9 @@ export default function ProspectionTab(props) {
           onClose={function(){ setEditLead(null) }}
           onSave={function(fields){ saveLead(editLead.id, fields) }}
           onSendCrm={onSendToCrm ? function(){ sendToCrm(editLead); setEditLead(null) } : null}
+          toast={toast}
+          onRelance={function(t){ var l = editLead; setEditLead(null); generateEmail(l, t) }}
+          onChanged={refreshLeads}
         />
       )}
     </div>
@@ -465,10 +475,14 @@ function LeadModal(props) {
   }
 
   var lblStyle = { fontSize:10, fontWeight:900, textTransform:'uppercase', letterSpacing:0.3, opacity:0.6, display:'block', marginBottom:3 }
+  var [tab, setTab] = useState('suivi')
+  var tabBtn = function(active) {
+    return { fontSize:11, fontWeight:900, padding:'5px 12px', borderRadius:14, border:'2px solid '+NOIR, cursor:'pointer', background:active?ROSE:'#FFFFFF', color:active?'#FFFFFF':NOIR }
+  }
 
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(25,25,35,.6)',zIndex:300,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'20px',overflowY:'auto'}} onClick={props.onClose}>
-      <div style={{background:'#FFFFFF',borderRadius:12,width:'100%',maxWidth:560,border:'3px solid '+NOIR,boxShadow:'5px 5px 0 '+NOIR,marginTop:20,marginBottom:40}} onClick={function(e){ e.stopPropagation() }}>
+      <div style={{background:'#FFFFFF',borderRadius:12,width:'100%',maxWidth:tab==='suivi'?720:560,border:'3px solid '+NOIR,boxShadow:'5px 5px 0 '+NOIR,marginTop:20,marginBottom:40}} onClick={function(e){ e.stopPropagation() }}>
 
         {/* En-tête */}
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',borderBottom:'2px solid '+NOIR,position:'sticky',top:0,background:'#FFF7FC',borderRadius:'9px 9px 0 0'}}>
@@ -476,7 +490,27 @@ function LeadModal(props) {
           <button style={{background:'#FFFFFF',border:'2px solid '+NOIR,borderRadius:'50%',width:32,height:32,cursor:'pointer',fontWeight:900}} onClick={props.onClose}>✕</button>
         </div>
 
-        <div style={{padding:'18px 20px',display:'flex',flexDirection:'column',gap:14}}>
+        {/* Onglets */}
+        <div style={{display:'flex',gap:6,padding:'12px 20px 0'}}>
+          <button type="button" style={tabBtn(tab==='suivi')} onClick={function(){ setTab('suivi') }}>📇 Suivi commercial</button>
+          <button type="button" style={tabBtn(tab==='infos')} onClick={function(){ setTab('infos') }}>✏️ Infos prospect</button>
+        </div>
+
+        {tab === 'suivi' && (
+          <div style={{padding:'14px 20px'}}>
+            <div style={{fontWeight:900,fontSize:16,marginBottom:10}}>{lead.name}</div>
+            <ProspectCrmPanel
+              kind="chasse"
+              refId={lead.id}
+              prospect={lead}
+              toast={props.toast}
+              onRelance={props.onRelance}
+              onChanged={function(d){ var ns = d ? (d.newStatus || (d.prospectPatch && d.prospectPatch.status)) : null; if (ns) set('status', ns); if (props.onChanged) props.onChanged() }}
+            />
+          </div>
+        )}
+
+        <div style={{padding:'18px 20px',display:tab==='infos'?'flex':'none',flexDirection:'column',gap:14}}>
 
           {/* Entreprise */}
           <div>
@@ -585,11 +619,11 @@ function LeadModal(props) {
 
         {/* Footer actions */}
         <div style={{display:'flex',gap:8,padding:'14px 20px',borderTop:'2px solid '+NOIR,position:'sticky',bottom:0,background:'#FFFFFF',borderRadius:'0 0 9px 9px',flexWrap:'wrap'}}>
-          <button className="btn btn-p" style={{flex:1,minWidth:140,justifyContent:'center',fontWeight:900}} onClick={handleSave}>💾 Enregistrer</button>
+          {tab === 'infos' && <button className="btn btn-p" style={{flex:1,minWidth:140,justifyContent:'center',fontWeight:900}} onClick={handleSave}>💾 Enregistrer</button>}
           {props.onSendCrm && !lead.sent_to_crm && (
             <button className="btn" style={{background:ROSE,color:'#fff',fontWeight:900,justifyContent:'center'}} onClick={props.onSendCrm}>→ Envoyer au CRM</button>
           )}
-          <button className="btn" style={{background:'#FFFFFF',border:'2px solid '+NOIR,justifyContent:'center'}} onClick={props.onClose}>Annuler</button>
+          <button className="btn" style={{background:'#FFFFFF',border:'2px solid '+NOIR,justifyContent:'center',marginLeft:tab==='suivi'?'auto':0}} onClick={props.onClose}>{tab==='suivi'?'Fermer':'Annuler'}</button>
         </div>
       </div>
     </div>

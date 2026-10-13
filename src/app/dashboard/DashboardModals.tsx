@@ -1,6 +1,11 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import ProspectEmailModal from './ProspectEmailModal'
+import ProspectCrmPanel from './ProspectCrmPanel'
+
+// Secteurs proposés dans la fiche CRM (alignés sur les playbooks de l'IA email)
+var CRM_CATEGORIES = ['Événementiel', 'Tournages', 'Agence', 'Médias', 'Startup', 'Tech', 'Coworking', 'Corporate', 'Avocats', 'Conseil', 'Banque', 'Immobilier', 'RH', 'Luxe', 'Hôtel', 'Médical', 'École', 'Institution', 'Autre']
 
 export default function DashboardModals(props) {
   var modal = props.modal
@@ -32,6 +37,12 @@ export default function DashboardModals(props) {
   var logActivity = props.logActivity
   var loadContacts = props.loadContacts
   var sb = props.sb
+
+  // Fiche prospect : onglet Suivi (CRM) / Infos
+  var formId = form ? form.id : null
+  var [ficheTab, setFicheTab] = useState('suivi')
+  useEffect(function(){ setFicheTab('suivi') }, [formId])
+  var catOptions = CRM_CATEGORIES.indexOf(form && form.category ? form.category : 'Autre') >= 0 ? CRM_CATEGORIES : [form.category].concat(CRM_CATEGORIES)
 
   return (
     <div>
@@ -69,9 +80,33 @@ export default function DashboardModals(props) {
 
       {modal === 'prospect' && (
         <div className="overlay" onClick={closeModal}>
-          <div className="modal" onClick={function(e){e.stopPropagation()}}>
-            <div className="mh"><div className="mt">{form.id?'Modifier le prospect':'Nouveau prospect'}</div></div>
-            <div className="mb">
+          <div className="modal" style={form.id ? {maxWidth:720,width:'100%'} : undefined} onClick={function(e){e.stopPropagation()}}>
+            <div className="mh"><div className="mt">{form.id ? (form.name || 'Fiche prospect') : 'Nouveau prospect'}</div></div>
+            {form.id && (
+              <div style={{display:'flex',gap:6,padding:'10px 20px 0'}}>
+                <button type="button" onClick={function(){ setFicheTab('suivi') }} style={{fontSize:11,fontWeight:900,padding:'5px 12px',borderRadius:14,border:'2px solid #191923',cursor:'pointer',background:ficheTab==='suivi'?'#FF82D7':'#FFFFFF',color:ficheTab==='suivi'?'#FFFFFF':'#191923'}}>📇 Suivi commercial</button>
+                <button type="button" onClick={function(){ setFicheTab('infos') }} style={{fontSize:11,fontWeight:900,padding:'5px 12px',borderRadius:14,border:'2px solid #191923',cursor:'pointer',background:ficheTab==='infos'?'#FF82D7':'#FFFFFF',color:ficheTab==='infos'?'#FFFFFF':'#191923'}}>✏️ Infos prospect</button>
+              </div>
+            )}
+            {form.id && ficheTab === 'suivi' && (
+              <div className="mb">
+                <ProspectCrmPanel
+                  kind="crm"
+                  refId={form.id}
+                  altRefs={form.chasseId ? [{ kind: 'chasse', ref: form.chasseId }] : []}
+                  prospect={form}
+                  toast={toast}
+                  onRelance={function(t){ generateEmail(Object.assign({}, form, {cat:'crm', arrondissement:'', taille:form.size, pitch:form.notes||'', type:form.category}), t) }}
+                  onChanged={function(d){
+                    var pp = d && d.prospectPatch ? d.prospectPatch : {}
+                    var extra = Object.assign({}, d && d.newStatus ? { status: d.newStatus } : {}, pp.status ? { status: pp.status } : {}, pp.nextAction !== undefined ? { nextAction: pp.nextAction } : {}, pp.nextDate !== undefined ? { nextDate: pp.nextDate } : {})
+                    setForm(function(prev){ return Object.assign({}, prev, extra) })
+                    if (setProspects) setProspects(function(prev){ return prev.map(function(x){ return String(x.id) === String(form.id) ? Object.assign({}, x, extra) : x }) })
+                  }}
+                />
+              </div>
+            )}
+            <div className="mb" style={form.id && ficheTab !== 'infos' ? {display:'none'} : undefined}>
               <div className="fg">
                 <label className="lbl">Nom de l&apos;entreprise *</label>
                 <div style={{display:'flex',gap:8}}>
@@ -106,12 +141,7 @@ export default function DashboardModals(props) {
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                 <div className="fg"><label className="lbl">Catégorie</label>
                   <select className="inp" value={form.category||'Autre'} onChange={function(e){setForm(Object.assign({},form,{category:e.target.value}))}}>
-                    <option value="Startup">Startup</option>
-                    <option value="Corporate">Corporate</option>
-                    <option value="Agence">Agence</option>
-                    <option value="RH">RH</option>
-                    <option value="Luxe">Luxe</option>
-                    <option value="Autre">Autre</option>
+                    {catOptions.map(function(c){ return <option key={c} value={c}>{c}</option> })}
                   </select>
                 </div>
                 <div className="fg"><label className="lbl">Taille (personnes)</label><input type="number" className="inp" value={form.size||''} onChange={function(e){setForm(Object.assign({},form,{size:e.target.value}))}} /></div>
@@ -135,13 +165,13 @@ export default function DashboardModals(props) {
                 </div>
               </div>
               <div className="fg"><label className="lbl">Prochaine action</label><input className="inp" value={form.nextAction||''} onChange={function(e){setForm(Object.assign({},form,{nextAction:e.target.value}))}} placeholder="Ex: Relancer par email" /></div>
-              <div className="fg"><label className="lbl">Date de relance</label><input type="date" className="inp" value={form.nextDate||''} onChange={function(e){setForm(Object.assign({},form,{nextDate:e.target.value}))}} /></div>
+              <div className="fg"><label className="lbl">Date de relance</label><input type="date" className="inp" value={form.nextDate||''} onChange={function(e){setForm(Object.assign({},form,{nextDate:e.target.value}))}} />{form.id && <div style={{fontSize:10,color:'#888',marginTop:3}}>Les relances email se pilotent dans l&apos;onglet « Suivi commercial ».</div>}</div>
               <div className="fg"><label className="lbl">Notes</label><textarea className="inp" value={form.notes||''} onChange={function(e){setForm(Object.assign({},form,{notes:e.target.value}))}} rows={3} placeholder="Infos utiles, historique..." /></div>
             </div>
             <div className="mf">
-              <button className="btn" onClick={closeModal}>Annuler</button>
-              {form.id && <button className="btn btn-red" onClick={function(){ if(window.confirm('Supprimer ce prospect ?')){ deleteProspect(form.id); closeModal() } }}>Supprimer</button>}
-              <button className="btn btn-y" onClick={saveProspect}>{form.id?'Modifier':'Créer'}</button>
+              <button className="btn" onClick={closeModal}>{form.id && ficheTab === 'suivi' ? 'Fermer' : 'Annuler'}</button>
+              {form.id && ficheTab === 'infos' && <button className="btn btn-red" onClick={function(){ if(window.confirm('Supprimer ce prospect ?')){ deleteProspect(form.id); closeModal() } }}>Supprimer</button>}
+              {(!form.id || ficheTab === 'infos') && <button className="btn btn-y" onClick={saveProspect}>{form.id?'Enregistrer':'Créer'}</button>}
             </div>
           </div>
         </div>
