@@ -379,8 +379,9 @@ export async function onBadDelivery(sb: any, row: any, status: string, info: any
 //  - importe les anciens mails (avant ce module) en les rattachant au
 //    prospect via l'adresse du destinataire, et propose une relance.
 export async function syncFromResend(sb: any, opts: any): Promise<any> {
-  var key = process.env.RESEND_API_KEY || ''
-  if (!key) throw new Error('RESEND_API_KEY manquante')
+  // La clé d'envoi est limitée à l'envoi : la lecture de l'historique utilise une clé « Full access » dédiée
+  var key = process.env.RESEND_FULL_API_KEY || process.env.RESEND_API_KEY || ''
+  if (!key) throw new Error('RESEND_FULL_API_KEY manquante')
   var sinceDays = (opts && opts.sinceDays) || 90
   var maxPages = (opts && opts.maxPages) || 10
   var since = Date.now() - sinceDays * 86400000
