@@ -141,13 +141,10 @@ export async function GET(
       .order("ordre", { ascending: true })
     var vacsDirect = resVacsDirect.data || []
 
-    // Signature employeur (mandat permanent) → utilisée par buildContract via injection ultérieure
-    // Note : buildContract n'accepte pas employerSig directement, on charge quand même
-    // pour cohérence avec le flow signed (submit_route.ts)
-    var _employerSigDirect = await loadEmployerSignature()
-    void _employerSigDirect
+    // Signature employeur (mandat permanent) → bloc E.T. visible par le salarié
+    var employerSigDirect = await loadEmployerSignature()
 
-    var htmlDirect = buildContract(contractDirect, empDirect, vacsDirect, LOGO_PINK)
+    var htmlDirect = buildContract(contractDirect, empDirect, vacsDirect, LOGO_PINK, employerSigDirect)
     return new NextResponse(htmlDirect, {
       status: 200,
       headers: { "Content-Type": "text/html; charset=utf-8" },

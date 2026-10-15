@@ -495,9 +495,9 @@ export async function POST(
   if (entityKind === "amendment") {
     avenantHtml = buildAvenant(amendment, contract, emp, vacs, LOGO_PINK, previousValues, employerSig)
   } else {
-    // Contrat initial : buildContract ne prend pas employerSig en paramètre.
-    // Il est injecté plus tard via injectEmployeeSignature / Paraphes.
-    avenantHtml = buildContract(contract, emp, vacs, LOGO_PINK)
+    // Contrat initial : employerSig → bloc signature E.T. (mandat permanent)
+    // + placeholder salarié remplacé ensuite par injectEmployeeSignature.
+    avenantHtml = buildContract(contract, emp, vacs, LOGO_PINK, employerSig)
   }
   var welcomePackHtml = ""
   if (includeWp) {
