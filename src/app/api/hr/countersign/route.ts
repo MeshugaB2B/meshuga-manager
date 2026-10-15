@@ -70,7 +70,7 @@ function parisDayRange(dateStr) {
   return { start: start.toISOString(), end: end.toISOString() }
 }
 
-function buildEmployeeBlockFromAudit(a, hash) {
+function buildEmployeeBlockFromAudit(a, hash, mobHtml) {
   var ua = a.parsed_ua || {}
   var geo = a.geo || null
   var geoStr = geo ? [geo.city, geo.country].filter(Boolean).join(", ") : "Non déterminée"
@@ -80,6 +80,7 @@ function buildEmployeeBlockFromAudit(a, hash) {
   var hashShort = hash ? String(hash).slice(0, 32) + "…" : "—"
   return ''
     + '<div class="sig-space" style="padding:0;display:block">'
+    + (mobHtml || '')
     + '<div style="text-align:center;padding:14px 12px 10px 12px;border-bottom:1px dotted #DDD;margin-bottom:8px">'
     + '<div style="font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;font-size:8px;color:#666;font-style:italic;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Signature électronique du salarié</div>'
     + '<div style="font-family:Yellowtail,cursive;font-size:38px;color:#FF82D7;line-height:1;padding:6px 0">' + esc(a.signed_full_name) + '</div>'
@@ -171,9 +172,13 @@ export async function GET(req: Request) {
   }
 
   // 2. Bloc salarié manuscrit vide → signature électronique (données d'audit)
-  var employeeRe = /<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé[^<]*<\/div>\s*<div class="sig-foot">Date : __ \/ __ \/ ____<\/div>/
-  if (employeeRe.test(html)) {
-    html = html.replace(employeeRe, buildEmployeeBlockFromAudit(audit, hash))
+  // La clause de mobilité (5e enfant de la grille .sig-block) est réintégrée DANS la
+  // zone signature, sinon la grille à 4 rangées fait déborder le bloc.
+  var employeeRe = /(<div class="sig-mob"[^>]*>[\s\S]*?<\/div>)?\s*<div class="sig-space">Signature précédée de la mention manuscrite « Lu et approuvé[^<]*<\/div>\s*<div class="sig-foot">Date : __ \/ __ \/ ____<\/div>/
+  var mEmp = html.match(employeeRe)
+  if (mEmp) {
+    var mob = mEmp[1] ? mEmp[1].replace(/margin:6px 0/, "margin:8px 12px 0 12px").replace(/font-size:10\.5px/, "font-size:10px") : ""
+    html = html.replace(employeeRe, buildEmployeeBlockFromAudit(audit, hash, mob))
     report.employee_block = true
   }
 
@@ -197,7 +202,7 @@ export async function GET(req: Request) {
   var base = "contracts/" + c.id + "/" + ts + "_contrat_signe_contresigne"
   await admin.storage.from("hr-contract-docs").upload(base + ".html", new Blob([html], { type: "text/html; charset=utf-8" }), { contentType: "text/html; charset=utf-8", upsert: true })
   var up = await admin.storage.from("hr-contract-docs").upload(base + ".pdf", pdf, { contentType: "application/pdf", upsert: true })
-  var ins = await admin.from("hr_contract_documents").insert({
+  var docRow = {
     contract_id: c.id,
     doc_type: "contrat_signe",
     label: "Contrat signé + contresigné employeur le " + new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }),
@@ -207,7 +212,13 @@ export async function GET(req: Request) {
     assembled_pdf_path: up.error ? null : base + ".pdf",
     document_date: nowIso.substring(0, 10),
     validated_by_user: true,
-  })
+  }
+  // Re-génération : on met à jour la version contresignée existante au lieu d'en empiler une 2e
+  var prev = await admin.from("hr_contract_documents").select("id")
+    .eq("contract_id", c.id).like("label", "Contrat signé + contresigné employeur%").limit(1)
+  var ins = (prev.data && prev.data.length)
+    ? await admin.from("hr_contract_documents").update(docRow).eq("id", prev.data[0].id)
+    : await admin.from("hr_contract_documents").insert(docRow)
 
   return new NextResponse(pdf, {
     status: 200,

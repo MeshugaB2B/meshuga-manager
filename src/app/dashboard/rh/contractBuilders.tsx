@@ -566,8 +566,13 @@ export function buildSharedSignatures(c, emp, salarieRole, employerSig) {
         + renderEmployerSignatureBlock(employerSig || null)
         + '</div>'
         + '<div class="sig-block">'
-        + (hasMobilite(c) ? '<div class="sig-mob" style="font-size:10.5px;line-height:1.45;border:1.5px solid #191923;border-left:5px solid #FF82D7;padding:6px 9px;margin:6px 0;background:#FFF7FC"><strong>Clause de mobilité (Île-de-France — prestations événementielles B2B) :</strong> ' + (feminin ? 'la Salariée' : 'le Salarié') + ' déclare l\'avoir lue et l\'<strong>accepter expressément</strong> en signant électroniquement le présent contrat.</div>' : '')
-        + renderEmployeeSignatureBlockEmpty(emp.prenom || "", emp.nom || "", salarieRole || "", feminin)
+        // La clause de mobilité est placée DANS la zone .sig-space (avant le marker) :
+        // .sig-block est une grille à 4 rangées, un 5e enfant casserait la mise en page.
+        + renderEmployeeSignatureBlockEmpty(emp.prenom || "", emp.nom || "", salarieRole || "", feminin).replace(
+          '<!--EMPLOYEE_SIGNATURE_PLACEHOLDER-->',
+          (hasMobilite(c) ? '<div class="sig-mob" style="font-size:10px;line-height:1.45;border:1.5px solid #191923;border-left:5px solid #FF82D7;padding:6px 9px;margin:8px 12px 0 12px;background:#FFF7FC;font-style:normal;color:#191923"><strong>Clause de mobilité (Île-de-France — prestations événementielles B2B) :</strong> ' + (feminin ? 'la Salariée' : 'le Salarié') + ' déclare l\'avoir lue et l\'<strong>accepter expressément</strong> en signant électroniquement le présent contrat.</div>' : '')
+          + '<!--EMPLOYEE_SIGNATURE_PLACEHOLDER-->'
+        )
         + '</div>'
         + '</div></section>'
         + '</div>'
