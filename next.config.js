@@ -9,6 +9,7 @@ const nextConfig = {
     // Inclusion du Chromium brotli dans chaque fonction qui rend du PDF.
     outputFileTracingIncludes: {
       "/api/hr/backfill-pdf": ["./node_modules/@sparticuz/chromium/**"],
+      "/api/hr/countersign": ["./node_modules/@sparticuz/chromium/**"],
       "/api/sign/[token]/submit": ["./node_modules/@sparticuz/chromium/**"],
       "/api/hr/hygiene-guide/preview": ["./node_modules/@sparticuz/chromium/**"],
       "/api/sign-attestation/[token]/submit": ["./node_modules/@sparticuz/chromium/**"],
