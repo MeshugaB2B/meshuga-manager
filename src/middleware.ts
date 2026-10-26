@@ -16,8 +16,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Adresses courtes : events.meshuga.fr/, /merci, /cgv
-  if (path === '/' || path === '/merci' || path === '/cgv') {
+  // Adresses courtes : events.meshuga.fr/, /merci, /cgv, /plaquette
+  if (path === '/' || path === '/merci' || path === '/cgv' || path === '/plaquette') {
     var url = request.nextUrl.clone()
     url.pathname = path === '/' ? '/events' : '/events' + path
     return NextResponse.rewrite(url)
